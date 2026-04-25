@@ -3,19 +3,20 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Mail, MailOpen, X } from "lucide-react";
-import { messages, useDbVersion, type Message } from "@/lib/db";
+import { useMessages, useMarkMessageRead, useDeleteMessages, type Message } from "@/lib/db";
 import { BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function AdminMessages() {
-  useDbVersion();
-  const all = messages.list();
+  const { data: all = [] } = useMessages();
+  const markRead = useMarkMessageRead();
+  const delMany = useDeleteMessages();
   const [active, setActive] = useState<Message | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
-  const open = (m: Message) => { setActive(m); if (!m.read) messages.setRead(m.id, true); };
-  const remove = (id: string) => { if (confirm("Delete this message?")) { messages.remove(id); if (active?.id === id) setActive(null); toast.success("Deleted"); } };
-  const removeSelected = () => { if (!selected.length) return; if (confirm(`Delete ${selected.length} message(s)?`)) { messages.removeMany(selected); setSelected([]); toast.success("Deleted"); } };
+  const open = (m: Message) => { setActive(m); if (!m.read) markRead.mutate({ id: m.id, read: true }); };
+  const remove = (id: string) => { if (confirm("Delete this message?")) { delMany.mutate([id], { onSuccess: () => { if (active?.id === id) setActive(null); toast.success("Deleted"); } }); } };
+  const removeSelected = () => { if (!selected.length) return; if (confirm(`Delete ${selected.length} message(s)?`)) { delMany.mutate(selected, { onSuccess: () => { setSelected([]); toast.success("Deleted"); } }); } };
   const toggleSelect = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
 
   return (
@@ -60,7 +61,7 @@ export default function AdminMessages() {
             </div>
             <p className="text-sm whitespace-pre-wrap leading-relaxed">{active.message}</p>
             <div className="flex gap-2 mt-6 pt-4 border-t border-border">
-              <Button size="sm" variant="outline" onClick={() => { messages.setRead(active.id, !active.read); setActive({ ...active, read: !active.read }); }} className="gap-1.5">
+              <Button size="sm" variant="outline" onClick={() => { markRead.mutate({ id: active.id, read: !active.read }); setActive({ ...active, read: !active.read }); }} className="gap-1.5">
                 {active.read ? <Mail className="h-3.5 w-3.5" /> : <MailOpen className="h-3.5 w-3.5" />} Mark {active.read ? "unread" : "read"}
               </Button>
               <Button size="sm" variant="outline" onClick={() => remove(active.id)} className="gap-1.5 text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
