@@ -6,7 +6,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
-import { ensureSeeded } from "@/lib/db";
 import Loading from "./pages/Loading";
 import CuremedHome from "./pages/CuremedHome";
 import BrandPage from "./pages/BrandPage";
@@ -25,8 +24,6 @@ import AdminLandingPageEditor from "./pages/admin/AdminLandingPageEditor";
 const queryClient = new QueryClient();
 
 const App = () => {
-  useEffect(() => { ensureSeeded(); }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
