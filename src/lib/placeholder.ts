@@ -43,6 +43,18 @@ export function brandLogoSvg(brand: string, name: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+import abcLogo from "@/assets/brand-australian-bodycare.png";
+
+const BRAND_LOGO_IMAGES: Record<string, string> = {
+  abc: abcLogo,
+};
+
+export function getBrandLogo(brand: string, name: string): { src: string; isImage: boolean } {
+  const real = BRAND_LOGO_IMAGES[brand];
+  if (real) return { src: real, isImage: true };
+  return { src: brandLogoSvg(brand, name), isImage: false };
+}
+
 export function curemedLogoSvg(): string {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 120'>
     <circle cx='60' cy='60' r='38' fill='hsl(205, 67%, 36%)'/>
