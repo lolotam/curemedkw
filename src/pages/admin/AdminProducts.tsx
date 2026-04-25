@@ -1,0 +1,88 @@
+import { useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Plus, Search, Star, Trash2, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { products, useDbVersion } from "@/lib/db";
+import { BRAND_LIST, BRANDS } from "@/lib/brands";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
+export default function AdminProducts() {
+  useDbVersion();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [q, setQ] = useState("");
+  const brandFilter = searchParams.get("brand") || "all";
+  const list = useMemo(() => {
+    let items = products.list();
+    if (brandFilter !== "all") items = items.filter((p) => p.brand === brandFilter);
+    const query = q.trim().toLowerCase();
+    if (query) items = items.filter((p) => p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
+    return items.sort((a, b) => b.updatedAt - a.updatedAt);
+  }, [q, brandFilter]);
+
+  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { products.remove(id); toast.success("Product deleted"); } };
+  const setBrand = (b: string) => { const next = new URLSearchParams(searchParams); if (b === "all") next.delete("brand"); else next.set("brand", b); setSearchParams(next); };
+
+  return (
+    <div className="p-8">
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div><h1 className="text-3xl font-bold">Products</h1><p className="text-muted-foreground mt-1">Manage products across all four brands</p></div>
+        <Button asChild className="bg-brand hover:bg-brand/90 text-white gap-2"><Link to="/admin/products/new"><Plus className="h-4 w-4" /> Add product</Link></Button>
+      </div>
+      <Card className="p-4 mb-4">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, SKU, category…" className="pl-9" /></div>
+          <div className="flex flex-wrap gap-1.5">
+            <Chip active={brandFilter === "all"} onClick={() => setBrand("all")}>All brands</Chip>
+            {BRAND_LIST.map((b) => <Chip key={b.key} active={brandFilter === b.key} onClick={() => setBrand(b.key)}>{b.name}</Chip>)}
+          </div>
+        </div>
+      </Card>
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground"><tr>
+              <th className="text-left px-4 py-3">Product</th><th className="text-left px-4 py-3">Brand</th>
+              <th className="text-left px-4 py-3">Category</th><th className="text-left px-4 py-3">Price</th>
+              <th className="text-left px-4 py-3">Stock</th><th className="text-left px-4 py-3">Featured</th>
+              <th className="text-right px-4 py-3">Actions</th></tr></thead>
+            <tbody>
+              {list.map((p) => (
+                <tr key={p.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
+                    <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
+                    <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
+                  <td className="px-4 py-3">{BRANDS[p.brand].name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{p.category}</td>
+                  <td className="px-4 py-3 font-medium">KD {p.price.toFixed(2)}</td>
+                  <td className="px-4 py-3"><StockPill status={p.stockStatus} /></td>
+                  <td className="px-4 py-3">{p.featured && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}</td>
+                  <td className="px-4 py-3 text-right"><div className="inline-flex gap-1">
+                    <Button asChild variant="ghost" size="sm"><Link to={`/admin/products/${p.id}`}><Pencil className="h-3.5 w-3.5" /></Link></Button>
+                    <Button variant="ghost" size="sm" onClick={() => remove(p.id, p.name)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </div></td>
+                </tr>
+              ))}
+              {list.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button onClick={onClick} className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors", active ? "bg-brand text-white" : "bg-muted hover:bg-muted/70")}>{children}</button>;
+}
+function StockPill({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    in_stock: { label: "In stock", cls: "bg-green-500/10 text-green-700 dark:text-green-400" },
+    low_stock: { label: "Low", cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+    out_of_stock: { label: "Out", cls: "bg-red-500/10 text-red-700 dark:text-red-400" },
+  };
+  const m = map[status] || map.in_stock;
+  return <span className={cn("px-2 py-0.5 text-xs font-medium rounded-full", m.cls)}>{m.label}</span>;
+}
