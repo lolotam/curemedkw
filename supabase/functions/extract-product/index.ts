@@ -98,39 +98,62 @@ Deno.serve(async (req) => {
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!apiKey) return json({ error: "OPENROUTER_API_KEY is not configured" }, 500);
 
-    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://curemedkw.lovable.app",
-        "X-Title": "Curemed Admin",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: "system", content: SYSTEM },
-          {
-            role: "user",
-            content: `Source URL: ${sourceUrl}\n\nPAGE CONTENT (markdown):\n\n${markdown.slice(0, 60000)}`,
-          },
-        ],
-        tools: [TOOL],
-        tool_choice: { type: "function", function: { name: "set_product_fields" } },
-        temperature: 0.2,
-      }),
-    });
+    const callOpenRouter = () =>
+      fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://curemedkw.lovable.app",
+          "X-Title": "Curemed Admin",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: SYSTEM },
+            {
+              role: "user",
+              content: `Source URL: ${sourceUrl}\n\nPAGE CONTENT (markdown):\n\n${markdown.slice(0, 60000)}`,
+            },
+          ],
+          tools: [TOOL],
+          tool_choice: { type: "function", function: { name: "set_product_fields" } },
+          temperature: 0.2,
+        }),
+      });
 
+    let r = await callOpenRouter();
+    // Auto-retry once on 429 with short backoff
+    if (r.status === 429) {
+      await new Promise((res) => setTimeout(res, 1500));
+      r = await callOpenRouter();
+    }
+
+    // IMPORTANT: return 200 with structured error so the supabase-js client
+    // doesn't swallow the body. The frontend reads `error` / `code` fields.
     if (r.status === 402) {
-      return json({ error: "OpenRouter credits exhausted." }, 402);
+      return json({
+        error: "AI credits exhausted on the selected model. Try a cheaper model or top up your OpenRouter account.",
+        code: "PAYMENT_REQUIRED",
+        fallback: true,
+      });
     }
     if (r.status === 429) {
-      return json({ error: "OpenRouter rate limit hit. Try again." }, 429);
+      return json({
+        error: "The selected AI model is rate limited right now. Please wait a few seconds and try again, or pick a different model.",
+        code: "RATE_LIMITED",
+        fallback: true,
+      });
     }
     if (!r.ok) {
       const t = await r.text();
       console.error("OpenRouter error", r.status, t);
-      return json({ error: `OpenRouter error (${r.status}): ${t.slice(0, 300)}` }, 502);
+      return json({
+        error: `AI provider error (${r.status}). Try a different model.`,
+        code: "PROVIDER_ERROR",
+        details: t.slice(0, 300),
+        fallback: true,
+      });
     }
 
     const payload = await r.json();
