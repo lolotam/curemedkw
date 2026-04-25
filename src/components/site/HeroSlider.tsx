@@ -39,7 +39,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
   }
 
   if (slides.length === 0) {
-    return <>{fallback}</>;
+    return fallback ? <>{fallback}</> : null;
   }
 
   const next = () => setIndex((i) => (i + 1) % count);
