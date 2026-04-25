@@ -1,10 +1,11 @@
 import { Link, NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon } from "lucide-react";
-import { adminAuth } from "@/lib/admin";
+import { adminLogout, useAdminSession } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import curemedLogo from "@/assets/curemed-logo.png";
+import { Loader2, ShieldAlert } from "lucide-react";
 
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Overview", end: true },
@@ -17,13 +18,42 @@ const NAV = [
 export function AdminLayout() {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
+  const { user, isAdmin, loading } = useAdminSession();
 
-  if (!adminAuth.isLoggedIn()) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…
+      </div>
+    );
+  }
+
+  if (!user) {
     return <Navigate to="/admin/login" replace />;
   }
 
-  const logout = () => {
-    adminAuth.logout();
+  if (!isAdmin) {
+    return (
+      <div data-brand="curemed" className="min-h-screen flex items-center justify-center bg-brand-soft p-4">
+        <div className="max-w-md w-full bg-card border border-border rounded-2xl p-8 text-center">
+          <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-destructive/10 text-destructive mb-3">
+            <ShieldAlert className="h-5 w-5" />
+          </div>
+          <h1 className="text-xl font-bold">Not authorized</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Your account ({user.email}) doesn't have admin access. Contact a site administrator.
+          </p>
+          <div className="mt-6 flex gap-2 justify-center">
+            <Button variant="outline" asChild><Link to="/curemed">Back to site</Link></Button>
+            <Button variant="ghost" onClick={async () => { await adminLogout(); navigate("/admin/login", { replace: true }); }}>Sign out</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const logout = async () => {
+    await adminLogout();
     navigate("/admin/login", { replace: true });
   };
 
