@@ -68,15 +68,164 @@ export type Database = {
         }
         Relationships: []
       }
+      messages: {
+        Row: {
+          brand: string | null
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          phone: string | null
+          read: boolean
+          subject: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+          phone?: string | null
+          read?: boolean
+          subject?: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          phone?: string | null
+          read?: boolean
+          subject?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          benefits: string[]
+          brand: Database["public"]["Enums"]["brand_key"]
+          category: string
+          created_at: string
+          featured: boolean
+          gallery: string[]
+          id: string
+          ingredients: string[]
+          long_description: string
+          main_image: string
+          name: string
+          price: number
+          short_description: string
+          size: string
+          sku: string
+          stock_status: Database["public"]["Enums"]["stock_status"]
+          tags: string[]
+          updated_at: string
+          usage: string
+        }
+        Insert: {
+          benefits?: string[]
+          brand: Database["public"]["Enums"]["brand_key"]
+          category?: string
+          created_at?: string
+          featured?: boolean
+          gallery?: string[]
+          id?: string
+          ingredients?: string[]
+          long_description?: string
+          main_image?: string
+          name: string
+          price?: number
+          short_description?: string
+          size?: string
+          sku: string
+          stock_status?: Database["public"]["Enums"]["stock_status"]
+          tags?: string[]
+          updated_at?: string
+          usage?: string
+        }
+        Update: {
+          benefits?: string[]
+          brand?: Database["public"]["Enums"]["brand_key"]
+          category?: string
+          created_at?: string
+          featured?: boolean
+          gallery?: string[]
+          id?: string
+          ingredients?: string[]
+          long_description?: string
+          main_image?: string
+          name?: string
+          price?: number
+          short_description?: string
+          size?: string
+          sku?: string
+          stock_status?: Database["public"]["Enums"]["stock_status"]
+          tags?: string[]
+          updated_at?: string
+          usage?: string
+        }
+        Relationships: []
+      }
+      subscribers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      brand_key: "flexitol" | "kapiva" | "nada" | "abc"
+      stock_status: "in_stock" | "low_stock" | "out_of_stock"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -203,6 +352,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      brand_key: ["flexitol", "kapiva", "nada", "abc"],
+      stock_status: ["in_stock", "low_stock", "out_of_stock"],
+    },
   },
 } as const

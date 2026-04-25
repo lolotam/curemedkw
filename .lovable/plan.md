@@ -1,56 +1,91 @@
 
 ## Goal
-Connect your external Supabase project `curemedkw` (`ipkrqxrwxylmenidsuiy`) to this Lovable project and migrate the existing localStorage-based data layer to real Supabase tables, authenticated admin access, and proper image storage.
+Move the entire site off localStorage onto the Lovable Cloud database that's already connected, plus tidy up the admin sidebar logo and the awkward "🔒 Default password: curemed-admin" hint on the login page.
 
-## Step 1 — Connect Supabase (native integration)
-Lovable doesn't accept Supabase URL/keys pasted in chat — it uses an OAuth-style connect flow. After approving this plan, I'll trigger the Supabase connection prompt. You'll then:
-1. Click **Connect Supabase** in the Lovable UI.
-2. Authorize the integration.
-3. Pick the **curemedkw** project from the list.
+---
 
-Once linked, Lovable auto-injects `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` and wires up the typed client at `src/integrations/supabase/client.ts`. The anon key you pasted will be picked up automatically — no need to hardcode it.
+## Step 1 — Database schema (migration)
 
-## Step 2 — Database schema (migrations)
-Create the following tables in your Supabase project:
+Create the missing tables in Cloud (the `hero_slides` table already exists from the previous migration).
 
-- **`products`** — id (uuid), brand (text), name, category, price (numeric), short_description, long_description, main_image (text URL), gallery (text[]), ingredients (text[]), benefits (text[]), usage, size, sku, stock_status (enum: in_stock/low_stock/out_of_stock), featured (bool), tags (text[]), created_at, updated_at.
-- **`messages`** — id, name, email, phone, brand, subject, message, read (bool), created_at.
-- **`subscribers`** — id, email (unique), created_at.
-- **`user_roles`** — id, user_id (fk auth.users), role (enum: admin, user). Roles in a SEPARATE table per security best practices.
-- **`has_role(uuid, app_role)`** — SECURITY DEFINER function for safe RLS checks.
+**Enums**
+- `app_role` → `'admin' | 'user'`
+- `stock_status` → `'in_stock' | 'low_stock' | 'out_of_stock'`
+- `brand_key` → `'flexitol' | 'kapiva' | 'nada' | 'abc'`
 
-RLS policies:
-- `products` — public SELECT; INSERT/UPDATE/DELETE only for admins.
-- `messages` — public INSERT (contact form); SELECT/UPDATE/DELETE only for admins.
-- `subscribers` — public INSERT (newsletter); SELECT/DELETE only for admins.
-- `user_roles` — only admins can read/manage.
+**`products`** — id (uuid), brand (brand_key), name, category, price (numeric), short_description, long_description, main_image (text URL), gallery (text[]), ingredients (text[]), benefits (text[]), usage, size, sku (unique), stock_status, featured (bool), tags (text[]), created_at, updated_at + `update_updated_at_column` trigger.
 
-## Step 3 — Storage
-Create a public `product-images` bucket. Replace base64-in-localStorage uploads with real Supabase Storage uploads in `AdminProductEditor`. Store returned public URLs in `products.main_image` / `products.gallery`.
+**`messages`** — id, name, email, phone, brand (text), subject, message, read (bool), created_at.
 
-## Step 4 — Replace admin auth
-Remove the hardcoded password (`src/lib/admin.ts`). Replace `/admin/login` with real Supabase email+password auth (and Google sign-in as a default). Gate the `/admin/*` routes by checking `has_role(user, 'admin')`. You'll bootstrap your own admin account by signing up once, then I'll insert a `user_roles` row granting you admin (via the data tools after connection).
+**`subscribers`** — id, email (citext, unique), created_at.
 
-## Step 5 — Rewrite data layer
-Rewrite `src/lib/db.ts` to call Supabase instead of localStorage:
-- `products.list/byBrand/featured/get/create/update/remove` → Supabase queries.
-- `messages.list/create/setRead/remove/removeMany` → Supabase queries.
-- `subscribers.list/add/remove` → Supabase queries.
-- Replace the `useDbVersion` event bus with React Query (`@tanstack/react-query` is already installed) for cached, reactive data.
+**`user_roles`** — id, user_id (fk auth.users), role (app_role), unique(user_id, role).
 
-Public pages (`CuremedHome`, `BrandPage`, `ProductDetail`) and admin pages (`AdminOverview`, `AdminProducts`, `AdminProductEditor`, `AdminMessages`, `AdminSubscribers`) will be updated to use the new async hooks. Loading states and error toasts added where needed.
+**`has_role(uuid, app_role)`** — SECURITY DEFINER function (no recursion risk in RLS).
 
-## Step 6 — Seed data
-Port the existing 20-product seed (`src/lib/seed.ts`) into a one-time INSERT against the `products` table so your sample catalog appears in Supabase. Existing brand/product images stay as the generated SVG placeholders until you upload real ones via the admin editor.
+**RLS policies**
+| Table | SELECT | INSERT | UPDATE / DELETE |
+|---|---|---|---|
+| products | public | admin only | admin only |
+| messages | admin only | public (contact form) | admin only |
+| subscribers | admin only | public (newsletter) | admin only (delete) |
+| user_roles | admin only | admin only | admin only |
 
-## Out of scope (for this round)
-- Real payment / checkout
-- Order management
-- Multi-admin invitations UI (you'll be the first admin; more can be added later)
+The existing `hero_slides` policies are currently `public` for all operations — I'll tighten INSERT/UPDATE/DELETE to admin-only as part of this migration so admins are the only ones editing landing pages.
+
+---
+
+## Step 2 — Storage bucket
+Create a public `product-images` bucket (read public, write admin-only via RLS on `storage.objects`). Same pattern already used for `hero-media`.
+
+---
+
+## Step 3 — Real admin auth
+- Delete the hardcoded password in `src/lib/admin.ts`.
+- Rebuild `/admin/login` as a real **email + password** + **Google sign-in** form (uses `supabase.auth.signInWithPassword` and `signInWithOAuth({ provider: 'google' })`). Auto-confirm will stay **off** so emails are verified.
+- New `useAdminSession()` hook listens to `onAuthStateChange`, fetches the user's roles via `has_role`, and exposes `{ user, isAdmin, loading }`.
+- `AdminLayout` becomes async — shows a spinner while loading, redirects to `/admin/login` if not signed in, and shows a "Not authorized" screen if signed in but not an admin.
+- After you sign up the first time, I'll insert a `user_roles` row with `role = 'admin'` for your account so you can access `/admin`.
+
+---
+
+## Step 4 — Rewrite the data layer (`src/lib/db.ts` → Cloud)
+Replace the localStorage helpers with thin Supabase wrappers + React Query hooks (TanStack Query is already in the project):
+
+- `useProducts()`, `useProductsByBrand(brand)`, `useFeaturedProducts()`, `useProduct(id)`
+- `useCreateProduct()`, `useUpdateProduct()`, `useDeleteProduct()`
+- `useMessages()`, `useUnreadCount()`, `useCreateMessage()`, `useMarkMessageRead()`, `useDeleteMessages()`
+- `useSubscribers()`, `useSubscribe()`, `useDeleteSubscriber()`
+
+`useDbVersion()` and the `curemed-db-change` event bus go away — React Query handles invalidation.
+
+Pages updated to async hooks (with skeletons + error toasts):
+- `CuremedHome`, `BrandPage`, `ProductDetail`, `ContactSection`, `Newsletter`
+- `AdminOverview`, `AdminProducts`, `AdminProductEditor`, `AdminMessages`, `AdminSubscribers`
+
+`AdminProductEditor` switches from base64-in-localStorage to real uploads against the `product-images` bucket (returns public URL → saved into `products.main_image` / `products.gallery`).
+
+---
+
+## Step 5 — Seed the 20 sample products
+Port `src/lib/seed.ts` into a one-time `INSERT … ON CONFLICT DO NOTHING` (keyed by `sku`) so the catalog appears in the Cloud DB. Sample messages and subscribers won't be ported (they're not useful real data).
+
+---
+
+## Step 6 — Admin dashboard polish
+- Replace the auto-generated SVG sidebar logo with the real `src/assets/curemed-logo.png` (already in the project).
+- Remove the "🔒 Default password: `curemed-admin`" hint from the new login screen — replaced by the email/password + Google buttons.
+- Tidy the sidebar header spacing so the logo sits cleanly above "Admin Dashboard".
+
+---
+
+## Out of scope (this round)
+- Order management / checkout
+- Multi-admin invite UI (you'll be the first admin; more can be added by inserting into `user_roles` later)
+- Migrating any data sitting in your browser's localStorage today (it's only sample data — the seed will replace it)
 
 ## After approval
-I'll switch to default mode and:
-1. Trigger the Supabase connect prompt.
-2. Wait for you to authorize and pick `curemedkw`.
-3. Run the migration, create the storage bucket, rewrite the data layer, and seed.
-4. Walk you through creating your admin account and confirm everything works end-to-end.
+I'll switch to default mode and execute the migration, create the bucket, rewrite the data layer, redo admin auth + sidebar logo, and seed the products. Then I'll walk you through:
+1. Creating your admin account on `/admin/login`.
+2. Granting that account the `admin` role (one SQL insert I'll run for you).
+3. A quick smoke test (load a brand page, submit the contact form, log into admin, edit a product image).
