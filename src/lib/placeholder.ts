@@ -45,10 +45,12 @@ export function brandLogoSvg(brand: string, name: string): string {
 
 import abcLogo from "@/assets/brand-australian-bodycare.png";
 import kapivaLogo from "@/assets/brand-kapiva.png";
+import nadaLogo from "@/assets/brand-nada.png";
 
 const BRAND_LOGO_IMAGES: Record<string, string> = {
   abc: abcLogo,
   kapiva: kapivaLogo,
+  nada: nadaLogo,
 };
 
 export function getBrandLogo(brand: string, name: string): { src: string; isImage: boolean } {
