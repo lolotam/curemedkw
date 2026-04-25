@@ -1,5 +1,4 @@
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Package, Mail, Users, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useProducts, useMessages, useSubscribers } from "@/lib/db";
