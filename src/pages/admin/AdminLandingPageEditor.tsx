@@ -64,7 +64,7 @@ export default function AdminLandingPageEditor() {
         cta_label_ar: "",
         cta_href: "",
         sort_order: max + 1,
-        is_active: false,
+        is_active: true,
       });
       setSlides((prev) => [...prev, created]);
       toast({ title: "Slide added" });
@@ -124,12 +124,29 @@ export default function AdminLandingPageEditor() {
     setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, _saving: true } : x)));
     try {
       const { url, type } = await uploadHeroMedia(file);
-      await updateSlide(s.id, { media_url: url, media_type: type });
-      setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, media_url: url, media_type: type, _saving: false, _dirty: false } : x)));
-      toast({ title: "Media uploaded" });
+      // Auto-publish on first upload so the hero appears immediately on the live site.
+      const shouldActivate = !s.media_url && !s.is_active;
+      const patch: any = { media_url: url, media_type: type };
+      if (shouldActivate) patch.is_active = true;
+      await updateSlide(s.id, patch);
+      setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, ...patch, _saving: false, _dirty: false } : x)));
+      toast({ title: shouldActivate ? "Media uploaded & published" : "Media uploaded" });
     } catch (e: any) {
       setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, _saving: false } : x)));
       toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // Persist Active/Hidden toggle immediately — it's a publish switch, not a draft change.
+  const toggleActive = async (s: Draft, value: boolean) => {
+    setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: value, _saving: true } : x)));
+    try {
+      await updateSlide(s.id, { is_active: value });
+      setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, _saving: false } : x)));
+      toast({ title: value ? "Slide published" : "Slide hidden" });
+    } catch (e: any) {
+      setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: !value, _saving: false } : x)));
+      toast({ title: "Update failed", description: e.message, variant: "destructive" });
     }
   };
 
@@ -199,7 +216,7 @@ export default function AdminLandingPageEditor() {
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-muted-foreground">Slide #{i + 1}</span>
                       <div className="flex items-center gap-1.5 ml-2">
-                        <Switch checked={s.is_active} onCheckedChange={(v) => patchLocal(s.id, { is_active: v })} />
+                        <Switch checked={s.is_active} onCheckedChange={(v) => toggleActive(s, v)} disabled={s._saving} />
                         <Label className="text-xs">{s.is_active ? "Active" : "Hidden"}</Label>
                       </div>
                     </div>
