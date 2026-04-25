@@ -93,12 +93,23 @@ Deno.serve(async (req) => {
     const markdown = String(body?.markdown ?? "").trim();
     const sourceUrl = String(body?.sourceUrl ?? "").trim();
     const model = String(body?.model ?? "openai/gpt-4o-mini").trim();
+    const fallbackModelsRaw = Array.isArray(body?.fallbackModels) ? body.fallbackModels : [];
+    const fallbackModels = fallbackModelsRaw
+      .map((m: unknown) => String(m ?? "").trim())
+      .filter((m: string) => m.length > 0);
     if (!markdown) return json({ error: "markdown is required" }, 400);
 
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!apiKey) return json({ error: "OPENROUTER_API_KEY is not configured" }, 500);
 
-    const callOpenRouter = () =>
+    // Build dedup'd chain: primary + up to 2 fallbacks
+    const chain: string[] = [];
+    for (const m of [model, ...fallbackModels]) {
+      if (m && !chain.includes(m)) chain.push(m);
+      if (chain.length >= 3) break;
+    }
+
+    const callOpenRouter = (useModel: string) =>
       fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -108,7 +119,7 @@ Deno.serve(async (req) => {
           "X-Title": "Curemed Admin",
         },
         body: JSON.stringify({
-          model,
+          model: useModel,
           messages: [
             { role: "system", content: SYSTEM },
             {
@@ -122,63 +133,74 @@ Deno.serve(async (req) => {
         }),
       });
 
-    let r = await callOpenRouter();
-    // Auto-retry once on 429 with short backoff
-    if (r.status === 429) {
-      await new Promise((res) => setTimeout(res, 1500));
-      r = await callOpenRouter();
-    }
+    const attempts: Array<{ model: string; status: number; reason: string }> = [];
 
-    // IMPORTANT: return 200 with structured error so the supabase-js client
-    // doesn't swallow the body. The frontend reads `error` / `code` fields.
-    if (r.status === 402) {
-      return json({
-        error: "AI credits exhausted on the selected model. Try a cheaper model or top up your OpenRouter account.",
-        code: "PAYMENT_REQUIRED",
-        fallback: true,
-      });
-    }
-    if (r.status === 429) {
-      return json({
-        error: "The selected AI model is rate limited right now. Please wait a few seconds and try again, or pick a different model.",
-        code: "RATE_LIMITED",
-        fallback: true,
-      });
-    }
-    if (!r.ok) {
-      const t = await r.text();
-      console.error("OpenRouter error", r.status, t);
-      return json({
-        error: `AI provider error (${r.status}). Try a different model.`,
-        code: "PROVIDER_ERROR",
-        details: t.slice(0, 300),
-        fallback: true,
-      });
-    }
-
-    const payload = await r.json();
-    const choice = payload?.choices?.[0];
-    const call = choice?.message?.tool_calls?.[0];
-    let args: any = null;
-    if (call?.function?.arguments) {
-      try {
-        args = JSON.parse(call.function.arguments);
-      } catch (e) {
-        console.error("Failed to parse tool args", e, call.function.arguments);
+    for (const useModel of chain) {
+      let r = await callOpenRouter(useModel);
+      // Auto-retry once on 429 with short backoff
+      if (r.status === 429) {
+        await new Promise((res) => setTimeout(res, 1500));
+        r = await callOpenRouter(useModel);
       }
-    }
-    if (!args) {
-      // Fallback: try to parse direct content as JSON
-      const raw = choice?.message?.content;
-      if (typeof raw === "string") {
-        try { args = JSON.parse(raw); } catch { /* ignore */ }
+
+      if (r.status === 402) {
+        attempts.push({ model: useModel, status: 402, reason: "payment_required" });
+        continue;
       }
-    }
-    if (!args) {
-      return json({ error: "Model did not return structured fields" }, 502);
+      if (r.status === 429) {
+        attempts.push({ model: useModel, status: 429, reason: "rate_limited" });
+        continue;
+      }
+      if (!r.ok) {
+        const t = await r.text().catch(() => "");
+        console.error("OpenRouter error", useModel, r.status, t);
+        attempts.push({
+          model: useModel,
+          status: r.status,
+          reason: `provider_error: ${t.slice(0, 200)}`,
+        });
+        continue;
+      }
+
+      const payload = await r.json().catch(() => null);
+      const choice = payload?.choices?.[0];
+      const call = choice?.message?.tool_calls?.[0];
+      let args: any = null;
+      if (call?.function?.arguments) {
+        try {
+          args = JSON.parse(call.function.arguments);
+        } catch (e) {
+          console.error("Failed to parse tool args", e, call.function.arguments);
+        }
+      }
+      if (!args) {
+        const raw = choice?.message?.content;
+        if (typeof raw === "string") {
+          try { args = JSON.parse(raw); } catch { /* ignore */ }
+        }
+      }
+      if (!args) {
+        attempts.push({ model: useModel, status: 200, reason: "no_structured_output" });
+        continue;
+      }
+
+      return json({ fields: args, model: useModel, primaryModel: chain[0], attempts });
     }
 
-    return json({ fields: args, model });
+    // All models in the chain failed — return 200 with structured error
+    const lastReason = attempts[attempts.length - 1]?.reason || "unknown";
+    const isAllRateLimited = attempts.every((a) => a.status === 429);
+    const isAllPayment = attempts.every((a) => a.status === 402);
+    return json({
+      error: isAllRateLimited
+        ? "All selected AI models are rate limited right now. Please wait a few seconds and try again."
+        : isAllPayment
+          ? "All selected AI models are out of credits. Top up your OpenRouter account or pick different models."
+          : `All AI models failed (last: ${lastReason}). Try different models.`,
+      code: "ALL_MODELS_FAILED",
+      attempts,
+      fallback: true,
+    });
   } catch (e) {
     console.error("extract-product error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);

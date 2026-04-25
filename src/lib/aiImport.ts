@@ -22,6 +22,13 @@ export interface ExtractedFields {
   usage: string;
 }
 
+export interface ExtractResult {
+  fields: ExtractedFields;
+  usedModel: string;
+  primaryModel: string;
+  attempts: Array<{ model: string; status: number; reason: string }>;
+}
+
 export interface OpenRouterModel {
   id: string;
   name: string;
@@ -42,13 +49,20 @@ export async function extractProductFields(args: {
   markdown: string;
   sourceUrl: string;
   model: string;
-}): Promise<ExtractedFields> {
+  fallbackModels?: string[];
+}): Promise<ExtractResult> {
   const { data, error } = await supabase.functions.invoke("extract-product", {
     body: args,
   });
   if (error) throw new Error((data as any)?.error || error.message);
   if ((data as any)?.error) throw new Error((data as any).error);
-  return (data as any).fields as ExtractedFields;
+  const d = data as any;
+  return {
+    fields: d.fields as ExtractedFields,
+    usedModel: d.model as string,
+    primaryModel: (d.primaryModel as string) ?? args.model,
+    attempts: (d.attempts as ExtractResult["attempts"]) ?? [],
+  };
 }
 
 export function useOpenRouterModels() {
