@@ -12,7 +12,7 @@ import { Newsletter } from "@/components/site/Newsletter";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST } from "@/lib/brands";
 import { products, useDbVersion } from "@/lib/db";
-import { brandLogoSvg } from "@/lib/placeholder";
+import { getBrandLogo } from "@/lib/placeholder";
 
 export default function CuremedHome() {
   const { t, lang } = useI18n();
@@ -35,15 +35,18 @@ export default function CuremedHome() {
             </div>
           </div>
           <div className="relative grid grid-cols-2 gap-3 animate-fade-in-up">
-            {BRAND_LIST.map((b) => (
-              <Link key={b.key} to={`/${b.slug}`} data-brand={b.themeAttr} className="aspect-square rounded-2xl bg-brand-soft border border-brand/10 p-4 flex flex-col justify-between hover:-translate-y-1 transition-transform">
-                <img src={brandLogoSvg(b.themeAttr, b.name)} alt={b.name} className="h-8 w-auto" />
-                <div>
-                  <p className="text-xs text-brand font-semibold">{b.name}</p>
-                  <p className="text-sm font-medium mt-1 line-clamp-2">{b.tagline[lang]}</p>
-                </div>
-              </Link>
-            ))}
+            {BRAND_LIST.map((b) => {
+              const l = getBrandLogo(b.themeAttr, b.name);
+              return (
+                <Link key={b.key} to={`/${b.slug}`} data-brand={b.themeAttr} className="aspect-square rounded-2xl bg-brand-soft border border-brand/10 p-4 flex flex-col justify-between hover:-translate-y-1 transition-transform">
+                  <img src={l.src} alt={b.name} className="h-8 w-auto object-contain" />
+                  <div>
+                    <p className="text-xs text-brand font-semibold">{b.name}</p>
+                    <p className="text-sm font-medium mt-1 line-clamp-2">{b.tagline[lang]}</p>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -54,10 +57,18 @@ export default function CuremedHome() {
           <p className="mt-3 text-muted-foreground">{t("brands.subtitle")}</p>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {BRAND_LIST.map((b) => (
+          {BRAND_LIST.map((b) => {
+            const l = getBrandLogo(b.themeAttr, b.name);
+            return (
             <Link key={b.key} to={`/${b.slug}`} data-brand={b.themeAttr} className="group rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl">
               <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
-                <img src={brandLogoSvg(b.themeAttr, b.name)} alt={b.name} className="h-12 w-auto drop-shadow" />
+                {l.isImage ? (
+                  <div className="bg-white rounded-xl px-4 py-2 flex items-center justify-center">
+                    <img src={l.src} alt={b.name} className="h-10 w-auto object-contain" />
+                  </div>
+                ) : (
+                  <img src={l.src} alt={b.name} className="h-12 w-auto drop-shadow object-contain" />
+                )}
               </div>
               <div className="p-6">
                 <h3 className="text-xl font-bold text-brand">{b.name}</h3>
@@ -65,7 +76,8 @@ export default function CuremedHome() {
                 <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">{t("common.discover")} <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover:translate-x-1" /></p>
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       </section>
 

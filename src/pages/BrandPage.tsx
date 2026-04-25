@@ -12,7 +12,7 @@ import { Newsletter } from "@/components/site/Newsletter";
 import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { products, useDbVersion } from "@/lib/db";
-import { brandLogoSvg } from "@/lib/placeholder";
+import { getBrandLogo } from "@/lib/placeholder";
 
 export default function BrandPage() {
   const { brand: brandSlug } = useParams<{ brand: string }>();
@@ -22,13 +22,14 @@ export default function BrandPage() {
   if (!brandKey) return <Navigate to="/curemed" replace />;
   const meta = BRANDS[brandKey];
   const brandProducts = products.byBrand(brandKey);
+  const logo = getBrandLogo(meta.themeAttr, meta.name);
 
   return (
     <SiteLayout brand={meta.themeAttr}>
       <section className="relative overflow-hidden bg-brand-soft">
         <div className="container py-20 md:py-28 grid lg:grid-cols-2 gap-12 items-center">
           <div className="animate-fade-in-up">
-            <img src={brandLogoSvg(meta.themeAttr, meta.name)} alt={meta.name} className="h-12 mb-6" />
+            <img src={logo.src} alt={meta.name} className="h-12 mb-6 object-contain" />
             <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-brand">{meta.tagline[lang]}</h1>
             <p className="mt-5 text-lg text-foreground/80 max-w-xl">{meta.about[lang]}</p>
             <div className="mt-8 flex flex-wrap gap-3">
