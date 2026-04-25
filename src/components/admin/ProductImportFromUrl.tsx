@@ -96,9 +96,6 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
         model: models3[0],
         fallbackModels: [models3[1], models3[2]],
       });
-      onImported(result.fields, scraped.images || []);
-      // Re-call with scrape payload so the editor can persist the markdown
-      // file into the product's storage folder.
       onImported(result.fields, scraped.images || [], {
         markdown: scraped.markdown,
         sourceUrl: scraped.sourceUrl,
