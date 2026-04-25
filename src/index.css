@@ -8,6 +8,31 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* ===== Curemed master palette (placeholder until exact codes are provided) ===== */
+    --curemed-beige: 36 38% 95%;
+    --curemed-beige-deep: 34 30% 88%;
+    --curemed-blue: 205 67% 36%;
+    --curemed-blue-soft: 195 50% 57%;
+    --curemed-teal: 173 38% 55%;
+    --curemed-ink: 215 28% 17%;
+
+    /* Brand palettes */
+    --flexitol-primary: 202 100% 28%;
+    --flexitol-secondary: 200 64% 57%;
+    --flexitol-accent: 36 38% 95%;
+
+    --kapiva-primary: 132 33% 20%;
+    --kapiva-secondary: 36 47% 92%;
+    --kapiva-accent: 12 65% 50%;
+
+    --nada-primary: 340 75% 55%;
+    --nada-secondary: 50 95% 60%;
+    --nada-accent: 170 60% 45%;
+
+    --abc-primary: 188 62% 44%;
+    --abc-secondary: 28 41% 60%;
+    --abc-accent: 36 38% 95%;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -56,6 +81,10 @@ All colors MUST be HSL.
   }
 
   .dark {
+    --curemed-beige: 215 28% 12%;
+    --curemed-beige-deep: 215 28% 16%;
+    --curemed-ink: 36 38% 95%;
+
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
@@ -92,6 +121,46 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  /* Brand theming via [data-brand] attribute */
+  [data-brand="curemed"] {
+    --brand-primary: var(--curemed-blue);
+    --brand-secondary: var(--curemed-teal);
+    --brand-bg: var(--curemed-beige);
+    --brand-bg-deep: var(--curemed-beige-deep);
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="flexitol"] {
+    --brand-primary: var(--flexitol-primary);
+    --brand-secondary: var(--flexitol-secondary);
+    --brand-bg: var(--flexitol-accent);
+    --brand-bg-deep: 200 30% 92%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="kapiva"] {
+    --brand-primary: var(--kapiva-primary);
+    --brand-secondary: var(--kapiva-accent);
+    --brand-bg: var(--kapiva-secondary);
+    --brand-bg-deep: 36 35% 86%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="nada"] {
+    --brand-primary: var(--nada-primary);
+    --brand-secondary: var(--nada-secondary);
+    --brand-bg: 340 60% 97%;
+    --brand-bg-deep: 340 50% 93%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="abc"] {
+    --brand-primary: var(--abc-primary);
+    --brand-secondary: var(--abc-secondary);
+    --brand-bg: 188 30% 96%;
+    --brand-bg-deep: 188 25% 90%;
+    --brand-ink: var(--curemed-ink);
+  }
+
+  /* RTL adjustments */
+  [dir="rtl"] body { font-family: 'Tajawal', system-ui, sans-serif; }
 }
 
 @layer base {
@@ -102,4 +171,41 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+}
+
+@layer utilities {
+  .bg-brand { background-color: hsl(var(--brand-primary)); }
+  .bg-brand-soft { background-color: hsl(var(--brand-bg)); }
+  .bg-brand-deep { background-color: hsl(var(--brand-bg-deep)); }
+  .text-brand { color: hsl(var(--brand-primary)); }
+  .text-brand-secondary { color: hsl(var(--brand-secondary)); }
+  .border-brand { border-color: hsl(var(--brand-primary)); }
+  .ring-brand { --tw-ring-color: hsl(var(--brand-primary)); }
+
+  .marquee {
+    animation: marquee 40s linear infinite;
+  }
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  [dir="rtl"] .marquee {
+    animation: marquee-rtl 40s linear infinite;
+  }
+  @keyframes marquee-rtl {
+    from { transform: translateX(0); }
+    to { transform: translateX(50%); }
+  }
+
+  @keyframes fade-in-up {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-fade-in-up { animation: fade-in-up 0.6s ease-out both; }
+
+  @keyframes logo-pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.85; }
+  }
+  .animate-logo-pulse { animation: logo-pulse 1.6s ease-in-out infinite; }
 }
