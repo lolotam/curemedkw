@@ -9,6 +9,7 @@ import { Testimonials } from "@/components/site/Testimonials";
 import { FAQ } from "@/components/site/FAQ";
 import { ContactSection } from "@/components/site/ContactSection";
 import { Newsletter } from "@/components/site/Newsletter";
+import { HeroSlider } from "@/components/site/HeroSlider";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST } from "@/lib/brands";
 import { products, useDbVersion } from "@/lib/db";
@@ -21,6 +22,7 @@ export default function CuremedHome() {
 
   return (
     <SiteLayout brand="curemed">
+      <HeroSlider pageKey="curemed" fallback={
       <section className="relative overflow-hidden bg-brand-soft">
         <div className="container py-16 md:py-28 grid lg:grid-cols-2 gap-10 items-center">
           <div className="animate-fade-in-up">
@@ -50,6 +52,7 @@ export default function CuremedHome() {
           </div>
         </div>
       </section>
+      } />
 
       <section id="brands" className="container py-16 md:py-24">
         <div className="text-center max-w-2xl mx-auto mb-12">

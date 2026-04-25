@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      hero_slides: {
+        Row: {
+          created_at: string
+          cta_href: string | null
+          cta_label_ar: string | null
+          cta_label_en: string | null
+          id: string
+          is_active: boolean
+          media_type: string
+          media_url: string
+          page_key: string
+          sort_order: number
+          subtitle_ar: string | null
+          subtitle_en: string | null
+          title_ar: string | null
+          title_en: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cta_href?: string | null
+          cta_label_ar?: string | null
+          cta_label_en?: string | null
+          id?: string
+          is_active?: boolean
+          media_type?: string
+          media_url: string
+          page_key: string
+          sort_order?: number
+          subtitle_ar?: string | null
+          subtitle_en?: string | null
+          title_ar?: string | null
+          title_en?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cta_href?: string | null
+          cta_label_ar?: string | null
+          cta_label_en?: string | null
+          id?: string
+          is_active?: boolean
+          media_type?: string
+          media_url?: string
+          page_key?: string
+          sort_order?: number
+          subtitle_ar?: string | null
+          subtitle_en?: string | null
+          title_ar?: string | null
+          title_en?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

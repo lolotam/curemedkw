@@ -9,10 +9,12 @@ import { Testimonials } from "@/components/site/Testimonials";
 import { FAQ } from "@/components/site/FAQ";
 import { ContactSection } from "@/components/site/ContactSection";
 import { Newsletter } from "@/components/site/Newsletter";
+import { HeroSlider } from "@/components/site/HeroSlider";
 import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { products, useDbVersion } from "@/lib/db";
 import { getBrandLogo } from "@/lib/placeholder";
+import type { HeroPageKey } from "@/lib/heroSlides";
 
 export default function BrandPage() {
   const { brand: brandSlug } = useParams<{ brand: string }>();
@@ -26,6 +28,7 @@ export default function BrandPage() {
 
   return (
     <SiteLayout brand={meta.themeAttr}>
+      <HeroSlider pageKey={brandKey as HeroPageKey} fallback={
       <section className="relative overflow-hidden bg-brand-soft">
         <div className="container py-20 md:py-28 grid lg:grid-cols-2 gap-12 items-center">
           <div className="animate-fade-in-up">
@@ -44,6 +47,7 @@ export default function BrandPage() {
           </div>
         </div>
       </section>
+      } />
 
       <section id="products" className="container py-16 md:py-24">
         <div className="mb-10">
