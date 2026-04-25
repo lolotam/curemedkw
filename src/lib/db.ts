@@ -1,3 +1,4 @@
+import * as React from "react";
 import { seedDatabase } from "./seed";
 
 export type BrandKey = "flexitol" | "kapiva" | "nada" | "abc";
@@ -154,9 +155,6 @@ export function resetSampleData() {
 }
 
 export function useDbVersion() {
-  // tiny hook: forces re-render on db change
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const React = require("react") as typeof import("react");
   const [v, setV] = React.useState(0);
   React.useEffect(() => {
     const handler = () => setV((x) => x + 1);
