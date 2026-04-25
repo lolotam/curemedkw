@@ -12,6 +12,7 @@ export interface ExtractedFields {
   name: string;
   brand: "flexitol" | "kapiva" | "nada" | "abc";
   category: string;
+  tags: string[];
   price: number;
   shortDescription: string;
   longDescription: string;
