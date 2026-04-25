@@ -25,6 +25,8 @@ Rules:
 - "shortDescription" is a single sentence, max ~180 chars.
 - "ingredients" and "benefits" are arrays of single short strings (one item per line).
 - "usage" is a short paragraph or numbered steps.
+- "category" is a short, broad area like "Foot Care", "Body Care", "Hair Care", "Wellness", etc. Title-cased, max 3 words.
+- "tags" is 3 to 8 short keywords (lowercase, single words or 2-word phrases) describing the product (e.g. ["dry skin", "moisturizer", "tea tree"]).
 - If a field is not present in the source, leave it empty ("" or []).
 - Never invent SKUs, prices, or sizes that aren't explicitly stated.
 - "price" must be a number in the listed currency (no symbols). 0 if unknown.
@@ -41,6 +43,7 @@ const TOOL = {
         name: { type: "string" },
         brand: { type: "string", enum: ["flexitol", "kapiva", "nada", "abc"] },
         category: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
         price: { type: "number" },
         shortDescription: { type: "string" },
         longDescription: { type: "string" },
@@ -54,6 +57,7 @@ const TOOL = {
         "name",
         "brand",
         "category",
+        "tags",
         "price",
         "shortDescription",
         "longDescription",
