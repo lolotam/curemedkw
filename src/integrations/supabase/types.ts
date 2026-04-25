@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          image_url: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          slug: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en: string
+          slug: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          image_url?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          slug?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       hero_slides: {
         Row: {
           created_at: string
@@ -109,6 +145,7 @@ export type Database = {
           benefits: string[]
           brand: Database["public"]["Enums"]["brand_key"]
           category: string
+          category_id: string | null
           created_at: string
           featured: boolean
           gallery: string[]
@@ -130,6 +167,7 @@ export type Database = {
           benefits?: string[]
           brand: Database["public"]["Enums"]["brand_key"]
           category?: string
+          category_id?: string | null
           created_at?: string
           featured?: boolean
           gallery?: string[]
@@ -151,6 +189,7 @@ export type Database = {
           benefits?: string[]
           brand?: Database["public"]["Enums"]["brand_key"]
           category?: string
+          category_id?: string | null
           created_at?: string
           featured?: boolean
           gallery?: string[]
@@ -168,7 +207,15 @@ export type Database = {
           updated_at?: string
           usage?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscribers: {
         Row: {

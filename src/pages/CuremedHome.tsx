@@ -9,6 +9,7 @@ import { FAQ } from "@/components/site/FAQ";
 import { ContactSection } from "@/components/site/ContactSection";
 import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
+import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST } from "@/lib/brands";
 import { useFeaturedProducts } from "@/lib/db";
@@ -22,6 +23,8 @@ export default function CuremedHome() {
   return (
     <SiteLayout brand="curemed">
       <HeroSlider pageKey="curemed" />
+
+      <CategoryCarousel />
 
       <section id="brands" className="container py-16 md:py-24">
         <div className="text-center max-w-2xl mx-auto mb-12">

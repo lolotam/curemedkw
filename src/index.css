@@ -197,6 +197,21 @@ All colors MUST be HSL.
     to { transform: translateX(50%); }
   }
 
+  .cat-marquee {
+    animation: cat-marquee 35s linear infinite;
+  }
+  @keyframes cat-marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  [dir="rtl"] .cat-marquee {
+    animation: cat-marquee-rtl 35s linear infinite;
+  }
+  @keyframes cat-marquee-rtl {
+    from { transform: translateX(0); }
+    to { transform: translateX(50%); }
+  }
+
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(16px); }
     to { opacity: 1; transform: translateY(0); }

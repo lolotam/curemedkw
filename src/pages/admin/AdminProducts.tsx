@@ -26,37 +26,32 @@ export default function AdminProducts() {
     return [...items].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
   }, [q, brandFilter, allProducts]);
 
-  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { del.mutate(id, { onSuccess: () => { toast.success("Product deleted"); setSelected((s) => { const n = new Set(s); n.delete(id); return n; }); } }); } };
+  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { del.mutate(id, { onSuccess: () => toast.success("Product deleted") }); } };
   const setBrand = (b: string) => { const next = new URLSearchParams(searchParams); if (b === "all") next.delete("brand"); else next.set("brand", b); setSearchParams(next); };
 
-  const toggleOne = (id: string) =>
-    setSelected((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
+  const allChecked = list.length > 0 && list.every((p) => selected.has(p.id));
+  const toggleAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allChecked) list.forEach((p) => next.delete(p.id));
+      else list.forEach((p) => next.add(p.id));
+      return next;
+    });
+  };
+  const toggleOne = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
       return n;
     });
-  const visibleIds = list.map((p) => p.id);
-  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
-  const someVisibleSelected = visibleIds.some((id) => selected.has(id));
-  const toggleAllVisible = () =>
-    setSelected((s) => {
-      const n = new Set(s);
-      if (allVisibleSelected) visibleIds.forEach((id) => n.delete(id));
-      else visibleIds.forEach((id) => n.add(id));
-      return n;
-    });
-
+  };
   const bulkRemove = () => {
     const ids = Array.from(selected);
     if (!ids.length) return;
-    if (!confirm(`Delete ${ids.length} product${ids.length === 1 ? "" : "s"}? This also removes their images and scraped files.`)) return;
+    if (!confirm(`Delete ${ids.length} product${ids.length === 1 ? "" : "s"}?`)) return;
     bulkDel.mutate(ids, {
-      onSuccess: (count) => {
-        toast.success(`Deleted ${count} product${count === 1 ? "" : "s"}`);
-        setSelected(new Set());
-      },
-      onError: (err: any) => toast.error(err?.message || "Bulk delete failed"),
+      onSuccess: () => { toast.success(`Deleted ${ids.length}`); setSelected(new Set()); },
+      onError: (e: any) => toast.error(e.message),
     });
   };
 
@@ -74,62 +69,26 @@ export default function AdminProducts() {
             <Chip active={brandFilter === "all"} onClick={() => setBrand("all")}>All brands</Chip>
             {BRAND_LIST.map((b) => <Chip key={b.key} active={brandFilter === b.key} onClick={() => setBrand(b.key)}>{b.name}</Chip>)}
           </div>
+          {selected.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={bulkRemove} className="gap-1.5">
+              <Trash2 className="h-3.5 w-3.5" /> Delete {selected.size}
+            </Button>
+          )}
         </div>
       </Card>
-      {selected.size > 0 && (
-        <Card className="p-3 mb-4 flex items-center justify-between gap-3 border-destructive/40 bg-destructive/5">
-          <p className="text-sm">
-            <span className="font-semibold">{selected.size}</span> selected
-          </p>
-          <div className="flex gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-              Clear
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={bulkRemove}
-              disabled={bulkDel.isPending}
-              className="gap-1.5"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {bulkDel.isPending ? "Deleting…" : `Delete ${selected.size}`}
-            </Button>
-          </div>
-        </Card>
-      )}
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground"><tr>
-              <th className="px-3 py-3 w-10">
-                <Checkbox
-                  checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
-                  onCheckedChange={toggleAllVisible}
-                  aria-label="Select all visible"
-                />
-              </th>
+              <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
               <th className="text-left px-4 py-3">Product</th><th className="text-left px-4 py-3">Brand</th>
               <th className="text-left px-4 py-3">Category</th><th className="text-left px-4 py-3">Price</th>
               <th className="text-left px-4 py-3">Stock</th><th className="text-left px-4 py-3">Featured</th>
               <th className="text-right px-4 py-3">Actions</th></tr></thead>
             <tbody>
               {list.map((p) => (
-                <tr
-                  key={p.id}
-                  className={cn(
-                    "border-t border-border hover:bg-muted/30",
-                    selected.has(p.id) && "bg-destructive/5",
-                  )}
-                >
-                  <td className="px-3 py-3">
-                    <Checkbox
-                      checked={selected.has(p.id)}
-                      onCheckedChange={() => toggleOne(p.id)}
-                      aria-label={`Select ${p.name}`}
-                    />
-                  </td>
+                <tr key={p.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-4 py-3"><Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} /></td>
                   <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
                     <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>

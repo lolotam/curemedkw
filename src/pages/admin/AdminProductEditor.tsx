@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, X, Star, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,16 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  useProduct,
-  useCreateProduct,
-  useUpdateProduct,
-  useDeleteProduct,
-  uploadProductImage,
-  uploadProductMarkdown,
-  type Product,
-  type BrandKey,
-} from "@/lib/db";
+import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, useCategories, useCreateCategory, slugify, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
 import { toast } from "sonner";
@@ -29,6 +20,7 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   brand,
   name: "",
   category: BRANDS[brand].categories[0],
+  categoryId: null,
   price: 0,
   shortDescription: "",
   longDescription: "",
@@ -53,6 +45,8 @@ export default function AdminProductEditor() {
   const createMut = useCreateProduct();
   const updateMut = useUpdateProduct();
   const deleteMut = useDeleteProduct();
+  const { data: categories = [] } = useCategories();
+  const createCategoryMut = useCreateCategory();
   const [form, setForm] = useState(() => BLANK());
   const [hydrated, setHydrated] = useState(isNew);
 
@@ -76,16 +70,11 @@ export default function AdminProductEditor() {
   const fileMain = useRef<HTMLInputElement>(null);
   const fileGallery = useRef<HTMLInputElement>(null);
 
-  // Markdown captured from the AI import — saved into the product folder
-  // after the product row exists.
-  const pendingScrapeRef = useRef<{ markdown: string; sourceUrl: string } | null>(null);
-  const productId = isNew ? undefined : id;
-
   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const url = await uploadProductImage(file, productId);
+      const url = await uploadProductImage(file);
       update("mainImage", url);
       toast.success("Main image updated");
     } catch (err: any) { toast.error(err.message); }
@@ -95,7 +84,7 @@ export default function AdminProductEditor() {
   const uploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     try {
-      const urls = await Promise.all(files.map((f) => uploadProductImage(f, productId)));
+      const urls = await Promise.all(files.map(uploadProductImage));
       update("gallery", [...form.gallery, ...urls]);
       toast.success(`${urls.length} image(s) added`);
     } catch (err: any) { toast.error(err.message); }
@@ -111,28 +100,24 @@ export default function AdminProductEditor() {
     update("gallery", [oldMain, ...form.gallery.filter((g) => g !== src)]);
   };
 
-  const applyImported = (
-    fields: ExtractedFields,
-    images: string[],
-    scrape?: { markdown: string; sourceUrl: string },
-  ) => {
-    if (scrape?.markdown) {
-      pendingScrapeRef.current = scrape;
-      // If the product already exists, persist immediately.
-      if (productId) {
-        uploadProductMarkdown(productId, scrape.markdown, scrape.sourceUrl)
-          .then(() => {
-            pendingScrapeRef.current = null;
-            toast.message("Scraped markdown saved to product folder");
-          })
-          .catch((err) => console.warn("Failed to save markdown", err));
-      }
-    }
+  const applyImported = (fields: ExtractedFields, images: string[]) => {
     setForm((f) => {
       const next = { ...f };
       if (fields.name) next.name = fields.name;
       if (fields.brand) next.brand = fields.brand;
-      if (fields.category) next.category = fields.category;
+      if (fields.category) {
+        next.category = fields.category;
+        // Auto-link to existing category if slug matches
+        const wantedSlug = slugify(fields.category);
+        const match = categories.find(
+          (c) => c.slug === wantedSlug || c.nameEn.toLowerCase() === fields.category.toLowerCase(),
+        );
+        if (match) next.categoryId = match.id;
+      }
+      if (fields.tags?.length) {
+        const merged = Array.from(new Set([...next.tags, ...fields.tags.map((t) => t.trim()).filter(Boolean)]));
+        next.tags = merged;
+      }
       if (typeof fields.price === "number" && fields.price > 0) next.price = fields.price;
       if (fields.shortDescription) next.shortDescription = fields.shortDescription;
       if (fields.longDescription) next.longDescription = fields.longDescription;
@@ -162,6 +147,38 @@ export default function AdminProductEditor() {
     });
   };
 
+  const sortedCategories = useMemo(
+    () => [...categories].sort((a, b) => a.nameEn.localeCompare(b.nameEn)),
+    [categories],
+  );
+
+  const onCategorySelect = async (val: string) => {
+    if (val === "__none__") {
+      update("categoryId", null);
+      return;
+    }
+    if (val === "__new__") {
+      const name = window.prompt("New category English name:")?.trim();
+      if (!name) return;
+      const nameAr = window.prompt(`Arabic name for "${name}" (optional):`)?.trim() || "";
+      const slug = slugify(name);
+      try {
+        const created = await createCategoryMut.mutateAsync({
+          slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
+        });
+        update("categoryId", created.id);
+        update("category", created.nameEn);
+        toast.success(`Category "${name}" created`);
+      } catch (err: any) {
+        toast.error("Create category failed: " + (err.message || "unknown"));
+      }
+      return;
+    }
+    const cat = categories.find((c) => c.id === val);
+    update("categoryId", val);
+    if (cat) update("category", cat.nameEn);
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) {
@@ -171,35 +188,10 @@ export default function AdminProductEditor() {
     try {
       if (isNew) {
         const created = await createMut.mutateAsync(form);
-        // Now that we have an id, flush any pending scrape markdown.
-        if (pendingScrapeRef.current) {
-          try {
-            await uploadProductMarkdown(
-              created.id,
-              pendingScrapeRef.current.markdown,
-              pendingScrapeRef.current.sourceUrl,
-            );
-          } catch (err) {
-            console.warn("Failed to save scrape markdown after create", err);
-          }
-          pendingScrapeRef.current = null;
-        }
         toast.success("Product created");
         navigate(`/admin/products/${created.id}`);
       } else if (id) {
         await updateMut.mutateAsync({ id, patch: form });
-        if (pendingScrapeRef.current) {
-          try {
-            await uploadProductMarkdown(
-              id,
-              pendingScrapeRef.current.markdown,
-              pendingScrapeRef.current.sourceUrl,
-            );
-          } catch (err) {
-            console.warn("Failed to save scrape markdown", err);
-          }
-          pendingScrapeRef.current = null;
-        }
         toast.success("Product updated");
       }
     } catch (err: any) {
@@ -255,10 +247,19 @@ export default function AdminProductEditor() {
                 </Select>
               </Field>
               <Field label="Category">
-                <Input value={form.category} onChange={(e) => update("category", e.target.value)} list="cats" />
-                <datalist id="cats">
-                  {BRANDS[form.brand].categories.map((c) => <option key={c} value={c} />)}
-                </datalist>
+                <Select value={form.categoryId ?? "__none__"} onValueChange={onCategorySelect}>
+                  <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    <SelectItem value="__new__" className="text-brand font-medium">+ Create new category…</SelectItem>
+                    {sortedCategories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.nameEn}{c.nameAr ? ` · ${c.nameAr}` : ""}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.category && !form.categoryId && (
+                  <p className="text-[10px] text-muted-foreground">Free-text: {form.category}</p>
+                )}
               </Field>
               <Field label="Price (KD)">
                 <Input type="number" step="0.01" min={0} value={form.price} onChange={(e) => update("price", parseFloat(e.target.value) || 0)} />

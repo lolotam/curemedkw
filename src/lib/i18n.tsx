@@ -86,6 +86,14 @@ export const TRANSLATIONS: Dict = {
   "admin.login.password": { en: "Password", ar: "كلمة المرور" },
   "admin.login.submit": { en: "Sign in", ar: "تسجيل الدخول" },
   "admin.login.invalid": { en: "Incorrect password.", ar: "كلمة المرور غير صحيحة." },
+
+  "categories.title": { en: "Shop by category", ar: "تسوّق حسب الفئة" },
+  "categories.subtitle": { en: "Find what you need, by area of care.", ar: "اعثر على ما تحتاجه حسب مجال العناية." },
+  "category.allProducts": { en: "All products", ar: "جميع المنتجات" },
+  "category.noProducts": { en: "No products in this category yet.", ar: "لا توجد منتجات في هذه الفئة بعد." },
+  "filter.title": { en: "Filter by", ar: "تصفية حسب" },
+  "filter.areas": { en: "Areas", ar: "المجالات" },
+  "filter.clear": { en: "Clear filters", ar: "إزالة التصفية" },
 };
 
 interface Ctx {
