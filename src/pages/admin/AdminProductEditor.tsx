@@ -13,6 +13,8 @@ import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
+import type { ExtractedFields } from "@/lib/aiImport";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -95,6 +97,41 @@ export default function AdminProductEditor() {
     update("gallery", [oldMain, ...form.gallery.filter((g) => g !== src)]);
   };
 
+  const applyImported = (fields: ExtractedFields, images: string[]) => {
+    setForm((f) => {
+      const next = { ...f };
+      if (fields.name) next.name = fields.name;
+      if (fields.brand) next.brand = fields.brand;
+      if (fields.category) next.category = fields.category;
+      if (typeof fields.price === "number" && fields.price > 0) next.price = fields.price;
+      if (fields.shortDescription) next.shortDescription = fields.shortDescription;
+      if (fields.longDescription) next.longDescription = fields.longDescription;
+      if (fields.size) next.size = fields.size;
+      if (fields.sku) next.sku = fields.sku;
+      if (fields.ingredients?.length) next.ingredients = fields.ingredients;
+      if (fields.benefits?.length) next.benefits = fields.benefits;
+      if (fields.usage) next.usage = fields.usage;
+
+      if (images.length) {
+        const isPlaceholder = next.mainImage.startsWith("data:");
+        const [first, ...rest] = images;
+        if (isPlaceholder) {
+          next.mainImage = first;
+          const merged = [...rest, ...next.gallery].filter(
+            (u, i, a) => a.indexOf(u) === i && u !== next.mainImage,
+          );
+          next.gallery = merged;
+        } else {
+          const merged = [...images, ...next.gallery].filter(
+            (u, i, a) => a.indexOf(u) === i && u !== next.mainImage,
+          );
+          next.gallery = merged;
+        }
+      }
+      return next;
+    });
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) {
@@ -145,6 +182,8 @@ export default function AdminProductEditor() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          <ProductImportFromUrl onImported={applyImported} />
+
           {/* Core */}
           <Card className="p-6 space-y-4">
             <h2 className="font-semibold">Core</h2>
