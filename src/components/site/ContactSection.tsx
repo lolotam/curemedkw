@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useI18n } from "@/lib/i18n";
-import { messages, type BrandKey } from "@/lib/db";
+import { useCreateMessage, type BrandKey } from "@/lib/db";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -19,19 +19,23 @@ const schema = z.object({
 export function ContactSection({ brand }: { brand?: BrandKey | "curemed" }) {
   const { t } = useI18n();
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
+  const createMsg = useCreateMessage();
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse(form);
     if (!parsed.success) { toast.error(t("contact.error")); return; }
     const d = parsed.data;
-    messages.create({
-      name: d.name, email: d.email, phone: d.phone,
-      subject: d.subject, message: d.message,
-      brand: brand ?? "curemed",
-    });
-    setForm({ name: "", email: "", phone: "", subject: "", message: "" });
-    toast.success(t("contact.success"));
+    createMsg.mutate(
+      { name: d.name, email: d.email, phone: d.phone, subject: d.subject, message: d.message, brand: brand ?? "curemed" },
+      {
+        onSuccess: () => {
+          setForm({ name: "", email: "", phone: "", subject: "", message: "" });
+          toast.success(t("contact.success"));
+        },
+        onError: () => toast.error(t("contact.error")),
+      }
+    );
   };
 
   return (

@@ -4,25 +4,26 @@ import { Plus, Search, Star, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { products, useDbVersion } from "@/lib/db";
+import { useProducts, useDeleteProduct } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 export default function AdminProducts() {
-  useDbVersion();
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState("");
+  const { data: allProducts = [] } = useProducts();
+  const del = useDeleteProduct();
   const brandFilter = searchParams.get("brand") || "all";
   const list = useMemo(() => {
-    let items = products.list();
+    let items = allProducts;
     if (brandFilter !== "all") items = items.filter((p) => p.brand === brandFilter);
     const query = q.trim().toLowerCase();
     if (query) items = items.filter((p) => p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
-    return items.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [q, brandFilter]);
+    return [...items].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  }, [q, brandFilter, allProducts]);
 
-  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { products.remove(id); toast.success("Product deleted"); } };
+  const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { del.mutate(id, { onSuccess: () => toast.success("Product deleted") }); } };
   const setBrand = (b: string) => { const next = new URLSearchParams(searchParams); if (b === "all") next.delete("brand"); else next.set("brand", b); setSearchParams(next); };
 
   return (

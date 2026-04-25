@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { products, type Product, type BrandKey } from "@/lib/db";
+import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
 import { toast } from "sonner";
@@ -38,26 +38,26 @@ export default function AdminProductEditor() {
   const navigate = useNavigate();
   const isNew = !id || id === "new";
 
-  const [form, setForm] = useState(() => {
-    if (!isNew && id) {
-      const existing = products.get(id);
-      if (existing) {
-        const { id: _i, createdAt: _c, updatedAt: _u, ...rest } = existing;
-        return rest;
-      }
-    }
-    return BLANK();
-  });
+  const { data: existing, isLoading } = useProduct(isNew ? undefined : id);
+  const createMut = useCreateProduct();
+  const updateMut = useUpdateProduct();
+  const deleteMut = useDeleteProduct();
+  const [form, setForm] = useState(() => BLANK());
+  const [hydrated, setHydrated] = useState(isNew);
 
   useEffect(() => {
-    if (!isNew && id) {
-      const existing = products.get(id);
-      if (!existing) {
-        toast.error("Product not found");
-        navigate("/admin/products");
-      }
+    if (isNew || hydrated) return;
+    if (!isLoading && !existing) {
+      toast.error("Product not found");
+      navigate("/admin/products");
+      return;
     }
-  }, [id, isNew, navigate]);
+    if (existing) {
+      const { id: _i, createdAt: _c, updatedAt: _u, ...rest } = existing;
+      setForm(rest);
+      setHydrated(true);
+    }
+  }, [existing, isLoading, isNew, navigate, hydrated]);
 
   const update = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -65,23 +65,11 @@ export default function AdminProductEditor() {
   const fileMain = useRef<HTMLInputElement>(null);
   const fileGallery = useRef<HTMLInputElement>(null);
 
-  const readFile = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      if (file.size > 1.5 * 1024 * 1024) {
-        reject(new Error("Image too large (max 1.5MB). Use a smaller file."));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsDataURL(file);
-    });
-
   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const url = await readFile(file);
+      const url = await uploadProductImage(file);
       update("mainImage", url);
       toast.success("Main image updated");
     } catch (err: any) { toast.error(err.message); }
@@ -91,7 +79,7 @@ export default function AdminProductEditor() {
   const uploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     try {
-      const urls = await Promise.all(files.map(readFile));
+      const urls = await Promise.all(files.map(uploadProductImage));
       update("gallery", [...form.gallery, ...urls]);
       toast.success(`${urls.length} image(s) added`);
     } catch (err: any) { toast.error(err.message); }
@@ -107,7 +95,7 @@ export default function AdminProductEditor() {
     update("gallery", [oldMain, ...form.gallery.filter((g) => g !== src)]);
   };
 
-  const save = (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) {
       toast.error("Name and SKU are required");
@@ -115,24 +103,26 @@ export default function AdminProductEditor() {
     }
     try {
       if (isNew) {
-        const created = products.create(form);
+        const created = await createMut.mutateAsync(form);
         toast.success("Product created");
         navigate(`/admin/products/${created.id}`);
       } else if (id) {
-        products.update(id, form);
+        await updateMut.mutateAsync({ id, patch: form });
         toast.success("Product updated");
       }
     } catch (err: any) {
-      toast.error("Save failed: " + (err.message || "storage may be full"));
+      toast.error("Save failed: " + (err.message || "unknown error"));
     }
   };
 
-  const remove = () => {
+  const remove = async () => {
     if (!id || isNew) return;
     if (confirm(`Delete "${form.name}"?`)) {
-      products.remove(id);
-      toast.success("Deleted");
-      navigate("/admin/products");
+      try {
+        await deleteMut.mutateAsync(id);
+        toast.success("Deleted");
+        navigate("/admin/products");
+      } catch (err: any) { toast.error(err.message); }
     }
   };
 

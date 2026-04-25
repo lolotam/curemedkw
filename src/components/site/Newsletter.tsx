@@ -2,20 +2,22 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useI18n } from "@/lib/i18n";
-import { subscribers } from "@/lib/db";
+import { useSubscribe } from "@/lib/db";
 import { toast } from "sonner";
 import { Mail } from "lucide-react";
 
 export function Newsletter() {
   const { t } = useI18n();
   const [email, setEmail] = useState("");
+  const subscribe = useSubscribe();
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = email.trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) || trimmed.length > 255) { toast.error(t("contact.error")); return; }
-    subscribers.add(trimmed);
-    setEmail("");
-    toast.success(t("newsletter.success"));
+    subscribe.mutate(trimmed, {
+      onSuccess: () => { setEmail(""); toast.success(t("newsletter.success")); },
+      onError: () => toast.error(t("contact.error")),
+    });
   };
   return (
     <section className="container py-12">

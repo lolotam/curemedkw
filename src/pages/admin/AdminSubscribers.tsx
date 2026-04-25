@@ -3,18 +3,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Trash2, Search, Users } from "lucide-react";
-import { subscribers, useDbVersion } from "@/lib/db";
+import { useSubscribers, useDeleteSubscriber } from "@/lib/db";
 import { toast } from "sonner";
 
 export default function AdminSubscribers() {
-  useDbVersion();
   const [q, setQ] = useState("");
-  const all = subscribers.list();
+  const { data: all = [] } = useSubscribers();
+  const del = useDeleteSubscriber();
   const list = useMemo(() => {
     const query = q.trim().toLowerCase();
     return query ? all.filter((s) => s.email.toLowerCase().includes(query)) : all;
   }, [q, all]);
-  const remove = (id: string, email: string) => { if (confirm(`Remove ${email}?`)) { subscribers.remove(id); toast.success("Removed"); } };
+  const remove = (id: string, email: string) => { if (confirm(`Remove ${email}?`)) { del.mutate(id, { onSuccess: () => toast.success("Removed") }); } };
   const exportCsv = () => {
     const header = "email,subscribed_at\n";
     const rows = all.map((s) => `${s.email},${new Date(s.createdAt).toISOString()}`).join("\n");

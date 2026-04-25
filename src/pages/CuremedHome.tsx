@@ -12,13 +12,13 @@ import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST } from "@/lib/brands";
-import { products, useDbVersion } from "@/lib/db";
+import { useFeaturedProducts } from "@/lib/db";
 import { getBrandLogo } from "@/lib/placeholder";
 
 export default function CuremedHome() {
   const { t, lang } = useI18n();
-  useDbVersion();
-  const featured = products.featured().slice(0, 8);
+  const { data: featuredAll = [] } = useFeaturedProducts();
+  const featured = featuredAll.slice(0, 8);
 
   return (
     <SiteLayout brand="curemed">

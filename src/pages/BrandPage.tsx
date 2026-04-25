@@ -12,18 +12,17 @@ import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
-import { products, useDbVersion } from "@/lib/db";
+import { useProductsByBrand } from "@/lib/db";
 import { getBrandLogo } from "@/lib/placeholder";
 import type { HeroPageKey } from "@/lib/heroSlides";
 
 export default function BrandPage() {
   const { brand: brandSlug } = useParams<{ brand: string }>();
   const { t, lang } = useI18n();
-  useDbVersion();
   const brandKey = brandSlug ? slugToBrand(brandSlug) : null;
   if (!brandKey) return <Navigate to="/curemed" replace />;
   const meta = BRANDS[brandKey];
-  const brandProducts = products.byBrand(brandKey);
+  const { data: brandProducts = [] } = useProductsByBrand(brandKey);
   const logo = getBrandLogo(meta.themeAttr, meta.name);
 
   return (
