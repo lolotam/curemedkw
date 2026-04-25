@@ -1,140 +1,56 @@
 
-# Curemed Website + Admin Dashboard — Full Plan
+## Goal
+Connect your external Supabase project `curemedkw` (`ipkrqxrwxylmenidsuiy`) to this Lovable project and migrate the existing localStorage-based data layer to real Supabase tables, authenticated admin access, and proper image storage.
 
-A multi-brand company site for **Curemed** with four sub-brands (Flexitol, Kapiva, NADA, ABC Australian Bodycare), plus a password-protected **admin dashboard** that manages products, contact messages, and newsletter subscribers — all stored in a local browser database (localStorage) with seeded sample data.
+## Step 1 — Connect Supabase (native integration)
+Lovable doesn't accept Supabase URL/keys pasted in chat — it uses an OAuth-style connect flow. After approving this plan, I'll trigger the Supabase connection prompt. You'll then:
+1. Click **Connect Supabase** in the Lovable UI.
+2. Authorize the integration.
+3. Pick the **curemedkw** project from the list.
 
----
+Once linked, Lovable auto-injects `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SUPABASE_PROJECT_ID` and wires up the typed client at `src/integrations/supabase/client.ts`. The anon key you pasted will be picked up automatically — no need to hardcode it.
 
-## 1. Public Website (foundations from previous plan)
+## Step 2 — Database schema (migrations)
+Create the following tables in your Supabase project:
 
-### Loading screen `/`
-- Beige background, animated Curemed logo loader
-- Auto-redirects to `/curemed` after animation
+- **`products`** — id (uuid), brand (text), name, category, price (numeric), short_description, long_description, main_image (text URL), gallery (text[]), ingredients (text[]), benefits (text[]), usage, size, sku, stock_status (enum: in_stock/low_stock/out_of_stock), featured (bool), tags (text[]), created_at, updated_at.
+- **`messages`** — id, name, email, phone, brand, subject, message, read (bool), created_at.
+- **`subscribers`** — id, email (unique), created_at.
+- **`user_roles`** — id, user_id (fk auth.users), role (enum: admin, user). Roles in a SEPARATE table per security best practices.
+- **`has_role(uuid, app_role)`** — SECURITY DEFINER function for safe RLS checks.
 
-### Curemed master landing `/curemed`
-- Hero (mission + CTA)
-- "Our Brands" grid — 4 cards, each links to its brand page
-- Spotlight carousel (mixed featured products from all brands)
-- About / What we do pillars
-- Testimonials, FAQ, Contact form (writes to local DB)
-- Newsletter signup (writes to local DB)
-- Footer
+RLS policies:
+- `products` — public SELECT; INSERT/UPDATE/DELETE only for admins.
+- `messages` — public INSERT (contact form); SELECT/UPDATE/DELETE only for admins.
+- `subscribers` — public INSERT (newsletter); SELECT/DELETE only for admins.
+- `user_roles` — only admins can read/manage.
 
-### Brand landing pages
-`/flexitol`, `/kapiva`, `/nada`, `/australian-bodycare`
-- Brand-specific color palette + hero with tagline
-- **Auto-scrolling product carousel** pulling that brand's products from the local DB
-- Key benefits / features grid
-- Testimonials + FAQ + Contact section
+## Step 3 — Storage
+Create a public `product-images` bucket. Replace base64-in-localStorage uploads with real Supabase Storage uploads in `AdminProductEditor`. Store returned public URLs in `products.main_image` / `products.gallery`.
 
-### Product detail page `/:brand/product/:id`
-- Image gallery (main + thumbnails)
-- Name, brand, category, price, SKU, stock status
-- Short + long description
-- Ingredients, Benefits, Usage instructions, Size/variant
-- Tags, "Featured" badge
-- Related products from same brand
+## Step 4 — Replace admin auth
+Remove the hardcoded password (`src/lib/admin.ts`). Replace `/admin/login` with real Supabase email+password auth (and Google sign-in as a default). Gate the `/admin/*` routes by checking `has_role(user, 'admin')`. You'll bootstrap your own admin account by signing up once, then I'll insert a `user_roles` row granting you admin (via the data tools after connection).
 
-### Global features
-- **Language toggle** EN / AR (with full RTL layout for Arabic), persisted in localStorage
-- **Theme toggle** Light / Dark, persisted in localStorage
-- Each brand page applies its own color palette via CSS variables
+## Step 5 — Rewrite data layer
+Rewrite `src/lib/db.ts` to call Supabase instead of localStorage:
+- `products.list/byBrand/featured/get/create/update/remove` → Supabase queries.
+- `messages.list/create/setRead/remove/removeMany` → Supabase queries.
+- `subscribers.list/add/remove` → Supabase queries.
+- Replace the `useDbVersion` event bus with React Query (`@tanstack/react-query` is already installed) for cached, reactive data.
 
----
+Public pages (`CuremedHome`, `BrandPage`, `ProductDetail`) and admin pages (`AdminOverview`, `AdminProducts`, `AdminProductEditor`, `AdminMessages`, `AdminSubscribers`) will be updated to use the new async hooks. Loading states and error toasts added where needed.
 
-## 2. Local Database (browser-based)
+## Step 6 — Seed data
+Port the existing 20-product seed (`src/lib/seed.ts`) into a one-time INSERT against the `products` table so your sample catalog appears in Supabase. Existing brand/product images stay as the generated SVG placeholders until you upload real ones via the admin editor.
 
-Since the app runs entirely in the browser, a real SQLite file isn't possible. Instead I'll use a tiny **localStorage-backed data layer** that mimics a database — works offline, persists per-browser, no setup needed.
+## Out of scope (for this round)
+- Real payment / checkout
+- Order management
+- Multi-admin invitations UI (you'll be the first admin; more can be added later)
 
-Stores:
-- `products` — full product records (see fields below)
-- `messages` — contact form submissions
-- `subscribers` — newsletter emails
-- `uploaded_images` — uploaded photos saved as base64 data URLs
-
-A small data-access module (`src/lib/db.ts`) exposes `list / get / create / update / delete` for each store, so the UI code looks like real DB calls.
-
-> If you later want true cloud persistence and real image hosting, we can swap this layer for Lovable Cloud without rewriting any UI.
-
----
-
-## 3. Admin Dashboard `/admin`
-
-### Access
-- Single hardcoded admin password gate at `/admin/login`
-- Successful login sets a session flag in sessionStorage
-- All `/admin/*` routes are protected; logout clears the session
-
-### Admin layout
-- Sidebar nav: **Overview · Products · Messages · Subscribers · Logout**
-- Top bar with site link + theme toggle
-
-### Overview page `/admin`
-- Stat cards: Total products, Products by brand, Unread messages, Total subscribers
-- Recent activity: latest 5 messages, latest 5 subscribers, recently edited products
-
-### Products manager `/admin/products`
-- Searchable, filterable table (by brand, category, featured, stock status)
-- Columns: image · name · brand · category · price · stock · featured · actions (edit / delete)
-- "Add product" button → full editor
-
-### Product editor `/admin/products/new` and `/admin/products/:id`
-Full form covering every field:
-- **Core:** name, brand (dropdown of 4), category, price, short description, long description
-- **Media:** main image upload + gallery (multiple images), drag-to-reorder, set cover, remove. Images stored as base64 in localStorage.
-- **Details:** ingredients (list), benefits (list), usage instructions, size/variant
-- **Meta:** SKU, stock status (in stock / low / out), featured toggle, tags (chips)
-- Save / Cancel / Delete buttons; live preview panel showing how the product card will look
-
-### Messages inbox `/admin/messages`
-- Table of contact submissions: name · email · brand context · date · status (read/unread)
-- Click row to open full message in a drawer; mark read/unread; delete
-- Bulk delete
-
-### Subscribers `/admin/subscribers`
-- Table of newsletter emails with date subscribed
-- Search + delete
-- **Export to CSV** button
-
----
-
-## 4. Seeded Sample Data
-
-On first load, the app auto-seeds the local DB with:
-- **20 sample products** (5 per brand), each with:
-  - Realistic name, category, price, SKU
-  - Generated short + long descriptions matching each brand's domain (foot care, ayurveda, intimate hygiene, body care)
-  - Ingredient lists, benefits, usage instructions, size variants
-  - Tags, featured flags, stock status
-  - Placeholder mockup images (clean SVG/illustration placeholders branded per brand color) for both main image and gallery
-- A few sample contact messages and newsletter subscribers so the inbox/list aren't empty
-
-Admin can fully edit or delete any seeded item — they behave exactly like user-created records.
-
-A "Reset sample data" button in admin Overview restores defaults if needed.
-
----
-
-## 5. Image handling
-
-- Uploaded images are read with `FileReader` → stored as base64 data URLs in localStorage
-- Each image gets an ID; products reference image IDs
-- Soft cap warning if total storage exceeds ~4MB (browser limit awareness)
-- Placeholder mockups used everywhere a real photo isn't yet provided — clearly styled so it's obvious they're placeholders
-
----
-
-## 6. What I still need from you (can be sent later)
-- Curemed exact color palette
-- Real logos for Curemed and each brand (placeholders used until then)
-- The admin password you want to use (I'll use a default like `curemed-admin` and you can change it in one line)
-
----
-
-## Build order
-1. Global foundations: theme tokens, language/theme toggles, RTL, routing, local DB layer + seeder
-2. Loading screen + Curemed landing + brand landings + product detail page (consuming the local DB)
-3. Admin login + protected layout + Overview
-4. Products manager + full product editor with image upload
-5. Messages inbox + Subscribers list with CSV export
-6. Polish: empty states, toasts, responsive, dark mode pass, Arabic RTL pass
+## After approval
+I'll switch to default mode and:
+1. Trigger the Supabase connect prompt.
+2. Wait for you to authorize and pick `curemedkw`.
+3. Run the migration, create the storage bucket, rewrite the data layer, and seed.
+4. Walk you through creating your admin account and confirm everything works end-to-end.
