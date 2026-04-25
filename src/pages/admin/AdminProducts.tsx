@@ -4,7 +4,8 @@ import { Plus, Search, Star, Trash2, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { useProducts, useDeleteProduct } from "@/lib/db";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useProducts, useDeleteProduct, useBulkDeleteProducts } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,8 @@ export default function AdminProducts() {
   const [q, setQ] = useState("");
   const { data: allProducts = [] } = useProducts();
   const del = useDeleteProduct();
+  const bulkDel = useBulkDeleteProducts();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const brandFilter = searchParams.get("brand") || "all";
   const list = useMemo(() => {
     let items = allProducts;
@@ -25,6 +28,32 @@ export default function AdminProducts() {
 
   const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { del.mutate(id, { onSuccess: () => toast.success("Product deleted") }); } };
   const setBrand = (b: string) => { const next = new URLSearchParams(searchParams); if (b === "all") next.delete("brand"); else next.set("brand", b); setSearchParams(next); };
+
+  const allChecked = list.length > 0 && list.every((p) => selected.has(p.id));
+  const toggleAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allChecked) list.forEach((p) => next.delete(p.id));
+      else list.forEach((p) => next.add(p.id));
+      return next;
+    });
+  };
+  const toggleOne = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+  const bulkRemove = () => {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} product${ids.length === 1 ? "" : "s"}?`)) return;
+    bulkDel.mutate(ids, {
+      onSuccess: () => { toast.success(`Deleted ${ids.length}`); setSelected(new Set()); },
+      onError: (e: any) => toast.error(e.message),
+    });
+  };
 
   return (
     <div className="p-8">
@@ -40,12 +69,18 @@ export default function AdminProducts() {
             <Chip active={brandFilter === "all"} onClick={() => setBrand("all")}>All brands</Chip>
             {BRAND_LIST.map((b) => <Chip key={b.key} active={brandFilter === b.key} onClick={() => setBrand(b.key)}>{b.name}</Chip>)}
           </div>
+          {selected.size > 0 && (
+            <Button variant="destructive" size="sm" onClick={bulkRemove} className="gap-1.5">
+              <Trash2 className="h-3.5 w-3.5" /> Delete {selected.size}
+            </Button>
+          )}
         </div>
       </Card>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground"><tr>
+              <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
               <th className="text-left px-4 py-3">Product</th><th className="text-left px-4 py-3">Brand</th>
               <th className="text-left px-4 py-3">Category</th><th className="text-left px-4 py-3">Price</th>
               <th className="text-left px-4 py-3">Stock</th><th className="text-left px-4 py-3">Featured</th>
@@ -53,6 +88,7 @@ export default function AdminProducts() {
             <tbody>
               {list.map((p) => (
                 <tr key={p.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-4 py-3"><Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} /></td>
                   <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
                     <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
@@ -67,7 +103,7 @@ export default function AdminProducts() {
                   </div></td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={7} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
+              {list.length === 0 && <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
             </tbody>
           </table>
         </div>
