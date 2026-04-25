@@ -7,8 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { adminAuth } from "@/lib/admin";
 import { useI18n } from "@/lib/i18n";
-import { curemedLogoSvg } from "@/lib/placeholder";
 import { toast } from "sonner";
+import curemedLogo from "@/assets/curemed-logo.png";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -23,7 +23,7 @@ export default function AdminLogin() {
     <div data-brand="curemed" className="min-h-screen flex items-center justify-center bg-brand-soft p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-6">
-          <img src={curemedLogoSvg()} alt="Curemed" className="h-10 w-auto mx-auto" />
+          <img src={curemedLogo} alt="Curemed" className="h-10 w-auto mx-auto" />
           <div className="mt-4 inline-flex items-center justify-center h-12 w-12 rounded-full bg-brand/10 text-brand"><Lock className="h-5 w-5" /></div>
           <h1 className="mt-3 text-2xl font-bold">{t("admin.login.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">Enter the admin password to continue</p>

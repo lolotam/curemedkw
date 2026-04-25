@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { curemedLogoSvg } from "@/lib/placeholder";
 import { useI18n } from "@/lib/i18n";
+import curemedLogo from "@/assets/curemed-logo.png";
 
 const SEEN_KEY = "curemed.loader.seen";
 
@@ -27,7 +27,7 @@ export default function Loading() {
       style={{ backgroundColor: "hsl(var(--curemed-beige))" }}
     >
       <div className="animate-logo-pulse">
-        <img src={curemedLogoSvg()} alt="Curemed" className="h-16 md:h-20 w-auto" />
+        <img src={curemedLogo} alt="Curemed" className="h-16 md:h-20 w-auto" />
       </div>
       <p className="mt-8 text-sm tracking-widest uppercase text-muted-foreground animate-fade-in-up">
         {t("loader.tagline")}

@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST } from "@/lib/brands";
-import { curemedLogoSvg } from "@/lib/placeholder";
 import { Mail, Phone, MapPin } from "lucide-react";
+import curemedLogo from "@/assets/curemed-logo.png";
 
 export function SiteFooter() {
   const { t } = useI18n();
@@ -10,7 +10,7 @@ export function SiteFooter() {
     <footer className="border-t border-border/50 bg-muted/30 mt-16">
       <div className="container py-12 grid gap-8 md:grid-cols-4">
         <div className="space-y-3">
-          <img src={curemedLogoSvg()} alt="Curemed" className="h-10 w-auto" />
+          <img src={curemedLogo} alt="Curemed" className="h-10 w-auto" />
           <p className="text-sm text-muted-foreground max-w-xs">
             {t("about.body")}
           </p>

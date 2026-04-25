@@ -5,8 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
 import { BRAND_LIST } from "@/lib/brands";
-import { curemedLogoSvg } from "@/lib/placeholder";
 import { cn } from "@/lib/utils";
+import curemedLogo from "@/assets/curemed-logo.png";
 
 export function SiteHeader() {
   const { t, lang, setLang } = useI18n();
@@ -20,7 +20,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="container flex h-16 items-center justify-between gap-4">
         <Link to="/curemed" className="flex items-center gap-2">
-          <img src={curemedLogoSvg()} alt="Curemed" className="h-9 w-auto" />
+          <img src={curemedLogo} alt="Curemed" className="h-9 w-auto" />
         </Link>
 
         <nav className="hidden items-center gap-1 lg:flex">
