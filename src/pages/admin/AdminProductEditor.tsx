@@ -8,7 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, type Product, type BrandKey } from "@/lib/db";
+import {
+  useProduct,
+  useCreateProduct,
+  useUpdateProduct,
+  useDeleteProduct,
+  uploadProductImage,
+  uploadProductMarkdown,
+  type Product,
+  type BrandKey,
+} from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
 import { toast } from "sonner";
@@ -67,11 +76,16 @@ export default function AdminProductEditor() {
   const fileMain = useRef<HTMLInputElement>(null);
   const fileGallery = useRef<HTMLInputElement>(null);
 
+  // Markdown captured from the AI import — saved into the product folder
+  // after the product row exists.
+  const pendingScrapeRef = useRef<{ markdown: string; sourceUrl: string } | null>(null);
+  const productId = isNew ? undefined : id;
+
   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const url = await uploadProductImage(file);
+      const url = await uploadProductImage(file, productId);
       update("mainImage", url);
       toast.success("Main image updated");
     } catch (err: any) { toast.error(err.message); }
@@ -81,7 +95,7 @@ export default function AdminProductEditor() {
   const uploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     try {
-      const urls = await Promise.all(files.map(uploadProductImage));
+      const urls = await Promise.all(files.map((f) => uploadProductImage(f, productId)));
       update("gallery", [...form.gallery, ...urls]);
       toast.success(`${urls.length} image(s) added`);
     } catch (err: any) { toast.error(err.message); }
@@ -97,7 +111,23 @@ export default function AdminProductEditor() {
     update("gallery", [oldMain, ...form.gallery.filter((g) => g !== src)]);
   };
 
-  const applyImported = (fields: ExtractedFields, images: string[]) => {
+  const applyImported = (
+    fields: ExtractedFields,
+    images: string[],
+    scrape?: { markdown: string; sourceUrl: string },
+  ) => {
+    if (scrape?.markdown) {
+      pendingScrapeRef.current = scrape;
+      // If the product already exists, persist immediately.
+      if (productId) {
+        uploadProductMarkdown(productId, scrape.markdown, scrape.sourceUrl)
+          .then(() => {
+            pendingScrapeRef.current = null;
+            toast.message("Scraped markdown saved to product folder");
+          })
+          .catch((err) => console.warn("Failed to save markdown", err));
+      }
+    }
     setForm((f) => {
       const next = { ...f };
       if (fields.name) next.name = fields.name;
@@ -141,10 +171,35 @@ export default function AdminProductEditor() {
     try {
       if (isNew) {
         const created = await createMut.mutateAsync(form);
+        // Now that we have an id, flush any pending scrape markdown.
+        if (pendingScrapeRef.current) {
+          try {
+            await uploadProductMarkdown(
+              created.id,
+              pendingScrapeRef.current.markdown,
+              pendingScrapeRef.current.sourceUrl,
+            );
+          } catch (err) {
+            console.warn("Failed to save scrape markdown after create", err);
+          }
+          pendingScrapeRef.current = null;
+        }
         toast.success("Product created");
         navigate(`/admin/products/${created.id}`);
       } else if (id) {
         await updateMut.mutateAsync({ id, patch: form });
+        if (pendingScrapeRef.current) {
+          try {
+            await uploadProductMarkdown(
+              id,
+              pendingScrapeRef.current.markdown,
+              pendingScrapeRef.current.sourceUrl,
+            );
+          } catch (err) {
+            console.warn("Failed to save scrape markdown", err);
+          }
+          pendingScrapeRef.current = null;
+        }
         toast.success("Product updated");
       }
     } catch (err: any) {
