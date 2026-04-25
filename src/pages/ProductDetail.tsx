@@ -4,7 +4,7 @@ import { ArrowLeft, Star, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
-import { products, useDbVersion } from "@/lib/db";
+import { useProduct, useProductsByBrand } from "@/lib/db";
 import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -12,14 +12,15 @@ import { cn } from "@/lib/utils";
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
   const { t } = useI18n();
-  useDbVersion();
   const [activeImg, setActiveImg] = useState(0);
   const brandKey = brandSlug ? slugToBrand(brandSlug) : null;
   if (!brandKey) return <Navigate to="/curemed" replace />;
-  const product = id ? products.get(id) : null;
+  const { data: product, isLoading } = useProduct(id);
+  const { data: brandList = [] } = useProductsByBrand(brandKey);
+  if (isLoading) return null;
   if (!product || product.brand !== brandKey) return <Navigate to={`/${brandSlug}`} replace />;
   const meta = BRANDS[brandKey];
-  const related = products.byBrand(brandKey).filter((p) => p.id !== product.id).slice(0, 4);
+  const related = brandList.filter((p) => p.id !== product.id).slice(0, 4);
   const images = [product.mainImage, ...product.gallery.filter((g) => g !== product.mainImage)];
   const stockBadge = {
     in_stock: { label: t("common.inStock"), cls: "bg-green-500/10 text-green-700 dark:text-green-400" },
