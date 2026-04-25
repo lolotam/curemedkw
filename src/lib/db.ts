@@ -218,16 +218,76 @@ export function useDeleteProduct() {
   });
 }
 
+export function useBulkDeleteProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return 0;
+      const { error } = await supabase.from("products").delete().in("id", ids);
+      if (error) throw error;
+      // Best-effort: also clean up the storage folder for each product.
+      // Failures are ignored — the DB row is already gone.
+      await Promise.allSettled(
+        ids.map(async (pid) => {
+          const { data: list } = await supabase.storage
+            .from("product-images")
+            .list(pid, { limit: 1000 });
+          if (list && list.length) {
+            await supabase.storage
+              .from("product-images")
+              .remove(list.map((f) => `${pid}/${f.name}`));
+          }
+        }),
+      );
+      return ids.length;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.products });
+      qc.invalidateQueries({ queryKey: qk.productsFeatured });
+    },
+  });
+}
+
 /* ============================================================
  * Image uploads (product-images bucket)
  * ============================================================ */
 
-export async function uploadProductImage(file: File): Promise<string> {
+export async function uploadProductImage(
+  file: File,
+  productId?: string,
+): Promise<string> {
   const ext = file.name.split(".").pop() || "bin";
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const fname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  // Folder per product when known; otherwise use a "pending/" prefix for new
+  // products (URL still works after the row is saved).
+  const path = productId ? `${productId}/${fname}` : `pending/${fname}`;
   const { error } = await supabase.storage
     .from("product-images")
     .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+}
+
+/**
+ * Persist the scraped markdown for a product into its folder.
+ * Stored as `<productId>/scrape-<timestamp>.md`.
+ */
+export async function uploadProductMarkdown(
+  productId: string,
+  markdown: string,
+  sourceUrl?: string,
+): Promise<string> {
+  const ts = new Date().toISOString().replace(/[:.]/g, "-");
+  const path = `${productId}/scrape-${ts}.md`;
+  const header = sourceUrl ? `<!-- source: ${sourceUrl} -->\n\n` : "";
+  const blob = new Blob([header + markdown], { type: "text/markdown" });
+  const { error } = await supabase.storage
+    .from("product-images")
+    .upload(path, blob, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: "text/markdown",
+    });
   if (error) throw error;
   return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
 }
