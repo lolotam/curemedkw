@@ -36,7 +36,11 @@ const DEFAULT_MODELS = [
 const SLOT_LABELS = ["Primary AI model", "Fallback model #2", "Fallback model #3"] as const;
 
 export interface ProductImportFromUrlProps {
-  onImported: (fields: ExtractedFields, images: string[]) => void;
+  onImported: (
+    fields: ExtractedFields,
+    images: string[],
+    scrape?: { markdown: string; sourceUrl: string },
+  ) => void;
 }
 
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
@@ -93,6 +97,12 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
         fallbackModels: [models3[1], models3[2]],
       });
       onImported(result.fields, scraped.images || []);
+      // Re-call with scrape payload so the editor can persist the markdown
+      // file into the product's storage folder.
+      onImported(result.fields, scraped.images || [], {
+        markdown: scraped.markdown,
+        sourceUrl: scraped.sourceUrl,
+      });
       const usedFallback = result.usedModel && result.usedModel !== models3[0];
       toast.success(
         `Imported${scraped.images?.length ? ` with ${scraped.images.length} image(s)` : ""}${usedFallback ? ` using fallback ${result.usedModel}` : ""}. Review and save.`,
