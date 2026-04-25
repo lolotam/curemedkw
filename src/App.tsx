@@ -19,6 +19,8 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminProductEditor from "./pages/admin/AdminProductEditor";
 import AdminMessages from "./pages/admin/AdminMessages";
 import AdminSubscribers from "./pages/admin/AdminSubscribers";
+import AdminLandingPages from "./pages/admin/AdminLandingPages";
+import AdminLandingPageEditor from "./pages/admin/AdminLandingPageEditor";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +44,8 @@ const App = () => {
                   <Route path="products" element={<AdminProducts />} />
                   <Route path="products/new" element={<AdminProductEditor />} />
                   <Route path="products/:id" element={<AdminProductEditor />} />
+                  <Route path="landing" element={<AdminLandingPages />} />
+                  <Route path="landing/:pageKey" element={<AdminLandingPageEditor />} />
                   <Route path="messages" element={<AdminMessages />} />
                   <Route path="subscribers" element={<AdminSubscribers />} />
                 </Route>
