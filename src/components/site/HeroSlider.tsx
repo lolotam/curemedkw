@@ -1,0 +1,149 @@
+import * as React from "react";
+import { Link } from "react-router-dom";
+import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n";
+import { listSlidesForPage, type HeroPageKey, type HeroSlide } from "@/lib/heroSlides";
+
+interface Props {
+  pageKey: HeroPageKey;
+  /** Fallback rendered when no slides are configured yet. */
+  fallback?: React.ReactNode;
+  intervalMs?: number;
+}
+
+export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
+  const { lang, dir } = useI18n();
+  const [slides, setSlides] = React.useState<HeroSlide[] | null>(null);
+  const [index, setIndex] = React.useState(0);
+  const [paused, setPaused] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    listSlidesForPage(pageKey)
+      .then((rows) => { if (!cancelled) setSlides(rows); })
+      .catch(() => { if (!cancelled) setSlides([]); });
+    return () => { cancelled = true; };
+  }, [pageKey]);
+
+  const count = slides?.length ?? 0;
+
+  React.useEffect(() => {
+    if (paused || count <= 1) return;
+    const t = setInterval(() => setIndex((i) => (i + 1) % count), intervalMs);
+    return () => clearInterval(t);
+  }, [paused, count, intervalMs]);
+
+  if (slides === null) {
+    return <div className="bg-brand-soft min-h-[60vh] animate-pulse" />;
+  }
+
+  if (slides.length === 0) {
+    return <>{fallback}</>;
+  }
+
+  const next = () => setIndex((i) => (i + 1) % count);
+  const prev = () => setIndex((i) => (i - 1 + count) % count);
+
+  return (
+    <section
+      className="relative w-full h-[70vh] min-h-[460px] max-h-[760px] overflow-hidden bg-brand-deep"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      aria-roledescription="carousel"
+    >
+      {slides.map((s, i) => {
+        const title = lang === "ar" ? s.title_ar : s.title_en;
+        const subtitle = lang === "ar" ? s.subtitle_ar : s.subtitle_en;
+        const ctaLabel = lang === "ar" ? s.cta_label_ar : s.cta_label_en;
+        const isActive = i === index;
+        return (
+          <div
+            key={s.id}
+            className={`absolute inset-0 transition-opacity duration-700 ease-out ${isActive ? "opacity-100 z-10" : "opacity-0 z-0"}`}
+            aria-hidden={!isActive}
+          >
+            {s.media_type === "video" ? (
+              <video
+                src={s.media_url}
+                className="absolute inset-0 w-full h-full object-cover"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+            ) : (
+              <img
+                src={s.media_url}
+                alt={title || "Hero slide"}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading={i === 0 ? "eager" : "lazy"}
+              />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-background/10 rtl:from-background/80 rtl:via-background/40 rtl:to-background/10" />
+            <div className="relative z-10 container h-full flex items-center">
+              <div className="max-w-2xl text-foreground">
+                {title && (
+                  <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight animate-fade-in-up">
+                    {title}
+                  </h1>
+                )}
+                {subtitle && (
+                  <p className="mt-5 text-lg md:text-xl text-foreground/80 max-w-xl animate-fade-in-up">
+                    {subtitle}
+                  </p>
+                )}
+                {ctaLabel && s.cta_href && (
+                  <div className="mt-8 animate-fade-in-up">
+                    {s.cta_href.startsWith("/") ? (
+                      <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
+                        <Link to={s.cta_href}>
+                          {ctaLabel} <ArrowRight className="ml-2 h-4 w-4 rtl:rotate-180" />
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
+                        <a href={s.cta_href}>
+                          {ctaLabel} <ArrowRight className="ml-2 h-4 w-4 rtl:rotate-180" />
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      {count > 1 && (
+        <>
+          <button
+            onClick={prev}
+            aria-label="Previous slide"
+            className="absolute top-1/2 -translate-y-1/2 left-4 rtl:left-auto rtl:right-4 z-20 rounded-full bg-background/80 hover:bg-background border border-border shadow-md p-2.5 backdrop-blur"
+          >
+            <ChevronLeft className="h-5 w-5 rtl:rotate-180" />
+          </button>
+          <button
+            onClick={next}
+            aria-label="Next slide"
+            className="absolute top-1/2 -translate-y-1/2 right-4 rtl:right-auto rtl:left-4 z-20 rounded-full bg-background/80 hover:bg-background border border-border shadow-md p-2.5 backdrop-blur"
+          >
+            <ChevronRight className="h-5 w-5 rtl:rotate-180" />
+          </button>
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setIndex(i)}
+                aria-label={`Go to slide ${i + 1}`}
+                className={`h-2 rounded-full transition-all ${i === index ? "w-8 bg-brand" : "w-2 bg-foreground/40 hover:bg-foreground/60"}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
