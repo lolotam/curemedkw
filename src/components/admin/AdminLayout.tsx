@@ -4,7 +4,7 @@ import { adminAuth } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { curemedLogoSvg } from "@/lib/placeholder";
+import curemedLogo from "@/assets/curemed-logo.png";
 
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Overview", end: true },
@@ -31,8 +31,8 @@ export function AdminLayout() {
     <div data-brand="curemed" className="min-h-screen bg-muted/20 flex" dir="ltr">
       <aside className="w-64 bg-background border-r border-border min-h-screen sticky top-0 flex flex-col">
         <div className="p-5 border-b border-border">
-          <img src={curemedLogoSvg()} alt="Curemed" className="h-8 w-auto" />
-          <p className="text-xs text-muted-foreground mt-2 font-medium">Admin Dashboard</p>
+          <img src={curemedLogo} alt="Curemed" className="h-9 w-auto object-contain" />
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mt-2 font-semibold">Admin Dashboard</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
           {NAV.map((item) => (
