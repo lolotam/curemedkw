@@ -24,7 +24,12 @@ export function ContactSection({ brand }: { brand?: BrandKey | "curemed" }) {
     e.preventDefault();
     const parsed = schema.safeParse(form);
     if (!parsed.success) { toast.error(t("contact.error")); return; }
-    messages.create({ ...parsed.data, brand: brand ?? "curemed" });
+    const d = parsed.data;
+    messages.create({
+      name: d.name, email: d.email, phone: d.phone,
+      subject: d.subject, message: d.message,
+      brand: brand ?? "curemed",
+    });
     setForm({ name: "", email: "", phone: "", subject: "", message: "" });
     toast.success(t("contact.success"));
   };
