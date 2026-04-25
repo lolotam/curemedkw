@@ -13,6 +13,7 @@ export interface Product {
   brand: BrandKey;
   name: string;
   category: string;
+  categoryId: string | null;
   price: number;
   shortDescription: string;
   longDescription: string;
@@ -54,6 +55,7 @@ type ProductRow = {
   gallery: string[]; ingredients: string[]; benefits: string[]; usage: string;
   size: string; sku: string; stock_status: StockStatus; featured: boolean;
   tags: string[]; created_at: string; updated_at: string;
+  category_id: string | null;
 };
 
 const rowToProduct = (r: ProductRow): Product => ({
@@ -61,6 +63,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   brand: r.brand,
   name: r.name,
   category: r.category,
+  categoryId: r.category_id ?? null,
   price: Number(r.price),
   shortDescription: r.short_description,
   longDescription: r.long_description,
@@ -85,6 +88,7 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.brand !== undefined) out.brand = p.brand;
   if (p.name !== undefined) out.name = p.name;
   if (p.category !== undefined) out.category = p.category;
+  if (p.categoryId !== undefined) out.category_id = p.categoryId;
   if (p.price !== undefined) out.price = p.price;
   if (p.shortDescription !== undefined) out.short_description = p.shortDescription;
   if (p.longDescription !== undefined) out.long_description = p.longDescription;
@@ -110,9 +114,12 @@ export const qk = {
   product: (id: string) => ["products", id] as const,
   productsByBrand: (b: BrandKey) => ["products", "brand", b] as const,
   productsFeatured: ["products", "featured"] as const,
+  productsByCategory: (id: string) => ["products", "category", id] as const,
   messages: ["messages"] as const,
   unreadCount: ["messages", "unread"] as const,
   subscribers: ["subscribers"] as const,
+  categories: ["categories"] as const,
+  category: (slug: string) => ["categories", "slug", slug] as const,
 };
 
 /* ============================================================
@@ -218,6 +225,37 @@ export function useDeleteProduct() {
   });
 }
 
+export function useBulkDeleteProducts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return;
+      const { error } = await supabase.from("products").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.products });
+      qc.invalidateQueries({ queryKey: qk.productsFeatured });
+    },
+  });
+}
+
+export function useProductsByCategory(categoryId: string | undefined) {
+  return useQuery({
+    queryKey: categoryId ? qk.productsByCategory(categoryId) : ["products", "category", "none"],
+    enabled: !!categoryId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("category_id", categoryId!)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data as ProductRow[]).map(rowToProduct);
+    },
+  });
+}
+
 /* ============================================================
  * Image uploads (product-images bucket)
  * ============================================================ */
@@ -231,6 +269,153 @@ export async function uploadProductImage(file: File): Promise<string> {
   if (error) throw error;
   return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
 }
+
+/* ============================================================
+ * Categories
+ * ============================================================ */
+
+export interface Category {
+  id: string;
+  slug: string;
+  nameEn: string;
+  nameAr: string;
+  imageUrl: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type CategoryRow = {
+  id: string; slug: string; name_en: string; name_ar: string;
+  image_url: string; sort_order: number; is_active: boolean;
+  created_at: string; updated_at: string;
+};
+
+const rowToCategory = (r: CategoryRow): Category => ({
+  id: r.id,
+  slug: r.slug,
+  nameEn: r.name_en,
+  nameAr: r.name_ar,
+  imageUrl: r.image_url,
+  sortOrder: r.sort_order,
+  isActive: r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export type CategoryInput = Omit<Category, "id" | "createdAt" | "updatedAt">;
+
+const categoryToRow = (c: Partial<CategoryInput>): Partial<CategoryRow> => {
+  const out: any = {};
+  if (c.slug !== undefined) out.slug = c.slug;
+  if (c.nameEn !== undefined) out.name_en = c.nameEn;
+  if (c.nameAr !== undefined) out.name_ar = c.nameAr;
+  if (c.imageUrl !== undefined) out.image_url = c.imageUrl;
+  if (c.sortOrder !== undefined) out.sort_order = c.sortOrder;
+  if (c.isActive !== undefined) out.is_active = c.isActive;
+  return out;
+};
+
+export function useCategories() {
+  return useQuery({
+    queryKey: qk.categories,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("name_en", { ascending: true });
+      if (error) throw error;
+      return (data as CategoryRow[]).map(rowToCategory);
+    },
+  });
+}
+
+export function useCategoryBySlug(slug: string | undefined) {
+  return useQuery({
+    queryKey: slug ? qk.category(slug) : ["categories", "slug", "none"],
+    enabled: !!slug,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("categories").select("*").eq("slug", slug!).maybeSingle();
+      if (error) throw error;
+      return data ? rowToCategory(data as CategoryRow) : null;
+    },
+  });
+}
+
+export function useCreateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CategoryInput) => {
+      const { data, error } = await supabase
+        .from("categories").insert(categoryToRow(input) as any).select("*").single();
+      if (error) throw error;
+      return rowToCategory(data as CategoryRow);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.categories }); },
+  });
+}
+
+export function useUpdateCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: Partial<CategoryInput> }) => {
+      const { data, error } = await supabase
+        .from("categories").update(categoryToRow(patch) as any).eq("id", id).select("*").single();
+      if (error) throw error;
+      return rowToCategory(data as CategoryRow);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.categories }); },
+  });
+}
+
+export function useDeleteCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("categories").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      qc.invalidateQueries({ queryKey: qk.products });
+    },
+  });
+}
+
+export function useBulkDeleteCategories() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return;
+      const { error } = await supabase.from("categories").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      qc.invalidateQueries({ queryKey: qk.products });
+    },
+  });
+}
+
+export async function uploadCategoryImage(file: File): Promise<string> {
+  const ext = file.name.split(".").pop() || "bin";
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("category-images")
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("category-images").getPublicUrl(path).data.publicUrl;
+}
+
+export const slugify = (s: string) =>
+  s.toLowerCase().trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
 /* ============================================================
  * Messages
