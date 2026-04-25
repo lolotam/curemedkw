@@ -1,6 +1,5 @@
-import { useParams, Link, Navigate } from "react-router-dom";
-import { ArrowRight, CheckCircle2, ShieldCheck, Leaf, Award } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useParams, Navigate } from "react-router-dom";
+import { CheckCircle2, ShieldCheck, Leaf, Award } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
@@ -13,7 +12,6 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { useProductsByBrand } from "@/lib/db";
-import { getBrandLogo } from "@/lib/placeholder";
 import type { HeroPageKey } from "@/lib/heroSlides";
 
 export default function BrandPage() {
@@ -23,30 +21,10 @@ export default function BrandPage() {
   if (!brandKey) return <Navigate to="/curemed" replace />;
   const meta = BRANDS[brandKey];
   const { data: brandProducts = [] } = useProductsByBrand(brandKey);
-  const logo = getBrandLogo(meta.themeAttr, meta.name);
 
   return (
     <SiteLayout brand={meta.themeAttr}>
-      <HeroSlider pageKey={brandKey as HeroPageKey} fallback={
-      <section className="relative overflow-hidden bg-brand-soft">
-        <div className="container py-20 md:py-28 grid lg:grid-cols-2 gap-12 items-center">
-          <div className="animate-fade-in-up">
-            <img src={logo.src} alt={meta.name} className="h-12 mb-6 object-contain" />
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-brand">{meta.tagline[lang]}</h1>
-            <p className="mt-5 text-lg text-foreground/80 max-w-xl">{meta.about[lang]}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
-                <a href="#products">{t("common.shopAll")} <ArrowRight className="ml-2 h-4 w-4 rtl:rotate-180" /></a>
-              </Button>
-              <Button asChild size="lg" variant="outline"><Link to="/curemed">{t("common.backToBrand")}</Link></Button>
-            </div>
-          </div>
-          <div className="relative aspect-[4/3] rounded-3xl overflow-hidden bg-brand-deep flex items-center justify-center p-8">
-            {brandProducts[0] && <img src={brandProducts[0].mainImage} alt={brandProducts[0].name} className="max-h-full object-contain animate-fade-in-up" />}
-          </div>
-        </div>
-      </section>
-      } />
+      <HeroSlider pageKey={brandKey as HeroPageKey} />
 
       <section id="products" className="container py-16 md:py-24">
         <div className="mb-10">
