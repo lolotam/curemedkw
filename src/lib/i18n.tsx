@@ -94,6 +94,15 @@ export const TRANSLATIONS: Dict = {
   "filter.title": { en: "Filter by", ar: "تصفية حسب" },
   "filter.areas": { en: "Areas", ar: "المجالات" },
   "filter.clear": { en: "Clear filters", ar: "إزالة التصفية" },
+
+  "discount.was": { en: "Was", ar: "كان" },
+  "discount.now": { en: "Now", ar: "الآن" },
+  "discount.badge": { en: "OFF", ar: "خصم" },
+  "discount.title": { en: "Special offers", ar: "عروض خاصة" },
+  "discount.subtitle": { en: "Save more on these limited-time deals.", ar: "وفّر أكثر مع هذه العروض لفترة محدودة." },
+  "filter.discounted": { en: "Discounted only", ar: "العروض فقط" },
+  "category.subcategories": { en: "Subcategories", ar: "الفئات الفرعية" },
+  "viewing.now": { en: "viewing now", ar: "يتصفحون الآن" },
 };
 
 interface Ctx {
