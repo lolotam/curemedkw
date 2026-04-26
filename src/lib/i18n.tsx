@@ -290,6 +290,15 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
 export function useI18n() {
   const ctx = React.useContext(I18nContext);
-  if (!ctx) throw new Error("useI18n must be used inside I18nProvider");
+  if (!ctx) {
+    // Fallback prevents a blank screen if a stale HMR module copy is loaded
+    // before the provider re-mounts. Returns identity translations.
+    return {
+      lang: "en" as Lang,
+      setLang: () => {},
+      t: (key: string) => TRANSLATIONS[key]?.en ?? key,
+      dir: "ltr" as const,
+    };
+  }
   return ctx;
 }
