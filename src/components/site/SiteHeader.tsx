@@ -220,3 +220,42 @@ function MobileItem({ to, label, onClick }: { to: string; label: string; onClick
     </Link>
   );
 }
+
+function UserMenu() {
+  const { user, signOut } = useAuth();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+
+  if (!user) {
+    return (
+      <Button variant="ghost" size="sm" onClick={() => navigate("/auth")} className="gap-1.5">
+        <UserIcon className="h-4 w-4" />
+        <span className="hidden sm:inline text-xs font-semibold">{t("nav.signin")}</span>
+      </Button>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Account">
+          <UserIcon className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/account")}>
+          <UserIcon className="h-4 w-4 mr-2" />{t("nav.account")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/account")}>
+          <Package className="h-4 w-4 mr-2" />{t("nav.myOrders")}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={async () => { await signOut(); navigate("/"); }}>
+          <LogOut className="h-4 w-4 mr-2" />{t("nav.signout")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
