@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import curemedLogo from "@/assets/curemed-logo.png";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -19,6 +19,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // If already signed in, jump to /admin (the layout handles non-admin case)
   useEffect(() => {
@@ -89,8 +90,28 @@ export default function AdminLogin() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="pw">{t("admin.login.password")}</Label>
-            <Input id="pw" type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"}
-              value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} />
+            <div className="relative">
+              <Input
+                id="pw"
+                type={showPassword ? "text" : "password"}
+                autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
           <Button type="submit" disabled={busy} className="w-full bg-brand hover:bg-brand/90 text-white">
             {busy && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
