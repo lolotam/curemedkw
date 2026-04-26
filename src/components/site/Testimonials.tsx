@@ -1,31 +1,40 @@
 import { Card } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n";
-import { Quote } from "lucide-react";
+import { Quote, MapPin } from "lucide-react";
+import { useTestimonials } from "@/lib/db";
 
-interface T { name: string; role: { en: string; ar: string }; quote: { en: string; ar: string }; }
-
-const DEFAULTS: T[] = [
-  { name: "Dr. Layla A.", role: { en: "Dermatologist, Kuwait", ar: "طبيبة جلدية، الكويت" }, quote: { en: "Curemed consistently delivers the brands I trust. Their service is professional and reliable.", ar: "تقدم كيورميد دائماً العلامات التي أثق بها. خدمتهم احترافية وموثوقة." } },
-  { name: "Ahmed M.", role: { en: "Pharmacy owner", ar: "صاحب صيدلية" }, quote: { en: "Great product range and very responsive sales team. Highly recommended.", ar: "تشكيلة منتجات رائعة وفريق مبيعات سريع الاستجابة. أنصح به بشدة." } },
-  { name: "Noura S.", role: { en: "Customer", ar: "عميلة" }, quote: { en: "I rely on Curemed brands for my whole family — quality I can feel.", ar: "أعتمد على علامات كيورميد لعائلتي بأكملها — جودة أشعر بها." } },
-];
-
-export function Testimonials({ items = DEFAULTS }: { items?: T[] }) {
+export function Testimonials() {
   const { t, lang } = useI18n();
+  const { data: items = [] } = useTestimonials();
+  if (items.length === 0) return null;
   return (
     <section className="container py-16 md:py-24">
-      <div className="text-center mb-12"><h2 className="text-3xl md:text-4xl font-bold">{t("testimonials.title")}</h2></div>
-      <div className="grid gap-6 md:grid-cols-3">
-        {items.map((it, i) => (
-          <Card key={i} className="p-6 bg-brand-soft border-brand/10">
-            <Quote className="h-8 w-8 text-brand opacity-30 mb-3" />
-            <p className="text-sm leading-relaxed text-foreground">"{it.quote[lang]}"</p>
-            <div className="mt-4 pt-4 border-t border-border/50">
-              <p className="font-semibold text-sm">{it.name}</p>
-              <p className="text-xs text-muted-foreground">{it.role[lang]}</p>
-            </div>
-          </Card>
-        ))}
+      <div className="text-center mb-12">
+        <h2 className="text-3xl md:text-4xl font-bold">{t("testimonials.title")}</h2>
+      </div>
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {items.map((it) => {
+          const name = lang === "ar" ? it.nameAr : it.nameEn;
+          const role = lang === "ar" ? it.roleAr : it.roleEn;
+          const quote = lang === "ar" ? it.quoteAr : it.quoteEn;
+          const initial = (name || "?").charAt(0);
+          const tint = it.gender === "f" ? "bg-pink-500/15 text-pink-600" : "bg-blue-500/15 text-blue-600";
+          return (
+            <Card key={it.id} className="p-6 bg-brand-soft border-brand/10">
+              <Quote className="h-7 w-7 text-brand opacity-30 mb-3" />
+              <p className="text-sm leading-relaxed text-foreground" dir={lang === "ar" ? "rtl" : "ltr"}>"{quote}"</p>
+              <div className="mt-4 pt-4 border-t border-border/50 flex items-center gap-3">
+                <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold ${tint}`}>{initial}</span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm">{name}</p>
+                  <p className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> {role}{it.location ? ` · ${it.location}` : ""}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          );
+        })}
       </div>
     </section>
   );
