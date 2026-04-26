@@ -1,34 +1,29 @@
-## Goal
-Replace every brand card image with the corresponding logo you uploaded to the `brands-images` Supabase storage bucket.
+## Problem
+On `/curemed`, the Lafe's, Hartington, and Phytophar brand cards render auto-generated colored text badges (the blue "LAFE'S / HARTINGTON / PHYTOPHAR" pills in your screenshot) instead of the real logos.
 
-## Mapping (storage filename → brand)
-| Brand | Storage file |
-|---|---|
-| Flexitol | `flexitol.png` |
-| Kapiva | `kapiva.png` |
-| Australian Bodycare | `Australian Bodycare.png` |
-| NADA | `NADA.png` |
-| Lafe's | `Lafes.png` |
-| Hartington | `Hartington.png` |
-| Phytophar | `Phytophar.png` |
+Root cause: `src/lib/placeholder.ts` → `getBrandLogo()` only knows about 4 local PNGs (flexitol, kapiva, nada, abc). The other 3 brands fall through to the SVG text-badge fallback.
 
-All 7 files are confirmed present in the public `brands-images` bucket.
+All 7 logos are already uploaded to the public `brands-images` bucket and already wired into `src/lib/brands.ts` as `BRANDS[*].logo` (verified: `Australian Bodycare.png`, `flexitol.png`, `Hartington.png`, `kapiva.png`, `Lafes.png`, `NADA.png`, `Phytophar.png`).
 
-## Changes
+## Fix — single file: `src/lib/placeholder.ts`
 
-### `src/lib/brands.ts`
-- Remove the 7 local `import * from "@/assets/brand-*.png"` statements.
-- Replace each `BRANDS[*].logo` value with the public Supabase URL:
-  ```
-  https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/brands-images/<filename>
-  ```
-  (URL-encoding the space in `Australian Bodycare.png` as `Australian%20Bodycare.png`).
+Rewire `getBrandLogo()` to source logos from the central brand registry instead of the partial local-asset map.
 
-That's the only file that needs editing — `SiteHeader`, `SiteFooter`, and `CuremedHome` all read `BRAND_LIST[].logo`, so they'll pick up the new URLs automatically across:
-- `/curemed` "Our Brands" cards
-- Header brand menu icons
-- Footer brand list
+- Remove the 4 local `import … from "@/assets/brand-*.png"` statements.
+- Remove the `BRAND_LOGO_IMAGES` map.
+- Add `import { BRANDS } from "@/lib/brands"` (use a lazy/runtime lookup to avoid any circular-import concerns — `placeholder.ts` is imported by many files).
+- Rewrite `getBrandLogo(brand, name)`:
+  1. Find the brand in `BRANDS` whose `themeAttr` matches the `brand` arg (this is what `CuremedHome` passes).
+  2. If a `logo` URL exists → return `{ src: brandMeta.logo, isImage: true }`.
+  3. Otherwise → fall back to existing `brandLogoSvg(brand, name)` text badge.
+
+Keep `brandLogoSvg`, `placeholderImage`, and `curemedLogoSvg` untouched — still used elsewhere (product placeholders, etc.).
+
+## Result
+All 7 brand cards (Flexitol, Kapiva, ABC, NADA, Lafe's, Hartington, Phytophar) on `/curemed` will display the real uploaded logos from the `brands-images` bucket inside the existing white rounded tile, matching the look of the current Flexitol/Kapiva/ABC/NADA cards.
+
+No DB, RLS, header, footer, or brand-page changes required — those already consume `BRANDS[*].logo` directly.
 
 ## Out of scope
-- Not deleting the local `src/assets/brand-*.png` files (harmless, and keeps git history clean).
-- No DB or RLS changes — the bucket is already public.
+- Not deleting the now-unused `src/assets/brand-*.png` files (harmless, keeps git history clean).
+- No changes to the `BRANDS` registry, card layout, or styling.
