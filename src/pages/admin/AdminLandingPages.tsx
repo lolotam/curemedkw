@@ -4,6 +4,7 @@ import { HERO_PAGES, type HeroPageKey } from "@/lib/heroSlides";
 import { BRANDS } from "@/lib/brands";
 import type { BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import curemedBadge from "@/assets/curemed-c-badge.png";
 
 export default function AdminLandingPages() {
   return (
@@ -118,8 +119,13 @@ function BrandLandingCard({
               />
             </div>
           ) : (
-            <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-brand to-brand/60 text-white shadow-md ring-1 ring-white/30 flex items-center justify-center font-black text-2xl">
-              C
+            <div className="h-14 w-14 rounded-xl bg-white/95 backdrop-blur p-2 shadow-md ring-1 ring-black/5 flex items-center justify-center">
+              <img
+                src={curemedBadge}
+                alt="Curemed"
+                className="max-h-full max-w-full object-contain"
+                loading="lazy"
+              />
             </div>
           )}
         </div>
