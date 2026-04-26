@@ -31,7 +31,7 @@ export function CouponInput({
     setBusy(true);
     try {
       const r = await validateCoupon(code, subtotal);
-      if (!r.ok) {
+      if (r.ok === false) {
         toast.error(r.reason);
         return;
       }
