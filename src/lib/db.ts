@@ -576,3 +576,136 @@ export function useDeleteSubscriber() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: qk.subscribers }); },
   });
 }
+
+/* ============================================================
+ * Tags
+ * ============================================================ */
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+}
+
+type TagRow = { id: string; name: string; slug: string; created_at: string };
+const rowToTag = (r: TagRow): Tag => ({ id: r.id, name: r.name, slug: r.slug, createdAt: r.created_at });
+
+export function useTags() {
+  return useQuery({
+    queryKey: qk.tags,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("tags").select("*").order("name", { ascending: true });
+      if (error) throw error;
+      return (data as TagRow[]).map(rowToTag);
+    },
+  });
+}
+
+export function useUpsertTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string }) => {
+      const name = input.name.trim();
+      if (!name) throw new Error("Empty tag name");
+      const slug = slugify(name);
+      const { data, error } = await supabase
+        .from("tags").upsert({ name, slug }, { onConflict: "slug" }).select("*").single();
+      if (error) throw error;
+      return rowToTag(data as TagRow);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.tags }); },
+  });
+}
+
+export function useRenameTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, oldName, newName }: { id: string; oldName: string; newName: string }) => {
+      const name = newName.trim();
+      if (!name) throw new Error("Empty tag name");
+      const slug = slugify(name);
+      const { error } = await supabase.from("tags").update({ name, slug }).eq("id", id);
+      if (error) throw error;
+      // Replace in every product's tags array (client-side rewrite)
+      const { data: products, error: pErr } = await supabase
+        .from("products").select("id, tags").contains("tags", [oldName]);
+      if (pErr) throw pErr;
+      for (const p of (products ?? []) as { id: string; tags: string[] }[]) {
+        const next = (p.tags ?? []).map((t) => (t === oldName ? name : t));
+        await supabase.from("products").update({ tags: next }).eq("id", p.id);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.tags });
+      qc.invalidateQueries({ queryKey: qk.products });
+    },
+  });
+}
+
+export function useDeleteTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from("tags").delete().eq("id", id);
+      if (error) throw error;
+      // Strip from products
+      const { data: products, error: pErr } = await supabase
+        .from("products").select("id, tags").contains("tags", [name]);
+      if (pErr) throw pErr;
+      for (const p of (products ?? []) as { id: string; tags: string[] }[]) {
+        const next = (p.tags ?? []).filter((t) => t !== name);
+        await supabase.from("products").update({ tags: next }).eq("id", p.id);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.tags });
+      qc.invalidateQueries({ queryKey: qk.products });
+    },
+  });
+}
+
+/* ============================================================
+ * Testimonials
+ * ============================================================ */
+
+export interface Testimonial {
+  id: string;
+  nameEn: string; nameAr: string;
+  roleEn: string; roleAr: string;
+  quoteEn: string; quoteAr: string;
+  gender: "m" | "f";
+  location: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+type TestimonialRow = {
+  id: string; name_en: string; name_ar: string;
+  role_en: string; role_ar: string;
+  quote_en: string; quote_ar: string;
+  gender: string; location: string;
+  sort_order: number; is_active: boolean;
+};
+const rowToTestimonial = (r: TestimonialRow): Testimonial => ({
+  id: r.id,
+  nameEn: r.name_en, nameAr: r.name_ar,
+  roleEn: r.role_en, roleAr: r.role_ar,
+  quoteEn: r.quote_en, quoteAr: r.quote_ar,
+  gender: (r.gender === "f" ? "f" : "m"),
+  location: r.location,
+  sortOrder: r.sort_order,
+  isActive: r.is_active,
+});
+
+export function useTestimonials() {
+  return useQuery({
+    queryKey: qk.testimonials,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("testimonials").select("*").eq("is_active", true).order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data as TestimonialRow[]).map(rowToTestimonial);
+    },
+  });
+}
