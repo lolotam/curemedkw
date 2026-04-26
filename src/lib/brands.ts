@@ -15,6 +15,7 @@ export interface BrandMeta {
   key: BrandKey;
   slug: string;
   name: string;
+  shortName?: string;
   tagline: { en: string; ar: string };
   about: { en: string; ar: string };
   themeAttr: string;
