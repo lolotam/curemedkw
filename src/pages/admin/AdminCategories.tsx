@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Search, Trash2, Pencil, Upload, X, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,18 +196,25 @@ function CategoryEditorDialog({
   const [form, setForm] = useState<CategoryInput>(BLANK);
   const [uploading, setUploading] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Reset form when dialog opens
-  useMemo(() => {
-    if (editing === "new") { setForm(BLANK); setSlugTouched(false); }
-    else if (editing) {
+  // Reset form whenever the dialog opens for a new target
+  useEffect(() => {
+    if (editing === "new") {
+      setForm(BLANK);
+      setSlugTouched(false);
+    } else if (editing) {
       setForm({
-        slug: editing.slug, nameEn: editing.nameEn, nameAr: editing.nameAr,
-        imageUrl: editing.imageUrl, sortOrder: editing.sortOrder, isActive: editing.isActive,
+        slug: editing.slug,
+        nameEn: editing.nameEn,
+        nameAr: editing.nameAr,
+        imageUrl: editing.imageUrl,
+        sortOrder: editing.sortOrder,
+        isActive: editing.isActive,
       });
       setSlugTouched(true);
     }
-    return null;
+    setSaving(false);
   }, [editing]);
 
   const update = <K extends keyof CategoryInput>(k: K, v: CategoryInput[K]) =>
@@ -237,11 +244,11 @@ function CategoryEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg flex flex-col max-h-[90vh] p-0">
         <DialogHeader>
-          <DialogTitle>{editing === "new" ? "Add category" : "Edit category"}</DialogTitle>
+          <DialogTitle className="px-6 pt-6">{editing === "new" ? "Add category" : "Edit category"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">
           <div className="flex items-start gap-4">
             <div className="relative h-32 w-32 rounded-xl overflow-hidden border border-border bg-muted shrink-0">
               {form.imageUrl ? (
@@ -307,14 +314,21 @@ function CategoryEditorDialog({
             </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <DialogFooter className="px-6 py-4 border-t border-border bg-background sticky bottom-0">
+          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button
             className="bg-brand hover:bg-brand/90 text-white"
-            disabled={!form.nameEn.trim() || !form.slug.trim()}
-            onClick={() => onSave(form)}
+            disabled={saving || !form.nameEn.trim() || !form.slug.trim()}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await onSave(form);
+              } finally {
+                setSaving(false);
+              }
+            }}
           >
-            Save
+            {saving ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
       </DialogContent>

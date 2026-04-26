@@ -211,31 +211,24 @@ export default function AdminProductEditor() {
   };
 
   return (
-    <form onSubmit={save} className="min-h-screen flex flex-col">
-      {/* Sticky toolbar */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur border-b border-border">
-        <div className="flex items-center gap-3 px-6 py-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/products")} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold truncate">{isNew ? "Add product" : "Edit product"}</h1>
-            {!isNew && form.name && (
-              <p className="text-xs text-muted-foreground truncate">{form.name} · {form.sku}</p>
-            )}
-          </div>
-          {!isNew && (
-            <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" /> Delete
-            </Button>
-          )}
-          <Button type="submit" className="bg-brand hover:bg-brand/90 text-white">Save</Button>
+    <form onSubmit={save} className="p-8 max-w-5xl">
+      <div className="flex items-center gap-3 mb-6">
+        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/products")} className="gap-1">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">{isNew ? "Add product" : "Edit product"}</h1>
         </div>
+        {!isNew && (
+          <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+        )}
+        <Button type="submit" className="bg-brand hover:bg-brand/90 text-white">Save</Button>
       </div>
 
-      <div className="flex-1 p-6 grid gap-6 xl:grid-cols-12">
-        {/* LEFT: Core + Details */}
-        <div className="xl:col-span-5 space-y-6 min-w-0">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
           <ProductImportFromUrl onImported={applyImported} />
 
           {/* Core */}
@@ -275,44 +268,20 @@ export default function AdminProductEditor() {
                 <Textarea rows={2} value={form.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} />
               </Field>
               <Field label="Long description" full>
-                <Textarea rows={8} value={form.longDescription} onChange={(e) => update("longDescription", e.target.value)} />
+                <Textarea rows={5} value={form.longDescription} onChange={(e) => update("longDescription", e.target.value)} />
               </Field>
             </div>
           </Card>
 
-          {/* Details */}
-          <Card className="p-6 space-y-4">
-            <h2 className="font-semibold">Details</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Size / Variant">
-                <Input value={form.size} onChange={(e) => update("size", e.target.value)} placeholder="e.g. 250ml" />
-              </Field>
-              <Field label="SKU *">
-                <Input value={form.sku} onChange={(e) => update("sku", e.target.value)} required />
-              </Field>
-              <Field label="Ingredients (one per line)" full>
-                <Textarea rows={5} value={form.ingredients.join("\n")} onChange={(e) => update("ingredients", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
-              </Field>
-              <Field label="Benefits (one per line)" full>
-                <Textarea rows={5} value={form.benefits.join("\n")} onChange={(e) => update("benefits", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
-              </Field>
-              <Field label="How to use" full>
-                <Textarea rows={4} value={form.usage} onChange={(e) => update("usage", e.target.value)} />
-              </Field>
-            </div>
-          </Card>
-        </div>
-
-        {/* MIDDLE: Media */}
-        <div className="xl:col-span-4 space-y-6 min-w-0">
+          {/* Media */}
           <Card className="p-6 space-y-4">
             <h2 className="font-semibold">Media</h2>
             <div className="flex items-start gap-4">
-              <div className="relative h-40 w-40 rounded-lg overflow-hidden border border-border bg-muted shrink-0">
+              <div className="relative h-32 w-32 rounded-lg overflow-hidden border border-border bg-muted shrink-0">
                 <img src={form.mainImage} alt="" className="h-full w-full object-cover" />
                 <span className="absolute top-1 left-1 bg-brand text-white text-[10px] font-bold px-1.5 py-0.5 rounded">MAIN</span>
               </div>
-              <div className="space-y-2 min-w-0">
+              <div className="space-y-2">
                 <p className="text-sm font-medium">Main image</p>
                 <p className="text-xs text-muted-foreground">PNG/JPG, under 1.5MB. Stored locally in your browser.</p>
                 <input type="file" ref={fileMain} accept="image/*" onChange={uploadMain} className="hidden" />
@@ -333,7 +302,7 @@ export default function AdminProductEditor() {
               {form.gallery.length === 0 ? (
                 <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-6 text-center">No gallery images yet.</p>
               ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {form.gallery.map((src, i) => (
                     <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
                       <img src={src} alt="" className="h-full w-full object-cover" />
@@ -351,10 +320,32 @@ export default function AdminProductEditor() {
               )}
             </div>
           </Card>
+
+          {/* Details */}
+          <Card className="p-6 space-y-4">
+            <h2 className="font-semibold">Details</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Size / Variant">
+                <Input value={form.size} onChange={(e) => update("size", e.target.value)} placeholder="e.g. 250ml" />
+              </Field>
+              <Field label="SKU *">
+                <Input value={form.sku} onChange={(e) => update("sku", e.target.value)} required />
+              </Field>
+              <Field label="Ingredients (one per line)" full>
+                <Textarea rows={4} value={form.ingredients.join("\n")} onChange={(e) => update("ingredients", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
+              </Field>
+              <Field label="Benefits (one per line)" full>
+                <Textarea rows={4} value={form.benefits.join("\n")} onChange={(e) => update("benefits", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
+              </Field>
+              <Field label="How to use" full>
+                <Textarea rows={3} value={form.usage} onChange={(e) => update("usage", e.target.value)} />
+              </Field>
+            </div>
+          </Card>
         </div>
 
-        {/* RIGHT: Meta + Preview (sticky) */}
-        <div className="xl:col-span-3 space-y-6 min-w-0 xl:sticky xl:top-20 xl:self-start">
+        {/* Side: meta + preview */}
+        <div className="space-y-6">
           <Card className="p-6 space-y-4">
             <h2 className="font-semibold">Meta</h2>
             <Field label="Stock status">

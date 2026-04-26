@@ -1,251 +1,176 @@
-import { useMemo, useState } from "react";
-import { Sparkles, Check, ChevronsUpDown, RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { cn } from "@/lib/utils";
-import { useOpenRouterModels, type OpenRouterModel } from "@/lib/aiImport";
-import {
-  AI_MODEL_SLOT_LABELS,
-  DEFAULT_AI_MODELS,
-  useAiModels,
-} from "@/lib/aiModels";
+  FLAGSHIP_MODELS,
+  OTHER_MODELS,
+  RESIDENCY_MODELS,
+  TIERS,
+  formatPrice,
+} from "@/lib/openaiPricing";
 
-function formatPricePerMillion(perToken?: string) {
-  if (!perToken) return null;
-  const n = Number(perToken);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  const perM = n * 1_000_000;
-  return `$${perM.toFixed(perM < 1 ? 3 : 2)}/1M`;
-}
-
-interface SlotCardProps {
-  slot: 0 | 1 | 2;
-  selectedId: string;
-  models: OpenRouterModel[] | undefined;
-  loading: boolean;
-  error: unknown;
-  onChange: (id: string) => void;
-  onReset: () => void;
-}
-
-function SlotCard({ slot, selectedId, models, loading, error, onChange, onReset }: SlotCardProps) {
-  const [open, setOpen] = useState(false);
-  const sorted = useMemo(
-    () => (models ? [...models].sort((a, b) => a.id.localeCompare(b.id)) : []),
-    [models],
-  );
-  const selected = models?.find((m) => m.id === selectedId);
-  const isDefault = selectedId === DEFAULT_AI_MODELS[slot];
-
+function PriceCell({ value }: { value: number | null }) {
   return (
-    <Card className="p-5 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-brand/10 text-brand flex items-center justify-center text-sm font-semibold">
-            {slot + 1}
-          </div>
-          <div>
-            <h3 className="font-semibold leading-tight">{AI_MODEL_SLOT_LABELS[slot]}</h3>
-            <p className="text-xs text-muted-foreground">
-              {slot === 0
-                ? "Tried first for every AI extraction."
-                : `Used if ${slot === 1 ? "Primary" : "Fallback #2"} fails or hits a rate limit.`}
-            </p>
-          </div>
-        </div>
-        {!isDefault && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onReset}
-            className="text-xs gap-1.5"
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> Reset
-          </Button>
-        )}
-      </div>
+    <td className="p-4 align-middle text-right tabular-nums">
+      {value === null ? (
+        <span className="text-muted-foreground">—</span>
+      ) : (
+        <span className="font-medium">{formatPrice(value)}</span>
+      )}
+    </td>
+  );
+}
 
-      <div className="space-y-2">
-        <Label className="text-xs">Model</Label>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              role="combobox"
-              aria-expanded={open}
-              className="w-full justify-between font-normal h-11"
-            >
-              <span className="truncate text-left">
-                {loading
-                  ? "Loading models…"
-                  : selected
-                    ? `${selected.name}`
-                    : selectedId}
-              </span>
-              <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            className="w-[var(--radix-popover-trigger-width)] p-0"
-            align="start"
-          >
-            <Command>
-              <CommandInput placeholder="Search models…" />
-              <CommandList className="max-h-80">
-                <CommandEmpty>
-                  {error ? "Failed to load models" : "No models found"}
-                </CommandEmpty>
-                <CommandGroup>
-                  {sorted.map((m) => (
-                    <CommandItem
-                      key={m.id}
-                      value={`${m.id} ${m.name}`}
-                      onSelect={() => {
-                        onChange(m.id);
-                        setOpen(false);
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          selectedId === m.id ? "opacity-100" : "opacity-0",
-                        )}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm truncate">{m.name}</div>
-                        <div className="text-[10px] text-muted-foreground truncate">
-                          {m.id}
-                          {m.context_length
-                            ? ` · ${m.context_length.toLocaleString()} ctx`
-                            : ""}
-                        </div>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-      </div>
+function FlagshipTable() {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full caption-bottom text-sm">
+        <thead className="[&_tr]:border-b">
+          <tr className="border-b">
+            <th rowSpan={2} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground border-r border-border">
+              Model
+            </th>
+            <th colSpan={3} className="h-10 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wider text-foreground border-r border-border">
+              Short context
+            </th>
+            <th colSpan={3} className="h-10 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wider text-foreground">
+              Long context
+            </th>
+          </tr>
+          <tr className="border-b">
+            <th className="h-10 px-4 text-right align-middle font-medium text-muted-foreground text-xs">Input</th>
+            <th className="h-10 px-4 text-right align-middle font-medium text-muted-foreground text-xs">Cached input</th>
+            <th className="h-10 px-4 text-right align-middle font-medium text-muted-foreground text-xs border-r border-border">Output</th>
+            <th className="h-10 px-4 text-right align-middle font-medium text-muted-foreground text-xs">Input</th>
+            <th className="h-10 px-4 text-right align-middle font-medium text-muted-foreground text-xs">Cached input</th>
+            <th className="h-10 px-4 text-right align-middle font-medium text-muted-foreground text-xs">Output</th>
+          </tr>
+        </thead>
+        <tbody className="[&_tr:last-child]:border-0">
+          {FLAGSHIP_MODELS.map((row) => (
+            <tr key={row.model} className="border-b transition-colors hover:bg-muted/50">
+              <td className="p-4 align-middle font-mono text-sm border-r border-border">{row.model}</td>
+              <PriceCell value={row.short.input} />
+              <PriceCell value={row.short.cached} />
+              <td className="p-4 align-middle text-right tabular-nums border-r border-border">
+                {row.short.output === null ? (
+                  <span className="text-muted-foreground">—</span>
+                ) : (
+                  <span className="font-medium">{formatPrice(row.short.output)}</span>
+                )}
+              </td>
+              <PriceCell value={row.long.input} />
+              <PriceCell value={row.long.cached} />
+              <PriceCell value={row.long.output} />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
-      <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-        {loading ? (
-          <Skeleton className="h-4 w-3/4" />
-        ) : selected ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <code className="font-mono text-[11px] text-foreground">{selected.id}</code>
-            {selected.context_length && (
-              <span>· {selected.context_length.toLocaleString()} ctx</span>
-            )}
-            {formatPricePerMillion(selected.pricing?.prompt) && (
-              <span>· in {formatPricePerMillion(selected.pricing?.prompt)}</span>
-            )}
-            {formatPricePerMillion(selected.pricing?.completion) && (
-              <span>· out {formatPricePerMillion(selected.pricing?.completion)}</span>
-            )}
-          </div>
-        ) : (
-          <span>
-            <code className="font-mono text-[11px] text-foreground">{selectedId}</code> (not in
-            current OpenRouter list)
-          </span>
-        )}
-      </div>
-    </Card>
+function OtherModelsTable() {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Model</TableHead>
+            <TableHead className="text-right">Input</TableHead>
+            <TableHead className="text-right">Cached input</TableHead>
+            <TableHead className="text-right">Output</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {OTHER_MODELS.map((row) => (
+            <TableRow key={row.model}>
+              <TableCell className="font-mono text-sm">{row.model}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {row.input === null ? <span className="text-muted-foreground">—</span> : <span className="font-medium">{formatPrice(row.input)}</span>}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {row.cached === null ? <span className="text-muted-foreground">—</span> : <span className="font-medium">{formatPrice(row.cached)}</span>}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {row.output === null ? <span className="text-muted-foreground">—</span> : <span className="font-medium">{formatPrice(row.output)}</span>}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function EmptyTier({ tier }: { tier: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-border p-10 text-center">
+      <p className="text-sm text-muted-foreground">
+        No <span className="font-medium text-foreground">{tier}</span> tier pricing data provided.
+      </p>
+      <p className="text-xs text-muted-foreground mt-1">
+        Only Standard tier prices are listed in the supplied reference.
+      </p>
+    </div>
   );
 }
 
 export default function AdminModels() {
-  const { models, setModelAt, resetSlot, resetAll } = useAiModels();
-  const { data, isLoading, error, refetch, isFetching } = useOpenRouterModels();
-
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">AI Models</h1>
-        <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-          Configure which model handles AI product imports. Models are tried top-to-bottom — if
-          Primary fails or is rate-limited, Fallback #2 then Fallback #3 runs automatically.
-        </p>
-      </div>
-
-      <Card className="p-5 flex items-center gap-4 border-brand/40 bg-gradient-to-br from-brand/5 to-transparent">
-        <div className="h-11 w-11 rounded-lg bg-brand/15 text-brand flex items-center justify-center">
-          <Sparkles className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold">OpenRouter</h2>
-            <Badge variant="secondary" className="text-[10px]">
-              Provider
-            </Badge>
-            <Badge className="text-[10px] bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/15">
-              Active
-            </Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Single gateway to every supported model. API key stored as a secure backend secret.
+    <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">OpenAI Model Pricing</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Reference list of every OpenAI model endpoint and per-1M-token price.
           </p>
         </div>
-      </Card>
+      </div>
 
-      {error && (
-        <Card className="p-4 border-destructive/40 bg-destructive/5 flex items-center gap-3">
-          <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-          <div className="flex-1 text-sm">
-            <p className="font-medium text-destructive">Could not load OpenRouter models</p>
-            <p className="text-xs text-muted-foreground">
-              {(error as Error)?.message || "Unknown error"}
+      <Tabs defaultValue="Standard" className="w-full">
+        <TabsList>
+          {TIERS.map((tier) => (
+            <TabsTrigger key={tier} value={tier}>
+              {tier}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="Standard" className="space-y-8 mt-6">
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold">Flagship models</h2>
+              <p className="text-xs text-muted-foreground">Our latest models. Prices per 1M tokens.</p>
+            </div>
+            <FlagshipTable />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Regional processing (data residency) endpoints are charged a 10% uplift for{" "}
+              {RESIDENCY_MODELS.map((m, i) => (
+                <span key={m}>
+                  <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{m}</code>
+                  {i < RESIDENCY_MODELS.length - 1 ? ", " : ""}
+                  {i === RESIDENCY_MODELS.length - 2 ? "and " : ""}
+                </span>
+              ))}
+              .
             </p>
-          </div>
-          <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
-            {isFetching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Retry"}
-          </Button>
-        </Card>
-      )}
+          </section>
 
-      <div className="space-y-4">
-        {[0, 1, 2].map((i) => (
-          <SlotCard
-            key={i}
-            slot={i as 0 | 1 | 2}
-            selectedId={models[i]}
-            models={data}
-            loading={isLoading}
-            error={error}
-            onChange={(id) => setModelAt(i as 0 | 1 | 2, id)}
-            onReset={() => resetSlot(i as 0 | 1 | 2)}
-          />
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold">Other models</h2>
+              <p className="text-xs text-muted-foreground">Prices per 1M tokens.</p>
+            </div>
+            <OtherModelsTable />
+          </section>
+        </TabsContent>
+
+        {(["Batch", "Flex", "Priority"] as const).map((tier) => (
+          <TabsContent key={tier} value={tier} className="mt-6">
+            <EmptyTier tier={tier} />
+          </TabsContent>
         ))}
-      </div>
-
-      <div className="flex items-center justify-between pt-2 border-t border-border">
-        <p className="text-xs text-muted-foreground">
-          Defaults: {DEFAULT_AI_MODELS.join(" → ")}
-        </p>
-        <Button variant="outline" size="sm" onClick={resetAll} className="gap-1.5">
-          <RotateCcw className="h-3.5 w-3.5" /> Reset all to defaults
-        </Button>
-      </div>
+      </Tabs>
     </div>
   );
 }

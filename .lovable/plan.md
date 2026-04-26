@@ -1,59 +1,34 @@
-## Goal
+## Two small fixes
 
-Replace the current OpenAI pricing reference page at `/admin/models` with a real **AI Model configuration** page. The 3 model selectors (Primary + 2 fallbacks) currently living inside `ProductImportFromUrl.tsx` will be moved here as the single source of truth, with **OpenRouter** shown as the provider and the full OpenRouter model list available as a searchable submenu under each slot.
+### 1) Add Category — Save button is "missing"
 
-## Changes
+**Root cause:** The Save button does exist in `DialogFooter`, but on a fresh "Add category" open it appears **disabled (greyed out)** because the form state never resets correctly. The dialog uses `useMemo(() => { ... }, [editing])` to reset form state — `useMemo` is not the right hook for side effects (calling `setForm` during render). On the first open after a previous edit, the form keeps stale values or shows as invalid, and the button looks unresponsive / hidden behind state.
 
-### 1. New shared store: `src/lib/aiModels.ts` (new file)
-- Export `AI_MODEL_STORAGE_KEYS = ["ai-import-model", "ai-import-model-2", "ai-import-model-3"]` (re-using the existing localStorage keys so currently-saved choices are preserved).
-- Export `DEFAULT_AI_MODELS = ["openai/gpt-4o-mini", "google/gemini-2.0-flash-001", "anthropic/claude-3.5-haiku"]`.
-- Export `useAiModels()` hook → reads/writes the 3 model IDs to `localStorage` and broadcasts changes via a `storage` event + a tiny custom-event so the importer card re-reads on change.
-- Export `getAiModels()` (sync) for non-React code paths.
+There's also a secondary UX problem: the footer can scroll out of view on smaller screens because the dialog body has no max-height / scroll.
 
-### 2. Rewrite `src/pages/admin/AdminModels.tsx`
-Drop everything currently in the file (FlagshipTable, OtherModelsTable, EmptyTier, the Tabs over Standard/Batch/Flex/Priority, all imports from `openaiPricing`).
+**Fix in `src/pages/admin/AdminCategories.tsx` (`CategoryEditorDialog`):**
+- Replace the `useMemo` reset with a proper `useEffect` keyed on `editing` so the form resets cleanly every time the dialog opens (BLANK for "new", populated for edit).
+- Make the Save button always visible:
+  - Keep `disabled` only while a save is in flight (track a local `saving` state), not based on empty fields. Show inline validation hints under Name/Slug instead.
+  - Wrap the dialog body in `max-h-[70vh] overflow-y-auto` and keep `DialogFooter` outside the scroll area so Save/Cancel are always pinned and visible.
+- Also call `onSave` inside a `try/finally` that toggles `saving`, and make the button label switch to "Saving…" while pending.
 
-New layout (full-width admin page, matching other admin pages’ padding):
+### 2) Hero section — true 16:9 frame
 
-- **Header**: "AI Models" + sub-text "Configure which model handles AI product imports. Models are tried top-to-bottom — if Primary fails or is rate-limited, Fallback #2 then Fallback #3 runs automatically."
-- **Provider card**: a single read-only row showing **OpenRouter** with its logo/icon (`Sparkles` from lucide), an "Active" badge, and a small note "API key configured via Lovable Cloud secret `OPENROUTER_API_KEY`."
-- **Model slots** — 3 stacked Cards (`Primary AI model`, `Fallback model #2`, `Fallback model #3`). Each card contains:
-  - Slot label + numeric chip (1/2/3)
-  - A `Popover` + `Command` searchable submenu (same component pattern already used in `ProductImportFromUrl.tsx`) listing every model from `useOpenRouterModels()`
-  - Below the picker, a small meta strip showing the selected model's `name`, `id`, `context_length`, and per-1M prompt/completion price from the OpenRouter `pricing` field
-  - "Reset to default" link button per slot
-- **Footer actions**: "Reset all to defaults" button.
+**Current:** `src/components/site/HeroSlider.tsx` uses `h-[70vh] min-h-[460px] max-h-[760px]` — that's viewport-relative, so the media is cropped (object-cover) to fit, never matching the source 16:9.
 
-Loading state shows skeletons; if `useOpenRouterModels()` errors, show an inline error with retry.
+**Fix:**
+- Replace the viewport-height wrapper with an aspect-ratio container so the section itself is exactly 16:9 of its width:
+  - Outer: `relative w-full overflow-hidden bg-brand-deep` with `aspect-[16/9]` (Tailwind built-in).
+  - Remove `h-[70vh] min-h-[460px] max-h-[760px]`.
+- Keep `object-cover` on `<img>` / `<video>` so any non-16:9 source still fills, but a 16:9 source will display pixel-perfect with no crop.
+- Keep the existing overlay, text block, arrows, and dots — they already use `absolute inset-0` so they'll adapt automatically.
+- The text block currently uses `h-full flex items-center` inside `container` — that stays the same; on very wide screens the 16:9 frame can become tall, which is the desired behavior to "fit the image/video exactly".
 
-### 3. Refactor `src/components/admin/ProductImportFromUrl.tsx`
-- Remove the local `useState` for the 3 model IDs, the `STORAGE_KEYS` / `DEFAULT_MODELS` / `SLOT_LABELS` constants, the `renderModelPicker` function, and the entire 3-column model picker grid at the bottom of the card.
-- Import `useAiModels` from `src/lib/aiModels.ts` and read the 3 IDs from there.
-- Keep the URL input + "Scrape & fill" button + status text exactly as today.
-- Replace the model-picker grid with a small read-only summary line: "Using: `<primary>` → `<fb2>` → `<fb3>` · [Configure in AI Models →](/admin/models)" (link via `react-router` `Link`).
+**Optional safety cap (will include):** add `max-h-[85vh]` on the outer wrapper so on ultra-wide monitors the hero doesn't push everything off-screen, while still preserving the 16:9 frame on all common viewports.
 
-### 4. Sidebar (`src/components/admin/AdminLayout.tsx`)
-- Rename the nav entry label from `AI Models` to `AI Models` (unchanged label, but update the description meaning). No structural change — route stays `/admin/models`.
+### Files to edit
+- `src/pages/admin/AdminCategories.tsx` — fix dialog reset (useEffect), always-enabled Save with saving state, scrollable body / pinned footer.
+- `src/components/site/HeroSlider.tsx` — swap fixed viewport height for `aspect-[16/9]` wrapper (with optional `max-h-[85vh]` cap).
 
-### 5. Cleanup
-- `src/lib/openaiPricing.ts` is no longer imported anywhere. Leave the file in place (no deletion needed) so this PR stays scoped to the page restructure. It can be removed in a follow-up.
-
-## Files
-
-**New**
-- `src/lib/aiModels.ts`
-
-**Edited**
-- `src/pages/admin/AdminModels.tsx` (complete rewrite)
-- `src/components/admin/ProductImportFromUrl.tsx` (remove embedded pickers, read from shared store, add link to settings)
-
-**Untouched**
-- Routes in `src/App.tsx` (route already exists)
-- Edge functions (`extract-product`, `openrouter-models`) — already accept `model` + `fallbackModels` and already proxy OpenRouter
-
-## Result
-
-- `/admin/models` becomes the **single place** to choose Primary / Fallback #2 / Fallback #3 OpenRouter models.
-- Each slot has a searchable submenu of every OpenRouter model with name, id, context length and pricing.
-- The product importer card stays focused on the URL → scrape flow and just shows which models are active with a link back to settings.
-- No database or edge-function changes required.
+No DB / edge function / route changes needed.
