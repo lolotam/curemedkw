@@ -230,4 +230,32 @@ All colors MUST be HSL.
     50% { transform: scale(1.05); opacity: 0.85; }
   }
   .animate-logo-pulse { animation: logo-pulse 1.6s ease-in-out infinite; }
+
+  /* Floating motion for icon badges */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .animate-float { animation: float 4s ease-in-out infinite; }
+
+  /* Soft pulsing glow for decorative halos */
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.08); }
+  }
+  .animate-glow-pulse { animation: glow-pulse 5s ease-in-out infinite; }
+
+  /* Slow drift for background blobs */
+  @keyframes blob-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(20px, -15px) scale(1.05); }
+    66% { transform: translate(-15px, 10px) scale(0.97); }
+  }
+  .animate-blob-drift { animation: blob-drift 14s ease-in-out infinite; }
+
+  /* Stagger helpers */
+  .animation-delay-100 { animation-delay: 100ms; }
+  .animation-delay-200 { animation-delay: 200ms; }
+  .animation-delay-300 { animation-delay: 300ms; }
+  .animation-delay-400 { animation-delay: 400ms; }
 }
