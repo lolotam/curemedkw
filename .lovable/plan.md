@@ -1,73 +1,57 @@
-## Goal
-Transform the plain 4-card "What we do" pillars section on the Curemed home page into a vibrant, modern, animated showcase — without breaking i18n (EN/AR) or the brand theming system.
+## Plan: 3 enhancements
 
-## Current state
-- File: `src/pages/CuremedHome.tsx` (lines 59–72)
-- Plain `Card` grid, single brand color icon tile, static, no motion.
-- Uses `t("pillars.*")` keys (already translated EN/AR).
+### 1. Show/Hide password toggle on `/admin/login`
+**File:** `src/pages/admin/AdminLogin.tsx`
+- Add a `showPassword` state (default `false`).
+- Wrap the password `Input` in a `relative` container; change `type` to `showPassword ? "text" : "password"`.
+- Add an absolute-positioned eye toggle button (uses `Eye` / `EyeOff` from `lucide-react`) on the trailing edge inside the input (right padding `pr-10`).
+- Button is `type="button"` so it never submits the form; `aria-label` toggles between "Show password" / "Hide password".
 
-## Design direction
-A colorful, glassy, animated showcase where each pillar gets its own accent color, gradient halo, floating icon, and reveal-on-scroll animation. Modern, playful but professional (medical/wellness appropriate).
+### 2. Multiple categories per product (admin editor + filtering)
 
-### Visual concept per card
-- Rounded-3xl card with **soft white/glass background** (`bg-card/70 backdrop-blur`) and a **colored gradient border glow** that intensifies on hover.
-- **Top-right blurred color blob** (decorative gradient circle) using the pillar's accent color — adds depth and color.
-- **Animated icon badge**: gradient-filled rounded-2xl tile with a subtle floating animation (gentle up/down loop) and a rotating ring on hover.
-- **Number indicator** ("01", "02"…) faintly displayed in the corner for editorial feel.
-- **Hover effects**: card lifts (`-translate-y-2`), gradient glow appears, icon scales + slight rotate, title color shifts to the accent color, an arrow CTA fades in.
-- **Scroll reveal**: stagger fade-in-up using existing `animate-fade-in-up` keyframe (already in `index.css`) with per-card `animation-delay` inline style.
+**Database (new migration):**
+- Create junction table `public.product_categories` with columns:
+  - `product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE`
+  - `category_id uuid NOT NULL REFERENCES categories(id) ON DELETE CASCADE`
+  - `PRIMARY KEY (product_id, category_id)`
+  - `created_at timestamptz DEFAULT now()`
+- Enable RLS:
+  - Public `SELECT` (categories already public).
+  - Admin-only `INSERT`/`DELETE` via existing `has_role(auth.uid(), 'admin')` pattern (matches policies on `products`).
+- Backfill: for every product where `products.category_id IS NOT NULL`, insert a row into `product_categories`. The existing single `category_id` column is kept for backward compatibility (used as the "primary" category for sorting/breadcrumbs).
+- Indexes on `(category_id)` and `(product_id)`.
 
-### Section background
-- Replace flat `bg-muted/40` with a soft **layered gradient background** + subtle radial color spots (decorative blurred divs) to add color without overwhelming.
-- Add a small **eyebrow label** above the title ("Our Expertise" / "خبراتنا") and a short subtitle for hierarchy.
-- Title gets a gradient text treatment using brand colors.
+**Data layer (`src/lib/db.ts`):**
+- Extend the `Product` type with `categoryIds: string[]` (in addition to existing `categoryId` which becomes the "primary" category).
+- Update `useProduct` / `useProducts` queries to also fetch joined `product_categories` rows; map into `categoryIds`.
+- Update `useCreateProduct` and `useUpdateProduct` to:
+  - Insert/update the product row (still writes `category_id` = first id in `categoryIds` for the legacy primary).
+  - After insert/update, sync `product_categories`: delete existing rows for that product, insert the new set (transactional via two awaited calls; acceptable for admin flow).
+- Update `useProductsByCategory` to query products via `product_categories` (so a product appearing in multiple categories is returned for each).
 
-### Per-pillar accent palette (HSL, added as semantic tokens)
-- Pharma → blue/cyan (existing brand tones)
-- Skincare → pink/rose
-- Wellness → emerald/green
-- Medical → violet/indigo
+**Admin editor (`src/pages/admin/AdminProductEditor.tsx`):**
+- Replace the single `Select` with a multi-select control: a popover containing a searchable checkbox list of categories (with "+ Create new category…" action preserved).
+- Display selected categories as removable badges above the popover trigger.
+- Form state stores `categoryIds: string[]`; `categoryId` (primary) is auto-set to the first selected id, kept in sync, and used for legacy display fields.
+- Save flow unchanged from the user's perspective (Save button), but now persists via the data-layer changes above.
 
-These will be applied per-card via inline CSS variables (no hard-coded Tailwind colors in JSX where avoidable; we'll use `style={{ "--accent": "..." }}` and a small set of utility classes) so the design system stays consistent.
+**Frontend filter (`src/pages/BrandPage.tsx`):**
+- Use `categoryIds` (fallback to `[categoryId]` when empty) when computing per-category counts and the active filter intersection so a product in multiple categories shows up under each.
 
-## New animations to add (in `src/index.css`)
-- `@keyframes float` — gentle 6px vertical bob, 4s ease-in-out infinite (for icon badges).
-- `@keyframes glow-pulse` — opacity + scale on the blurred halo, 5s infinite.
-- `@keyframes shimmer` — diagonal shine sweep across the card border on hover (optional, subtle).
-- Utilities: `.animate-float`, `.animate-glow-pulse`, plus `.animation-delay-100/200/300/400` helper classes for stagger.
+### 3. Styled customer name in fake order notifications
+**File:** `src/components/site/LiveOrdersToast.tsx`
+- Refactor the rendered toast body so the customer name is its own `<span>` with `font-bold text-brand` (matches Curemed brand color), and the area name uses a subtle accent (`font-medium text-foreground`). Surrounding sentence text stays `text-muted-foreground` for hierarchy.
+- Both Arabic and English variants get the same treatment, with proper RTL ordering preserved by using JSX fragments instead of plain template strings:
+  - EN: **{name}** from *{area}* just ordered {product.name}
+  - AR: **{name.ar}** من *{area.ar}* طلب {productNameAr} قبل لحظات
+- No changes to interval, frequency, or product-selection logic.
 
-These are additive; no existing animations are touched.
+### Files to be edited
+- `src/pages/admin/AdminLogin.tsx`
+- `supabase/migrations/<new>.sql` (new junction table + RLS + backfill)
+- `src/lib/db.ts`
+- `src/pages/admin/AdminProductEditor.tsx`
+- `src/pages/BrandPage.tsx`
+- `src/components/site/LiveOrdersToast.tsx`
 
-## i18n additions (in `src/lib/i18n.tsx`)
-- `pillars.eyebrow` → EN: "Our Expertise", AR: "خبراتنا"
-- `pillars.subtitle` → EN: "Four pillars that define how we care for every Kuwaiti home.", AR: "أربع ركائز تحدد كيف نعتني بكل بيت كويتي."
-
-(Existing `pillars.title` and per-pillar titles/bodies remain unchanged.)
-
-## Implementation plan
-
-1. **`src/index.css`** — append new keyframes and utility classes (float, glow-pulse, shimmer, animation-delay helpers) inside the existing `@layer utilities` block.
-
-2. **`src/lib/i18n.tsx`** — add the two new translation keys (`pillars.eyebrow`, `pillars.subtitle`).
-
-3. **`src/pages/CuremedHome.tsx`** — rewrite only the pillars `<section>` (lines 59–72). Keep the `Pill / Sparkles / HeartPulse / Stethoscope` icons and `t("pillars.*")` keys. Restructure JSX to:
-   - Wrap section in a relative container with two absolutely-positioned blurred gradient blobs (decorative, `aria-hidden`).
-   - Render eyebrow + gradient title + subtitle header block.
-   - Map an extended pillar config array that also carries `accentFrom`, `accentTo`, and `index` for staggered animation delay.
-   - Each card uses: rounded-3xl, gradient border via `before:` pseudo (Tailwind arbitrary), glass background, hover lift, animated icon tile, decorative blob, number, animated arrow CTA.
-   - RTL safe: use `rtl:rotate-180` for arrows, logical spacing utilities, icon stays centered.
-
-4. **No breaking changes**: still uses `Card`-style markup (we'll switch to a plain `div` to avoid the default `Card` border conflicting with the new gradient border, but visual hierarchy and accessibility remain intact).
-
-## Files to change
-- `src/index.css` (additions only)
-- `src/lib/i18n.tsx` (2 new keys)
-- `src/pages/CuremedHome.tsx` (pillars section JSX only)
-
-## Out of scope
-- Other sections of the home page (brands, spotlight, testimonials, etc.) remain untouched.
-- No new dependencies; pure Tailwind + CSS keyframes.
-- Other brand pages (Flexitol, Kapiva, Nada, ABC) are not modified — this is for the Curemed home only, as selected.
-
-## Verification after build
-- Inspect on desktop (1476px) and mobile to confirm grid wraps to 2 cols then 1 col, animations play smoothly, hover states feel snappy, RTL Arabic layout mirrors correctly, and dark mode still reads well.
+`src/integrations/supabase/types.ts` will regenerate automatically after the migration.

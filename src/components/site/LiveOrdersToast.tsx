@@ -34,8 +34,25 @@ export function LiveOrdersToast() {
       const name = pickRandom(isFemale ? KW_WOMEN_NAMES : KW_MEN_NAMES);
       const area = pickRandom(KW_AREAS);
       const productNameAr = product.nameAr?.trim() || product.name;
-      const ar = `${name.ar} من ${area.ar} طلب ${productNameAr} قبل لحظات`;
-      const en = `${name.en} from ${area.en} just ordered ${product.name}`;
+      const isAr = langRef.current === "ar";
+      const body = isAr ? (
+        <span className="text-muted-foreground">
+          <span className="font-bold text-brand">{name.ar}</span>
+          {" من "}
+          <span className="font-medium text-foreground">{area.ar}</span>
+          {" طلب "}
+          <span className="text-foreground">{productNameAr}</span>
+          {" قبل لحظات"}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">
+          <span className="font-bold text-brand">{name.en}</span>
+          {" from "}
+          <span className="font-medium text-foreground">{area.en}</span>
+          {" just ordered "}
+          <span className="text-foreground">{product.name}</span>
+        </span>
+      );
       toast(
         <div className="flex items-center gap-3">
           {product.mainImage ? (
@@ -50,8 +67,8 @@ export function LiveOrdersToast() {
               <ShoppingBag className="h-5 w-5" />
             </span>
           )}
-          <div className="text-sm leading-snug" dir={langRef.current === "ar" ? "rtl" : "ltr"}>
-            {langRef.current === "ar" ? ar : en}
+          <div className="text-sm leading-snug" dir={isAr ? "rtl" : "ltr"}>
+            {body}
           </div>
         </div>,
         { duration: 6000, position: "top-left" },

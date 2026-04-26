@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, useCategories, useCreateCategory, slugify, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
@@ -26,6 +28,7 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   name: "",
   category: BRANDS[brand].categories[0],
   categoryId: null,
+  categoryIds: [],
   price: 0,
   originalPrice: null,
   shortDescription: "",
@@ -209,7 +212,10 @@ export default function AdminProductEditor() {
         const match = categories.find(
           (c) => c.slug === wantedSlug || c.nameEn.toLowerCase() === fields.category.toLowerCase(),
         );
-        if (match) next.categoryId = match.id;
+        if (match && !next.categoryIds.includes(match.id)) {
+          next.categoryIds = [match.id, ...next.categoryIds];
+          next.categoryId = match.id;
+        }
       }
       if (fields.tags?.length) {
         const merged = Array.from(new Set([...next.tags, ...fields.tags.map((t) => t.trim()).filter(Boolean)]));
@@ -249,32 +255,60 @@ export default function AdminProductEditor() {
     [categories],
   );
 
-  const onCategorySelect = async (val: string) => {
-    if (val === "__none__") {
-      update("categoryId", null);
-      return;
+  const [catSearch, setCatSearch] = useState("");
+  const [catOpen, setCatOpen] = useState(false);
+  const filteredCategories = useMemo(() => {
+    const q = catSearch.trim().toLowerCase();
+    if (!q) return sortedCategories;
+    return sortedCategories.filter(
+      (c) =>
+        c.nameEn.toLowerCase().includes(q) ||
+        c.nameAr.includes(q) ||
+        c.slug.toLowerCase().includes(q),
+    );
+  }, [sortedCategories, catSearch]);
+
+  const setCategoryIds = (ids: string[]) => {
+    setForm((f) => {
+      const primary = ids[0] ?? null;
+      const primaryCat = primary ? categories.find((c) => c.id === primary) : null;
+      return {
+        ...f,
+        categoryIds: ids,
+        categoryId: primary,
+        category: primaryCat ? primaryCat.nameEn : (primary ? f.category : ""),
+      };
+    });
+  };
+
+  const toggleCategory = (catId: string) => {
+    const has = form.categoryIds.includes(catId);
+    const next = has
+      ? form.categoryIds.filter((id) => id !== catId)
+      : [...form.categoryIds, catId];
+    setCategoryIds(next);
+  };
+
+  const removeCategory = (catId: string) => {
+    setCategoryIds(form.categoryIds.filter((id) => id !== catId));
+  };
+
+  const createNewCategoryFromInput = async () => {
+    const name = catSearch.trim();
+    if (!name) return;
+    const nameAr = window.prompt(`Arabic name for "${name}" (optional):`)?.trim() || "";
+    const slug = slugify(name);
+    try {
+      const created = await createCategoryMut.mutateAsync({
+        slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
+        parentId: null, visiblePages: ["curemed"],
+      });
+      setCategoryIds([...form.categoryIds, created.id]);
+      setCatSearch("");
+      toast.success(`Category "${name}" created and added`);
+    } catch (err: any) {
+      toast.error("Create category failed: " + (err.message || "unknown"));
     }
-    if (val === "__new__") {
-      const name = window.prompt("New category English name:")?.trim();
-      if (!name) return;
-      const nameAr = window.prompt(`Arabic name for "${name}" (optional):`)?.trim() || "";
-      const slug = slugify(name);
-      try {
-        const created = await createCategoryMut.mutateAsync({
-          slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
-          parentId: null, visiblePages: ["curemed"],
-        });
-        update("categoryId", created.id);
-        update("category", created.nameEn);
-        toast.success(`Category "${name}" created`);
-      } catch (err: any) {
-        toast.error("Create category failed: " + (err.message || "unknown"));
-      }
-      return;
-    }
-    const cat = categories.find((c) => c.id === val);
-    update("categoryId", val);
-    if (cat) update("category", cat.nameEn);
   };
 
   const save = async (e: React.FormEvent) => {
@@ -362,20 +396,124 @@ export default function AdminProductEditor() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Category">
-                <Select value={form.categoryId ?? "__none__"} onValueChange={onCategorySelect}>
-                  <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— None —</SelectItem>
-                    <SelectItem value="__new__" className="text-brand font-medium">+ Create new category…</SelectItem>
-                    {sortedCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.nameEn}{c.nameAr ? ` · ${c.nameAr}` : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.category && !form.categoryId && (
-                  <p className="text-[10px] text-muted-foreground">Free-text: {form.category}</p>
-                )}
+              <Field label="Categories">
+                <div className="space-y-2">
+                  {form.categoryIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {form.categoryIds.map((cid, i) => {
+                        const c = categories.find((x) => x.id === cid);
+                        if (!c) return null;
+                        return (
+                          <Badge
+                            key={cid}
+                            variant="secondary"
+                            className={cn(
+                              "gap-1 pr-1",
+                              i === 0 && "bg-brand/10 text-brand border-brand/30",
+                            )}
+                          >
+                            {i === 0 && <Star className="h-3 w-3 fill-current" />}
+                            <span>{c.nameEn}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeCategory(cid)}
+                              className="ml-0.5 rounded hover:bg-foreground/10 p-0.5"
+                              aria-label={`Remove ${c.nameEn}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Popover open={catOpen} onOpenChange={setCatOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={catOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className="truncate text-muted-foreground">
+                          {form.categoryIds.length === 0
+                            ? "Select one or more categories"
+                            : `${form.categoryIds.length} selected — add or remove`}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <div className="p-2 border-b border-border">
+                        <Input
+                          autoFocus
+                          value={catSearch}
+                          onChange={(e) => setCatSearch(e.target.value)}
+                          placeholder="Search or create…"
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {filteredCategories.length === 0 && !catSearch.trim() && (
+                          <p className="px-3 py-4 text-sm text-muted-foreground text-center">
+                            No categories yet.
+                          </p>
+                        )}
+                        {filteredCategories.map((c) => {
+                          const checked = form.categoryIds.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => toggleCategory(c.id)}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent text-left",
+                                checked && "bg-accent/50",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded border",
+                                  checked
+                                    ? "bg-brand border-brand text-white"
+                                    : "border-input",
+                                )}
+                              >
+                                {checked && <Check className="h-3 w-3" />}
+                              </span>
+                              <span className="flex-1 truncate">
+                                {c.nameEn}
+                                {c.nameAr ? (
+                                  <span className="text-muted-foreground"> · {c.nameAr}</span>
+                                ) : null}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        {catSearch.trim() &&
+                          !filteredCategories.some(
+                            (c) => c.nameEn.toLowerCase() === catSearch.trim().toLowerCase(),
+                          ) && (
+                            <button
+                              type="button"
+                              onClick={createNewCategoryFromInput}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm border-t border-border text-brand font-medium hover:bg-accent"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Create "{catSearch.trim()}"
+                            </button>
+                          )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-[10px] text-muted-foreground">
+                    The first selected category (★) is used as the primary category for breadcrumbs and SEO.
+                  </p>
+                  {form.category && form.categoryIds.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground">Free-text: {form.category}</p>
+                  )}
+                </div>
               </Field>
               <Field label="Price (KD)">
                 <Input type="number" step="0.01" min={0} value={form.price} onChange={(e) => update("price", parseFloat(e.target.value) || 0)} />

@@ -14,6 +14,7 @@ export interface Product {
   name: string;
   category: string;
   categoryId: string | null;
+  categoryIds: string[];
   price: number;
   originalPrice: number | null;
   shortDescription: string;
@@ -83,6 +84,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   name: r.name,
   category: r.category,
   categoryId: r.category_id ?? null,
+  categoryIds: [],
   price: Number(r.price),
   originalPrice: r.original_price === null || r.original_price === undefined ? null : Number(r.original_price),
   shortDescription: r.short_description,
@@ -170,12 +172,23 @@ export function useProducts() {
   return useQuery({
     queryKey: qk.products,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*")
-        .order("updated_at", { ascending: false });
+      const [{ data, error }, { data: links, error: linkErr }] = await Promise.all([
+        supabase.from("products").select("*").order("updated_at", { ascending: false }),
+        supabase.from("product_categories").select("product_id, category_id"),
+      ]);
       if (error) throw error;
-      return (data as ProductRow[]).map(rowToProduct);
+      if (linkErr) throw linkErr;
+      const linkMap = new Map<string, string[]>();
+      for (const l of (links ?? []) as { product_id: string; category_id: string }[]) {
+        const arr = linkMap.get(l.product_id) ?? [];
+        arr.push(l.category_id);
+        linkMap.set(l.product_id, arr);
+      }
+      return (data as ProductRow[]).map((r) => {
+        const p = rowToProduct(r);
+        const ids = linkMap.get(p.id) ?? (p.categoryId ? [p.categoryId] : []);
+        return { ...p, categoryIds: ids };
+      });
     },
   });
 }
@@ -190,7 +203,24 @@ export function useProductsByBrand(brand: BrandKey) {
         .eq("brand", brand)
         .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data as ProductRow[]).map(rowToProduct);
+      const products = (data as ProductRow[]).map(rowToProduct);
+      const ids = products.map((p) => p.id);
+      if (!ids.length) return products;
+      const { data: links, error: linkErr } = await supabase
+        .from("product_categories")
+        .select("product_id, category_id")
+        .in("product_id", ids);
+      if (linkErr) throw linkErr;
+      const linkMap = new Map<string, string[]>();
+      for (const l of (links ?? []) as { product_id: string; category_id: string }[]) {
+        const arr = linkMap.get(l.product_id) ?? [];
+        arr.push(l.category_id);
+        linkMap.set(l.product_id, arr);
+      }
+      return products.map((p) => ({
+        ...p,
+        categoryIds: linkMap.get(p.id) ?? (p.categoryId ? [p.categoryId] : []),
+      }));
     },
   });
 }
@@ -235,7 +265,18 @@ export function useProduct(id: string | undefined) {
       const { data, error } = await supabase
         .from("products").select("*").eq("id", id!).maybeSingle();
       if (error) throw error;
-      return data ? rowToProduct(data as ProductRow) : null;
+      if (!data) return null;
+      const product = rowToProduct(data as ProductRow);
+      const { data: links, error: linkErr } = await supabase
+        .from("product_categories")
+        .select("category_id")
+        .eq("product_id", id!);
+      if (linkErr) throw linkErr;
+      const ids = (links ?? []).map((l: any) => l.category_id as string);
+      return {
+        ...product,
+        categoryIds: ids.length ? ids : (product.categoryId ? [product.categoryId] : []),
+      };
     },
   });
 }
@@ -244,11 +285,20 @@ export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: ProductInput) => {
-      const row = productToRow(input);
+      const ids = input.categoryIds ?? [];
+      // Keep legacy primary category_id in sync (first selected, or existing value)
+      const primary = ids[0] ?? input.categoryId ?? null;
+      const row = productToRow({ ...input, categoryId: primary });
       const { data, error } = await supabase
         .from("products").insert(row as any).select("*").single();
       if (error) throw error;
-      return rowToProduct(data as ProductRow);
+      const product = rowToProduct(data as ProductRow);
+      if (ids.length) {
+        const rows = ids.map((cid) => ({ product_id: product.id, category_id: cid }));
+        const { error: linkErr } = await supabase.from("product_categories").insert(rows);
+        if (linkErr) throw linkErr;
+      }
+      return { ...product, categoryIds: ids };
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: qk.products }); qc.invalidateQueries({ queryKey: qk.productsFeatured }); },
   });
@@ -258,10 +308,28 @@ export function useUpdateProduct() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<ProductInput> }) => {
+      const ids = patch.categoryIds;
+      const patchToWrite =
+        ids !== undefined
+          ? { ...patch, categoryId: ids[0] ?? null }
+          : patch;
       const { data, error } = await supabase
-        .from("products").update(productToRow(patch) as any).eq("id", id).select("*").single();
+        .from("products").update(productToRow(patchToWrite) as any).eq("id", id).select("*").single();
       if (error) throw error;
-      return rowToProduct(data as ProductRow);
+      const product = rowToProduct(data as ProductRow);
+      if (ids !== undefined) {
+        // Replace the full set
+        const { error: delErr } = await supabase
+          .from("product_categories").delete().eq("product_id", id);
+        if (delErr) throw delErr;
+        if (ids.length) {
+          const rows = ids.map((cid) => ({ product_id: id, category_id: cid }));
+          const { error: insErr } = await supabase.from("product_categories").insert(rows);
+          if (insErr) throw insErr;
+        }
+        return { ...product, categoryIds: ids };
+      }
+      return product;
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.products });
@@ -302,10 +370,18 @@ export function useProductsByCategory(categoryId: string | undefined) {
     queryKey: categoryId ? qk.productsByCategory(categoryId) : ["products", "category", "none"],
     enabled: !!categoryId,
     queryFn: async () => {
+      // Prefer the junction table so multi-category products show up under each category
+      const { data: links, error: linkErr } = await supabase
+        .from("product_categories")
+        .select("product_id")
+        .eq("category_id", categoryId!);
+      if (linkErr) throw linkErr;
+      const productIds = Array.from(new Set((links ?? []).map((l: any) => l.product_id as string)));
+      if (!productIds.length) return [] as Product[];
       const { data, error } = await supabase
         .from("products")
         .select("*")
-        .eq("category_id", categoryId!)
+        .in("id", productIds)
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data as ProductRow[]).map(rowToProduct);

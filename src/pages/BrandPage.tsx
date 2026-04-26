@@ -32,7 +32,10 @@ export default function BrandPage() {
   const brandCategories = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of brandProducts) {
-      if (p.categoryId) counts.set(p.categoryId, (counts.get(p.categoryId) || 0) + 1);
+      const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+      for (const cid of ids) {
+        counts.set(cid, (counts.get(cid) || 0) + 1);
+      }
     }
     return categories
       .filter((c) => counts.has(c.id))
@@ -41,7 +44,10 @@ export default function BrandPage() {
 
   const filteredProducts = useMemo(() => {
     if (selectedCats.size === 0) return brandProducts;
-    return brandProducts.filter((p) => p.categoryId && selectedCats.has(p.categoryId));
+    return brandProducts.filter((p) => {
+      const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+      return ids.some((cid) => selectedCats.has(cid));
+    });
   }, [brandProducts, selectedCats]);
 
   const toggleCat = (id: string) => {
