@@ -717,6 +717,25 @@ export function useTags() {
   });
 }
 
+/**
+ * Idempotently inserts every non-empty tag into the master `tags` table.
+ * Safe to call from product create/update flows or from a manual "sync" button.
+ */
+export async function syncProductTags(tags: string[] | undefined | null): Promise<number> {
+  const list = (tags ?? [])
+    .map((t) => (t ?? "").trim())
+    .filter((t) => t.length > 0);
+  if (!list.length) return 0;
+  const rows = Array.from(
+    new Map(list.map((name) => [slugify(name), { name, slug: slugify(name) }])).values(),
+  );
+  const { error } = await supabase
+    .from("tags")
+    .upsert(rows, { onConflict: "slug", ignoreDuplicates: true });
+  if (error) throw error;
+  return rows.length;
+}
+
 export function useUpsertTag() {
   const qc = useQueryClient();
   return useMutation({
