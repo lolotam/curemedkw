@@ -4,6 +4,7 @@ import { BRANDS } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { Star, MessageCircle } from "lucide-react";
 import { usePriceVisibility } from "@/lib/db";
+import { AddToCartButton } from "@/components/site/AddToCartButton";
 
 export function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
   const { t, lang } = useI18n();
@@ -64,9 +65,9 @@ export function ProductCard({ product, compact = false }: { product: Product; co
           ) : (
             <span className="text-base font-bold text-foreground">KD {product.price.toFixed(2)}</span>
           )}
-          <span className="text-xs font-medium text-brand opacity-0 transition-opacity group-hover:opacity-100">
-            {t("common.viewProduct")} →
-          </span>
+          {!priceHidden && product.stockStatus !== "out_of_stock" && (
+            <AddToCartButton product={product} iconOnly />
+          )}
         </div>
       </div>
     </Link>
