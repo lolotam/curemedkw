@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   useOrders, useOrder, useUpdateOrder, useDeleteOrder,
+  useCreateNotification,
   type OrderStatus, type PaymentStatus,
 } from "@/lib/db";
 import { toast } from "sonner";
@@ -190,6 +191,7 @@ export default function AdminOrders() {
 function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClose: () => void }) {
   const { data: order, isLoading } = useOrder(orderId ?? undefined);
   const updateOrder = useUpdateOrder();
+  const notify = useCreateNotification();
   const [adminNotes, setAdminNotes] = useState("");
 
   // Sync notes when order loads
@@ -265,6 +267,15 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
                   value={order.orderStatus}
                   onValueChange={async (v) => {
                     await updateOrder.mutateAsync({ id: order.id, patch: { orderStatus: v as OrderStatus } });
+                    if (order.userId) {
+                      void notify.mutateAsync({
+                        userId: order.userId,
+                        title: `Order #${order.orderNumber} ${v}`,
+                        body: `Your order status has been updated to ${v}.`,
+                        type: "order",
+                        link: `/order-confirmation/${order.id}`,
+                      });
+                    }
                     toast.success("Status updated");
                   }}
                 >

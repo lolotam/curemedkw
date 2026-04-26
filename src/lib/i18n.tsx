@@ -300,6 +300,52 @@ export const TRANSLATIONS: Dict = {
   "contact.location.title": { en: "Find us on the map", ar: "موقعنا على الخريطة" },
 };
 
+// Account / auth keys
+TRANSLATIONS["nav.account"] = { en: "Account", ar: "حسابي" };
+TRANSLATIONS["nav.signin"] = { en: "Sign in", ar: "تسجيل الدخول" };
+TRANSLATIONS["nav.signup"] = { en: "Sign up", ar: "إنشاء حساب" };
+TRANSLATIONS["nav.signout"] = { en: "Sign out", ar: "تسجيل الخروج" };
+TRANSLATIONS["nav.myOrders"] = { en: "My orders", ar: "طلباتي" };
+TRANSLATIONS["nav.notifications"] = { en: "Notifications", ar: "الإشعارات" };
+
+TRANSLATIONS["auth.email"] = { en: "Email", ar: "البريد الإلكتروني" };
+TRANSLATIONS["auth.password"] = { en: "Password", ar: "كلمة المرور" };
+TRANSLATIONS["auth.fullName"] = { en: "Full name", ar: "الاسم الكامل" };
+TRANSLATIONS["auth.phone"] = { en: "Phone", ar: "رقم الهاتف" };
+TRANSLATIONS["auth.signin.title"] = { en: "Welcome back", ar: "مرحباً بعودتك" };
+TRANSLATIONS["auth.signup.title"] = { en: "Create your account", ar: "إنشاء حسابك" };
+TRANSLATIONS["auth.signin.cta"] = { en: "Sign in", ar: "تسجيل الدخول" };
+TRANSLATIONS["auth.signup.cta"] = { en: "Create account", ar: "إنشاء الحساب" };
+TRANSLATIONS["auth.forgot"] = { en: "Forgot password?", ar: "نسيت كلمة المرور؟" };
+TRANSLATIONS["auth.haveAccount"] = { en: "Have an account?", ar: "لديك حساب؟" };
+TRANSLATIONS["auth.noAccount"] = { en: "Need an account?", ar: "ليس لديك حساب؟" };
+TRANSLATIONS["auth.continueGoogle"] = { en: "Continue with Google", ar: "المتابعة مع جوجل" };
+TRANSLATIONS["auth.or"] = { en: "or", ar: "أو" };
+TRANSLATIONS["auth.reset.title"] = { en: "Reset your password", ar: "إعادة تعيين كلمة المرور" };
+TRANSLATIONS["auth.reset.cta"] = { en: "Send reset link", ar: "إرسال رابط الاستعادة" };
+TRANSLATIONS["auth.reset.body"] = { en: "Enter your email and we'll send you a link to reset your password.", ar: "أدخل بريدك الإلكتروني وسنرسل لك رابطًا لإعادة تعيين كلمة المرور." };
+TRANSLATIONS["auth.newPassword"] = { en: "New password", ar: "كلمة المرور الجديدة" };
+TRANSLATIONS["auth.updatePassword"] = { en: "Update password", ar: "تحديث كلمة المرور" };
+TRANSLATIONS["auth.checkEmail"] = { en: "Check your inbox for a confirmation link.", ar: "تحقق من بريدك للحصول على رابط التأكيد." };
+
+TRANSLATIONS["account.title"] = { en: "My account", ar: "حسابي" };
+TRANSLATIONS["account.tabs.profile"] = { en: "Profile", ar: "الملف الشخصي" };
+TRANSLATIONS["account.tabs.orders"] = { en: "Orders", ar: "الطلبات" };
+TRANSLATIONS["account.tabs.notifications"] = { en: "Notifications", ar: "الإشعارات" };
+TRANSLATIONS["account.tabs.security"] = { en: "Security", ar: "الأمان" };
+TRANSLATIONS["account.save"] = { en: "Save changes", ar: "حفظ التغييرات" };
+TRANSLATIONS["account.uploadAvatar"] = { en: "Upload photo", ar: "رفع صورة" };
+TRANSLATIONS["account.changePassword"] = { en: "Change password", ar: "تغيير كلمة المرور" };
+TRANSLATIONS["account.noOrders"] = { en: "You haven't placed any orders yet.", ar: "لم تقم بأي طلب بعد." };
+TRANSLATIONS["account.noNotifications"] = { en: "No notifications yet.", ar: "لا توجد إشعارات." };
+TRANSLATIONS["account.markAllRead"] = { en: "Mark all as read", ar: "تعيين الكل كمقروء" };
+
+TRANSLATIONS["coupon.label"] = { en: "Promo code", ar: "كود الخصم" };
+TRANSLATIONS["coupon.apply"] = { en: "Apply", ar: "تطبيق" };
+TRANSLATIONS["coupon.applied"] = { en: "Coupon applied", ar: "تم تطبيق الكوبون" };
+TRANSLATIONS["coupon.remove"] = { en: "Remove", ar: "إزالة" };
+TRANSLATIONS["coupon.discount"] = { en: "Discount", ar: "الخصم" };
+
 interface Ctx {
   lang: Lang;
   setLang: (l: Lang) => void;

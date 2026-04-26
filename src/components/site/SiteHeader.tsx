@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Moon, Sun, Globe, X, Bell, Mail } from "lucide-react";
+import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -10,6 +10,11 @@ import curemedLogo from "@/assets/curemed-logo.png";
 import { useAdminSession } from "@/lib/admin";
 import { useMessages, useUnreadMessageCount } from "@/lib/db";
 import { CartIcon } from "@/components/site/CartIcon";
+import { useAuth } from "@/lib/auth";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -49,6 +54,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-1">
           {isAdmin && <AdminBell />}
           <CartIcon />
+          <UserMenu />
           <Button
             variant="ghost"
             size="sm"
@@ -212,5 +218,44 @@ function MobileItem({ to, label, onClick }: { to: string; label: string; onClick
     >
       {label}
     </Link>
+  );
+}
+
+function UserMenu() {
+  const { user, signOut } = useAuth();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+
+  if (!user) {
+    return (
+      <Button variant="ghost" size="sm" onClick={() => navigate("/auth")} className="gap-1.5">
+        <UserIcon className="h-4 w-4" />
+        <span className="hidden sm:inline text-xs font-semibold">{t("nav.signin")}</span>
+      </Button>
+    );
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label="Account">
+          <UserIcon className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuLabel className="truncate">{user.email}</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate("/account")}>
+          <UserIcon className="h-4 w-4 mr-2" />{t("nav.account")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate("/account")}>
+          <Package className="h-4 w-4 mr-2" />{t("nav.myOrders")}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={async () => { await signOut(); navigate("/"); }}>
+          <LogOut className="h-4 w-4 mr-2" />{t("nav.signout")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
