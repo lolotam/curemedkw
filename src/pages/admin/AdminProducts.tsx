@@ -7,7 +7,6 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProducts, useDeleteProduct, useBulkDeleteProducts } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { brandSlugFromKey } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
