@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import curemedLogo from "@/assets/curemed-logo.png";
 import { useAdminSession } from "@/lib/admin";
 import { useMessages, useUnreadMessageCount } from "@/lib/db";
+import { CartIcon } from "@/components/site/CartIcon";
 import {
   Sheet,
   SheetContent,
@@ -47,6 +48,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-1">
           {isAdmin && <AdminBell />}
+          <CartIcon />
           <Button
             variant="ghost"
             size="sm"

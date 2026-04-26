@@ -28,6 +28,11 @@ import AdminModels from "./pages/admin/AdminModels";
 import AdminTags from "./pages/admin/AdminTags";
 import AdminFlags from "./pages/admin/AdminFlags";
 import AdminReviews from "./pages/admin/AdminReviews";
+import AdminOrders from "./pages/admin/AdminOrders";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import OrderConfirmation from "./pages/OrderConfirmation";
+import { CartProvider } from "@/lib/cart";
 
 const queryClient = new QueryClient();
 
@@ -36,7 +41,8 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <I18nProvider>
-          <TooltipProvider>
+          <CartProvider>
+            <TooltipProvider>
             <Toaster />
             <Sonner />
             <BrowserRouter>
@@ -45,6 +51,9 @@ const App = () => {
                 <Route path="/curemed" element={<CuremedHome />} />
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<ContactUs />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminOverview />} />
@@ -61,6 +70,7 @@ const App = () => {
                   <Route path="subscribers" element={<AdminSubscribers />} />
                   <Route path="flags" element={<AdminFlags />} />
                   <Route path="reviews" element={<AdminReviews />} />
+                  <Route path="orders" element={<AdminOrders />} />
                 </Route>
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/:brand/product/:id" element={<ProductDetail />} />
@@ -68,7 +78,8 @@ const App = () => {
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
-          </TooltipProvider>
+            </TooltipProvider>
+          </CartProvider>
         </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>

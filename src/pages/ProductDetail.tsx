@@ -9,6 +9,7 @@ import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ProductReviews } from "@/components/site/ProductReviews";
+import { AddToCartButton } from "@/components/site/AddToCartButton";
 
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
@@ -92,6 +93,11 @@ export default function ProductDetail() {
               <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>
                 {stockBadge.label}
               </span>
+            </div>
+          )}
+          {!priceHidden && product.stockStatus !== "out_of_stock" && (
+            <div className="mt-6">
+              <AddToCartButton product={product} size="lg" fullWidth />
             </div>
           )}
           <div className="mt-6 grid grid-cols-2 gap-3 text-sm">

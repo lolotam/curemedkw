@@ -173,6 +173,8 @@ export const qk = {
   productReviews: (productId: string) => ["product_reviews", productId] as const,
   approvedReviews: ["product_reviews", "approved"] as const,
   adminReviews: ["product_reviews", "admin"] as const,
+  orders: ["orders"] as const,
+  order: (id: string) => ["orders", id] as const,
 };
 
 /* ============================================================
@@ -1086,6 +1088,243 @@ export function useDeleteReview() {
       qc.invalidateQueries({ queryKey: qk.adminReviews });
       qc.invalidateQueries({ queryKey: qk.approvedReviews });
       qc.invalidateQueries({ queryKey: ["product_reviews"] });
+    },
+  });
+}
+/* ============================================================
+ * Orders
+ * ============================================================ */
+
+export type OrderStatus = "new" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
+export type PaymentMethod = "pay_by_link" | "cod";
+export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+
+export interface OrderItem {
+  id: string;
+  orderId: string;
+  productId: string | null;
+  productNameSnapshot: string;
+  productImageSnapshot: string;
+  brandSnapshot: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface Order {
+  id: string;
+  orderNumber: string;
+  userId: string | null;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  city: string;
+  area: string;
+  block: string;
+  street: string;
+  building: string;
+  addressLine: string;
+  notes: string;
+  adminNotes: string;
+  subtotal: number;
+  discountAmount: number;
+  total: number;
+  couponCode: string | null;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  orderStatus: OrderStatus;
+  createdAt: string;
+  updatedAt: string;
+  items?: OrderItem[];
+}
+
+const rowToOrder = (r: any, items?: OrderItem[]): Order => ({
+  id: r.id,
+  orderNumber: r.order_number,
+  userId: r.user_id ?? null,
+  customerName: r.customer_name,
+  customerEmail: r.customer_email,
+  customerPhone: r.customer_phone,
+  city: r.city ?? "",
+  area: r.area ?? "",
+  block: r.block ?? "",
+  street: r.street ?? "",
+  building: r.building ?? "",
+  addressLine: r.address_line ?? "",
+  notes: r.notes ?? "",
+  adminNotes: r.admin_notes ?? "",
+  subtotal: Number(r.subtotal ?? 0),
+  discountAmount: Number(r.discount_amount ?? 0),
+  total: Number(r.total ?? 0),
+  couponCode: r.coupon_code ?? null,
+  paymentMethod: r.payment_method,
+  paymentStatus: r.payment_status,
+  orderStatus: r.order_status,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  items,
+});
+
+const rowToOrderItem = (r: any): OrderItem => ({
+  id: r.id,
+  orderId: r.order_id,
+  productId: r.product_id ?? null,
+  productNameSnapshot: r.product_name_snapshot,
+  productImageSnapshot: r.product_image_snapshot ?? "",
+  brandSnapshot: r.brand_snapshot ?? "",
+  quantity: r.quantity,
+  unitPrice: Number(r.unit_price),
+  lineTotal: Number(r.line_total),
+});
+
+export interface CreateOrderInput {
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  city: string;
+  area: string;
+  block: string;
+  street: string;
+  building: string;
+  addressLine?: string;
+  notes?: string;
+  paymentMethod: PaymentMethod;
+  couponCode?: string | null;
+  discountAmount?: number;
+  items: Array<{
+    productId: string;
+    productName: string;
+    productImage: string;
+    brand: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
+}
+
+export function useCreateOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateOrderInput) => {
+      const subtotal = input.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+      const discount = input.discountAmount ?? 0;
+      const total = Math.max(0, subtotal - discount);
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: orderRow, error } = await supabase
+        .from("orders")
+        .insert({
+          user_id: userData?.user?.id ?? null,
+          customer_name: input.customerName,
+          customer_email: input.customerEmail,
+          customer_phone: input.customerPhone,
+          city: input.city,
+          area: input.area,
+          block: input.block,
+          street: input.street,
+          building: input.building,
+          address_line: input.addressLine ?? "",
+          notes: input.notes ?? "",
+          subtotal,
+          discount_amount: discount,
+          total,
+          coupon_code: input.couponCode ?? null,
+          payment_method: input.paymentMethod,
+        } as any)
+        .select("*")
+        .single();
+      if (error) throw error;
+      const order = rowToOrder(orderRow);
+      const itemRows = input.items.map((i) => ({
+        order_id: order.id,
+        product_id: i.productId,
+        product_name_snapshot: i.productName,
+        product_image_snapshot: i.productImage,
+        brand_snapshot: i.brand,
+        quantity: i.quantity,
+        unit_price: i.unitPrice,
+        line_total: i.unitPrice * i.quantity,
+      }));
+      if (itemRows.length) {
+        const { error: itemErr } = await supabase.from("order_items").insert(itemRows);
+        if (itemErr) throw itemErr;
+      }
+      return order;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.orders });
+    },
+  });
+}
+
+export function useOrders() {
+  return useQuery({
+    queryKey: qk.orders,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r) => rowToOrder(r));
+    },
+  });
+}
+
+export function useOrder(id: string | undefined) {
+  return useQuery({
+    queryKey: id ? qk.order(id) : ["orders", "none"],
+    enabled: !!id,
+    queryFn: async () => {
+      const [{ data: orderData, error: oErr }, { data: itemsData, error: iErr }] = await Promise.all([
+        supabase.from("orders").select("*").eq("id", id!).maybeSingle(),
+        supabase.from("order_items").select("*").eq("order_id", id!).order("created_at", { ascending: true }),
+      ]);
+      if (oErr) throw oErr;
+      if (iErr) throw iErr;
+      if (!orderData) return null;
+      return rowToOrder(orderData, (itemsData ?? []).map(rowToOrderItem));
+    },
+  });
+}
+
+export function useUpdateOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<{
+        orderStatus: OrderStatus;
+        paymentStatus: PaymentStatus;
+        adminNotes: string;
+      }>;
+    }) => {
+      const row: any = {};
+      if (patch.orderStatus !== undefined) row.order_status = patch.orderStatus;
+      if (patch.paymentStatus !== undefined) row.payment_status = patch.paymentStatus;
+      if (patch.adminNotes !== undefined) row.admin_notes = patch.adminNotes;
+      const { error } = await supabase.from("orders").update(row).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.orders });
+      qc.invalidateQueries({ queryKey: qk.order(vars.id) });
+    },
+  });
+}
+
+export function useDeleteOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      // Delete items first (no cascade defined client-side)
+      await supabase.from("order_items").delete().eq("order_id", id);
+      const { error } = await supabase.from("orders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.orders });
     },
   });
 }
