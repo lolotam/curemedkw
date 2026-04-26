@@ -35,7 +35,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
   }, [paused, count, intervalMs]);
 
   if (slides === null) {
-    return <div className="bg-brand-soft min-h-[60vh] animate-pulse" />;
+    return <div className="bg-brand-soft w-full aspect-[16/9] max-h-[85vh] animate-pulse" />;
   }
 
   if (slides.length === 0) {
