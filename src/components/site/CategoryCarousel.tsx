@@ -5,7 +5,9 @@ import { useCategories } from "@/lib/db";
 export function CategoryCarousel() {
   const { t, lang } = useI18n();
   const { data: categories = [] } = useCategories();
-  const active = categories.filter((c) => c.isActive);
+  // Only show top-level categories in the marketing carousel; subcategories
+  // are reachable via their parent's category page.
+  const active = categories.filter((c) => c.isActive && !c.parentId);
   if (active.length === 0) return null;
 
   // Duplicate for seamless marquee loop
