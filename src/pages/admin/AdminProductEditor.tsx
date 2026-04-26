@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye, Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, useCategories, useCreateCategory, slugify, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
@@ -26,6 +28,7 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   name: "",
   category: BRANDS[brand].categories[0],
   categoryId: null,
+  categoryIds: [],
   price: 0,
   originalPrice: null,
   shortDescription: "",
