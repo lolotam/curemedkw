@@ -81,6 +81,10 @@ export const TRANSLATIONS: Dict = {
   "product.usage": { en: "How to use", ar: "طريقة الاستخدام" },
   "product.size": { en: "Size", ar: "الحجم" },
   "product.sku": { en: "SKU", ar: "رمز المنتج" },
+  "product.description": { en: "Description", ar: "الوصف" },
+  "product.inquire": { en: "Inquire about this product", ar: "استفسر عن هذا المنتج" },
+  "product.brand": { en: "Brand", ar: "العلامة" },
+  "product.category": { en: "Category", ar: "الفئة" },
 
   "admin.login.title": { en: "Admin sign in", ar: "تسجيل دخول الإدارة" },
   "admin.login.password": { en: "Password", ar: "كلمة المرور" },
