@@ -1,101 +1,34 @@
-## Plan — Product Categories System
+## Two small fixes
 
-### 1. Database (migration)
+### 1) Add Category — Save button is "missing"
 
-**New table `categories`:**
-- `id` uuid PK
-- `slug` text unique (URL-safe, e.g. `feet-care`)
-- `name_en` text, `name_ar` text
-- `image_url` text (1:1 image)
-- `sort_order` int default 0
-- `created_at`, `updated_at`
-- RLS: public SELECT; admin INSERT/UPDATE/DELETE (using `has_role`)
-- Trigger: `update_updated_at_column`
+**Root cause:** The Save button does exist in `DialogFooter`, but on a fresh "Add category" open it appears **disabled (greyed out)** because the form state never resets correctly. The dialog uses `useMemo(() => { ... }, [editing])` to reset form state — `useMemo` is not the right hook for side effects (calling `setForm` during render). On the first open after a previous edit, the form keeps stale values or shows as invalid, and the button looks unresponsive / hidden behind state.
 
-**Products table:**
-- Add `category_id uuid REFERENCES categories(id) ON DELETE SET NULL`
-- Keep existing `category` text column for backwards-compat / display fallback
-- Add `tags text[]` is already present — keep as-is
+There's also a secondary UX problem: the footer can scroll out of view on smaller screens because the dialog body has no max-height / scroll.
 
-**Storage:**
-- Reuse `product-images` bucket with `categories/<id>/` prefix (or add a small `category-images` bucket — I'll add a dedicated `category-images` public bucket for clarity, with admin-only write RLS).
+**Fix in `src/pages/admin/AdminCategories.tsx` (`CategoryEditorDialog`):**
+- Replace the `useMemo` reset with a proper `useEffect` keyed on `editing` so the form resets cleanly every time the dialog opens (BLANK for "new", populated for edit).
+- Make the Save button always visible:
+  - Keep `disabled` only while a save is in flight (track a local `saving` state), not based on empty fields. Show inline validation hints under Name/Slug instead.
+  - Wrap the dialog body in `max-h-[70vh] overflow-y-auto` and keep `DialogFooter` outside the scroll area so Save/Cancel are always pinned and visible.
+- Also call `onSave` inside a `try/finally` that toggles `saving`, and make the button label switch to "Saving…" while pending.
 
-### 2. Data layer (`src/lib/db.ts`)
+### 2) Hero section — true 16:9 frame
 
-Add types + hooks:
-- `Category { id, slug, nameEn, nameAr, imageUrl, sortOrder }`
-- `useCategories()` — sorted by `sort_order`
-- `useCategory(slug)`, `useCategoryById(id)`
-- `useCreateCategory`, `useUpdateCategory`, `useDeleteCategory`, `useBulkDeleteCategories`
-- `uploadCategoryImage(file, categoryId?)`
-- Extend `Product` type with `categoryId?: string` and update `rowToProduct` / `productToRow`
-- `useProductsByCategory(categoryId)`
+**Current:** `src/components/site/HeroSlider.tsx` uses `h-[70vh] min-h-[460px] max-h-[760px]` — that's viewport-relative, so the media is cropped (object-cover) to fit, never matching the source 16:9.
 
-### 3. AI extraction (`supabase/functions/extract-product`)
+**Fix:**
+- Replace the viewport-height wrapper with an aspect-ratio container so the section itself is exactly 16:9 of its width:
+  - Outer: `relative w-full overflow-hidden bg-brand-deep` with `aspect-[16/9]` (Tailwind built-in).
+  - Remove `h-[70vh] min-h-[460px] max-h-[760px]`.
+- Keep `object-cover` on `<img>` / `<video>` so any non-16:9 source still fills, but a 16:9 source will display pixel-perfect with no crop.
+- Keep the existing overlay, text block, arrows, and dots — they already use `absolute inset-0` so they'll adapt automatically.
+- The text block currently uses `h-full flex items-center` inside `container` — that stays the same; on very wide screens the 16:9 frame can become tall, which is the desired behavior to "fit the image/video exactly".
 
-Extend the tool schema so the AI also returns:
-- `category` (free text — existing)
-- `tags: string[]` (3–8 short keywords)
+**Optional safety cap (will include):** add `max-h-[85vh]` on the outer wrapper so on ultra-wide monitors the hero doesn't push everything off-screen, while still preserving the 16:9 frame on all common viewports.
 
-Update `aiImport.ts` `ExtractedFields` and `AdminProductEditor.applyImported` to populate `tags` and (if a matching category slug exists) auto-link `category_id`.
+### Files to edit
+- `src/pages/admin/AdminCategories.tsx` — fix dialog reset (useEffect), always-enabled Save with saving state, scrollable body / pinned footer.
+- `src/components/site/HeroSlider.tsx` — swap fixed viewport height for `aspect-[16/9]` wrapper (with optional `max-h-[85vh]` cap).
 
-### 4. Admin UI
-
-**New page `src/pages/admin/AdminCategories.tsx`:**
-- Table list with checkbox select-all, bulk delete, search
-- Columns: image (1:1 thumb), EN name, AR name, slug, sort order, # products, actions
-- "Add category" button → modal/inline editor with:
-  - Name EN, Name AR, slug (auto from EN, editable)
-  - 1:1 image upload (square crop hint, validated aspect)
-  - Sort order
-- Edit & delete per row; bulk delete bar like products page
-- Add nav entry in `AdminLayout` (`Tags` icon) → `/admin/categories`
-- Route in `App.tsx`
-
-**Product editor (`AdminProductEditor.tsx`):**
-- Replace free-text "Category" input with a `Select` of existing categories (plus "Create new…" inline)
-- Add multi-input "Tags" (chip input)
-- AI import populates both
-
-### 5. Public site
-
-**`src/components/site/CategoryCarousel.tsx` (new):**
-- Auto-scrolling marquee/carousel of category cards (1:1 image + bilingual name)
-- Cards link to `/category/<slug>`
-- Mounted on `CuremedHome.tsx` (between brands and pillars) and on every `BrandPage.tsx` (above products)
-
-**`src/pages/CategoryPage.tsx` (new):**
-- Route `/category/:slug`
-- Shows category banner (image + EN/AR name) + product grid using `useProductsByCategory`
-
-**Brand page filter (`BrandPage.tsx`):**
-- Add a left sidebar (mobile: collapsible) "Filter by → Areas/Categories" matching the screenshot style
-- Checkbox list of categories that have ≥1 product in this brand, with counts
-- Filters the brand product grid client-side
-- Replace `AutoCarousel` with a responsive grid when filters are active
-
-### 6. i18n
-
-Add keys: `category.title`, `category.all`, `category.filterBy`, `category.areas`, `nav.categories`, etc., in `src/lib/i18n.tsx`.
-
-### 7. QA
-
-- Verify migration runs cleanly (additive — no breaking change to existing products)
-- Verify RLS: anonymous can read categories, only admins can write
-- Verify AI fallback chain still works after schema change
-- Verify carousel auto-scrolls and pauses on hover
-- Verify category page + brand-page filter render in EN and AR (RTL)
-
-**Files created:**
-- migration (categories table, category-images bucket + RLS, products.category_id column)
-- `src/pages/admin/AdminCategories.tsx`
-- `src/pages/CategoryPage.tsx`
-- `src/components/site/CategoryCarousel.tsx`
-- `src/components/admin/CategoryEditorDialog.tsx`
-
-**Files edited:**
-- `src/lib/db.ts`, `src/lib/aiImport.ts`, `src/lib/i18n.tsx`
-- `src/App.tsx`, `src/components/admin/AdminLayout.tsx`
-- `src/pages/CuremedHome.tsx`, `src/pages/BrandPage.tsx`
-- `src/pages/admin/AdminProductEditor.tsx`
-- `supabase/functions/extract-product/index.ts`
+No DB / edge function / route changes needed.
