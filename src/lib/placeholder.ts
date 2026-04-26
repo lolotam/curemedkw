@@ -43,21 +43,12 @@ export function brandLogoSvg(brand: string, name: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-import abcLogo from "@/assets/brand-australian-bodycare.png";
-import kapivaLogo from "@/assets/brand-kapiva.png";
-import nadaLogo from "@/assets/brand-nada.png";
-import flexitolLogo from "@/assets/brand-flexitol.png";
-
-const BRAND_LOGO_IMAGES: Record<string, string> = {
-  abc: abcLogo,
-  kapiva: kapivaLogo,
-  nada: nadaLogo,
-  flexitol: flexitolLogo,
-};
+import { BRANDS } from "@/lib/brands";
 
 export function getBrandLogo(brand: string, name: string): { src: string; isImage: boolean } {
-  const real = BRAND_LOGO_IMAGES[brand];
-  if (real) return { src: real, isImage: true };
+  // `brand` matches BrandMeta.themeAttr (which equals the brand key for all current brands).
+  const meta = Object.values(BRANDS).find((b) => b.themeAttr === brand);
+  if (meta?.logo) return { src: meta.logo, isImage: true };
   return { src: brandLogoSvg(brand, name), isImage: false };
 }
 
