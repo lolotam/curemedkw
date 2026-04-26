@@ -1,64 +1,36 @@
-## Goal
-On the `/curemed` "Shop by category" section, display **every active category** (parents *and* subcategories) and present them in a single-row, **infinite right-to-left auto-scroll** marquee.
 
-## Root cause of the current bug
-In `src/components/site/CategoryCarousel.tsx`, the list is filtered with:
-```ts
-const active = categories.filter((c) => c.isActive && !c.parentId);
-```
-The `!c.parentId` check excludes every subcategory, which is why only top-level categories ever render. We need to drop that condition so subcategories show up too.
+## Plan: Logo replacement, full-width landing, and seamless marquee loop
 
-## Proposed changes — `src/components/site/CategoryCarousel.tsx`
+### 1. Replace the Curemed logo (header, footer, admin)
+- Copy the uploaded `user-uploads://curmed_3d_logo500-200.png` to `src/assets/curemed-logo.png` (overwrite).
+- Since `SiteHeader.tsx`, `SiteFooter.tsx`, and `AdminLayout.tsx` all import from `@/assets/curemed-logo.png`, swapping the file updates every location automatically — no code changes needed.
+- Bump the header logo height (`h-20` → `h-24` if needed) only if the new wider/3D logo looks cramped after preview.
 
-1. **Show every active category**
-   - Replace the filter with `categories.filter((c) => c.isActive)` so both parents and subs are included.
-   - Simplify the product-count logic: since each tile now represents a single category (no roll-up needed), count products whose `categoryIds` / `categoryId` directly match `c.id`. Remove the descendant-traversal map.
+### 2. Make the landing page full screen (edge-to-edge)
+The `/curemed` page currently constrains every section inside `.container` (max-width 1400px with 2rem padding).
 
-2. **Convert the grid into an infinite marquee**
-   - Remove the `grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` wrapper.
-   - Wrap the track in an overflow-hidden container with edge fade masks (same `linear-gradient` mask technique used in the brands marquee) so cards fade softly at both ends.
-   - Render the track as `flex w-max gap-5 md:gap-6 cat-marquee group-hover:[animation-play-state:paused]`.
-   - **Duplicate the list** (`[...active, ...active]`) so the `translateX(-50%)` keyframe loops seamlessly. Mark the second copy with `aria-hidden="true"` and `tabIndex={-1}` for accessibility.
-   - Give each card a fixed width (`w-44 sm:w-52 md:w-56 shrink-0`) so the track has a stable measurable size for the animation.
-   - The existing `.cat-marquee` utility in `src/index.css` already animates `0 → -50%` (right-to-left) and auto-flips for `[dir="rtl"]`, so no CSS changes are needed.
+- In `src/pages/CuremedHome.tsx`, replace the `container` wrapper on the **full-width sections** (Brands marquee header, Pillars, Featured carousel, Testimonials/FAQ/Contact/Newsletter wrappers where applicable) with a full-bleed `w-full px-4 md:px-8` layout so the page uses the entire viewport width.
+- Hero (`HeroSlider`) and the marquee strips are already full-bleed — leave them.
+- Inner content (text blocks, grids) gets `max-w-screen-2xl mx-auto` only where readability requires it (headings, copy), so backgrounds extend edge-to-edge while text stays centered.
 
-3. **Preserve existing visuals**
-   - Keep the pillar-tinted palette cycling, gradient halo on hover, tinted blob, square image panel, name + product-count pill, and the `-translate-y-2` hover lift exactly as they are today — only the layout container and the data filter change.
+### 3. Fix the seamless infinite loop on both marquees
+**Root cause:** The current implementation doubles the array and animates `translateX: 0 → -50%`. With `gap-5` between items, the gap between the **last item of set 1** and **first item of set 2** equals the gap, but when the animation wraps back to `0`, there is no gap before the first item — creating a visible "jump"/end effect. Same for the categories carousel.
 
-## Key snippet (illustrative)
-```tsx
-<div
-  className="group relative overflow-hidden"
-  style={{
-    maskImage: "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
-    WebkitMaskImage: "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
-  }}
->
-  <div className="cat-marquee flex w-max gap-5 md:gap-6 group-hover:[animation-play-state:paused]">
-    {[...active, ...active].map((c, i) => {
-      const palette = PALETTES[i % PALETTES.length];
-      const isClone = i >= active.length;
-      return (
-        <div
-          key={`${c.id}-${i}`}
-          className="group/card relative shrink-0 w-44 sm:w-52 md:w-56"
-          aria-hidden={isClone || undefined}
-        >
-          {/* existing card markup unchanged */}
-        </div>
-      );
-    })}
-  </div>
-</div>
-```
+**Fix (`src/index.css` + both components):**
+- Move the gap from CSS `gap-*` to per-item right margin (e.g. `mr-5 md:mr-6` on each card) so the spacing is **part of each item's width**. This makes the doubled track perfectly tileable: scrolling exactly `-50%` lines the cloned set up identically with the original, including the spacing before each card.
+- Remove `gap-5` / `gap-5 md:gap-6` from the marquee track in:
+  - `src/pages/CuremedHome.tsx` (brands marquee)
+  - `src/components/site/CategoryCarousel.tsx` (categories marquee)
+- Keep the existing `marquee` and `cat-marquee` keyframes (they already animate `0 → -50%`, which is the correct seamless distance once gap is internalized).
+- Keep `[...list, ...list]` duplication and `aria-hidden` on clones.
+- Optionally slow down to `60s` for a calmer loop.
 
-## Files to edit
-- `src/components/site/CategoryCarousel.tsx`
+### Files to edit
+- `src/assets/curemed-logo.png` (overwrite via copy)
+- `src/pages/CuremedHome.tsx` (full-width layout + marquee gap fix)
+- `src/components/site/CategoryCarousel.tsx` (marquee gap fix)
 
-No CSS, schema, or other component changes required.
-
-## Acceptance criteria
-- All active categories (parents + subcategories) appear in the section.
-- Cards form a single horizontal row that auto-scrolls right-to-left continuously, looping seamlessly.
-- Hovering pauses the animation; hover lift and palette accents still work.
-- Section still respects RTL (Arabic) by reversing direction via the existing CSS rule.
+### Result
+- New 3D Curemed logo appears in site header, footer, and admin sidebar.
+- Landing page sections stretch edge-to-edge across the full viewport.
+- Both "Shop by category" and "Our brands" marquees scroll truly infinitely — no visible end/jump as cards exit left and re-enter from the right.

@@ -90,7 +90,7 @@ export function CategoryCarousel() {
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
         }}
       >
-        <div className="cat-marquee flex w-max gap-5 md:gap-6 group-hover:[animation-play-state:paused] py-2">
+        <div className="cat-marquee flex w-max group-hover:[animation-play-state:paused] py-2">
           {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
@@ -98,7 +98,7 @@ export function CategoryCarousel() {
             return (
               <div
                 key={`${c.id}-${i}`}
-                className="group/card relative shrink-0 w-44 sm:w-52 md:w-56"
+                className="group/card relative shrink-0 w-44 sm:w-52 md:w-56 mr-5 md:mr-6"
                 aria-hidden={isClone || undefined}
               >
                 {/* gradient halo behind card on hover (matches pillars) */}

@@ -28,7 +28,7 @@ export default function CuremedHome() {
       <CategoryCarousel />
 
       <section id="brands" className="py-16 md:py-24">
-        <div className="container">
+        <div className="w-full px-4 md:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <h2 className="text-3xl md:text-4xl font-bold">{t("brands.title")}</h2>
             <p className="mt-3 text-muted-foreground">{t("brands.subtitle")}</p>
@@ -43,7 +43,7 @@ export default function CuremedHome() {
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className="marquee flex w-max gap-5 group-hover:[animation-play-state:paused]">
+          <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => {
               const l = getBrandLogo(b.themeAttr, b.name);
               const isClone = idx >= BRAND_LIST.length;
@@ -54,7 +54,7 @@ export default function CuremedHome() {
                   data-brand={b.themeAttr}
                   aria-hidden={isClone ? "true" : undefined}
                   tabIndex={isClone ? -1 : undefined}
-                  className="group/card shrink-0 w-72 md:w-80 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
+                  className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
                     {l.isImage ? (
@@ -98,7 +98,7 @@ export default function CuremedHome() {
           <div className="absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-emerald-400/15 blur-3xl animate-blob-drift animation-delay-200" />
         </div>
 
-        <div className="container relative">
+        <div className="w-full px-4 md:px-8 relative">
           {/* Header */}
           <div className="text-center max-w-2xl mx-auto mb-14">
             <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand backdrop-blur">
@@ -241,7 +241,7 @@ export default function CuremedHome() {
       </section>
 
       {featured.length > 0 && (
-        <section className="container py-16 md:py-24">
+        <section className="w-full px-4 md:px-8 py-16 md:py-24">
           <h2 className="text-3xl md:text-4xl font-bold mb-10 text-center">{t("spotlight.title")}</h2>
           <AutoCarousel intervalMs={5000}>
             {featured.map((p) => <ProductCard key={p.id} product={p} />)}
