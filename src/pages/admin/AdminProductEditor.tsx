@@ -632,6 +632,13 @@ export default function AdminProductEditor() {
           </Card>
         </div>
       </div>
+
+      <ImagePreviewDialog
+        src={previewSrc}
+        open={!!previewSrc}
+        onOpenChange={(o) => !o && setPreviewSrc(null)}
+        filename={previewSrc === form.mainImage ? `${baseName}-main` : baseName}
+      />
     </form>
   );
 }
