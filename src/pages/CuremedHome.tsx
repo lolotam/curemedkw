@@ -46,7 +46,7 @@ export default function CuremedHome() {
                   <img src={l.src} alt={b.name} className="h-12 w-auto drop-shadow object-contain" />
                 )}
               </div>
-              <div className="p-6">
+              <div className="p-6 flex flex-col items-center text-center">
                 <h3 className="text-xl font-bold text-brand">{b.name}</h3>
                 <p className="mt-2 text-sm text-foreground/80 line-clamp-3">{b.tagline[lang]}</p>
                 <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">{t("common.discover")} <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover:translate-x-1" /></p>

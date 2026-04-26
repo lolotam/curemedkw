@@ -107,8 +107,8 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
 export const BRAND_LIST: BrandMeta[] = [
   BRANDS.flexitol,
   BRANDS.kapiva,
-  BRANDS.nada,
   BRANDS.abc,
+  BRANDS.nada,
 ];
 
 export const slugToBrand = (slug: string): BrandKey | null => {
