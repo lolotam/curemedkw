@@ -6,6 +6,7 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import curemedLogo from "@/assets/curemed-logo.png";
 import { Loader2, ShieldAlert } from "lucide-react";
+import { useUnreadMessageCount } from "@/lib/db";
 
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Overview", end: true },
@@ -22,6 +23,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { theme, toggle } = useTheme();
   const { user, isAdmin, loading } = useAdminSession();
+  const { data: unreadCount = 0 } = useUnreadMessageCount();
 
   if (loading) {
     return (
@@ -81,7 +83,12 @@ export function AdminLayout() {
               )}
             >
               <item.icon className="h-4 w-4" />
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {item.to === "/admin/messages" && unreadCount > 0 && (
+                <span className="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
