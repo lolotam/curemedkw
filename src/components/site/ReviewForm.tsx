@@ -6,9 +6,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useCreateReview } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 export function ReviewForm({ productId }: { productId: string }) {
   const create = useCreateReview();
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [rating, setRating] = useState(0);
@@ -17,9 +19,9 @@ export function ReviewForm({ productId }: { productId: string }) {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return toast.error("Please enter your name");
-    if (rating < 1) return toast.error("Please pick a rating");
-    if (!comment.trim()) return toast.error("Please write a short review");
+    if (!name.trim()) return toast.error(t("reviews.error.name"));
+    if (rating < 1) return toast.error(t("reviews.error.rating"));
+    if (!comment.trim()) return toast.error(t("reviews.error.comment"));
     try {
       await create.mutateAsync({
         productId,
@@ -28,13 +30,13 @@ export function ReviewForm({ productId }: { productId: string }) {
         rating,
         comment,
       });
-      toast.success("Thanks! Your review will appear once approved.");
+      toast.success(t("reviews.success"));
       setName("");
       setEmail("");
       setRating(0);
       setComment("");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to submit");
+      toast.error(err instanceof Error ? err.message : t("reviews.submitFail"));
     }
   };
 
@@ -43,18 +45,18 @@ export function ReviewForm({ productId }: { productId: string }) {
   return (
     <form onSubmit={submit} className="rounded-2xl border border-border bg-card p-5 space-y-4">
       <div>
-        <h3 className="font-semibold">Write a review</h3>
+        <h3 className="font-semibold">{t("reviews.write")}</h3>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Reviews are visible after approval. Email is optional and never shown publicly.
+          {t("reviews.disclaimer")}
         </p>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Your name *</label>
+          <label className="text-xs font-medium text-muted-foreground">{t("reviews.name")}</label>
           <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
         </div>
         <div>
-          <label className="text-xs font-medium text-muted-foreground">Email (optional)</label>
+          <label className="text-xs font-medium text-muted-foreground">{t("reviews.email")}</label>
           <Input
             type="email"
             value={email}
@@ -65,7 +67,7 @@ export function ReviewForm({ productId }: { productId: string }) {
       </div>
       <div>
         <label className="text-xs font-medium text-muted-foreground block mb-1.5">
-          Rating *
+          {t("reviews.rating")}
         </label>
         <div className="flex items-center gap-1" onMouseLeave={() => setHover(0)}>
           {[1, 2, 3, 4, 5].map((n) => (
@@ -75,7 +77,7 @@ export function ReviewForm({ productId }: { productId: string }) {
               onClick={() => setRating(n)}
               onMouseEnter={() => setHover(n)}
               className="p-0.5"
-              aria-label={`${n} stars`}
+              aria-label={`${n} ${t("reviews.starsAria")}`}
             >
               <Star
                 className={cn(
@@ -93,13 +95,13 @@ export function ReviewForm({ productId }: { productId: string }) {
         </div>
       </div>
       <div>
-        <label className="text-xs font-medium text-muted-foreground">Your review *</label>
+        <label className="text-xs font-medium text-muted-foreground">{t("reviews.comment")}</label>
         <Textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={4}
           maxLength={1000}
-          placeholder="What did you like? How did it work for you?"
+          placeholder={t("reviews.commentPh")}
         />
       </div>
       <Button
@@ -112,7 +114,7 @@ export function ReviewForm({ productId }: { productId: string }) {
         ) : (
           <Send className="h-4 w-4 mr-2" />
         )}
-        Submit review
+        {t("reviews.submit")}
       </Button>
     </form>
   );
