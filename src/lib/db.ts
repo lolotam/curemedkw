@@ -1,7 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export type BrandKey = "flexitol" | "kapiva" | "nada" | "abc";
+export type BrandKey =
+  | "flexitol"
+  | "kapiva"
+  | "nada"
+  | "abc"
+  | "lafes"
+  | "hartington"
+  | "phytophar";
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
 
 /* ============================================================

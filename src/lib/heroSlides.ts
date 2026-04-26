@@ -1,6 +1,14 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type HeroPageKey = "curemed" | "flexitol" | "kapiva" | "nada" | "abc";
+export type HeroPageKey =
+  | "curemed"
+  | "flexitol"
+  | "kapiva"
+  | "nada"
+  | "abc"
+  | "lafes"
+  | "hartington"
+  | "phytophar";
 
 export const HERO_PAGES: { key: HeroPageKey; label: string; route: string }[] = [
   { key: "curemed", label: "Curemed (Main)", route: "/curemed" },
@@ -8,6 +16,9 @@ export const HERO_PAGES: { key: HeroPageKey; label: string; route: string }[] = 
   { key: "kapiva", label: "Kapiva", route: "/kapiva" },
   { key: "nada", label: "NADA", route: "/nada" },
   { key: "abc", label: "Australian Bodycare", route: "/australian-bodycare" },
+  { key: "lafes", label: "Lafe's", route: "/lafes" },
+  { key: "hartington", label: "Hartington", route: "/hartington" },
+  { key: "phytophar", label: "Phytophar", route: "/phytophar" },
 ];
 
 export interface HeroSlide {
