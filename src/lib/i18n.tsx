@@ -43,6 +43,11 @@ export const TRANSLATIONS: Dict = {
   },
 
   "pillars.title": { en: "What we do", ar: "ماذا نقدم" },
+ "pillars.eyebrow": { en: "Our Expertise", ar: "خبراتنا" },
+ "pillars.subtitle": {
+   en: "Four pillars that define how we care for every Kuwaiti home.",
+   ar: "أربع ركائز تحدد كيف نعتني بكل بيت كويتي.",
+ },
   "pillars.pharma.title": { en: "Pharmaceuticals", ar: "الأدوية" },
   "pillars.pharma.body": { en: "Trusted medicines and OTC solutions.", ar: "أدوية موثوقة وحلول صحية متاحة دون وصفة." },
   "pillars.skincare.title": { en: "Skincare", ar: "العناية بالبشرة" },
