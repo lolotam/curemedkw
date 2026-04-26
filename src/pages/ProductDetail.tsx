@@ -69,12 +69,12 @@ export default function ProductDetail() {
           <div className="mt-8 space-y-6">
             <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.benefits")}</h3>
               <ul className="grid gap-2 sm:grid-cols-2">{product.benefits.map((b, i) => <li key={i} className="flex items-start gap-2 text-sm"><Check className="h-4 w-4 text-brand mt-0.5 shrink-0" /> <span>{b}</span></li>)}</ul></div>
-            <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">Description</h3><p className="text-sm leading-relaxed text-foreground/80">{product.longDescription}</p></div>
+            <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.description")}</h3><p className="text-sm leading-relaxed text-foreground/80">{product.longDescription}</p></div>
             <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.ingredients")}</h3>
               <div className="flex flex-wrap gap-2">{product.ingredients.map((i, idx) => <span key={idx} className="text-xs px-2.5 py-1 rounded-full bg-muted">{i}</span>)}</div></div>
             <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.usage")}</h3><p className="text-sm leading-relaxed text-foreground/80">{product.usage}</p></div>
           </div>
-          <Button asChild size="lg" className="mt-8 bg-brand hover:bg-brand/90 text-white"><a href={`/${meta.slug}#contact`}>Inquire about this product</a></Button>
+          <Button asChild size="lg" className="mt-8 bg-brand hover:bg-brand/90 text-white"><a href={`/${meta.slug}#contact`}>{t("product.inquire")}</a></Button>
         </div>
       </section>
       {related.length > 0 && (
