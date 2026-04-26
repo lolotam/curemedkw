@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
 import type { ExtractedFields } from "@/lib/aiImport";
+import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -36,6 +38,13 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   featured: false,
   tags: [],
   sourceUrl: "",
+  nameAr: "",
+  categoryAr: "",
+  shortDescriptionAr: "",
+  longDescriptionAr: "",
+  usageAr: "",
+  benefitsAr: [],
+  ingredientsAr: [],
 });
 
 export default function AdminProductEditor() {
@@ -47,10 +56,47 @@ export default function AdminProductEditor() {
   const createMut = useCreateProduct();
   const updateMut = useUpdateProduct();
   const deleteMut = useDeleteProduct();
+  const qc = useQueryClient();
   const { data: categories = [] } = useCategories();
   const createCategoryMut = useCreateCategory();
   const [form, setForm] = useState(() => BLANK());
   const [hydrated, setHydrated] = useState(isNew);
+  const [translating, setTranslating] = useState(false);
+
+  const translate = async (productId: string, opts: { silent?: boolean; overwrite?: boolean } = {}) => {
+    setTranslating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("translate-product", {
+        body: { productId, persist: true, overwrite: opts.overwrite ?? false },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["product", productId] });
+      if (!opts.silent) {
+        if ((data as any)?.skipped) toast.info("Already translated. Click again to overwrite.");
+        else toast.success("Translated to Arabic");
+      }
+      // Refresh local form so Arabic fields display
+      const fresh = (data as any)?.translation;
+      if (fresh) {
+        setForm((f) => ({
+          ...f,
+          nameAr: fresh.name_ar ?? f.nameAr,
+          categoryAr: fresh.category_ar ?? f.categoryAr,
+          shortDescriptionAr: fresh.short_description_ar ?? f.shortDescriptionAr,
+          longDescriptionAr: fresh.long_description_ar ?? f.longDescriptionAr,
+          usageAr: fresh.usage_ar ?? f.usageAr,
+          benefitsAr: fresh.benefits_ar ?? f.benefitsAr,
+          ingredientsAr: fresh.ingredients_ar ?? f.ingredientsAr,
+        }));
+      }
+    } catch (err: any) {
+      if (!opts.silent) toast.error("Translate failed: " + (err.message || "unknown"));
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   useEffect(() => {
     if (isNew || hydrated) return;
@@ -192,10 +238,16 @@ export default function AdminProductEditor() {
       if (isNew) {
         const created = await createMut.mutateAsync(form);
         toast.success("Product created");
+        // Auto-translate new product in background
+        translate(created.id, { silent: true });
         navigate(`/admin/products/${created.id}`);
       } else if (id) {
         await updateMut.mutateAsync({ id, patch: form });
         toast.success("Product updated");
+        // Auto-translate after edit, only if Arabic name still missing
+        if (!form.nameAr || !form.nameAr.trim()) {
+          translate(id, { silent: true });
+        }
       }
     } catch (err: any) {
       toast.error("Save failed: " + (err.message || "unknown error"));
@@ -225,6 +277,18 @@ export default function AdminProductEditor() {
         {!isNew && (
           <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
             <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+        )}
+        {!isNew && id && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={translating}
+            onClick={() => translate(id, { overwrite: true })}
+            className="gap-1.5"
+          >
+            <Languages className="h-4 w-4" />
+            {translating ? "Translating…" : "Translate to Arabic"}
           </Button>
         )}
         <Button type="submit" className="bg-brand hover:bg-brand/90 text-white">Save</Button>

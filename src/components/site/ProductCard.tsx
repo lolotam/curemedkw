@@ -5,10 +5,16 @@ import { useI18n } from "@/lib/i18n";
 import { Star } from "lucide-react";
 
 export function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const brand = BRANDS[product.brand];
   const hasDiscount = !!product.originalPrice && product.originalPrice > product.price && product.price > 0;
   const pct = hasDiscount ? Math.round((1 - product.price / (product.originalPrice as number)) * 100) : 0;
+  const name = lang === "ar" && product.nameAr ? product.nameAr : product.name;
+  const category = lang === "ar" && product.categoryAr ? product.categoryAr : product.category;
+  const shortDesc =
+    lang === "ar" && product.shortDescriptionAr
+      ? product.shortDescriptionAr
+      : product.shortDescription;
   return (
     <Link
       to={`/${brand.slug}/product/${product.id}`}
@@ -18,7 +24,7 @@ export function ProductCard({ product, compact = false }: { product: Product; co
       <div className="aspect-square bg-brand-soft overflow-hidden">
         <img
           src={product.mainImage}
-          alt={product.name}
+          alt={name}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />
@@ -35,11 +41,11 @@ export function ProductCard({ product, compact = false }: { product: Product; co
       </div>
       <div className="p-4">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
-          {brand.name} · {product.category}
+          {brand.name} · {category}
         </p>
-        <h3 className="mt-1 font-semibold text-foreground line-clamp-2">{product.name}</h3>
+        <h3 className="mt-1 font-semibold text-foreground line-clamp-2">{name}</h3>
         {!compact && (
-          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{product.shortDescription}</p>
+          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{shortDesc}</p>
         )}
         <div className="mt-3 flex items-center justify-between">
           {hasDiscount ? (

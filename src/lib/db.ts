@@ -31,6 +31,14 @@ export interface Product {
   sourceUrl: string;
   createdAt: string;
   updatedAt: string;
+  // Arabic translations
+  nameAr: string;
+  categoryAr: string;
+  shortDescriptionAr: string;
+  longDescriptionAr: string;
+  usageAr: string;
+  benefitsAr: string[];
+  ingredientsAr: string[];
 }
 
 export interface Message {
@@ -60,6 +68,13 @@ type ProductRow = {
   category_id: string | null;
   original_price: number | null;
   source_url: string;
+  name_ar: string;
+  category_ar: string;
+  short_description_ar: string;
+  long_description_ar: string;
+  usage_ar: string;
+  benefits_ar: string[];
+  ingredients_ar: string[];
 };
 
 const rowToProduct = (r: ProductRow): Product => ({
@@ -85,6 +100,13 @@ const rowToProduct = (r: ProductRow): Product => ({
   sourceUrl: r.source_url ?? "",
   createdAt: r.created_at,
   updatedAt: r.updated_at,
+  nameAr: r.name_ar ?? "",
+  categoryAr: r.category_ar ?? "",
+  shortDescriptionAr: r.short_description_ar ?? "",
+  longDescriptionAr: r.long_description_ar ?? "",
+  usageAr: r.usage_ar ?? "",
+  benefitsAr: r.benefits_ar ?? [],
+  ingredientsAr: r.ingredients_ar ?? [],
 });
 
 export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
@@ -110,6 +132,13 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.featured !== undefined) out.featured = p.featured;
   if (p.tags !== undefined) out.tags = p.tags;
   if (p.sourceUrl !== undefined) out.source_url = p.sourceUrl;
+  if (p.nameAr !== undefined) out.name_ar = p.nameAr;
+  if (p.categoryAr !== undefined) out.category_ar = p.categoryAr;
+  if (p.shortDescriptionAr !== undefined) out.short_description_ar = p.shortDescriptionAr;
+  if (p.longDescriptionAr !== undefined) out.long_description_ar = p.longDescriptionAr;
+  if (p.usageAr !== undefined) out.usage_ar = p.usageAr;
+  if (p.benefitsAr !== undefined) out.benefits_ar = p.benefitsAr;
+  if (p.ingredientsAr !== undefined) out.ingredients_ar = p.ingredientsAr;
   return out;
 };
 
