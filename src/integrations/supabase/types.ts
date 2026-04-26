@@ -157,20 +157,26 @@ export type Database = {
       products: {
         Row: {
           benefits: string[]
+          benefits_ar: string[]
           brand: Database["public"]["Enums"]["brand_key"]
           category: string
+          category_ar: string
           category_id: string | null
           created_at: string
           featured: boolean
           gallery: string[]
           id: string
           ingredients: string[]
+          ingredients_ar: string[]
           long_description: string
+          long_description_ar: string
           main_image: string
           name: string
+          name_ar: string
           original_price: number | null
           price: number
           short_description: string
+          short_description_ar: string
           size: string
           sku: string
           source_url: string
@@ -178,23 +184,30 @@ export type Database = {
           tags: string[]
           updated_at: string
           usage: string
+          usage_ar: string
         }
         Insert: {
           benefits?: string[]
+          benefits_ar?: string[]
           brand: Database["public"]["Enums"]["brand_key"]
           category?: string
+          category_ar?: string
           category_id?: string | null
           created_at?: string
           featured?: boolean
           gallery?: string[]
           id?: string
           ingredients?: string[]
+          ingredients_ar?: string[]
           long_description?: string
+          long_description_ar?: string
           main_image?: string
           name: string
+          name_ar?: string
           original_price?: number | null
           price?: number
           short_description?: string
+          short_description_ar?: string
           size?: string
           sku: string
           source_url?: string
@@ -202,23 +215,30 @@ export type Database = {
           tags?: string[]
           updated_at?: string
           usage?: string
+          usage_ar?: string
         }
         Update: {
           benefits?: string[]
+          benefits_ar?: string[]
           brand?: Database["public"]["Enums"]["brand_key"]
           category?: string
+          category_ar?: string
           category_id?: string | null
           created_at?: string
           featured?: boolean
           gallery?: string[]
           id?: string
           ingredients?: string[]
+          ingredients_ar?: string[]
           long_description?: string
+          long_description_ar?: string
           main_image?: string
           name?: string
+          name_ar?: string
           original_price?: number | null
           price?: number
           short_description?: string
+          short_description_ar?: string
           size?: string
           sku?: string
           source_url?: string
@@ -226,6 +246,7 @@ export type Database = {
           tags?: string[]
           updated_at?: string
           usage?: string
+          usage_ar?: string
         }
         Relationships: [
           {
