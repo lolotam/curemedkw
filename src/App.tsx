@@ -11,6 +11,8 @@ import CuremedHome from "./pages/CuremedHome";
 import BrandPage from "./pages/BrandPage";
 import ProductDetail from "./pages/ProductDetail";
 import CategoryPage from "./pages/CategoryPage";
+import AboutUs from "./pages/AboutUs";
+import ContactUs from "./pages/ContactUs";
 import NotFound from "./pages/NotFound";
 import { AdminLayout } from "@/components/admin/AdminLayout";
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -39,6 +41,8 @@ const App = () => {
               <Routes>
                 <Route path="/" element={<Loading />} />
                 <Route path="/curemed" element={<CuremedHome />} />
+                <Route path="/about" element={<AboutUs />} />
+                <Route path="/contact" element={<ContactUs />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminOverview />} />

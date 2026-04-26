@@ -43,6 +43,8 @@ export function SiteHeader() {
               active={location.pathname.startsWith(`/${b.slug}`)}
             />
           ))}
+          <NavItem to="/about" label={t("nav.about")} active={isActive("/about")} />
+          <NavItem to="/contact" label={t("nav.contact")} active={isActive("/contact")} />
         </nav>
 
         <div className="flex items-center gap-1">
@@ -84,6 +86,8 @@ export function SiteHeader() {
                 onClick={() => setOpen(false)}
               />
             ))}
+            <MobileItem to="/about" label={t("nav.about")} onClick={() => setOpen(false)} />
+            <MobileItem to="/contact" label={t("nav.contact")} onClick={() => setOpen(false)} />
           </div>
         </div>
       )}

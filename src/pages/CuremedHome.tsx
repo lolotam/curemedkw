@@ -7,7 +7,6 @@ import { ProductCard } from "@/components/site/ProductCard";
 import { AutoCarousel } from "@/components/site/AutoCarousel";
 import { Testimonials } from "@/components/site/Testimonials";
 import { FAQ } from "@/components/site/FAQ";
-import { ContactSection } from "@/components/site/ContactSection";
 import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
@@ -251,7 +250,6 @@ export default function CuremedHome() {
 
       <Testimonials />
       <FAQ />
-      <ContactSection brand="curemed" />
       <Newsletter />
     </SiteLayout>
   );
