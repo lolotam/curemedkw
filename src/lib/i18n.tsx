@@ -4,6 +4,7 @@ export type Lang = "en" | "ar";
 
 type Dict = Record<string, { en: string; ar: string }>;
 
+// HMR cache buster
 export const TRANSLATIONS: Dict = {
   "nav.home": { en: "Home", ar: "الرئيسية" },
   "nav.about": { en: "About", ar: "من نحن" },
