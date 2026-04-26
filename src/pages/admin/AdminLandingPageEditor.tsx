@@ -1,12 +1,13 @@
 import * as React from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import {
   HERO_PAGES,
@@ -65,6 +66,7 @@ export default function AdminLandingPageEditor() {
         cta_href: "",
         sort_order: max + 1,
         is_active: true,
+        overlay_opacity: 80,
       });
       setSlides((prev) => [...prev, created]);
       toast({ title: "Slide added" });
@@ -178,7 +180,7 @@ export default function AdminLandingPageEditor() {
               <div className="grid lg:grid-cols-[280px,1fr] gap-5">
                 {/* Media */}
                 <div className="space-y-3">
-                  <div className="aspect-video w-full rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                  <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted flex items-center justify-center">
                     {s.media_url ? (
                       s.media_type === "video" ? (
                         <video src={s.media_url} className="w-full h-full object-cover" muted loop autoPlay playsInline />
@@ -187,6 +189,15 @@ export default function AdminLandingPageEditor() {
                       )
                     ) : (
                       <span className="text-xs text-muted-foreground">No media</span>
+                    )}
+                    {/* Live overlay preview matching the live hero gradient */}
+                    {s.media_url && (s.overlay_opacity ?? 80) > 0 && (
+                      <div
+                        className="absolute inset-0 pointer-events-none transition-opacity"
+                        style={{
+                          background: `linear-gradient(to right, hsl(var(--background) / ${(s.overlay_opacity ?? 80) / 100}), hsl(var(--background) / ${((s.overlay_opacity ?? 80) / 100) * 0.5}), hsl(var(--background) / ${((s.overlay_opacity ?? 80) / 100) * 0.125}))`,
+                        }}
+                      />
                     )}
                   </div>
                   <label className="block">
@@ -208,6 +219,46 @@ export default function AdminLandingPageEditor() {
                       </label>
                     </Button>
                   </label>
+
+                  {/* Overlay opacity control */}
+                  <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label className="text-xs font-semibold">Overlay opacity</Label>
+                      <span className="text-xs font-mono tabular-nums rounded bg-background border border-border px-1.5 py-0.5">
+                        {s.overlay_opacity ?? 80}%
+                      </span>
+                    </div>
+                    <Slider
+                      value={[s.overlay_opacity ?? 80]}
+                      min={0}
+                      max={100}
+                      step={5}
+                      onValueChange={([v]) => patchLocal(s.id, { overlay_opacity: v })}
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs flex-1"
+                        onClick={() => patchLocal(s.id, { overlay_opacity: 0 })}
+                      >
+                        <EyeOff className="h-3 w-3 mr-1" /> Remove
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs flex-1"
+                        onClick={() => patchLocal(s.id, { overlay_opacity: 80 })}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" /> Reset
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-tight">
+                      0% shows the photo in full color. Higher values darken the image so text stays readable.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Fields */}

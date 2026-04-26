@@ -57,6 +57,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
         const subtitle = lang === "ar" ? s.subtitle_ar : s.subtitle_en;
         const ctaLabel = lang === "ar" ? s.cta_label_ar : s.cta_label_en;
         const isActive = i === index;
+        const op = (s.overlay_opacity ?? 80) / 100;
         return (
           <div
             key={s.id}
@@ -80,7 +81,14 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
                 loading={i === 0 ? "eager" : "lazy"}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/40 to-background/10 rtl:from-background/80 rtl:via-background/40 rtl:to-background/10" />
+            {op > 0 && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: `linear-gradient(to right, hsl(var(--background) / ${op}), hsl(var(--background) / ${op * 0.5}), hsl(var(--background) / ${op * 0.125}))`,
+                }}
+              />
+            )}
             <div className="relative z-10 container h-full flex items-center">
               <div className="max-w-2xl text-foreground">
                 {title && (

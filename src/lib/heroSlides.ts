@@ -35,6 +35,7 @@ export interface HeroSlide {
   cta_href: string | null;
   sort_order: number;
   is_active: boolean;
+  overlay_opacity: number;
   created_at: string;
   updated_at: string;
 }
