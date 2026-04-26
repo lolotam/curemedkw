@@ -62,6 +62,7 @@ export const TRANSLATIONS: Dict = {
   "pillars.medical.body": { en: "Equipment for clinics and homes.", ar: "معدات للعيادات والمنازل." },
 
   "testimonials.title": { en: "What people say", ar: "آراء عملائنا" },
+  "testimonials.verifiedReview": { en: "Verified review", ar: "مراجعة موثقة" },
   "faq.title": { en: "Frequently asked questions", ar: "الأسئلة الشائعة" },
 
   "contact.title": { en: "Get in touch", ar: "تواصل معنا" },
