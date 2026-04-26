@@ -1254,6 +1254,33 @@ export function useCreateOrder() {
         const { error: itemErr } = await supabase.from("order_items").insert(itemRows);
         if (itemErr) throw itemErr;
       }
+      // Best-effort: bump coupon usage and notify the user.
+      if (input.couponCode) {
+        try {
+          const { data: cur } = await supabase
+            .from("coupons")
+            .select("id, used_count")
+            .eq("code", input.couponCode)
+            .maybeSingle();
+          if (cur) {
+            await supabase
+              .from("coupons")
+              .update({ used_count: (cur.used_count ?? 0) + 1 })
+              .eq("id", cur.id);
+          }
+        } catch {/* ignore */}
+      }
+      if (userData?.user?.id) {
+        try {
+          await supabase.from("notifications").insert({
+            user_id: userData.user.id,
+            title: `Order #${order.orderNumber} placed`,
+            body: `Thank you! We received your order and will contact you shortly.`,
+            type: "order",
+            link: `/order-confirmation/${order.id}`,
+          });
+        } catch {/* ignore */}
+      }
       return order;
     },
     onSuccess: () => {
