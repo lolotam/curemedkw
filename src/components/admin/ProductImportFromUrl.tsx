@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Sparkles, Loader2, Link2, Settings2 } from "lucide-react";
+import { Sparkles, Loader2, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -94,21 +93,6 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
               ? "Extracting fields…"
               : "Scrape & fill"}
         </Button>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-background/60 px-3 py-2 text-xs">
-        <div className="min-w-0 flex-1">
-          <span className="text-muted-foreground">Using: </span>
-          <span className="font-mono truncate">
-            {models3[0]} → {models3[1]} → {models3[2]}
-          </span>
-        </div>
-        <Link
-          to="/admin/models"
-          className="inline-flex items-center gap-1 text-brand hover:underline shrink-0"
-        >
-          <Settings2 className="h-3 w-3" /> Configure
-        </Link>
       </div>
     </Card>
   );
