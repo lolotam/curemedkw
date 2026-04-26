@@ -31,7 +31,7 @@ export function SiteFooter() {
           <h4 className="font-semibold mb-3 text-sm">{t("nav.contact")}</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5" /> Kuwait City, Kuwait</li>
-            <li className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" /> +965 0000 0000</li>
+            <li className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" /> +965 6000 3759</li>
             <li className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" /> info@curemed.com</li>
           </ul>
         </div>
