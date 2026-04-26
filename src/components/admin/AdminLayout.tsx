@@ -63,8 +63,10 @@ export function AdminLayout() {
   return (
     <div data-brand="curemed" className="min-h-screen bg-muted/20 flex" dir="ltr">
       <aside className="w-64 bg-background border-r border-border min-h-screen sticky top-0 flex flex-col">
-        <div className="p-5 border-b border-border">
-          <img src={curemedLogo} alt="Curemed" className="h-9 w-auto object-contain" />
+        <div className="p-5 border-b border-border flex flex-col items-center text-center">
+          <Link to="/curemed" aria-label="Go to main page">
+            <img src={curemedLogo} alt="Curemed" className="h-16 w-auto object-contain" />
+          </Link>
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground mt-2 font-semibold">Admin Dashboard</p>
         </div>
         <nav className="flex-1 p-3 space-y-1">
