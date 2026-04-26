@@ -91,7 +91,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
   abc: {
     key: "abc",
     slug: "australian-bodycare",
-    name: "ABC",
+    name: "Australian Bodycare",
     tagline: {
       en: "Tea Tree Oil care for healthy skin every day",
       ar: "عناية بزيت شجرة الشاي لبشرة صحية كل يوم",
