@@ -25,6 +25,9 @@ export const TRANSLATIONS: Dict = {
   "common.relatedProducts": { en: "You may also like", ar: "قد يعجبك أيضاً" },
   "common.backToBrand": { en: "Back to brand", ar: "العودة إلى العلامة" },
 
+  "price.contactUs": { en: "Contact us", ar: "تواصل معنا" },
+  "price.contactForPrice": { en: "Contact us for price", ar: "تواصل معنا للسعر" },
+
   "hero.title": { en: "Your trusted partner in healthcare solutions", ar: "شريكك الموثوق في حلول الرعاية الصحية" },
   "hero.subtitle": {
     en: "Curemed brings together a curated portfolio of world-class pharmaceutical, dermatological and wellness brands — distributed with care across Kuwait.",
@@ -59,6 +62,7 @@ export const TRANSLATIONS: Dict = {
   "pillars.medical.body": { en: "Equipment for clinics and homes.", ar: "معدات للعيادات والمنازل." },
 
   "testimonials.title": { en: "What people say", ar: "آراء عملائنا" },
+  "testimonials.verifiedReview": { en: "Verified review", ar: "مراجعة موثقة" },
   "faq.title": { en: "Frequently asked questions", ar: "الأسئلة الشائعة" },
 
   "contact.title": { en: "Get in touch", ar: "تواصل معنا" },

@@ -1,5 +1,5 @@
 import { Link, NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon, Sparkles, Tags, Tag } from "lucide-react";
+import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon, Sparkles, Tags, Tag, Flag, Star } from "lucide-react";
 import { adminLogout, useAdminSession } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
@@ -15,6 +15,8 @@ const NAV = [
   { to: "/admin/tags", icon: Tag, label: "Tags" },
   { to: "/admin/landing", icon: ImageIcon, label: "Landing Pages" },
   { to: "/admin/models", icon: Sparkles, label: "AI Models" },
+  { to: "/admin/reviews", icon: Star, label: "Reviews" },
+  { to: "/admin/flags", icon: Flag, label: "Site Flags" },
   { to: "/admin/messages", icon: Mail, label: "Messages" },
   { to: "/admin/subscribers", icon: Users, label: "Subscribers" },
 ];
