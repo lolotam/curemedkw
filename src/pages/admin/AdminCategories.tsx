@@ -467,10 +467,15 @@ function CategoryEditorDialog({
             </div>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 border-t border-border bg-background flex-row justify-end gap-2">
-          <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
+        <DialogFooter className="px-6 py-4 border-t border-border bg-background flex-row justify-end gap-2 shrink-0">
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button
-            className="bg-brand hover:bg-brand/90 text-white"
+            type="button"
+            style={{
+              backgroundColor: "hsl(var(--brand-primary, 205 67% 36%))",
+              color: "white",
+            }}
+            className="hover:opacity-90 min-w-[110px]"
             disabled={saving || !form.nameEn.trim() || !form.slug.trim()}
             onClick={async () => {
               setSaving(true);
