@@ -310,6 +310,8 @@ export interface Category {
   imageUrl: string;
   sortOrder: number;
   isActive: boolean;
+  parentId: string | null;
+  visiblePages: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -318,6 +320,8 @@ type CategoryRow = {
   id: string; slug: string; name_en: string; name_ar: string;
   image_url: string; sort_order: number; is_active: boolean;
   created_at: string; updated_at: string;
+  parent_id: string | null;
+  visible_pages: string[];
 };
 
 const rowToCategory = (r: CategoryRow): Category => ({
@@ -328,6 +332,8 @@ const rowToCategory = (r: CategoryRow): Category => ({
   imageUrl: r.image_url,
   sortOrder: r.sort_order,
   isActive: r.is_active,
+  parentId: r.parent_id ?? null,
+  visiblePages: r.visible_pages ?? [],
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -342,6 +348,8 @@ const categoryToRow = (c: Partial<CategoryInput>): Partial<CategoryRow> => {
   if (c.imageUrl !== undefined) out.image_url = c.imageUrl;
   if (c.sortOrder !== undefined) out.sort_order = c.sortOrder;
   if (c.isActive !== undefined) out.is_active = c.isActive;
+  if (c.parentId !== undefined) out.parent_id = c.parentId;
+  if (c.visiblePages !== undefined) out.visible_pages = c.visiblePages;
   return out;
 };
 
