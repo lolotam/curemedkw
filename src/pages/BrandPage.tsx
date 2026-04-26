@@ -49,7 +49,6 @@ export default function BrandPage() {
       return ids.some((cid) => selectedCats.has(cid));
     });
   }, [brandProducts, selectedCats]);
-  }, [brandProducts, selectedCats]);
 
   const toggleCat = (id: string) => {
     setSelectedCats((prev) => {
