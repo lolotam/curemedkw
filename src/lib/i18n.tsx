@@ -98,6 +98,8 @@ export const TRANSLATIONS: Dict = {
 
   "categories.title": { en: "Shop by category", ar: "تسوّق حسب الفئة" },
   "categories.subtitle": { en: "Find what you need, by area of care.", ar: "اعثر على ما تحتاجه حسب مجال العناية." },
+  "categories.product": { en: "product", ar: "منتج" },
+  "categories.products": { en: "products", ar: "منتجات" },
   "category.allProducts": { en: "All products", ar: "جميع المنتجات" },
   "category.noProducts": { en: "No products in this category yet.", ar: "لا توجد منتجات في هذه الفئة بعد." },
   "filter.title": { en: "Filter by", ar: "تصفية حسب" },
