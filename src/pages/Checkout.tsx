@@ -11,9 +11,22 @@ import { useI18n } from "@/lib/i18n";
 import { useCreateOrder, useProfile, type PaymentMethod } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
+import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
 import { KW_AREAS } from "@/lib/kuwaitData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+const COUPON_KEY = "curemed.appliedCoupon";
+function loadCoupon(): AppliedCoupon | null {
+  try {
+    const raw = sessionStorage.getItem(COUPON_KEY);
+    return raw ? (JSON.parse(raw) as AppliedCoupon) : null;
+  } catch { return null; }
+}
+function saveCoupon(c: AppliedCoupon | null) {
+  if (c) sessionStorage.setItem(COUPON_KEY, JSON.stringify(c));
+  else sessionStorage.removeItem(COUPON_KEY);
+}
 
 export default function Checkout() {
   const { items, subtotal, clear } = useCart();
@@ -36,6 +49,18 @@ export default function Checkout() {
     notes: "",
   });
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+
+  useEffect(() => { setApplied(loadCoupon()); }, []);
+  useEffect(() => {
+    if (applied && subtotal < applied.coupon.minOrderAmount) {
+      setApplied(null);
+      saveCoupon(null);
+    }
+  }, [subtotal, applied]);
+
+  const discount = applied ? Math.min(applied.discount, subtotal) : 0;
+  const total = Math.max(0, subtotal - discount);
 
   useEffect(() => {
     if (!profile) return;
@@ -83,6 +108,8 @@ export default function Checkout() {
       const order = await createOrder.mutateAsync({
         ...form,
         paymentMethod,
+        couponCode: applied?.coupon.code ?? null,
+        discountAmount: discount,
         items: items.map((i) => ({
           productId: i.productId,
           productName: i.name,
@@ -93,6 +120,7 @@ export default function Checkout() {
         })),
       });
       clear();
+      saveCoupon(null);
       toast.success(t("checkout.success"));
       navigate(`/order-confirmation/${order.id}`);
     } catch (err: any) {
@@ -212,14 +240,28 @@ export default function Checkout() {
                 </li>
               ))}
             </ul>
+            <div className="mb-3">
+              <CouponInput
+                subtotal={subtotal}
+                applied={applied}
+                onApply={(a) => { setApplied(a); saveCoupon(a); }}
+                onRemove={() => { setApplied(null); saveCoupon(null); }}
+              />
+            </div>
             <div className="space-y-1 text-sm border-t border-border pt-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                 <span>KD {subtotal.toFixed(2)}</span>
               </div>
+              {applied && (
+                <div className="flex justify-between text-brand">
+                  <span>{t("coupon.discount")} ({applied.coupon.code})</span>
+                  <span className="font-semibold">−KD {discount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-bold pt-2">
                 <span>{t("cart.total")}</span>
-                <span>KD {subtotal.toFixed(2)}</span>
+                <span>KD {total.toFixed(2)}</span>
               </div>
             </div>
             <Button

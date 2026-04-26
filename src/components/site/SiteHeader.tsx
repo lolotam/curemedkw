@@ -11,6 +11,7 @@ import { useAdminSession } from "@/lib/admin";
 import { useMessages, useUnreadMessageCount } from "@/lib/db";
 import { CartIcon } from "@/components/site/CartIcon";
 import { useAuth } from "@/lib/auth";
+import { UserNotificationBell } from "@/components/site/UserNotificationBell";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -53,6 +54,7 @@ export function SiteHeader() {
 
         <div className="flex items-center gap-1">
           {isAdmin && <AdminBell />}
+          <UserNotificationBell />
           <CartIcon />
           <UserMenu />
           <Button

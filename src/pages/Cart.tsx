@@ -1,4 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Minus, Plus, ShoppingBag, Trash2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -6,11 +7,38 @@ import { useCart } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
 import { BRANDS } from "@/lib/brands";
 import type { BrandKey } from "@/lib/db";
+import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
+
+const COUPON_KEY = "curemed.appliedCoupon";
+
+function loadCoupon(): AppliedCoupon | null {
+  try {
+    const raw = sessionStorage.getItem(COUPON_KEY);
+    return raw ? (JSON.parse(raw) as AppliedCoupon) : null;
+  } catch { return null; }
+}
+function saveCoupon(c: AppliedCoupon | null) {
+  if (c) sessionStorage.setItem(COUPON_KEY, JSON.stringify(c));
+  else sessionStorage.removeItem(COUPON_KEY);
+}
 
 export default function Cart() {
   const { items, subtotal, setQuantity, remove, clear } = useCart();
   const { t, lang } = useI18n();
   const navigate = useNavigate();
+  const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+
+  useEffect(() => { setApplied(loadCoupon()); }, []);
+  // If subtotal drops below the coupon's min, drop the coupon automatically.
+  useEffect(() => {
+    if (applied && subtotal < applied.coupon.minOrderAmount) {
+      setApplied(null);
+      saveCoupon(null);
+    }
+  }, [subtotal, applied]);
+
+  const discount = applied ? Math.min(applied.discount, subtotal) : 0;
+  const total = Math.max(0, subtotal - discount);
 
   if (items.length === 0) {
     return (
@@ -114,18 +142,32 @@ export default function Cart() {
 
           <aside className="rounded-2xl border border-border bg-card p-6 h-fit lg:sticky lg:top-28">
             <h2 className="font-bold text-lg mb-4">{t("cart.summary")}</h2>
+            <div className="mb-4">
+              <CouponInput
+                subtotal={subtotal}
+                applied={applied}
+                onApply={(a) => { setApplied(a); saveCoupon(a); }}
+                onRemove={() => { setApplied(null); saveCoupon(null); }}
+              />
+            </div>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                 <span className="font-semibold">KD {subtotal.toFixed(2)}</span>
               </div>
+              {applied && (
+                <div className="flex justify-between text-brand">
+                  <span>{t("coupon.discount")} ({applied.coupon.code})</span>
+                  <span className="font-semibold">−KD {discount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.shipping")}</span>
                 <span className="text-xs text-muted-foreground">{t("cart.shippingNote")}</span>
               </div>
               <div className="border-t border-border pt-3 mt-3 flex justify-between text-base">
                 <span className="font-semibold">{t("cart.total")}</span>
-                <span className="font-bold">KD {subtotal.toFixed(2)}</span>
+                <span className="font-bold">KD {total.toFixed(2)}</span>
               </div>
             </div>
             <Button

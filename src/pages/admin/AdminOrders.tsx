@@ -1,13 +1,14 @@
 import { useMemo, useState } from "react";
-import { Loader2, Package, Eye, Trash2, Search } from "lucide-react";
+import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -193,6 +194,9 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
   const updateOrder = useUpdateOrder();
   const notify = useCreateNotification();
   const [adminNotes, setAdminNotes] = useState("");
+  const [msgOpen, setMsgOpen] = useState(false);
+  const [msgTitle, setMsgTitle] = useState("");
+  const [msgBody, setMsgBody] = useState("");
 
   // Sync notes when order loads
   const noteValue = adminNotes !== "" ? adminNotes : order?.adminNotes ?? "";
@@ -221,6 +225,23 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
                 >
                   Open WhatsApp →
                 </a>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <a
+                      href={`https://wa.me/${order.customerPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
+                        `Hi ${order.customerName}, regarding your Curemed order #${order.orderNumber}:`
+                      )}`}
+                      target="_blank" rel="noreferrer"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" /> WhatsApp
+                    </a>
+                  </Button>
+                  {order.userId && (
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setMsgOpen(true)}>
+                      <Send className="h-3.5 w-3.5" /> Send notification
+                    </Button>
+                  )}
+                </div>
               </Section>
               <Section title="Address">
                 <p>{order.city}, {order.area}</p>
@@ -327,6 +348,46 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
               </Button>
             </div>
           </div>
+        )}
+        {order && (
+          <Dialog open={msgOpen} onOpenChange={setMsgOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Message {order.customerName}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div>
+                  <Label>Title</Label>
+                  <Input value={msgTitle} onChange={(e) => setMsgTitle(e.target.value)} placeholder="e.g. Update on your order" />
+                </div>
+                <div>
+                  <Label>Message</Label>
+                  <Textarea rows={4} value={msgBody} onChange={(e) => setMsgBody(e.target.value)} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setMsgOpen(false)}>Cancel</Button>
+                <Button
+                  className="bg-brand hover:bg-brand/90 text-white"
+                  disabled={!msgTitle.trim() || !order.userId || notify.isPending}
+                  onClick={async () => {
+                    if (!order.userId) return;
+                    await notify.mutateAsync({
+                      userId: order.userId,
+                      title: msgTitle.trim(),
+                      body: msgBody.trim(),
+                      type: "message",
+                      link: `/order-confirmation/${order.id}`,
+                    });
+                    toast.success("Message sent");
+                    setMsgTitle(""); setMsgBody(""); setMsgOpen(false);
+                  }}
+                >
+                  {notify.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}Send
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
       </DialogContent>
     </Dialog>
