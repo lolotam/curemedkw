@@ -46,6 +46,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
   const prev = () => setIndex((i) => (i - 1 + count) % count);
 
   return (
+    <>
     <section
       className="relative w-full aspect-[16/9] max-h-[85vh] overflow-hidden bg-brand-deep"
       onMouseEnter={() => setPaused(true)}
@@ -140,18 +141,24 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
           >
             <ChevronRight className="h-5 w-5 rtl:rotate-180" />
           </button>
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setIndex(i)}
-                aria-label={`Go to slide ${i + 1}`}
-                className={`h-2 rounded-full transition-all ${i === index ? "w-8 bg-brand" : "w-2 bg-foreground/40 hover:bg-foreground/60"}`}
-              />
-            ))}
-          </div>
         </>
       )}
     </section>
+    {count > 1 && (
+      <div className="w-full bg-background border-b border-border/60">
+        <div className="container py-4 md:py-5 flex justify-center gap-2">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              aria-current={i === index ? "true" : undefined}
+              className={`h-2 rounded-full transition-all ${i === index ? "w-8 bg-brand" : "w-2 bg-foreground/30 hover:bg-foreground/60"}`}
+            />
+          ))}
+        </div>
+      </div>
+    )}
+    </>
   );
 }
