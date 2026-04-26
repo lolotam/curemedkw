@@ -46,63 +46,29 @@ export function CategoryCarousel() {
   const { data: categories = [] } = useCategories();
   const { data: products = [] } = useProducts();
 
-  // Only show top-level categories; subcategories are reachable via the parent.
+  // Show every active category — both parents and subcategories.
   const active = useMemo(
-    () => categories.filter((c) => c.isActive && !c.parentId),
+    () => categories.filter((c) => c.isActive),
     [categories],
   );
 
-  // Build descendant-id map so subcategory products roll up to the parent tile.
-  const descendantsByParent = useMemo(() => {
-    const childrenOf = new Map<string, string[]>();
-    for (const c of categories) {
-      if (c.parentId) {
-        const arr = childrenOf.get(c.parentId) ?? [];
-        arr.push(c.id);
-        childrenOf.set(c.parentId, arr);
-      }
-    }
-    const result = new Map<string, Set<string>>();
-    const collect = (rootId: string): Set<string> => {
-      const set = new Set<string>([rootId]);
-      const stack = [rootId];
-      while (stack.length) {
-        const cur = stack.pop()!;
-        for (const child of childrenOf.get(cur) ?? []) {
-          if (!set.has(child)) {
-            set.add(child);
-            stack.push(child);
-          }
-        }
-      }
-      return set;
-    };
-    for (const c of active) result.set(c.id, collect(c.id));
-    return result;
-  }, [categories, active]);
-
-  // Count products per top-level category (including its subcategories).
+  // Direct product count per category (no descendant roll-up since subs are
+  // shown as their own tiles now).
   const counts = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of active) {
-      const ids = descendantsByParent.get(c.id) ?? new Set([c.id]);
       let n = 0;
       for (const p of products) {
         const productCatIds = new Set<string>([
           ...(p.categoryIds ?? []),
           ...(p.categoryId ? [p.categoryId] : []),
         ]);
-        for (const pid of productCatIds) {
-          if (ids.has(pid)) {
-            n++;
-            break; // count each product once per top-level category
-          }
-        }
+        if (productCatIds.has(c.id)) n++;
       }
       m.set(c.id, n);
     }
     return m;
-  }, [active, products, descendantsByParent]);
+  }, [active, products]);
 
   if (active.length === 0) return null;
 
@@ -113,25 +79,41 @@ export function CategoryCarousel() {
           <h2 className="text-3xl md:text-4xl font-bold">{t("categories.title")}</h2>
           <p className="mt-2 text-muted-foreground">{t("categories.subtitle")}</p>
         </div>
+      </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-6">
-          {active.map((c, i) => {
+      <div
+        className="group relative overflow-hidden"
+        style={{
+          maskImage:
+            "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+          WebkitMaskImage:
+            "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+        }}
+      >
+        <div className="cat-marquee flex w-max gap-5 md:gap-6 group-hover:[animation-play-state:paused] py-2">
+          {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
+            const isClone = i >= active.length;
             return (
-              <div key={c.id} className="group relative">
+              <div
+                key={`${c.id}-${i}`}
+                className="group/card relative shrink-0 w-44 sm:w-52 md:w-56"
+                aria-hidden={isClone || undefined}
+              >
                 {/* gradient halo behind card on hover (matches pillars) */}
                 <div
                   aria-hidden
                   className={cn(
-                    "absolute -inset-0.5 rounded-3xl bg-gradient-to-br opacity-0 blur transition-opacity duration-500 group-hover:opacity-60",
+                    "absolute -inset-0.5 rounded-3xl bg-gradient-to-br opacity-0 blur transition-opacity duration-500 group-hover/card:opacity-60",
                     palette.grad,
                   )}
                 />
                 <Link
                   to={`/category/${c.slug}`}
+                  tabIndex={isClone ? -1 : undefined}
                   className={cn(
-                    "relative block h-full overflow-hidden rounded-3xl border border-border bg-card/80 p-4 backdrop-blur-sm transition-all duration-500 group-hover:-translate-y-2 group-hover:shadow-2xl",
+                    "relative block h-full overflow-hidden rounded-3xl border border-border bg-card/80 p-4 backdrop-blur-sm transition-all duration-500 group-hover/card:-translate-y-2 group-hover/card:shadow-2xl",
                     palette.ring,
                   )}
                 >
@@ -156,7 +138,7 @@ export function CategoryCarousel() {
                         src={c.imageUrl}
                         alt={c.nameEn}
                         loading="lazy"
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-105"
                       />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center text-3xl font-bold text-foreground/70">
@@ -170,7 +152,7 @@ export function CategoryCarousel() {
                     <h3
                       className={cn(
                         "font-semibold text-sm md:text-base transition-colors duration-300",
-                        palette.titleHover,
+                        palette.titleHover.replace("group-hover:", "group-hover/card:"),
                       )}
                     >
                       {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
