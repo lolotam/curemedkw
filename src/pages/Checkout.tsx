@@ -240,14 +240,28 @@ export default function Checkout() {
                 </li>
               ))}
             </ul>
+            <div className="mb-3">
+              <CouponInput
+                subtotal={subtotal}
+                applied={applied}
+                onApply={(a) => { setApplied(a); saveCoupon(a); }}
+                onRemove={() => { setApplied(null); saveCoupon(null); }}
+              />
+            </div>
             <div className="space-y-1 text-sm border-t border-border pt-3">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("cart.subtotal")}</span>
                 <span>KD {subtotal.toFixed(2)}</span>
               </div>
+              {applied && (
+                <div className="flex justify-between text-brand">
+                  <span>{t("coupon.discount")} ({applied.coupon.code})</span>
+                  <span className="font-semibold">−KD {discount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-base font-bold pt-2">
                 <span>{t("cart.total")}</span>
-                <span>KD {subtotal.toFixed(2)}</span>
+                <span>KD {total.toFixed(2)}</span>
               </div>
             </div>
             <Button
