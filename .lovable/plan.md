@@ -1,43 +1,27 @@
-## Goal
-Populate `/admin/tags` with every tag actually in use by products (currently ~150+ unique tags live on `products.tags[]` but the `tags` master table is empty), and keep it in sync going forward. The admin UI already supports add / rename / delete and shows a "Used in N products" count — those will start working as soon as the table is backfilled.
+## Plan
 
-## 1. One-time backfill (SQL migration)
+Fix the category add/edit dialog so the Save button is reliably visible and usable in both flows.
 
-New migration that scans `products.tags[]`, collects every distinct value (trimmed, non-empty), and inserts into `public.tags` with a slug. Uses `ON CONFLICT (slug) DO NOTHING` so it's idempotent and safe to re-run.
+### What I’ll change
+1. Update the shared dialog component so portaled dialog content can inherit the active Curemed brand variables even when rendered outside the admin layout container.
+2. Keep the category editor footer layout stable so both action buttons stay visible at the bottom of the dialog.
+3. Replace the Save button’s styling in the category form with a durable brand-safe variant/class combination that remains visible even if CSS variables are missing.
+4. Audit other admin dialogs that use brand-colored actions inside portals and apply the same protection where needed.
 
-```sql
-INSERT INTO public.tags (name, slug)
-SELECT DISTINCT
-  trim(t)                                           AS name,
-  regexp_replace(lower(trim(t)), '[^a-z0-9]+', '-', 'g') AS slug
-FROM public.products, unnest(products.tags) AS t
-WHERE trim(t) <> ''
-ON CONFLICT (slug) DO NOTHING;
-```
+### Expected result
+- Add category: Save button is visible immediately.
+- Edit category: Save button stays visible.
+- The button keeps a strong branded appearance instead of disappearing into the white dialog background.
+- Similar admin dialogs won’t regress for the same reason.
 
-This will create rows for every tag — e.g. `moisturizer` (used by 34 products), `tea tree` (28), `hydration` (18), `antibacterial` (10), `dry skin` (10) … down to single-use tags like `aloe vera`, `castor oil`, etc.
+### Technical details
+- `src/components/ui/dialog.tsx`
+  - Extend `DialogContent` so it can carry the active brand context into the portal, instead of depending on a parent `[data-brand]` wrapper that no longer exists after portaling.
+- `src/pages/admin/AdminCategories.tsx`
+  - Keep the dialog as a three-row layout (`header / scrollable body / footer`) and ensure the footer actions remain visible.
+  - Update the Save button styling so it does not become white-on-white when `--brand-primary` is unavailable.
+- Related admin dialog audit
+  - Review portaled admin dialogs using `bg-brand` buttons and align them to the safer pattern.
 
-## 2. Auto-sync `tags` whenever products change (`src/lib/db.ts`)
-
-Add a small helper `syncProductTags(tags: string[])` that upserts each tag into the `tags` table (uses the existing `slug` unique constraint). Call it inside:
-
-- `useCreateProduct` — after the product insert, before returning.
-- `useUpdateProduct` — when the patch contains `tags`, after the update.
-
-Any tag the AI extractor or a manual edit produces is automatically registered in the master tag list, so `/admin/tags` always reflects reality. The mutations also invalidate `qk.tags` so the Tags admin refreshes immediately.
-
-## 3. Add "Sync from products" button on `/admin/tags` (`src/pages/admin/AdminTags.tsx`)
-
-A small secondary button next to the "Add" input that runs the same scan/upsert on demand from the client (using `useProducts()` + `useUpsertTag` in a loop). Useful if anyone ever bulk-imports tags directly into a product without going through the editor.
-
-The existing add / rename / delete flows and the "Used in N products" count column already work correctly — they just had nothing to display because the table was empty.
-
-## Files to edit / create
-- `supabase/migrations/<new>.sql` — backfill `tags` from `products.tags[]`
-- `src/lib/db.ts` — add `syncProductTags`, call from `useCreateProduct` and `useUpdateProduct`
-- `src/pages/admin/AdminTags.tsx` — add "Sync from products" button
-
-## Out of scope (already in place)
-- Tags table, RLS policies, slug uniqueness — already exist.
-- Add / rename / delete tag mutations — already implemented.
-- "Used in" count column with link to filtered products list — already implemented.
+### Root cause confirmed
+The category form is rendered inside a portaled dialog. The admin brand variables are defined on `AdminLayout` via `data-brand="curemed"`, but the dialog is mounted under `document.body`, outside that branded wrapper. Because of that, `.bg-brand` can resolve to no background color, while `text-white` still applies, making the Save button appear missing even though it is still in the DOM and clickable.

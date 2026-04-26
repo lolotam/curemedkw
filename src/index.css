@@ -78,6 +78,16 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Default brand fallbacks (Curemed) — used by portaled content (dialogs,
+       toasts, popovers, dropdowns) that renders outside any [data-brand]
+       container. Inside a [data-brand] wrapper the specific values below
+       override these. */
+    --brand-primary: var(--curemed-blue);
+    --brand-secondary: var(--curemed-teal);
+    --brand-bg: var(--curemed-beige);
+    --brand-bg-deep: var(--curemed-beige-deep);
+    --brand-ink: var(--curemed-ink);
   }
 
   .dark {
