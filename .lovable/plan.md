@@ -1,78 +1,202 @@
-## Restyle "Shop by category" — Static Pillar-Tinted Grid with Hover Ring
 
-Replace the auto‑scrolling marquee in `src/components/site/CategoryCarousel.tsx` with a calm, premium responsive grid that visually echoes the "What we do" pillars section right above it on the home page.
+## Add 3 new brands: Lafe's, Hartington, Phytophar
 
-### Layout
-- Drop the marquee + duplicated loop entirely (and remove the `cat-marquee` animation usage here).
-- Responsive grid: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` with `gap-5 md:gap-6`.
-- Show all active top-level categories (existing `c.isActive && !c.parentId` filter stays).
-- Section keeps its current heading + subtitle, centered, with the same padding.
+Goal: register `lafes`, `hartington`, `phytophar` as first-class brands so they get their own `/lafes`, `/hartington`, `/phytophar` landing pages, hero slots in the admin, header menu items, brand cards on `/curemed`, and dedicated color palettes derived from each logo.
 
-### Pillar tint cycling
-Cycle 4 palettes across categories by index `i % 4`, matching the pillars on the home page:
-1. **Pharma** — sky (`from-sky-500 to-cyan-400`, blob `bg-sky-400/30`, ring `group-hover:shadow-sky-400/40`, title hover `group-hover:text-sky-600`, badge `bg-sky-500/10 text-sky-700`)
-2. **Skincare** — rose/pink (`from-pink-500 to-rose-400`, blob `bg-pink-400/30`, ring `group-hover:shadow-pink-400/40`, title hover `group-hover:text-pink-600`, badge `bg-pink-500/10 text-pink-700`)
-3. **Wellness** — emerald (`from-emerald-500 to-teal-400`, blob `bg-emerald-400/30`, ring `group-hover:shadow-emerald-400/40`, title hover `group-hover:text-emerald-600`, badge `bg-emerald-500/10 text-emerald-700`)
-4. **Medical** — violet (`from-violet-500 to-indigo-400`, blob `bg-violet-400/30`, ring `group-hover:shadow-violet-400/40`, title hover `group-hover:text-violet-600`, badge `bg-violet-500/10 text-violet-700`)
+---
 
-### Card structure (per category)
-Wrapped exactly like the pillar cards so the hover halo reads identically:
-```tsx
-<div className="group relative">
-  {/* gradient halo behind card on hover — same as pillars */}
-  <div aria-hidden className={cn("absolute -inset-0.5 rounded-3xl bg-gradient-to-br opacity-0 blur transition-opacity duration-500 group-hover:opacity-60", grad)} />
+### 1. Database — extend `brand_key` enum
 
-  <Link to={`/category/${c.slug}`} className={cn(
-    "relative block h-full overflow-hidden rounded-3xl border border-border bg-card/80 p-4 backdrop-blur-sm transition-all duration-500 group-hover:-translate-y-2 group-hover:shadow-2xl",
-    ring,
-  )}>
-    {/* decorative tinted blob */}
-    <div aria-hidden className={cn("absolute -top-10 -right-10 h-28 w-28 rounded-full blur-2xl", blob)} />
+The `products.brand` column uses a Postgres enum `brand_key` with only `flexitol | kapiva | nada | abc`. Add the 3 new values so you can later create products under them.
 
-    {/* square image panel with soft tinted background behind it */}
-    <div className={cn("relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br", softTint)}>
-      {c.imageUrl
-        ? <img src={c.imageUrl} alt={c.nameEn} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="h-full w-full flex items-center justify-center text-3xl font-bold text-foreground/70">{c.nameEn.charAt(0)}</div>}
-    </div>
-
-    {/* name + count pill */}
-    <div className="relative mt-4 flex flex-col items-center text-center gap-2">
-      <h3 className={cn("font-semibold text-sm md:text-base transition-colors duration-300", titleHover)}>
-        {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
-      </h3>
-      <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold", badgeTint)}>
-        {count} {count === 1 ? t("categories.product") : t("categories.products")}
-      </span>
-    </div>
-  </Link>
-</div>
+Migration:
+```sql
+ALTER TYPE public.brand_key ADD VALUE IF NOT EXISTS 'lafes';
+ALTER TYPE public.brand_key ADD VALUE IF NOT EXISTS 'hartington';
+ALTER TYPE public.brand_key ADD VALUE IF NOT EXISTS 'phytophar';
 ```
-- `softTint` is a gentle gradient like `from-sky-100/60 to-sky-50` per palette (used as the panel behind the image).
-- The **gradient halo + lift + ring shadow** are copied from the pillars cards so the hover language matches exactly.
-- Image scales to `1.05` on group hover (kept inside `overflow-hidden` so it doesn't break the rounded corners).
 
-### Real product counts
-- Add a second hook usage in `CategoryCarousel.tsx`: pull products via `useProducts()` (already exported from `src/lib/db.ts`).
-- Build `counts = Map<categoryId, number>` by iterating products, counting BOTH `product.categoryId` and any IDs in `product.categoryIds` (de‑duped per product) so a product with multiple categories is counted in each — matches how `BrandPage.tsx` already counts.
-- A category's count also includes any of its **subcategories** (since subcategories are not shown here, their products should still roll up to the parent tile). Implementation: for each category `c` in the active top-level set, sum direct products + products tied to any descendant categories.
+`hero_slides.page_key` is a free `text` column with no CHECK constraint — no DB change needed there. Hero slides for new pages just work once added in the admin.
 
-### i18n
-Add two new keys (in `src/lib/i18n.tsx`) used by the count pill:
-- `categories.product` → "product" / "منتج"
-- `categories.products` → "products" / "منتجات"
+### 2. Copy logos into the project
 
-If the existing `t()` API doesn't support pluralization helpers, just pick `products` for `count !== 1` and `product` for `count === 1` in the component (as shown above).
+Copy the uploaded logos from `user-uploads://` to `src/assets/`:
+- `ChatGPT_Image_Apr_26_2026_09_29_30_PM.png` → `src/assets/brand-lafes.png`
+- `ChatGPT_Image_Apr_26_2026_09_32_35_PM.png` → `src/assets/brand-hartington.png`
+- `ChatGPT_Image_Apr_26_2026_09_31_14_PM.png` → `src/assets/brand-phytophar.png`
 
-### Cleanup
-- The `cat-marquee` keyframe/class in `src/index.css` is only used by this component — leave it in place for now (low risk; can be removed in a follow-up if no other usage is found via `rg`).
-- No DB schema changes. No new packages.
+### 3. Type updates — `src/lib/db.ts`
 
-### Files to edit
-- `src/components/site/CategoryCarousel.tsx` — full rewrite of the rendering body (header stays).
-- `src/lib/i18n.tsx` — add `categories.product` / `categories.products` strings (EN + AR).
+Extend `BrandKey`:
+```ts
+export type BrandKey =
+  | "flexitol" | "kapiva" | "nada" | "abc"
+  | "lafes" | "hartington" | "phytophar";
+```
 
-### Out of scope (not changing in this pass)
-- Brand pages' filter sidebar (already done in a prior step).
-- The "What we do" pillar section itself.
-- Removing the `cat-marquee` CSS keyframes.
+This auto-flows into `Product.brand`, `useProductsByBrand`, the message form, and admin product editor brand pickers.
+
+### 4. Brand registry — `src/lib/brands.ts`
+
+Add 3 new entries to `BRANDS` and append them to `BRAND_LIST` (after `nada`, so the home brand cards order becomes: Flexitol, Kapiva, Australian Bodycare, NADA, Lafe's, Hartington, Phytophar — keeping NADA last among the originals as you previously requested):
+
+```ts
+lafes: {
+  key: "lafes",
+  slug: "lafes",
+  name: "Lafe's",
+  themeAttr: "lafes",
+  logo: lafesLogo,
+  tagline: { en: "Clean, natural personal care", ar: "عناية شخصية طبيعية ونقية" },
+  about: { en: "Plant-powered deodorants and body care, free from aluminum, parabens, and harsh chemicals.", ar: "..." },
+  categories: ["Deodorant", "Body Care"],
+  instagram: "https://www.instagram.com/lafeskw",
+  seo: { en: "Lafe's Kuwait — Natural aluminum-free deodorants and body care.", ar: "..." },
+},
+hartington: {
+  key: "hartington",
+  slug: "hartington",
+  name: "Hartington Pharmaceutical",
+  themeAttr: "hartington",
+  logo: hartingtonLogo,
+  tagline: { en: "Trusted pharmaceutical care", ar: "رعاية صيدلانية موثوقة" },
+  about: { en: "Pharmaceutical-grade products developed for everyday health needs.", ar: "..." },
+  categories: ["Health", "Wellness"],
+  instagram: "https://www.instagram.com/hartingtonkw",
+  seo: { en: "Hartington Pharmaceutical Kuwait — Trusted pharmaceutical-grade health products.", ar: "..." },
+},
+phytophar: {
+  key: "phytophar",
+  slug: "phytophar",
+  name: "Phytophar",
+  themeAttr: "phytophar",
+  logo: phytopharLogo,
+  tagline: { en: "Plant-based wellness solutions", ar: "حلول عافية نباتية" },
+  about: { en: "Phytotherapy-inspired supplements and wellness products from natural plant sources.", ar: "..." },
+  categories: ["Supplements", "Wellness"],
+  instagram: "https://www.instagram.com/phytopharkw",
+  seo: { en: "Phytophar Kuwait — Plant-based phytotherapy supplements and wellness.", ar: "..." },
+},
+```
+
+### 5. Routing — `src/App.tsx`
+
+No new routes needed. The existing catch-all `/:brand` → `BrandPage` already handles arbitrary slugs via `slugToBrand(slug)`. Just adding the entries to `BRANDS` makes `/lafes`, `/hartington`, `/phytophar` resolve.
+
+### 6. Header nav — automatic
+
+`SiteHeader.tsx` already maps `BRAND_LIST.map(...)` for both desktop nav and mobile sheet. New brands will appear automatically once added to `BRAND_LIST`. No code change. (If 7 items become too crowded on `lg`, we can later move overflow into a "More brands" dropdown — call it out and you can decide.)
+
+### 7. Hero admin — `src/lib/heroSlides.ts`
+
+Add the 3 new page keys so they show up on the `/admin/landing` index and get their own editor at `/admin/landing/<key>`:
+```ts
+export type HeroPageKey =
+  | "curemed" | "flexitol" | "kapiva" | "nada" | "abc"
+  | "lafes" | "hartington" | "phytophar";
+
+export const HERO_PAGES = [
+  { key: "curemed", label: "Curemed (Main)", route: "/curemed" },
+  { key: "flexitol", label: "Flexitol", route: "/flexitol" },
+  { key: "kapiva", label: "Kapiva", route: "/kapiva" },
+  { key: "nada", label: "NADA", route: "/nada" },
+  { key: "abc", label: "Australian Bodycare", route: "/australian-bodycare" },
+  { key: "lafes", label: "Lafe's", route: "/lafes" },
+  { key: "hartington", label: "Hartington", route: "/hartington" },
+  { key: "phytophar", label: "Phytophar", route: "/phytophar" },
+];
+```
+
+Then `BrandPage.tsx` already does `<HeroSlider pageKey={brandKey as HeroPageKey} />` so hero slides flow through automatically. Until you upload slides, the `HeroSlider` will render its existing empty/fallback state.
+
+### 8. Brand cards on `/curemed` — automatic
+
+`CuremedHome.tsx` iterates `BRAND_LIST` and uses `b.logo` (with `getBrandLogo` fallback). Since each new brand sets `logo` to the imported asset, the card renders the real logo on a white tile inside the brand-deep panel — no code change required.
+
+### 9. Color palettes — `src/index.css`
+
+Derive each palette from the logo and add CSS variables + `[data-brand]` blocks. `BrandPage` and `SiteLayout` automatically pick these up via `data-brand={meta.themeAttr}`.
+
+**Lafe's** — matte charcoal logo on cream (Modern Organic palette from your reference):
+- Primary `#242424` → `0 0% 14%`
+- Secondary `#8DA691` (sage) → `132 13% 60%`
+- Accent / soft bg `#F9F8F6` (cream) → `40 17% 97%`
+- Bg-deep `#D4C5B9` (warm tan) → `28 22% 78%`
+
+**Hartington** — warm brown wordmark + green/blue accent (Hartington Design System palette):
+- Primary `#544A45` (warm brown) → `20 9% 30%`
+- Secondary `#B1D249` (lime green from arc) → `74 60% 56%`
+- Accent `#76B9D0` (sky blue from arc) → `196 49% 64%`
+- Soft bg `#F7F8F6` → `90 11% 97%`, bg-deep `30 8% 88%`
+
+**Phytophar** — royal blue wordmark + green/orange/blue capsule:
+- Primary `#3F5199` (royal blue) → `228 42% 42%`
+- Secondary `#8CBD44` (leaf green) → `82 48% 50%`
+- Accent `#F59E2D` (orange capsule) → `33 91% 57%`
+- Soft bg `#EAF0FF` → `222 100% 96%`, bg-deep `222 60% 90%`
+
+CSS additions:
+```css
+/* :root section */
+--lafes-primary: 0 0% 14%;
+--lafes-secondary: 132 13% 60%;
+--lafes-accent: 40 17% 97%;
+
+--hartington-primary: 20 9% 30%;
+--hartington-secondary: 74 60% 56%;
+--hartington-accent: 196 49% 64%;
+
+--phytophar-primary: 228 42% 42%;
+--phytophar-secondary: 82 48% 50%;
+--phytophar-accent: 33 91% 57%;
+
+/* [data-brand] blocks */
+[data-brand="lafes"] {
+  --brand-primary: var(--lafes-primary);
+  --brand-secondary: var(--lafes-secondary);
+  --brand-bg: var(--lafes-accent);
+  --brand-bg-deep: 28 22% 78%;
+  --brand-ink: var(--curemed-ink);
+}
+[data-brand="hartington"] {
+  --brand-primary: var(--hartington-primary);
+  --brand-secondary: var(--hartington-secondary);
+  --brand-bg: 90 11% 97%;
+  --brand-bg-deep: 30 8% 88%;
+  --brand-ink: var(--curemed-ink);
+}
+[data-brand="phytophar"] {
+  --brand-primary: var(--phytophar-primary);
+  --brand-secondary: var(--phytophar-secondary);
+  --brand-bg: 222 100% 96%;
+  --brand-bg-deep: 222 60% 90%;
+  --brand-ink: var(--curemed-ink);
+}
+```
+
+This automatically themes the brand page hero, filter checkboxes, "Why X" section, contact form button, footer accents, etc. — everything currently using the `bg-brand`, `text-brand`, `bg-brand-soft`, `bg-brand-deep` utilities.
+
+### 10. What you'll do after I ship this
+
+1. Open `/admin/landing` → click each new brand → upload hero slides (images/videos) and CTAs.
+2. Open `/admin/products` → create products and pick the new brand from the brand dropdown (it will list the 3 new values automatically once the enum migration runs).
+3. (Optional) tell me to refine any of the 3 palettes if the derived colors don't match your taste.
+
+---
+
+### Files touched
+
+- `supabase/migrations/<new>.sql` — extend `brand_key` enum
+- `src/assets/brand-lafes.png`, `brand-hartington.png`, `brand-phytophar.png` — copied logos
+- `src/lib/db.ts` — extend `BrandKey` type
+- `src/lib/brands.ts` — add 3 brand entries + import logos + extend `BRAND_LIST`
+- `src/lib/heroSlides.ts` — extend `HeroPageKey` and `HERO_PAGES`
+- `src/index.css` — palette variables + `[data-brand]` blocks for the 3 new brands
+
+### Files NOT touched (work automatically)
+
+- `src/App.tsx` — `/:brand` catch-all already routes to `BrandPage`
+- `src/components/site/SiteHeader.tsx` — iterates `BRAND_LIST`
+- `src/pages/CuremedHome.tsx` — iterates `BRAND_LIST` for brand cards
+- `src/pages/BrandPage.tsx` — already passes `brandKey` to `<HeroSlider pageKey>` and `data-brand` to `SiteLayout`
+- `src/pages/admin/AdminLandingPages.tsx` + `AdminLandingPageEditor.tsx` — iterate `HERO_PAGES`
