@@ -69,7 +69,7 @@ function BrandLandingCard({
         "shadow-sm transition-all duration-300 ease-out",
         "hover:-translate-y-1 hover:shadow-2xl hover:border-brand/50",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        "animate-fade-in opacity-0 [animation-fill-mode:forwards]",
+        "animate-fade-in",
       )}
     >
       {/* Top media band */}
