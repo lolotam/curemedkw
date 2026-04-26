@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { useCart } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
-import { useCreateOrder, type PaymentMethod } from "@/lib/db";
+import { useCreateOrder, useProfile, type PaymentMethod } from "@/lib/db";
+import { useAuth } from "@/lib/auth";
+import { useEffect } from "react";
 import { KW_AREAS } from "@/lib/kuwaitData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -18,6 +20,8 @@ export default function Checkout() {
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   const createOrder = useCreateOrder();
+  const { user } = useAuth();
+  const { data: profile } = useProfile(user?.id);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -32,6 +36,22 @@ export default function Checkout() {
     notes: "",
   });
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+
+  useEffect(() => {
+    if (!profile) return;
+    setForm((f) => ({
+      ...f,
+      customerName: f.customerName || profile.fullName,
+      customerEmail: f.customerEmail || user?.email || "",
+      customerPhone: f.customerPhone || profile.phone,
+      city: profile.city || f.city,
+      area: f.area || profile.area,
+      block: f.block || profile.block,
+      street: f.street || profile.street,
+      building: f.building || profile.building,
+      addressLine: f.addressLine || profile.addressLine,
+    }));
+  }, [profile, user]);
 
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
