@@ -22,6 +22,7 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   category: BRANDS[brand].categories[0],
   categoryId: null,
   price: 0,
+  originalPrice: null,
   shortDescription: "",
   longDescription: "",
   mainImage: placeholderImage(brand, "?", 0),
@@ -34,6 +35,7 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   stockStatus: "in_stock",
   featured: false,
   tags: [],
+  sourceUrl: "",
 });
 
 export default function AdminProductEditor() {
@@ -165,6 +167,7 @@ export default function AdminProductEditor() {
       try {
         const created = await createCategoryMut.mutateAsync({
           slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
+          parentId: null, visiblePages: ["curemed"],
         });
         update("categoryId", created.id);
         update("category", created.nameEn);

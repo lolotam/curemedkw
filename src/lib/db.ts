@@ -15,6 +15,7 @@ export interface Product {
   category: string;
   categoryId: string | null;
   price: number;
+  originalPrice: number | null;
   shortDescription: string;
   longDescription: string;
   mainImage: string;
@@ -27,6 +28,7 @@ export interface Product {
   stockStatus: StockStatus;
   featured: boolean;
   tags: string[];
+  sourceUrl: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +58,8 @@ type ProductRow = {
   size: string; sku: string; stock_status: StockStatus; featured: boolean;
   tags: string[]; created_at: string; updated_at: string;
   category_id: string | null;
+  original_price: number | null;
+  source_url: string;
 };
 
 const rowToProduct = (r: ProductRow): Product => ({
@@ -65,6 +69,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   category: r.category,
   categoryId: r.category_id ?? null,
   price: Number(r.price),
+  originalPrice: r.original_price === null || r.original_price === undefined ? null : Number(r.original_price),
   shortDescription: r.short_description,
   longDescription: r.long_description,
   mainImage: r.main_image,
@@ -77,6 +82,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   stockStatus: r.stock_status,
   featured: r.featured,
   tags: r.tags ?? [],
+  sourceUrl: r.source_url ?? "",
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -90,6 +96,7 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.category !== undefined) out.category = p.category;
   if (p.categoryId !== undefined) out.category_id = p.categoryId;
   if (p.price !== undefined) out.price = p.price;
+  if (p.originalPrice !== undefined) out.original_price = p.originalPrice;
   if (p.shortDescription !== undefined) out.short_description = p.shortDescription;
   if (p.longDescription !== undefined) out.long_description = p.longDescription;
   if (p.mainImage !== undefined) out.main_image = p.mainImage;
@@ -102,6 +109,7 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.stockStatus !== undefined) out.stock_status = p.stockStatus;
   if (p.featured !== undefined) out.featured = p.featured;
   if (p.tags !== undefined) out.tags = p.tags;
+  if (p.sourceUrl !== undefined) out.source_url = p.sourceUrl;
   return out;
 };
 
@@ -114,12 +122,15 @@ export const qk = {
   product: (id: string) => ["products", id] as const,
   productsByBrand: (b: BrandKey) => ["products", "brand", b] as const,
   productsFeatured: ["products", "featured"] as const,
+  productsDiscounted: ["products", "discounted"] as const,
   productsByCategory: (id: string) => ["products", "category", id] as const,
   messages: ["messages"] as const,
   unreadCount: ["messages", "unread"] as const,
   subscribers: ["subscribers"] as const,
   categories: ["categories"] as const,
   category: (slug: string) => ["categories", "slug", slug] as const,
+  tags: ["tags"] as const,
+  testimonials: ["testimonials"] as const,
 };
 
 /* ============================================================
@@ -166,6 +177,23 @@ export function useFeaturedProducts() {
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data as ProductRow[]).map(rowToProduct);
+    },
+  });
+}
+
+export function useDiscountedProducts() {
+  return useQuery({
+    queryKey: qk.productsDiscounted,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .not("original_price", "is", null)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data as ProductRow[])
+        .map(rowToProduct)
+        .filter((p) => (p.originalPrice ?? 0) > p.price && p.price > 0);
     },
   });
 }
@@ -282,6 +310,8 @@ export interface Category {
   imageUrl: string;
   sortOrder: number;
   isActive: boolean;
+  parentId: string | null;
+  visiblePages: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -290,6 +320,8 @@ type CategoryRow = {
   id: string; slug: string; name_en: string; name_ar: string;
   image_url: string; sort_order: number; is_active: boolean;
   created_at: string; updated_at: string;
+  parent_id: string | null;
+  visible_pages: string[];
 };
 
 const rowToCategory = (r: CategoryRow): Category => ({
@@ -300,6 +332,8 @@ const rowToCategory = (r: CategoryRow): Category => ({
   imageUrl: r.image_url,
   sortOrder: r.sort_order,
   isActive: r.is_active,
+  parentId: r.parent_id ?? null,
+  visiblePages: r.visible_pages ?? [],
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -314,6 +348,8 @@ const categoryToRow = (c: Partial<CategoryInput>): Partial<CategoryRow> => {
   if (c.imageUrl !== undefined) out.image_url = c.imageUrl;
   if (c.sortOrder !== undefined) out.sort_order = c.sortOrder;
   if (c.isActive !== undefined) out.is_active = c.isActive;
+  if (c.parentId !== undefined) out.parent_id = c.parentId;
+  if (c.visiblePages !== undefined) out.visible_pages = c.visiblePages;
   return out;
 };
 
@@ -538,5 +574,138 @@ export function useDeleteSubscriber() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: qk.subscribers }); },
+  });
+}
+
+/* ============================================================
+ * Tags
+ * ============================================================ */
+
+export interface Tag {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+}
+
+type TagRow = { id: string; name: string; slug: string; created_at: string };
+const rowToTag = (r: TagRow): Tag => ({ id: r.id, name: r.name, slug: r.slug, createdAt: r.created_at });
+
+export function useTags() {
+  return useQuery({
+    queryKey: qk.tags,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("tags").select("*").order("name", { ascending: true });
+      if (error) throw error;
+      return (data as TagRow[]).map(rowToTag);
+    },
+  });
+}
+
+export function useUpsertTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string }) => {
+      const name = input.name.trim();
+      if (!name) throw new Error("Empty tag name");
+      const slug = slugify(name);
+      const { data, error } = await supabase
+        .from("tags").upsert({ name, slug }, { onConflict: "slug" }).select("*").single();
+      if (error) throw error;
+      return rowToTag(data as TagRow);
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.tags }); },
+  });
+}
+
+export function useRenameTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, oldName, newName }: { id: string; oldName: string; newName: string }) => {
+      const name = newName.trim();
+      if (!name) throw new Error("Empty tag name");
+      const slug = slugify(name);
+      const { error } = await supabase.from("tags").update({ name, slug }).eq("id", id);
+      if (error) throw error;
+      // Replace in every product's tags array (client-side rewrite)
+      const { data: products, error: pErr } = await supabase
+        .from("products").select("id, tags").contains("tags", [oldName]);
+      if (pErr) throw pErr;
+      for (const p of (products ?? []) as { id: string; tags: string[] }[]) {
+        const next = (p.tags ?? []).map((t) => (t === oldName ? name : t));
+        await supabase.from("products").update({ tags: next }).eq("id", p.id);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.tags });
+      qc.invalidateQueries({ queryKey: qk.products });
+    },
+  });
+}
+
+export function useDeleteTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { error } = await supabase.from("tags").delete().eq("id", id);
+      if (error) throw error;
+      // Strip from products
+      const { data: products, error: pErr } = await supabase
+        .from("products").select("id, tags").contains("tags", [name]);
+      if (pErr) throw pErr;
+      for (const p of (products ?? []) as { id: string; tags: string[] }[]) {
+        const next = (p.tags ?? []).filter((t) => t !== name);
+        await supabase.from("products").update({ tags: next }).eq("id", p.id);
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.tags });
+      qc.invalidateQueries({ queryKey: qk.products });
+    },
+  });
+}
+
+/* ============================================================
+ * Testimonials
+ * ============================================================ */
+
+export interface Testimonial {
+  id: string;
+  nameEn: string; nameAr: string;
+  roleEn: string; roleAr: string;
+  quoteEn: string; quoteAr: string;
+  gender: "m" | "f";
+  location: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+type TestimonialRow = {
+  id: string; name_en: string; name_ar: string;
+  role_en: string; role_ar: string;
+  quote_en: string; quote_ar: string;
+  gender: string; location: string;
+  sort_order: number; is_active: boolean;
+};
+const rowToTestimonial = (r: TestimonialRow): Testimonial => ({
+  id: r.id,
+  nameEn: r.name_en, nameAr: r.name_ar,
+  roleEn: r.role_en, roleAr: r.role_ar,
+  quoteEn: r.quote_en, quoteAr: r.quote_ar,
+  gender: (r.gender === "f" ? "f" : "m"),
+  location: r.location,
+  sortOrder: r.sort_order,
+  isActive: r.is_active,
+});
+
+export function useTestimonials() {
+  return useQuery({
+    queryKey: qk.testimonials,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("testimonials").select("*").eq("is_active", true).order("sort_order", { ascending: true });
+      if (error) throw error;
+      return (data as TestimonialRow[]).map(rowToTestimonial);
+    },
   });
 }

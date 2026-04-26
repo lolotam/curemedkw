@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 
 const BLANK: CategoryInput = {
   slug: "", nameEn: "", nameAr: "", imageUrl: "", sortOrder: 0, isActive: true,
+  parentId: null, visiblePages: ["curemed"],
 };
 
 export default function AdminCategories() {
@@ -211,6 +212,8 @@ function CategoryEditorDialog({
         imageUrl: editing.imageUrl,
         sortOrder: editing.sortOrder,
         isActive: editing.isActive,
+        parentId: editing.parentId,
+        visiblePages: editing.visiblePages ?? [],
       });
       setSlugTouched(true);
     }

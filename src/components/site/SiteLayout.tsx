@@ -1,5 +1,7 @@
 import { SiteHeader } from "./SiteHeader";
 import { SiteFooter } from "./SiteFooter";
+import { WhatsAppFab } from "./WhatsAppFab";
+import { LiveOrdersToast } from "./LiveOrdersToast";
 
 export function SiteLayout({ brand = "curemed", children }: { brand?: string; children: React.ReactNode }) {
   return (
@@ -7,6 +9,8 @@ export function SiteLayout({ brand = "curemed", children }: { brand?: string; ch
       <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
+      <WhatsAppFab />
+      <LiveOrdersToast />
     </div>
   );
 }

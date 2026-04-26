@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil } from "lucide-react";
+import { Plus, Search, Star, Trash2, Pencil, ExternalLink, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useProducts, useDeleteProduct, useBulkDeleteProducts } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
+import { brandSlugFromKey } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 

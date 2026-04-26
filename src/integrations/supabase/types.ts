@@ -22,9 +22,11 @@ export type Database = {
           is_active: boolean
           name_ar: string
           name_en: string
+          parent_id: string | null
           slug: string
           sort_order: number
           updated_at: string
+          visible_pages: string[]
         }
         Insert: {
           created_at?: string
@@ -33,9 +35,11 @@ export type Database = {
           is_active?: boolean
           name_ar?: string
           name_en: string
+          parent_id?: string | null
           slug: string
           sort_order?: number
           updated_at?: string
+          visible_pages?: string[]
         }
         Update: {
           created_at?: string
@@ -44,11 +48,21 @@ export type Database = {
           is_active?: boolean
           name_ar?: string
           name_en?: string
+          parent_id?: string | null
           slug?: string
           sort_order?: number
           updated_at?: string
+          visible_pages?: string[]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "categories_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hero_slides: {
         Row: {
@@ -154,10 +168,12 @@ export type Database = {
           long_description: string
           main_image: string
           name: string
+          original_price: number | null
           price: number
           short_description: string
           size: string
           sku: string
+          source_url: string
           stock_status: Database["public"]["Enums"]["stock_status"]
           tags: string[]
           updated_at: string
@@ -176,10 +192,12 @@ export type Database = {
           long_description?: string
           main_image?: string
           name: string
+          original_price?: number | null
           price?: number
           short_description?: string
           size?: string
           sku: string
+          source_url?: string
           stock_status?: Database["public"]["Enums"]["stock_status"]
           tags?: string[]
           updated_at?: string
@@ -198,10 +216,12 @@ export type Database = {
           long_description?: string
           main_image?: string
           name?: string
+          original_price?: number | null
           price?: number
           short_description?: string
           size?: string
           sku?: string
+          source_url?: string
           stock_status?: Database["public"]["Enums"]["stock_status"]
           tags?: string[]
           updated_at?: string
@@ -232,6 +252,75 @@ export type Database = {
           created_at?: string
           email?: string
           id?: string
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      testimonials: {
+        Row: {
+          created_at: string
+          gender: string
+          id: string
+          is_active: boolean
+          location: string
+          name_ar: string
+          name_en: string
+          quote_ar: string
+          quote_en: string
+          role_ar: string
+          role_en: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          gender?: string
+          id?: string
+          is_active?: boolean
+          location?: string
+          name_ar?: string
+          name_en?: string
+          quote_ar?: string
+          quote_en?: string
+          role_ar?: string
+          role_en?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          gender?: string
+          id?: string
+          is_active?: boolean
+          location?: string
+          name_ar?: string
+          name_en?: string
+          quote_ar?: string
+          quote_en?: string
+          role_ar?: string
+          role_en?: string
+          sort_order?: number
+          updated_at?: string
         }
         Relationships: []
       }
