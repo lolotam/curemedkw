@@ -252,32 +252,60 @@ export default function AdminProductEditor() {
     [categories],
   );
 
-  const onCategorySelect = async (val: string) => {
-    if (val === "__none__") {
-      update("categoryId", null);
-      return;
+  const [catSearch, setCatSearch] = useState("");
+  const [catOpen, setCatOpen] = useState(false);
+  const filteredCategories = useMemo(() => {
+    const q = catSearch.trim().toLowerCase();
+    if (!q) return sortedCategories;
+    return sortedCategories.filter(
+      (c) =>
+        c.nameEn.toLowerCase().includes(q) ||
+        c.nameAr.includes(q) ||
+        c.slug.toLowerCase().includes(q),
+    );
+  }, [sortedCategories, catSearch]);
+
+  const setCategoryIds = (ids: string[]) => {
+    setForm((f) => {
+      const primary = ids[0] ?? null;
+      const primaryCat = primary ? categories.find((c) => c.id === primary) : null;
+      return {
+        ...f,
+        categoryIds: ids,
+        categoryId: primary,
+        category: primaryCat ? primaryCat.nameEn : (primary ? f.category : ""),
+      };
+    });
+  };
+
+  const toggleCategory = (catId: string) => {
+    const has = form.categoryIds.includes(catId);
+    const next = has
+      ? form.categoryIds.filter((id) => id !== catId)
+      : [...form.categoryIds, catId];
+    setCategoryIds(next);
+  };
+
+  const removeCategory = (catId: string) => {
+    setCategoryIds(form.categoryIds.filter((id) => id !== catId));
+  };
+
+  const createNewCategoryFromInput = async () => {
+    const name = catSearch.trim();
+    if (!name) return;
+    const nameAr = window.prompt(`Arabic name for "${name}" (optional):`)?.trim() || "";
+    const slug = slugify(name);
+    try {
+      const created = await createCategoryMut.mutateAsync({
+        slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
+        parentId: null, visiblePages: ["curemed"],
+      });
+      setCategoryIds([...form.categoryIds, created.id]);
+      setCatSearch("");
+      toast.success(`Category "${name}" created and added`);
+    } catch (err: any) {
+      toast.error("Create category failed: " + (err.message || "unknown"));
     }
-    if (val === "__new__") {
-      const name = window.prompt("New category English name:")?.trim();
-      if (!name) return;
-      const nameAr = window.prompt(`Arabic name for "${name}" (optional):`)?.trim() || "";
-      const slug = slugify(name);
-      try {
-        const created = await createCategoryMut.mutateAsync({
-          slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
-          parentId: null, visiblePages: ["curemed"],
-        });
-        update("categoryId", created.id);
-        update("category", created.nameEn);
-        toast.success(`Category "${name}" created`);
-      } catch (err: any) {
-        toast.error("Create category failed: " + (err.message || "unknown"));
-      }
-      return;
-    }
-    const cat = categories.find((c) => c.id === val);
-    update("categoryId", val);
-    if (cat) update("category", cat.nameEn);
   };
 
   const save = async (e: React.FormEvent) => {
