@@ -15,6 +15,7 @@ export interface Product {
   category: string;
   categoryId: string | null;
   price: number;
+  originalPrice: number | null;
   shortDescription: string;
   longDescription: string;
   mainImage: string;
@@ -27,6 +28,7 @@ export interface Product {
   stockStatus: StockStatus;
   featured: boolean;
   tags: string[];
+  sourceUrl: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +58,8 @@ type ProductRow = {
   size: string; sku: string; stock_status: StockStatus; featured: boolean;
   tags: string[]; created_at: string; updated_at: string;
   category_id: string | null;
+  original_price: number | null;
+  source_url: string;
 };
 
 const rowToProduct = (r: ProductRow): Product => ({
@@ -65,6 +69,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   category: r.category,
   categoryId: r.category_id ?? null,
   price: Number(r.price),
+  originalPrice: r.original_price === null || r.original_price === undefined ? null : Number(r.original_price),
   shortDescription: r.short_description,
   longDescription: r.long_description,
   mainImage: r.main_image,
@@ -77,6 +82,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   stockStatus: r.stock_status,
   featured: r.featured,
   tags: r.tags ?? [],
+  sourceUrl: r.source_url ?? "",
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -90,6 +96,7 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.category !== undefined) out.category = p.category;
   if (p.categoryId !== undefined) out.category_id = p.categoryId;
   if (p.price !== undefined) out.price = p.price;
+  if (p.originalPrice !== undefined) out.original_price = p.originalPrice;
   if (p.shortDescription !== undefined) out.short_description = p.shortDescription;
   if (p.longDescription !== undefined) out.long_description = p.longDescription;
   if (p.mainImage !== undefined) out.main_image = p.mainImage;
@@ -102,6 +109,7 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.stockStatus !== undefined) out.stock_status = p.stockStatus;
   if (p.featured !== undefined) out.featured = p.featured;
   if (p.tags !== undefined) out.tags = p.tags;
+  if (p.sourceUrl !== undefined) out.source_url = p.sourceUrl;
   return out;
 };
 
@@ -114,12 +122,15 @@ export const qk = {
   product: (id: string) => ["products", id] as const,
   productsByBrand: (b: BrandKey) => ["products", "brand", b] as const,
   productsFeatured: ["products", "featured"] as const,
+  productsDiscounted: ["products", "discounted"] as const,
   productsByCategory: (id: string) => ["products", "category", id] as const,
   messages: ["messages"] as const,
   unreadCount: ["messages", "unread"] as const,
   subscribers: ["subscribers"] as const,
   categories: ["categories"] as const,
   category: (slug: string) => ["categories", "slug", slug] as const,
+  tags: ["tags"] as const,
+  testimonials: ["testimonials"] as const,
 };
 
 /* ============================================================
@@ -166,6 +177,23 @@ export function useFeaturedProducts() {
         .order("updated_at", { ascending: false });
       if (error) throw error;
       return (data as ProductRow[]).map(rowToProduct);
+    },
+  });
+}
+
+export function useDiscountedProducts() {
+  return useQuery({
+    queryKey: qk.productsDiscounted,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .not("original_price", "is", null)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data as ProductRow[])
+        .map(rowToProduct)
+        .filter((p) => (p.originalPrice ?? 0) > p.price && p.price > 0);
     },
   });
 }
