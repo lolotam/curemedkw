@@ -1,11 +1,15 @@
 import type { BrandKey } from "./db";
-import flexitolLogo from "@/assets/brand-flexitol.png";
-import kapivaLogo from "@/assets/brand-kapiva.png";
-import nadaLogo from "@/assets/brand-nada.png";
-import abcLogo from "@/assets/brand-australian-bodycare.png";
-import lafesLogo from "@/assets/brand-lafes.png";
-import hartingtonLogo from "@/assets/brand-hartington.png";
-import phytopharLogo from "@/assets/brand-phytophar.png";
+
+// Brand logos served from the public `brands-images` Supabase storage bucket.
+const BRAND_LOGO_BASE =
+  "https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/brands-images";
+const flexitolLogo = `${BRAND_LOGO_BASE}/flexitol.png`;
+const kapivaLogo = `${BRAND_LOGO_BASE}/kapiva.png`;
+const nadaLogo = `${BRAND_LOGO_BASE}/NADA.png`;
+const abcLogo = `${BRAND_LOGO_BASE}/Australian%20Bodycare.png`;
+const lafesLogo = `${BRAND_LOGO_BASE}/Lafes.png`;
+const hartingtonLogo = `${BRAND_LOGO_BASE}/Hartington.png`;
+const phytopharLogo = `${BRAND_LOGO_BASE}/Phytophar.png`;
 
 export interface BrandMeta {
   key: BrandKey;
