@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, useCategories, useCreateCategory, slugify, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
@@ -17,6 +18,8 @@ import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
 import type { ExtractedFields } from "@/lib/aiImport";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
+import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -118,6 +121,43 @@ export default function AdminProductEditor() {
   const fileMain = useRef<HTMLInputElement>(null);
   const fileGallery = useRef<HTMLInputElement>(null);
 
+  // Image preview + selection state
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
+
+  const toggleSelected = (idx: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const allSelected = form.gallery.length > 0 && selected.size === form.gallery.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(form.gallery.map((_, i) => i)));
+  };
+
+  const downloadSelected = () => {
+    const urls = Array.from(selected).sort((a, b) => a - b).map((i) => form.gallery[i]).filter(Boolean);
+    if (!urls.length) return;
+    downloadImagesAsZip(urls, `${baseName}-selected.zip`, baseName);
+  };
+
+  const downloadAll = () => {
+    const urls = [form.mainImage, ...form.gallery].filter((u) => u && !u.startsWith("data:"));
+    if (!urls.length) {
+      toast.info("No downloadable images");
+      return;
+    }
+    downloadImagesAsZip(urls, `${baseName}-all.zip`, baseName);
+  };
+
   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -139,8 +179,17 @@ export default function AdminProductEditor() {
     e.target.value = "";
   };
 
-  const removeGalleryAt = (idx: number) =>
+  const removeGalleryAt = (idx: number) => {
     update("gallery", form.gallery.filter((_, i) => i !== idx));
+    setSelected((prev) => {
+      const next = new Set<number>();
+      prev.forEach((i) => {
+        if (i < idx) next.add(i);
+        else if (i > idx) next.add(i - 1);
+      });
+      return next;
+    });
+  };
 
   const setAsMain = (src: string) => {
     const oldMain = form.mainImage;
