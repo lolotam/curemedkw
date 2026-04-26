@@ -1,30 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
-import { Sparkles, Loader2, Check, ChevronsUpDown, Link2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Sparkles, Loader2, Link2, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 import {
   extractProductFields,
   scrapeProductUrl,
-  useOpenRouterModels,
   type ExtractedFields,
-  type OpenRouterModel,
 } from "@/lib/aiImport";
 
 const STORAGE_KEYS = ["ai-import-model", "ai-import-model-2", "ai-import-model-3"] as const;
@@ -33,7 +18,7 @@ const DEFAULT_MODELS = [
   "google/gemini-2.0-flash-001",
   "anthropic/claude-3.5-haiku",
 ] as const;
-const SLOT_LABELS = ["Primary AI model", "Fallback model #2", "Fallback model #3"] as const;
+const SLOT_LABELS = ["Primary", "Fallback #2", "Fallback #3"] as const;
 
 export interface ProductImportFromUrlProps {
   onImported: (fields: ExtractedFields, images: string[]) => void;
@@ -41,40 +26,23 @@ export interface ProductImportFromUrlProps {
 
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
   const [url, setUrl] = useState("");
-  const [models3, setModels3] = useState<[string, string, string]>(() => {
-    if (typeof window === "undefined") return [...DEFAULT_MODELS] as [string, string, string];
-    return [
-      localStorage.getItem(STORAGE_KEYS[0]) || DEFAULT_MODELS[0],
-      localStorage.getItem(STORAGE_KEYS[1]) || DEFAULT_MODELS[1],
-      localStorage.getItem(STORAGE_KEYS[2]) || DEFAULT_MODELS[2],
-    ];
-  });
-  const [openSlot, setOpenSlot] = useState<number | null>(null);
+  const [models3, setModels3] = useState<[string, string, string]>(() => readConfiguredModels());
   const [phase, setPhase] = useState<"idle" | "scraping" | "extracting">("idle");
-  const { data: models, isLoading: modelsLoading, error: modelsError } = useOpenRouterModels();
 
+  // Re-read whenever the page becomes visible / focused, so changes saved in
+  // /admin/models are picked up without a hard reload.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    models3.forEach((m, i) => localStorage.setItem(STORAGE_KEYS[i], m));
-  }, [models3]);
-
-  const sortedModels = useMemo(() => {
-    if (!models) return [];
-    return [...models].sort((a, b) => a.id.localeCompare(b.id));
-  }, [models]);
-
-  const labelFor = (id: string) => {
-    const m = models?.find((x) => x.id === id);
-    return m ? `${m.name} (${m.id})` : id;
-  };
-
-  const setModelAt = (slot: number, id: string) => {
-    setModels3((prev) => {
-      const next = [...prev] as [string, string, string];
-      next[slot] = id;
-      return next;
-    });
-  };
+    const refresh = () => setModels3(readConfiguredModels());
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, []);
 
   const run = async () => {
     const trimmed = url.trim();
@@ -109,68 +77,6 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
 
   const busy = phase !== "idle";
 
-  const renderModelPicker = (slot: number) => (
-    <div className="space-y-1.5" key={slot}>
-      <Label className="text-xs">{SLOT_LABELS[slot]}</Label>
-      <Popover
-        open={openSlot === slot}
-        onOpenChange={(o) => setOpenSlot(o ? slot : null)}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            role="combobox"
-            aria-expanded={openSlot === slot}
-            className="w-full justify-between font-normal"
-            disabled={busy}
-          >
-            <span className="truncate">
-              {modelsLoading ? "Loading models…" : labelFor(models3[slot])}
-            </span>
-            <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-          <Command>
-            <CommandInput placeholder="Search models…" />
-            <CommandList className="max-h-72">
-              <CommandEmpty>
-                {modelsError ? "Failed to load models" : "No models found"}
-              </CommandEmpty>
-              <CommandGroup>
-                {sortedModels.map((m: OpenRouterModel) => (
-                  <CommandItem
-                    key={m.id}
-                    value={`${m.id} ${m.name}`}
-                    onSelect={() => {
-                      setModelAt(slot, m.id);
-                      setOpenSlot(null);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        models3[slot] === m.id ? "opacity-100" : "opacity-0",
-                      )}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{m.name}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {m.id}
-                        {m.context_length ? ` · ${m.context_length.toLocaleString()} ctx` : ""}
-                      </div>
-                    </div>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
-
   return (
     <Card className="p-6 space-y-4 border-brand/40 bg-gradient-to-br from-brand/5 to-transparent">
       <div className="flex items-center gap-2">
@@ -178,8 +84,8 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
         <h2 className="font-semibold">Import from URL (AI)</h2>
       </div>
       <p className="text-xs text-muted-foreground -mt-2">
-        Paste a product page URL. Firecrawl scrapes it and an AI model fills in every field below.
-        If the primary model is rate-limited or fails, the 2nd then 3rd model is tried automatically.
+        Paste a product URL — Firecrawl scrapes the page and an AI model fills every field below.
+        If the primary model is rate-limited or fails, the next fallback runs automatically.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
@@ -212,13 +118,35 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
         </Button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {[0, 1, 2].map(renderModelPicker)}
+      <div className="flex items-start justify-between gap-3 rounded-md border border-border bg-background/60 p-3">
+        <div className="space-y-1.5 min-w-0">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+            Active AI models (in order)
+          </p>
+          <ol className="space-y-0.5 text-xs">
+            {models3.map((m, i) => (
+              <li key={i} className="flex gap-2 min-w-0">
+                <span className="text-muted-foreground shrink-0 w-20">{SLOT_LABELS[i]}</span>
+                <span className="font-mono truncate">{m}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <Button asChild type="button" variant="outline" size="sm" className="gap-1.5 shrink-0">
+          <Link to="/admin/models">
+            <Settings2 className="h-3.5 w-3.5" /> Configure
+          </Link>
+        </Button>
       </div>
-      <p className="text-[10px] text-muted-foreground">
-        Defaults: {DEFAULT_MODELS.join(" → ")}. Choices are remembered. Models are tried in order; on
-        rate-limit / failure the next one runs automatically.
-      </p>
     </Card>
   );
+}
+
+function readConfiguredModels(): [string, string, string] {
+  if (typeof window === "undefined") return [...DEFAULT_MODELS] as [string, string, string];
+  return [
+    localStorage.getItem(STORAGE_KEYS[0]) || DEFAULT_MODELS[0],
+    localStorage.getItem(STORAGE_KEYS[1]) || DEFAULT_MODELS[1],
+    localStorage.getItem(STORAGE_KEYS[2]) || DEFAULT_MODELS[2],
+  ];
 }
