@@ -81,14 +81,16 @@ export default function AdminProducts() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground"><tr>
               <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
+              <th className="px-4 py-3 w-12 text-left">#</th>
               <th className="text-left px-4 py-3">Product</th><th className="text-left px-4 py-3">Brand</th>
               <th className="text-left px-4 py-3">Category</th><th className="text-left px-4 py-3">Price</th>
               <th className="text-left px-4 py-3">Stock</th><th className="text-left px-4 py-3">Featured</th>
               <th className="text-right px-4 py-3">Actions</th></tr></thead>
             <tbody>
-              {list.map((p) => (
+              {list.map((p, i) => (
                 <tr key={p.id} className="border-t border-border hover:bg-muted/30">
                   <td className="px-4 py-3"><Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} /></td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground tabular-nums">{i + 1}</td>
                   <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
                     <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
@@ -103,7 +105,7 @@ export default function AdminProducts() {
                   </div></td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
+              {list.length === 0 && <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
             </tbody>
           </table>
         </div>

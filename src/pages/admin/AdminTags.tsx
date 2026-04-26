@@ -44,6 +44,7 @@ export default function AdminTags() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
+              <th className="text-left px-4 py-3 w-12">#</th>
               <th className="text-left px-4 py-3">Name</th>
               <th className="text-left px-4 py-3">Slug</th>
               <th className="text-left px-4 py-3">Used in</th>
@@ -51,10 +52,11 @@ export default function AdminTags() {
             </tr>
           </thead>
           <tbody>
-            {tags.map((t) => {
+            {tags.map((t, i) => {
               const used = counts.get(t.name) || 0;
               return (
                 <tr key={t.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground tabular-nums">{i + 1}</td>
                   <td className="px-4 py-3 font-medium inline-flex items-center gap-2"><TagIcon className="h-3.5 w-3.5 text-brand" />{t.name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{t.slug}</td>
                   <td className="px-4 py-3">
@@ -80,7 +82,7 @@ export default function AdminTags() {
                 </tr>
               );
             })}
-            {tags.length === 0 && <tr><td colSpan={4} className="text-center py-12 text-muted-foreground">No tags yet. Tags are also auto-created when AI extracts them on product import.</td></tr>}
+            {tags.length === 0 && <tr><td colSpan={5} className="text-center py-12 text-muted-foreground">No tags yet. Tags are also auto-created when AI extracts them on product import.</td></tr>}
           </tbody>
         </table>
       </Card>
