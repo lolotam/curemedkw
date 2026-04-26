@@ -39,7 +39,7 @@ export function SiteHeader() {
             <NavItem
               key={b.key}
               to={`/${b.slug}`}
-              label={b.name}
+              label={b.shortName ?? b.name}
               active={location.pathname.startsWith(`/${b.slug}`)}
             />
           ))}
@@ -80,7 +80,7 @@ export function SiteHeader() {
               <MobileItem
                 key={b.key}
                 to={`/${b.slug}`}
-                label={b.name}
+                label={b.shortName ?? b.name}
                 onClick={() => setOpen(false)}
               />
             ))}
