@@ -169,6 +169,10 @@ export const qk = {
   category: (slug: string) => ["categories", "slug", slug] as const,
   tags: ["tags"] as const,
   testimonials: ["testimonials"] as const,
+  siteSetting: (key: string) => ["site_settings", key] as const,
+  productReviews: (productId: string) => ["product_reviews", productId] as const,
+  approvedReviews: ["product_reviews", "approved"] as const,
+  adminReviews: ["product_reviews", "admin"] as const,
 };
 
 /* ============================================================
