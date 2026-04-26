@@ -29,10 +29,16 @@ import AdminTags from "./pages/admin/AdminTags";
 import AdminFlags from "./pages/admin/AdminFlags";
 import AdminReviews from "./pages/admin/AdminReviews";
 import AdminOrders from "./pages/admin/AdminOrders";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminCoupons from "./pages/admin/AdminCoupons";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
+import Account from "./pages/Account";
 import { CartProvider } from "@/lib/cart";
+import { AuthProvider } from "@/lib/auth";
 
 const queryClient = new QueryClient();
 
@@ -41,7 +47,8 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <I18nProvider>
-          <CartProvider>
+          <AuthProvider>
+            <CartProvider>
             <TooltipProvider>
             <Toaster />
             <Sonner />
@@ -54,6 +61,9 @@ const App = () => {
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/account" element={<Account />} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/admin" element={<AdminLayout />}>
                   <Route index element={<AdminOverview />} />
@@ -71,6 +81,8 @@ const App = () => {
                   <Route path="flags" element={<AdminFlags />} />
                   <Route path="reviews" element={<AdminReviews />} />
                   <Route path="orders" element={<AdminOrders />} />
+                  <Route path="users" element={<AdminUsers />} />
+                  <Route path="coupons" element={<AdminCoupons />} />
                 </Route>
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/:brand/product/:id" element={<ProductDetail />} />
@@ -79,7 +91,8 @@ const App = () => {
               </Routes>
             </BrowserRouter>
             </TooltipProvider>
-          </CartProvider>
+            </CartProvider>
+          </AuthProvider>
         </I18nProvider>
       </ThemeProvider>
     </QueryClientProvider>
