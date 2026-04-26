@@ -43,7 +43,7 @@ export default function CuremedHome() {
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className="marquee flex w-max gap-5 group-hover:[animation-play-state:paused]">
+          <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => {
               const l = getBrandLogo(b.themeAttr, b.name);
               const isClone = idx >= BRAND_LIST.length;
@@ -54,7 +54,7 @@ export default function CuremedHome() {
                   data-brand={b.themeAttr}
                   aria-hidden={isClone ? "true" : undefined}
                   tabIndex={isClone ? -1 : undefined}
-                  className="group/card shrink-0 w-72 md:w-80 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
+                  className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
                 >
                   <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
                     {l.isImage ? (
