@@ -27,33 +27,66 @@ export default function CuremedHome() {
 
       <CategoryCarousel />
 
-      <section id="brands" className="container py-16 md:py-24">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold">{t("brands.title")}</h2>
-          <p className="mt-3 text-muted-foreground">{t("brands.subtitle")}</p>
+      <section id="brands" className="py-16 md:py-24">
+        <div className="container">
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold">{t("brands.title")}</h2>
+            <p className="mt-3 text-muted-foreground">{t("brands.subtitle")}</p>
+          </div>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {BRAND_LIST.map((b) => {
-            const l = getBrandLogo(b.themeAttr, b.name);
-            return (
-            <Link key={b.key} to={`/${b.slug}`} data-brand={b.themeAttr} className="group rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl">
-              <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
-                {l.isImage ? (
-                  <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
-                    <img src={l.src} alt={b.name} className="max-h-full max-w-full w-auto h-auto object-contain" />
+        <div
+          className="group relative overflow-hidden"
+          style={{
+            maskImage:
+              "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+            WebkitMaskImage:
+              "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+          }}
+        >
+          <div className="marquee flex w-max gap-5 group-hover:[animation-play-state:paused]">
+            {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => {
+              const l = getBrandLogo(b.themeAttr, b.name);
+              const isClone = idx >= BRAND_LIST.length;
+              return (
+                <Link
+                  key={`${b.key}-${idx}`}
+                  to={`/${b.slug}`}
+                  data-brand={b.themeAttr}
+                  aria-hidden={isClone ? "true" : undefined}
+                  tabIndex={isClone ? -1 : undefined}
+                  className="group/card shrink-0 w-72 md:w-80 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
+                    {l.isImage ? (
+                      <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
+                        <img
+                          src={l.src}
+                          alt={b.name}
+                          className="max-h-full max-w-full w-auto h-auto object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <img
+                        src={l.src}
+                        alt={b.name}
+                        className="h-12 w-auto drop-shadow object-contain"
+                      />
+                    )}
                   </div>
-                ) : (
-                  <img src={l.src} alt={b.name} className="h-12 w-auto drop-shadow object-contain" />
-                )}
-              </div>
-              <div className="p-6 flex flex-col items-center text-center">
-                <h3 className="text-xl font-bold text-brand">{b.name}</h3>
-                <p className="mt-2 text-sm text-foreground/80 line-clamp-3">{b.tagline[lang]}</p>
-                <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">{t("common.discover")} <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover:translate-x-1" /></p>
-              </div>
-            </Link>
-            );
-          })}
+                  <div className="p-6 flex flex-col items-center text-center">
+                    <h3 className="text-xl font-bold text-brand">{b.name}</h3>
+                    <p className="mt-2 text-sm text-foreground/80 line-clamp-3">
+                      {b.tagline[lang]}
+                    </p>
+                    <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
+                      {t("common.discover")}{" "}
+                      <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
+                    </p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
         </div>
       </section>
 

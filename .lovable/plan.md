@@ -1,29 +1,41 @@
-## Problem
-On `/curemed`, the Lafe's, Hartington, and Phytophar brand cards render auto-generated colored text badges (the blue "LAFE'S / HARTINGTON / PHYTOPHAR" pills in your screenshot) instead of the real logos.
+## Goal
+Replace the 4-column grid of brand cards in the "Our Brands" section on `/curemed` with a single-row, **infinite auto-scrolling marquee** (continuous, seamless loop — not paginated).
 
-Root cause: `src/lib/placeholder.ts` → `getBrandLogo()` only knows about 4 local PNGs (flexitol, kapiva, nada, abc). The other 3 brands fall through to the SVG text-badge fallback.
+## Changes
 
-All 7 logos are already uploaded to the public `brands-images` bucket and already wired into `src/lib/brands.ts` as `BRANDS[*].logo` (verified: `Australian Bodycare.png`, `flexitol.png`, `Hartington.png`, `kapiva.png`, `Lafes.png`, `NADA.png`, `Phytophar.png`).
+### 1. `src/index.css`
+Add a `marquee` keyframe + utility for a smooth, infinite horizontal scroll:
+```css
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee-x 40s linear infinite;
+}
+.animate-marquee-rtl {
+  animation: marquee-x 40s linear infinite reverse;
+}
+```
+- Pause on hover via `group-hover:[animation-play-state:paused]`.
+- RTL direction uses the reversed animation so it visually flows right-to-left correctly.
 
-## Fix — single file: `src/lib/placeholder.ts`
+### 2. `src/pages/CuremedHome.tsx` — "Our Brands" section
+Replace the existing `<div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">` block with a marquee:
 
-Rewire `getBrandLogo()` to source logos from the central brand registry instead of the partial local-asset map.
+- Outer wrapper: `relative overflow-hidden group` with edge fade masks (left/right gradient overlays for a polished look).
+- Inner track: `flex w-max animate-marquee` (or RTL variant based on `dir` from `useI18n`).
+- Render `BRAND_LIST` **twice** back-to-back inside the track. Because the track translates by `-50%`, the second copy seamlessly takes over → infinite loop with no jump.
+- Each card keeps the same visual design (logo box on top, name + tagline + "Discover" CTA below) but with a fixed width (`w-72 md:w-80 shrink-0`) so they sit in one row regardless of viewport.
+- Pause animation on hover: `group-hover:[animation-play-state:paused]`.
+- Add `aria-hidden="true"` to the duplicated set for accessibility.
 
-- Remove the 4 local `import … from "@/assets/brand-*.png"` statements.
-- Remove the `BRAND_LOGO_IMAGES` map.
-- Add `import { BRANDS } from "@/lib/brands"` (use a lazy/runtime lookup to avoid any circular-import concerns — `placeholder.ts` is imported by many files).
-- Rewrite `getBrandLogo(brand, name)`:
-  1. Find the brand in `BRANDS` whose `themeAttr` matches the `brand` arg (this is what `CuremedHome` passes).
-  2. If a `logo` URL exists → return `{ src: brandMeta.logo, isImage: true }`.
-  3. Otherwise → fall back to existing `brandLogoSvg(brand, name)` text badge.
+### Acceptance
+- All 7 brand cards visible in a single row that auto-scrolls continuously and infinitely (no visible reset).
+- Pauses when the user hovers.
+- RTL (Arabic) scrolls in the natural reading direction.
+- Subtle fade on left/right edges; cards retain current styling and link to their brand pages.
 
-Keep `brandLogoSvg`, `placeholderImage`, and `curemedLogoSvg` untouched — still used elsewhere (product placeholders, etc.).
-
-## Result
-All 7 brand cards (Flexitol, Kapiva, ABC, NADA, Lafe's, Hartington, Phytophar) on `/curemed` will display the real uploaded logos from the `brands-images` bucket inside the existing white rounded tile, matching the look of the current Flexitol/Kapiva/ABC/NADA cards.
-
-No DB, RLS, header, footer, or brand-page changes required — those already consume `BRANDS[*].logo` directly.
-
-## Out of scope
-- Not deleting the now-unused `src/assets/brand-*.png` files (harmless, keeps git history clean).
-- No changes to the `BRANDS` registry, card layout, or styling.
+## Files to edit
+- `src/index.css` (add marquee keyframes/utilities)
+- `src/pages/CuremedHome.tsx` (replace grid with marquee track)
