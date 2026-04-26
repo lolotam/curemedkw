@@ -3,6 +3,9 @@ import flexitolLogo from "@/assets/brand-flexitol.png";
 import kapivaLogo from "@/assets/brand-kapiva.png";
 import nadaLogo from "@/assets/brand-nada.png";
 import abcLogo from "@/assets/brand-australian-bodycare.png";
+import lafesLogo from "@/assets/brand-lafes.png";
+import hartingtonLogo from "@/assets/brand-hartington.png";
+import phytopharLogo from "@/assets/brand-phytophar.png";
 
 export interface BrandMeta {
   key: BrandKey;
@@ -102,6 +105,69 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
       ar: "أستراليان بودي كير الكويت — غسول الجسم واللوشن والعناية بالشعر بزيت شجرة الشاي الطبيعي لجميع أفراد العائلة.",
     },
   },
+  lafes: {
+    key: "lafes",
+    slug: "lafes",
+    name: "Lafe's",
+    tagline: {
+      en: "Clean, natural personal care",
+      ar: "عناية شخصية طبيعية ونقية",
+    },
+    about: {
+      en: "Plant-powered deodorants and body care, free from aluminum, parabens, and harsh chemicals — kind to your skin and the planet.",
+      ar: "مزيلات عرق وعناية بالجسم بقوة النباتات، خالية من الألومنيوم والبارابين والمواد الكيميائية القاسية — لطيفة على بشرتك وعلى الكوكب.",
+    },
+    themeAttr: "lafes",
+    categories: ["Deodorant", "Body Care"],
+    logo: lafesLogo,
+    instagram: "https://www.instagram.com/lafeskw",
+    seo: {
+      en: "Lafe's Kuwait — Natural aluminum-free deodorants and clean personal care for the whole family.",
+      ar: "لافيز الكويت — مزيلات عرق طبيعية خالية من الألومنيوم وعناية شخصية نقية لجميع أفراد العائلة.",
+    },
+  },
+  hartington: {
+    key: "hartington",
+    slug: "hartington",
+    name: "Hartington Pharmaceutical",
+    tagline: {
+      en: "Trusted pharmaceutical care",
+      ar: "رعاية صيدلانية موثوقة",
+    },
+    about: {
+      en: "Pharmaceutical-grade products developed for everyday health needs — backed by science, designed for daily use.",
+      ar: "منتجات بدرجة صيدلانية مصممة لاحتياجات الصحة اليومية — مدعومة بالعلم، صُممت للاستخدام اليومي.",
+    },
+    themeAttr: "hartington",
+    categories: ["Health", "Wellness"],
+    logo: hartingtonLogo,
+    instagram: "https://www.instagram.com/hartingtonkw",
+    seo: {
+      en: "Hartington Pharmaceutical Kuwait — Trusted pharmaceutical-grade health and wellness products.",
+      ar: "هارتنغتون فارماسيوتيكال الكويت — منتجات صحية وعافية بدرجة صيدلانية موثوقة.",
+    },
+  },
+  phytophar: {
+    key: "phytophar",
+    slug: "phytophar",
+    name: "Phytophar",
+    tagline: {
+      en: "Plant-based wellness solutions",
+      ar: "حلول عافية نباتية",
+    },
+    about: {
+      en: "Phytotherapy-inspired supplements and wellness products from natural plant sources — pure, potent and effective.",
+      ar: "مكملات وحلول عافية مستوحاة من العلاج بالنباتات من مصادر طبيعية — نقية وفعالة وقوية.",
+    },
+    themeAttr: "phytophar",
+    categories: ["Supplements", "Wellness"],
+    logo: phytopharLogo,
+    instagram: "https://www.instagram.com/phytopharkw",
+    seo: {
+      en: "Phytophar Kuwait — Plant-based phytotherapy supplements and natural wellness products.",
+      ar: "فيتوفار الكويت — مكملات نباتية للعلاج بالأعشاب ومنتجات عافية طبيعية.",
+    },
+  },
 };
 
 export const BRAND_LIST: BrandMeta[] = [
@@ -109,6 +175,9 @@ export const BRAND_LIST: BrandMeta[] = [
   BRANDS.kapiva,
   BRANDS.abc,
   BRANDS.nada,
+  BRANDS.lafes,
+  BRANDS.hartington,
+  BRANDS.phytophar,
 ];
 
 export const slugToBrand = (slug: string): BrandKey | null => {

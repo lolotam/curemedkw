@@ -33,6 +33,21 @@ All colors MUST be HSL.
     --abc-secondary: 28 41% 60%;
     --abc-accent: 36 38% 95%;
 
+    /* Lafe's — matte charcoal logo, sage + cream supporting tones */
+    --lafes-primary: 0 0% 14%;
+    --lafes-secondary: 132 13% 60%;
+    --lafes-accent: 40 17% 97%;
+
+    /* Hartington Pharmaceutical — warm brown wordmark, lime + sky accents */
+    --hartington-primary: 20 9% 30%;
+    --hartington-secondary: 74 60% 56%;
+    --hartington-accent: 196 49% 64%;
+
+    /* Phytophar — royal blue wordmark, leaf-green + orange accents */
+    --phytophar-primary: 228 42% 42%;
+    --phytophar-secondary: 82 48% 50%;
+    --phytophar-accent: 33 91% 57%;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -166,6 +181,27 @@ All colors MUST be HSL.
     --brand-secondary: var(--abc-secondary);
     --brand-bg: 188 30% 96%;
     --brand-bg-deep: 188 25% 90%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="lafes"] {
+    --brand-primary: var(--lafes-primary);
+    --brand-secondary: var(--lafes-secondary);
+    --brand-bg: var(--lafes-accent);
+    --brand-bg-deep: 28 22% 78%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="hartington"] {
+    --brand-primary: var(--hartington-primary);
+    --brand-secondary: var(--hartington-secondary);
+    --brand-bg: 90 11% 97%;
+    --brand-bg-deep: 30 8% 88%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="phytophar"] {
+    --brand-primary: var(--phytophar-primary);
+    --brand-secondary: var(--phytophar-secondary);
+    --brand-bg: 222 100% 96%;
+    --brand-bg-deep: 222 60% 90%;
     --brand-ink: var(--curemed-ink);
   }
 

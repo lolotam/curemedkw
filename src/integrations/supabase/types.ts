@@ -414,7 +414,14 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
-      brand_key: "flexitol" | "kapiva" | "nada" | "abc"
+      brand_key:
+        | "flexitol"
+        | "kapiva"
+        | "nada"
+        | "abc"
+        | "lafes"
+        | "hartington"
+        | "phytophar"
       stock_status: "in_stock" | "low_stock" | "out_of_stock"
     }
     CompositeTypes: {
@@ -544,7 +551,15 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
-      brand_key: ["flexitol", "kapiva", "nada", "abc"],
+      brand_key: [
+        "flexitol",
+        "kapiva",
+        "nada",
+        "abc",
+        "lafes",
+        "hartington",
+        "phytophar",
+      ],
       stock_status: ["in_stock", "low_stock", "out_of_stock"],
     },
   },
