@@ -38,8 +38,8 @@ export default function CuremedHome() {
             <Link key={b.key} to={`/${b.slug}`} data-brand={b.themeAttr} className="group rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl">
               <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
                 {l.isImage ? (
-                  <div className="bg-white rounded-xl px-4 py-2 flex items-center justify-center">
-                    <img src={l.src} alt={b.name} className="h-10 w-auto object-contain" />
+                  <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
+                    <img src={l.src} alt={b.name} className="max-h-full max-w-full w-auto h-auto object-contain" />
                   </div>
                 ) : (
                   <img src={l.src} alt={b.name} className="h-12 w-auto drop-shadow object-contain" />
