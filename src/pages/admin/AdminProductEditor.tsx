@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Save, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -210,39 +210,25 @@ export default function AdminProductEditor() {
     }
   };
 
-  const saving = createMut.isPending || updateMut.isPending;
-
   return (
-    <form onSubmit={save} className="flex flex-col min-h-[calc(100vh-0px)]">
-      {/* Sticky action bar */}
-      <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="flex items-center gap-3 px-6 lg:px-8 py-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/products")} className="gap-1">
-            <ArrowLeft className="h-4 w-4" /> Back
-          </Button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold truncate">
-              {isNew ? "Add product" : (form.name || "Edit product")}
-            </h1>
-            {!isNew && form.sku && (
-              <p className="text-xs text-muted-foreground font-mono truncate">SKU: {form.sku}</p>
-            )}
-          </div>
-          {!isNew && (
-            <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
-              <Trash2 className="h-4 w-4" /> Delete
-            </Button>
-          )}
-          <Button type="submit" disabled={saving} className="bg-brand hover:bg-brand/90 text-white gap-1.5 min-w-[110px]">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? "Saving…" : "Save"}
-          </Button>
+    <form onSubmit={save} className="p-8 max-w-5xl">
+      <div className="flex items-center gap-3 mb-6">
+        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/products")} className="gap-1">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">{isNew ? "Add product" : "Edit product"}</h1>
         </div>
+        {!isNew && (
+          <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
+            <Trash2 className="h-4 w-4" /> Delete
+          </Button>
+        )}
+        <Button type="submit" className="bg-brand hover:bg-brand/90 text-white">Save</Button>
       </div>
 
-      {/* Canvas */}
-      <div className="flex-1 px-6 lg:px-8 py-6 grid gap-6 lg:grid-cols-3 xl:grid-cols-4">
-        <div className="lg:col-span-2 xl:col-span-3 space-y-6 min-w-0">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
           <ProductImportFromUrl onImported={applyImported} />
 
           {/* Core */}
@@ -359,7 +345,7 @@ export default function AdminProductEditor() {
         </div>
 
         {/* Side: meta + preview */}
-        <div className="space-y-6 min-w-0 lg:sticky lg:top-[68px] lg:self-start">
+        <div className="space-y-6">
           <Card className="p-6 space-y-4">
             <h2 className="font-semibold">Meta</h2>
             <Field label="Stock status">
