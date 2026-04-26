@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Trash2, Pencil, Upload, X, ImagePlus } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Upload, X, ImagePlus, CornerDownRight, FolderPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import {
   useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory,
   useBulkDeleteCategories, uploadCategoryImage, useProducts, slugify,
@@ -21,6 +24,46 @@ const BLANK: CategoryInput = {
   parentId: null, visiblePages: ["curemed"],
 };
 
+const TOP_LEVEL_VALUE = "__top__";
+
+/** Build a flat ordered list: each parent followed by its children. */
+function buildTree(categories: Category[]) {
+  const byParent = new Map<string | null, Category[]>();
+  const ids = new Set(categories.map((c) => c.id));
+  for (const c of categories) {
+    // Treat orphans (parent points to deleted row) as top-level
+    const key = c.parentId && ids.has(c.parentId) ? c.parentId : null;
+    const arr = byParent.get(key) ?? [];
+    arr.push(c);
+    byParent.set(key, arr);
+  }
+  const sortFn = (a: Category, b: Category) =>
+    a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn);
+  const out: { cat: Category; depth: 0 | 1 }[] = [];
+  const tops = (byParent.get(null) ?? []).slice().sort(sortFn);
+  for (const top of tops) {
+    out.push({ cat: top, depth: 0 });
+    const kids = (byParent.get(top.id) ?? []).slice().sort(sortFn);
+    for (const k of kids) out.push({ cat: k, depth: 1 });
+  }
+  return out;
+}
+
+/** Find every descendant id of a category (used for cycle protection). */
+function descendantIds(rootId: string, categories: Category[]): Set<string> {
+  const out = new Set<string>();
+  const walk = (id: string) => {
+    for (const c of categories) {
+      if (c.parentId === id && !out.has(c.id)) {
+        out.add(c.id);
+        walk(c.id);
+      }
+    }
+  };
+  walk(rootId);
+  return out;
+}
+
 export default function AdminCategories() {
   const { data: categories = [] } = useCategories();
   const { data: products = [] } = useProducts();
@@ -30,7 +73,7 @@ export default function AdminCategories() {
   const bulkDeleteMut = useBulkDeleteCategories();
   const [q, setQ] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [editing, setEditing] = useState<Category | "new" | null>(null);
+  const [editing, setEditing] = useState<Category | { mode: "new"; parentId: string | null } | null>(null);
 
   const productCounts = useMemo(() => {
     const m = new Map<string, number>();
@@ -40,22 +83,35 @@ export default function AdminCategories() {
     return m;
   }, [products]);
 
-  const filtered = useMemo(() => {
+  // Always render in tree order; when searching, keep the parent of any
+  // matched child visible so the hierarchy stays readable.
+  const rows = useMemo(() => {
+    const tree = buildTree(categories);
     const query = q.trim().toLowerCase();
-    if (!query) return categories;
-    return categories.filter(
-      (c) => c.nameEn.toLowerCase().includes(query) ||
-             c.nameAr.includes(query) ||
-             c.slug.toLowerCase().includes(query),
+    if (!query) return tree;
+    const matchIds = new Set(
+      categories
+        .filter(
+          (c) =>
+            c.nameEn.toLowerCase().includes(query) ||
+            c.nameAr.includes(query) ||
+            c.slug.toLowerCase().includes(query),
+        )
+        .map((c) => c.id),
     );
+    // Include parents of matched children
+    for (const c of categories) {
+      if (matchIds.has(c.id) && c.parentId) matchIds.add(c.parentId);
+    }
+    return tree.filter((r) => matchIds.has(r.cat.id));
   }, [q, categories]);
 
-  const allChecked = filtered.length > 0 && filtered.every((c) => selected.has(c.id));
+  const allChecked = rows.length > 0 && rows.every((r) => selected.has(r.cat.id));
   const toggleAll = () => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (allChecked) filtered.forEach((c) => next.delete(c.id));
-      else filtered.forEach((c) => next.add(c.id));
+      if (allChecked) rows.forEach((r) => next.delete(r.cat.id));
+      else rows.forEach((r) => next.add(r.cat.id));
       return next;
     });
   };
@@ -67,7 +123,33 @@ export default function AdminCategories() {
     });
   };
 
-  const removeOne = (c: Category) => {
+  const removeOne = async (c: Category) => {
+    const children = categories.filter((x) => x.parentId === c.id);
+    if (children.length > 0) {
+      const choice = window.prompt(
+        `"${c.nameEn}" has ${children.length} subcategor${children.length === 1 ? "y" : "ies"}.\n\n` +
+          `Type "move" to promote them to top-level and delete this category,\n` +
+          `or "all" to delete this category AND all its subcategories.\n` +
+          `Leave empty to cancel.`,
+      );
+      const action = (choice || "").trim().toLowerCase();
+      if (action !== "move" && action !== "all") return;
+      try {
+        if (action === "move") {
+          await Promise.all(
+            children.map((ch) => updateMut.mutateAsync({ id: ch.id, patch: { parentId: null } })),
+          );
+          await deleteMut.mutateAsync(c.id);
+          toast.success("Category deleted, subcategories moved to top-level");
+        } else {
+          await bulkDeleteMut.mutateAsync([...children.map((ch) => ch.id), c.id]);
+          toast.success(`Deleted ${children.length + 1} categories`);
+        }
+      } catch (e: any) {
+        toast.error(e.message);
+      }
+      return;
+    }
     if (!confirm(`Delete category "${c.nameEn}"? Products will keep their text category.`)) return;
     deleteMut.mutate(c.id, {
       onSuccess: () => toast.success("Category deleted"),
@@ -85,14 +167,18 @@ export default function AdminCategories() {
     });
   };
 
+  const isNew = editing && typeof editing === "object" && "mode" in editing && editing.mode === "new";
+  const editingCategory = editing && !isNew ? (editing as Category) : null;
+  const editingParentSeed = isNew ? (editing as { parentId: string | null }).parentId : null;
+
   return (
     <div className="p-8">
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold">Categories</h1>
-          <p className="text-muted-foreground mt-1">Bilingual product categories shown across the site.</p>
+          <p className="text-muted-foreground mt-1">Bilingual product categories with optional subcategories. Drag-free re-parenting via the editor.</p>
         </div>
-        <Button onClick={() => setEditing("new")} className="bg-brand hover:bg-brand/90 text-white gap-2">
+        <Button onClick={() => setEditing({ mode: "new", parentId: null })} className="bg-brand hover:bg-brand/90 text-white gap-2">
           <Plus className="h-4 w-4" /> Add category
         </Button>
       </div>
@@ -117,6 +203,7 @@ export default function AdminCategories() {
             <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
+                <th className="text-left px-4 py-3 w-12">#</th>
                 <th className="text-left px-4 py-3">Image</th>
                 <th className="text-left px-4 py-3">English</th>
                 <th className="text-left px-4 py-3">Arabic</th>
@@ -127,27 +214,47 @@ export default function AdminCategories() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => (
-                <tr key={c.id} className="border-t border-border hover:bg-muted/30">
+              {rows.map(({ cat: c, depth }, i) => (
+                <tr
+                  key={c.id}
+                  className={cn(
+                    "border-t border-border hover:bg-muted/30",
+                    depth === 1 && "bg-muted/20",
+                  )}
+                >
                   <td className="px-4 py-3"><Checkbox checked={selected.has(c.id)} onCheckedChange={() => toggleOne(c.id)} /></td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground tabular-nums">{i + 1}</td>
                   <td className="px-4 py-3">
-                    <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted border border-border">
-                      {c.imageUrl ? (
-                        <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                          <ImagePlus className="h-4 w-4" />
-                        </div>
-                      )}
+                    <div className={cn("flex items-center gap-2", depth === 1 && "pl-6")}>
+                      {depth === 1 && <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                      <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted border border-border shrink-0">
+                        {c.imageUrl ? (
+                          <img src={c.imageUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center text-muted-foreground">
+                            <ImagePlus className="h-4 w-4" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3 font-medium">{c.nameEn}</td>
+                  <td className={cn("px-4 py-3 font-medium", depth === 1 && "text-muted-foreground")}>{c.nameEn}</td>
                   <td className="px-4 py-3" dir="rtl">{c.nameAr || "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{c.slug}</td>
                   <td className="px-4 py-3">{c.sortOrder}</td>
                   <td className="px-4 py-3 text-muted-foreground">{productCounts.get(c.id) || 0}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
+                      {depth === 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          title="Add subcategory"
+                          onClick={() => setEditing({ mode: "new", parentId: c.id })}
+                        >
+                          <FolderPlus className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => setEditing(c)}><Pencil className="h-3.5 w-3.5" /></Button>
                       <Button variant="ghost" size="sm" onClick={() => removeOne(c)} className="text-destructive hover:text-destructive">
                         <Trash2 className="h-3.5 w-3.5" />
@@ -156,8 +263,8 @@ export default function AdminCategories() {
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr><td colSpan={8} className="text-center py-12 text-muted-foreground">No categories yet.</td></tr>
+              {rows.length === 0 && (
+                <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No categories yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -165,15 +272,18 @@ export default function AdminCategories() {
       </Card>
 
       <CategoryEditorDialog
-        editing={editing}
+        editingCategory={editingCategory}
+        isNew={!!isNew}
+        seedParentId={editingParentSeed}
+        allCategories={categories}
         onClose={() => setEditing(null)}
         onSave={async (input) => {
           try {
-            if (editing === "new") {
+            if (isNew) {
               await createMut.mutateAsync(input);
               toast.success("Category created");
-            } else if (editing) {
-              await updateMut.mutateAsync({ id: editing.id, patch: input });
+            } else if (editingCategory) {
+              await updateMut.mutateAsync({ id: editingCategory.id, patch: input });
               toast.success("Category updated");
             }
             setEditing(null);
@@ -187,13 +297,16 @@ export default function AdminCategories() {
 }
 
 function CategoryEditorDialog({
-  editing, onClose, onSave,
+  editingCategory, isNew, seedParentId, allCategories, onClose, onSave,
 }: {
-  editing: Category | "new" | null;
+  editingCategory: Category | null;
+  isNew: boolean;
+  seedParentId: string | null;
+  allCategories: Category[];
   onClose: () => void;
   onSave: (input: CategoryInput) => Promise<void> | void;
 }) {
-  const open = editing !== null;
+  const open = isNew || !!editingCategory;
   const [form, setForm] = useState<CategoryInput>(BLANK);
   const [uploading, setUploading] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
@@ -201,24 +314,25 @@ function CategoryEditorDialog({
 
   // Reset form whenever the dialog opens for a new target
   useEffect(() => {
-    if (editing === "new") {
-      setForm(BLANK);
+    if (!open) return;
+    if (isNew) {
+      setForm({ ...BLANK, parentId: seedParentId });
       setSlugTouched(false);
-    } else if (editing) {
+    } else if (editingCategory) {
       setForm({
-        slug: editing.slug,
-        nameEn: editing.nameEn,
-        nameAr: editing.nameAr,
-        imageUrl: editing.imageUrl,
-        sortOrder: editing.sortOrder,
-        isActive: editing.isActive,
-        parentId: editing.parentId,
-        visiblePages: editing.visiblePages ?? [],
+        slug: editingCategory.slug,
+        nameEn: editingCategory.nameEn,
+        nameAr: editingCategory.nameAr,
+        imageUrl: editingCategory.imageUrl,
+        sortOrder: editingCategory.sortOrder,
+        isActive: editingCategory.isActive,
+        parentId: editingCategory.parentId,
+        visiblePages: editingCategory.visiblePages ?? [],
       });
       setSlugTouched(true);
     }
     setSaving(false);
-  }, [editing]);
+  }, [open, isNew, seedParentId, editingCategory]);
 
   const update = <K extends keyof CategoryInput>(k: K, v: CategoryInput[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -227,6 +341,17 @@ function CategoryEditorDialog({
     update("nameEn", v);
     if (!slugTouched) update("slug", slugify(v));
   };
+
+  // Available parent options exclude self and any descendants (cycle protection).
+  const parentOptions = useMemo(() => {
+    const blocked = editingCategory
+      ? new Set([editingCategory.id, ...descendantIds(editingCategory.id, allCategories)])
+      : new Set<string>();
+    return allCategories
+      .filter((c) => !blocked.has(c.id))
+      .slice()
+      .sort((a, b) => a.nameEn.localeCompare(b.nameEn));
+  }, [editingCategory, allCategories]);
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -249,7 +374,9 @@ function CategoryEditorDialog({
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg flex flex-col max-h-[90vh] p-0">
         <DialogHeader>
-          <DialogTitle className="px-6 pt-6">{editing === "new" ? "Add category" : "Edit category"}</DialogTitle>
+          <DialogTitle className="px-6 pt-6">
+            {isNew ? (seedParentId ? "Add subcategory" : "Add category") : "Edit category"}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">
           <div className="flex items-start gap-4">
@@ -304,6 +431,29 @@ function CategoryEditorDialog({
                 placeholder="foot-care"
                 required
               />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label className="text-xs">Parent category</Label>
+              <Select
+                value={form.parentId ?? TOP_LEVEL_VALUE}
+                onValueChange={(v) => update("parentId", v === TOP_LEVEL_VALUE ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="— Top-level —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TOP_LEVEL_VALUE}>— Top-level —</SelectItem>
+                  {parentOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nameEn}
+                      {c.parentId ? "  ·  (currently a subcategory)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Leave as Top-level to make this a parent category. Pick another category to make it a subcategory or to transfer it under a different parent.
+              </p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Sort order</Label>
