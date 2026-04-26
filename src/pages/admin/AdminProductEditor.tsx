@@ -72,8 +72,8 @@ export default function AdminProductEditor() {
       });
       if (error) throw error;
       if ((data as any)?.error) throw new Error((data as any).error);
-      qc.invalidateQueries({ queryKey: qk.products() });
-      qc.invalidateQueries({ queryKey: qk.product(productId) });
+      qc.invalidateQueries({ queryKey: ["products"] });
+      qc.invalidateQueries({ queryKey: ["product", productId] });
       if (!opts.silent) {
         if ((data as any)?.skipped) toast.info("Already translated. Click again to overwrite.");
         else toast.success("Translated to Arabic");
