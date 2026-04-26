@@ -133,7 +133,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
   hartington: {
     key: "hartington",
     slug: "hartington",
-    name: "Hartington",
+    name: "Hartington Pharmaceutical",
     tagline: {
       en: "Trusted pharmaceutical care",
       ar: "رعاية صيدلانية موثوقة",
