@@ -1,13 +1,14 @@
 import { useParams, Link, Navigate } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, Star, Check } from "lucide-react";
+import { ArrowLeft, Star, Check, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
-import { useProduct, useProductsByBrand } from "@/lib/db";
+import { useProduct, useProductsByBrand, usePriceVisibility } from "@/lib/db";
 import { BRANDS, slugToBrand } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { ProductReviews } from "@/components/site/ProductReviews";
 
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
@@ -17,9 +18,11 @@ export default function ProductDetail() {
   if (!brandKey) return <Navigate to="/curemed" replace />;
   const { data: product, isLoading } = useProduct(id);
   const { data: brandList = [] } = useProductsByBrand(brandKey);
+  const { data: visibility } = usePriceVisibility();
   if (isLoading) return null;
   if (!product || product.brand !== brandKey) return <Navigate to={`/${brandSlug}`} replace />;
   const meta = BRANDS[brandKey];
+  const priceHidden = !!visibility && (visibility.global || visibility.brands[product.brand]);
   const related = brandList.filter((p) => p.id !== product.id).slice(0, 4);
   const images = [product.mainImage, ...product.gallery.filter((g) => g !== product.mainImage)];
   const isAr = lang === "ar";
@@ -72,10 +75,25 @@ export default function ProductDetail() {
             <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-brand text-white px-2.5 py-1 text-xs font-semibold"><Star className="h-3 w-3 fill-current" /> {t("common.featured")}</span>
           )}
           <p className="mt-4 text-base text-foreground/80">{shortDesc}</p>
-          <div className="mt-6 flex items-baseline gap-4">
-            <span className="text-4xl font-bold">KD {product.price.toFixed(2)}</span>
-            <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>{stockBadge.label}</span>
-          </div>
+          {priceHidden ? (
+            <div className="mt-6 flex items-center gap-3 flex-wrap">
+              <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
+                <Link to="/contact">
+                  <MessageCircle className="h-4 w-4 mr-2" /> {t("price.contactForPrice")}
+                </Link>
+              </Button>
+              <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>
+                {stockBadge.label}
+              </span>
+            </div>
+          ) : (
+            <div className="mt-6 flex items-baseline gap-4">
+              <span className="text-4xl font-bold">KD {product.price.toFixed(2)}</span>
+              <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>
+                {stockBadge.label}
+              </span>
+            </div>
+          )}
           <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg bg-muted/50 p-3"><p className="text-muted-foreground text-xs">{t("product.size")}</p><p className="font-semibold mt-0.5">{product.size}</p></div>
             <div className="rounded-lg bg-muted/50 p-3"><p className="text-muted-foreground text-xs">{t("product.sku")}</p><p className="font-semibold mt-0.5">{product.sku}</p></div>
@@ -91,6 +109,7 @@ export default function ProductDetail() {
           <Button asChild size="lg" className="mt-8 bg-brand hover:bg-brand/90 text-white"><a href={`/${meta.slug}#contact`}>{t("product.inquire")}</a></Button>
         </div>
       </section>
+      <ProductReviews productId={product.id} />
       {related.length > 0 && (
         <section className="container py-12 md:py-16">
           <h2 className="text-2xl md:text-3xl font-bold mb-8">{t("common.relatedProducts")}</h2>

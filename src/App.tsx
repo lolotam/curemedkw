@@ -26,6 +26,8 @@ import AdminLandingPages from "./pages/admin/AdminLandingPages";
 import AdminLandingPageEditor from "./pages/admin/AdminLandingPageEditor";
 import AdminModels from "./pages/admin/AdminModels";
 import AdminTags from "./pages/admin/AdminTags";
+import AdminFlags from "./pages/admin/AdminFlags";
+import AdminReviews from "./pages/admin/AdminReviews";
 
 const queryClient = new QueryClient();
 
@@ -57,6 +59,8 @@ const App = () => {
                   <Route path="models" element={<AdminModels />} />
                   <Route path="messages" element={<AdminMessages />} />
                   <Route path="subscribers" element={<AdminSubscribers />} />
+                  <Route path="flags" element={<AdminFlags />} />
+                  <Route path="reviews" element={<AdminReviews />} />
                 </Route>
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/:brand/product/:id" element={<ProductDetail />} />

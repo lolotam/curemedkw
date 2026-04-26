@@ -2,11 +2,14 @@ import { Link } from "react-router-dom";
 import type { Product } from "@/lib/db";
 import { BRANDS } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
-import { Star } from "lucide-react";
+import { Star, MessageCircle } from "lucide-react";
+import { usePriceVisibility } from "@/lib/db";
 
 export function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
   const { t, lang } = useI18n();
   const brand = BRANDS[product.brand];
+  const { data: visibility } = usePriceVisibility();
+  const priceHidden = !!visibility && (visibility.global || visibility.brands[product.brand]);
   const hasDiscount = !!product.originalPrice && product.originalPrice > product.price && product.price > 0;
   const pct = hasDiscount ? Math.round((1 - product.price / (product.originalPrice as number)) * 100) : 0;
   const name = lang === "ar" && product.nameAr ? product.nameAr : product.name;
@@ -33,7 +36,7 @@ export function ProductCard({ product, compact = false }: { product: Product; co
             <Star className="h-3 w-3 fill-current" /> {t("common.featured")}
           </span>
         )}
-        {hasDiscount && (
+        {hasDiscount && !priceHidden && (
           <span className="absolute top-3 right-3 rtl:right-auto rtl:left-3 inline-flex items-center rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-bold text-white shadow">
             -{pct}%
           </span>
@@ -48,7 +51,11 @@ export function ProductCard({ product, compact = false }: { product: Product; co
           <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{shortDesc}</p>
         )}
         <div className="mt-3 flex items-center justify-between">
-          {hasDiscount ? (
+          {priceHidden ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand text-white px-3 py-1.5 text-xs font-semibold">
+              <MessageCircle className="h-3.5 w-3.5" /> {t("price.contactUs")}
+            </span>
+          ) : hasDiscount ? (
             <div className="flex items-baseline gap-2">
               <span className="text-[10px] uppercase font-semibold text-muted-foreground">{t("discount.was")}</span>
               <span className="text-xs line-through text-muted-foreground">KD {(product.originalPrice as number).toFixed(2)}</span>
