@@ -36,6 +36,13 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   featured: false,
   tags: [],
   sourceUrl: "",
+  nameAr: "",
+  categoryAr: "",
+  shortDescriptionAr: "",
+  longDescriptionAr: "",
+  usageAr: "",
+  benefitsAr: [],
+  ingredientsAr: [],
 });
 
 export default function AdminProductEditor() {
