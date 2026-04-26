@@ -74,6 +74,7 @@ export type Database = {
           is_active: boolean
           media_type: string
           media_url: string
+          overlay_opacity: number
           page_key: string
           sort_order: number
           subtitle_ar: string | null
@@ -91,6 +92,7 @@ export type Database = {
           is_active?: boolean
           media_type?: string
           media_url: string
+          overlay_opacity?: number
           page_key: string
           sort_order?: number
           subtitle_ar?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           is_active?: boolean
           media_type?: string
           media_url?: string
+          overlay_opacity?: number
           page_key?: string
           sort_order?: number
           subtitle_ar?: string | null

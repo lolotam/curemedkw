@@ -1,43 +1,62 @@
-# Modern, branded card redesign for /admin/landing
+# Add Overlay Opacity Control per Hero Slide
 
-## Goal
-Restyle the brand cards on `/admin/landing` (`src/pages/admin/AdminLandingPages.tsx`) so each card looks modern, premium, and tied to its brand identity (logo + brand color accent).
+Each landing-page hero slide currently has a fixed dark gradient layer rendered on top of the image/video (in `HeroSlider.tsx`). I'll let admins control that layer's opacity per slide — including setting it to 0 so the photo shows in full color.
 
-## Current state
-- Plain rectangular cards in a 2-column grid.
-- Generic `ImageIcon` placeholder for every brand — no brand identity.
-- Only label + route shown.
+## 1. Database — add `overlay_opacity` column
 
-## Proposed design
+Migration on `public.hero_slides`:
+- Add `overlay_opacity smallint not null default 80` (0–100, where 0 = no overlay, 100 = fully dim)
+- Add a CHECK constraint `overlay_opacity between 0 and 100`
 
-### Layout
-- Grid becomes `sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4` so cards breathe on wide admin viewports.
-- Page header refreshed with a small subtitle chip and a total-count indicator.
+Default `80` matches the current visual (the existing `from-background/80` start).
 
-### Card styling (per brand)
-Each card becomes a premium "brand tile":
-- **Container**: `rounded-2xl`, `overflow-hidden`, soft shadow that lifts on hover (`hover:-translate-y-1 hover:shadow-2xl`), 300ms transitions, brand-colored ring on hover via `group-hover:ring-2 group-hover:ring-[hsl(var(--brand))]`.
-- **Top media band (h-28)**:
-  - Gradient background driven per-brand by setting `data-brand={meta.themeAttr}` so it picks up the existing `--brand` / `--brand-soft` CSS variables (no hard-coded colors).
-  - Subtle radial highlight + faint dotted pattern overlay for depth.
-  - Brand **logo** from `BRANDS[key].logo` floated bottom-left in a glassy white badge (`bg-white/90 backdrop-blur rounded-xl p-2 shadow-md ring-1 ring-black/5`).
-- **Body**:
-  - Brand `name` in bold + small uppercase route chip (e.g. `/flexitol`) in muted tone.
-  - One-line tagline from `BRANDS[key].tagline.en` for context.
-  - Bottom row: a small "Manage slides" pill + animated `ArrowRight` that translates on hover.
+## 2. Types & data layer (`src/lib/heroSlides.ts`)
 
-### Curemed (main) special case
-- `BRANDS` has no `curemed` entry — render a distinct "Main site" tile using global theme tokens and a stylized "C" monogram instead of a logo, with a "Main" chip in the corner.
+- Add `overlay_opacity: number` to the `HeroSlide` interface.
+- `HeroSlideInput` automatically inherits it.
+- No changes to `listSlidesForPage` / `createSlide` / `updateSlide` (they already pass through all columns).
+- `createSlide` callers in the editor will include `overlay_opacity: 80` for new slides.
 
-### Polish
-- Focus-visible ring on the `Link` for keyboard accessibility.
-- Staggered entrance animation using existing `animate-fade-in` with `style={{ animationDelay: `${i * 60}ms` }}`.
-- Dark-mode safe: only CSS variables, no hex values.
+## 3. Live hero (`src/components/site/HeroSlider.tsx`)
+
+Replace the fixed `bg-gradient-to-r from-background/80 via-background/40 to-background/10` element with a dynamic gradient driven by `overlay_opacity`:
+
+```tsx
+const op = (s.overlay_opacity ?? 80) / 100;
+// only render overlay if op > 0
+{op > 0 && (
+  <div
+    className="absolute inset-0 pointer-events-none"
+    style={{
+      background: `linear-gradient(to right,
+        hsl(var(--background) / ${op}),
+        hsl(var(--background) / ${op * 0.5}),
+        hsl(var(--background) / ${op * 0.125}))`,
+    }}
+  />
+)}
+```
+
+When opacity is `0`, the overlay isn't rendered at all → image shows in full color. Text legibility is the admin's call (they can leave a small overlay if needed).
+
+## 4. Editor UI (`src/pages/admin/AdminLandingPageEditor.tsx`)
+
+Inside each slide card, in the Media column under the upload button, add an **Overlay** control block:
+
+- **Label**: "Overlay opacity" with a numeric badge showing current % (e.g. `80%`)
+- **`Slider`** (shadcn `@/components/ui/slider`) — `min=0`, `max=100`, `step=5`, value bound to `overlay_opacity`
+- **"Remove overlay"** ghost button (sets to 0) and a **"Reset"** button (back to 80) for one-click actions
+- A small **live preview strip**: a thin bar overlaying a snippet of the slide thumbnail showing the chosen darkness, so admins see the effect without saving
+- Changes go through `patchLocal` → flagged `_dirty` → persisted via the existing **Save changes** button (consistent with other text fields)
+
+## 5. UX details
+
+- New slides created via "Add slide" get `overlay_opacity: 80`.
+- Existing slides without the column (pre-migration) fall back to `80` via `?? 80` in both editor and renderer, so nothing breaks during rollout.
+- RTL: gradient direction is unchanged (matches existing behavior; the original code uses identical from/via/to in both LTR & RTL).
 
 ## Files to edit
-- `src/pages/admin/AdminLandingPages.tsx` — rewrite card markup; import `BRANDS` from `@/lib/brands` and map each `HERO_PAGES` entry to its brand metadata for logo + themeAttr.
-
-## Out of scope
-- No DB / schema changes.
-- No changes to `HERO_PAGES`, routes, or the landing editor page itself.
-- No new dependencies.
+- New migration: add `overlay_opacity` column + check constraint on `public.hero_slides`
+- `src/lib/heroSlides.ts` — add field to `HeroSlide` type
+- `src/components/site/HeroSlider.tsx` — dynamic overlay rendering
+- `src/pages/admin/AdminLandingPageEditor.tsx` — slider + remove/reset controls, include in `createSlide`
