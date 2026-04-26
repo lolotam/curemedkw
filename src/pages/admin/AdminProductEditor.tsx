@@ -17,7 +17,6 @@ import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
 import type { ExtractedFields } from "@/lib/aiImport";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
-import { qk } from "@/lib/db";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
