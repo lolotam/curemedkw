@@ -1,62 +1,51 @@
-# Add Overlay Opacity Control per Hero Slide
 
-Each landing-page hero slide currently has a fixed dark gradient layer rendered on top of the image/video (in `HeroSlider.tsx`). I'll let admins control that layer's opacity per slide — including setting it to 0 so the photo shows in full color.
+# Unified Hero Slide Editor with Page Dropdown
 
-## 1. Database — add `overlay_opacity` column
+Right now `/admin/landing` shows one card per landing page (Curemed, Flexitol, Kapiva…), and clicking a card opens `/admin/landing/:pageKey` to edit that page's slides. You want a single editor screen with a **dropdown of all pages at the top**, so you can pick a brand and start adding/editing slides without leaving the page.
 
-Migration on `public.hero_slides`:
-- Add `overlay_opacity smallint not null default 80` (0–100, where 0 = no overlay, 100 = fully dim)
-- Add a CHECK constraint `overlay_opacity between 0 and 100`
+## 1. Make `pageKey` optional in the route
 
-Default `80` matches the current visual (the existing `from-background/80` start).
+In `src/App.tsx` (or wherever admin routes live — I'll confirm during implementation), keep `/admin/landing/:pageKey` working **and** make `/admin/landing` itself render the editor with the dropdown.
 
-## 2. Types & data layer (`src/lib/heroSlides.ts`)
+- `/admin/landing` → editor with no page selected (dropdown shows "Choose a landing page…")
+- `/admin/landing/:pageKey` → editor with that page preselected (deep-link / shareable)
+- Selecting a different page from the dropdown updates the URL via `navigate(`/admin/landing/${key}`)` — keeps back/forward working
 
-- Add `overlay_opacity: number` to the `HeroSlide` interface.
-- `HeroSlideInput` automatically inherits it.
-- No changes to `listSlidesForPage` / `createSlide` / `updateSlide` (they already pass through all columns).
-- `createSlide` callers in the editor will include `overlay_opacity: 80` for new slides.
+This means the existing `AdminLandingPages.tsx` index page (the brand cards grid) becomes redundant for navigation. I'll **keep it as an optional "browse all" view** moved to `/admin/landing/all` so nothing is lost, but the **default** `/admin/landing` becomes the new unified editor.
 
-## 3. Live hero (`src/components/site/HeroSlider.tsx`)
+## 2. New top bar in `AdminLandingPageEditor.tsx`
 
-Replace the fixed `bg-gradient-to-r from-background/80 via-background/40 to-background/10` element with a dynamic gradient driven by `overlay_opacity`:
+Replace the current header with a sticky toolbar containing:
 
-```tsx
-const op = (s.overlay_opacity ?? 80) / 100;
-// only render overlay if op > 0
-{op > 0 && (
-  <div
-    className="absolute inset-0 pointer-events-none"
-    style={{
-      background: `linear-gradient(to right,
-        hsl(var(--background) / ${op}),
-        hsl(var(--background) / ${op * 0.5}),
-        hsl(var(--background) / ${op * 0.125}))`,
-    }}
-  />
-)}
-```
+- **Page selector** — shadcn `Select` listing all `HERO_PAGES`. Each item shows the brand logo (from `BRANDS[key].logo` when available, "C" monogram for Curemed) + the label + a small route chip (`/flexitol`, etc.), so it's visually obvious which brand you're editing.
+- **Slide count badge** — e.g. "4 slides · 3 active" for the current page.
+- **"Add slide" button** — disabled until a page is picked.
+- **"View live" link** — opens `meta.route` in a new tab.
+- **Back link** — to `/admin/landing/all` (the grid view) for users who prefer browsing.
 
-When opacity is `0`, the overlay isn't rendered at all → image shows in full color. Text legibility is the admin's call (they can leave a small overlay if needed).
+The toolbar uses `sticky top-0 z-20 bg-background/80 backdrop-blur border-b` so it stays visible while scrolling through long slide lists.
 
-## 4. Editor UI (`src/pages/admin/AdminLandingPageEditor.tsx`)
+## 3. Empty / unselected state
 
-Inside each slide card, in the Media column under the upload button, add an **Overlay** control block:
+When no `pageKey` is in the URL:
+- Hide the slides list.
+- Show a centered prompt: an icon + "Select a landing page above to start editing its hero slides", plus a compact horizontal scroll of brand chips as quick-pick shortcuts (each chip = brand logo + name, click to select).
 
-- **Label**: "Overlay opacity" with a numeric badge showing current % (e.g. `80%`)
-- **`Slider`** (shadcn `@/components/ui/slider`) — `min=0`, `max=100`, `step=5`, value bound to `overlay_opacity`
-- **"Remove overlay"** ghost button (sets to 0) and a **"Reset"** button (back to 80) for one-click actions
-- A small **live preview strip**: a thin bar overlaying a snippet of the slide thumbnail showing the chosen darkness, so admins see the effect without saving
-- Changes go through `patchLocal` → flagged `_dirty` → persisted via the existing **Save changes** button (consistent with other text fields)
+## 4. Loading & switching behavior
 
-## 5. UX details
+- When `pageKey` changes (via dropdown or URL), clear the local `slides` state, show the existing loader, then call `listSlidesForPage(newKey, false)`.
+- Unsaved-changes guard: if any slide has `_dirty === true`, confirm before switching pages (`"You have unsaved changes on this page. Discard them?"`). Cancel = revert dropdown to current page.
 
-- New slides created via "Add slide" get `overlay_opacity: 80`.
-- Existing slides without the column (pre-migration) fall back to `80` via `?? 80` in both editor and renderer, so nothing breaks during rollout.
-- RTL: gradient direction is unchanged (matches existing behavior; the original code uses identical from/via/to in both LTR & RTL).
+## 5. Layout polish
 
-## Files to edit
-- New migration: add `overlay_opacity` column + check constraint on `public.hero_slides`
-- `src/lib/heroSlides.ts` — add field to `HeroSlide` type
-- `src/components/site/HeroSlider.tsx` — dynamic overlay rendering
-- `src/pages/admin/AdminLandingPageEditor.tsx` — slider + remove/reset controls, include in `createSlide`
+- Widen container from `max-w-5xl` to `max-w-6xl` to give the dropdown + slide cards more breathing room.
+- The page title becomes dynamic: `"Hero slides — {selected brand label}"` with the brand logo inline next to it (matches the brand styling already used on the index cards).
+
+## 6. Files to edit
+
+- `src/pages/admin/AdminLandingPageEditor.tsx` — add page dropdown, sticky header, empty state, page-switch handling, dirty-check, dynamic title.
+- `src/App.tsx` (or admin route file) — add `/admin/landing` → `AdminLandingPageEditor` (no param), keep `/admin/landing/:pageKey`, move existing index to `/admin/landing/all`.
+- `src/pages/admin/AdminLandingPages.tsx` — add a small banner at the top linking back to the new editor view ("Tip: use the unified editor"). No structural change.
+- (Optional) `src/components/admin/AdminLayout.tsx` — if there's a sidebar link to `/admin/landing`, no change needed since the route still exists.
+
+No database, RLS, or `heroSlides.ts` changes — purely a UI/routing reorganization.
