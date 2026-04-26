@@ -393,20 +393,124 @@ export default function AdminProductEditor() {
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Category">
-                <Select value={form.categoryId ?? "__none__"} onValueChange={onCategorySelect}>
-                  <SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— None —</SelectItem>
-                    <SelectItem value="__new__" className="text-brand font-medium">+ Create new category…</SelectItem>
-                    {sortedCategories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.nameEn}{c.nameAr ? ` · ${c.nameAr}` : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.category && !form.categoryId && (
-                  <p className="text-[10px] text-muted-foreground">Free-text: {form.category}</p>
-                )}
+              <Field label="Categories">
+                <div className="space-y-2">
+                  {form.categoryIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {form.categoryIds.map((cid, i) => {
+                        const c = categories.find((x) => x.id === cid);
+                        if (!c) return null;
+                        return (
+                          <Badge
+                            key={cid}
+                            variant="secondary"
+                            className={cn(
+                              "gap-1 pr-1",
+                              i === 0 && "bg-brand/10 text-brand border-brand/30",
+                            )}
+                          >
+                            {i === 0 && <Star className="h-3 w-3 fill-current" />}
+                            <span>{c.nameEn}</span>
+                            <button
+                              type="button"
+                              onClick={() => removeCategory(cid)}
+                              className="ml-0.5 rounded hover:bg-foreground/10 p-0.5"
+                              aria-label={`Remove ${c.nameEn}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <Popover open={catOpen} onOpenChange={setCatOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={catOpen}
+                        className="w-full justify-between font-normal"
+                      >
+                        <span className="truncate text-muted-foreground">
+                          {form.categoryIds.length === 0
+                            ? "Select one or more categories"
+                            : `${form.categoryIds.length} selected — add or remove`}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                      <div className="p-2 border-b border-border">
+                        <Input
+                          autoFocus
+                          value={catSearch}
+                          onChange={(e) => setCatSearch(e.target.value)}
+                          placeholder="Search or create…"
+                          className="h-8"
+                        />
+                      </div>
+                      <div className="max-h-64 overflow-y-auto py-1">
+                        {filteredCategories.length === 0 && !catSearch.trim() && (
+                          <p className="px-3 py-4 text-sm text-muted-foreground text-center">
+                            No categories yet.
+                          </p>
+                        )}
+                        {filteredCategories.map((c) => {
+                          const checked = form.categoryIds.includes(c.id);
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => toggleCategory(c.id)}
+                              className={cn(
+                                "w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-accent text-left",
+                                checked && "bg-accent/50",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "flex h-4 w-4 items-center justify-center rounded border",
+                                  checked
+                                    ? "bg-brand border-brand text-white"
+                                    : "border-input",
+                                )}
+                              >
+                                {checked && <Check className="h-3 w-3" />}
+                              </span>
+                              <span className="flex-1 truncate">
+                                {c.nameEn}
+                                {c.nameAr ? (
+                                  <span className="text-muted-foreground"> · {c.nameAr}</span>
+                                ) : null}
+                              </span>
+                            </button>
+                          );
+                        })}
+                        {catSearch.trim() &&
+                          !filteredCategories.some(
+                            (c) => c.nameEn.toLowerCase() === catSearch.trim().toLowerCase(),
+                          ) && (
+                            <button
+                              type="button"
+                              onClick={createNewCategoryFromInput}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm border-t border-border text-brand font-medium hover:bg-accent"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Create "{catSearch.trim()}"
+                            </button>
+                          )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-[10px] text-muted-foreground">
+                    The first selected category (★) is used as the primary category for breadcrumbs and SEO.
+                  </p>
+                  {form.category && form.categoryIds.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground">Free-text: {form.category}</p>
+                  )}
+                </div>
               </Field>
               <Field label="Price (KD)">
                 <Input type="number" step="0.01" min={0} value={form.price} onChange={(e) => update("price", parseFloat(e.target.value) || 0)} />
