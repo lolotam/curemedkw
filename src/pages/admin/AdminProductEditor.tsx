@@ -212,7 +212,10 @@ export default function AdminProductEditor() {
         const match = categories.find(
           (c) => c.slug === wantedSlug || c.nameEn.toLowerCase() === fields.category.toLowerCase(),
         );
-        if (match) next.categoryId = match.id;
+        if (match && !next.categoryIds.includes(match.id)) {
+          next.categoryIds = [match.id, ...next.categoryIds];
+          next.categoryId = match.id;
+        }
       }
       if (fields.tags?.length) {
         const merged = Array.from(new Set([...next.tags, ...fields.tags.map((t) => t.trim()).filter(Boolean)]));
