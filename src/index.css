@@ -160,7 +160,14 @@ All colors MUST be HSL.
   }
 
   /* RTL adjustments */
-  [dir="rtl"] body { font-family: 'Tajawal', system-ui, sans-serif; }
+  [dir="rtl"],
+  [dir="rtl"] body,
+  [dir="rtl"] button,
+  [dir="rtl"] input,
+  [dir="rtl"] textarea,
+  [dir="rtl"] select {
+    font-family: 'Cairo', system-ui, sans-serif;
+  }
 }
 
 @layer base {
