@@ -1,54 +1,75 @@
-# Plan — Row numbering + Subcategory management
+## Goal
 
-## 1. Row numbering (`#` column) on three admin tables
+Give admins a clear, real-time view of unread contact messages in two places:
 
-Add a leading `#` column to each table. Numbering is the visible 1-based index of the **currently filtered/sorted view** (so it always reads `1, 2, 3…` after a search or filter — not a stable DB number).
-
-Files:
-- `src/pages/admin/AdminProducts.tsx` — add `<th>#</th>` and `<td>{i + 1}</td>` from the `list.map((p, i) => …)` loop.
-- `src/pages/admin/AdminCategories.tsx` — same treatment on `filtered.map((c, i) => …)`.
-- `src/pages/admin/AdminTags.tsx` — same treatment on `tags.map((t, i) => …)`.
-
-Style: narrow column (`w-12`), muted color, monospace digits so the column stays aligned.
+1. A small **red unread-count badge** next to the "Messages" item in the admin sidebar nav.
+2. A **bell notification icon in the public site header** (visible only to admins) that opens a **slide-out panel** listing recent messages. Clicking any message navigates to `/admin/messages` with that message preselected.
 
 ---
 
-## 2. Subcategory support
+## 1. Admin sidebar — red unread badge on "Messages"
 
-The `categories.parent_id` column already exists (uuid, nullable, no FK constraint). No schema change needed — just wire it up.
+**File:** `src/components/admin/AdminLayout.tsx`
 
-### 2a. Data layer (`src/lib/db.ts`)
-- Confirm `Category` and `CategoryInput` already expose `parentId: string | null` (they do based on the editor code). If `parentId` is missing from the row mapper or input mapper, add it on both sides.
-- Add a small helper `useCategoryTree()` that returns categories grouped as `{ parent: Category, children: Category[] }[]`, plus orphans (parent_id pointing to a deleted row → treated as top-level).
-- Guard against cycles in the update path: when changing `parentId`, refuse if the chosen new parent is the category itself or any of its descendants.
-
-### 2b. Categories table UI (`src/pages/admin/AdminCategories.tsx`)
-- Render as a **two-level tree**:
-  - Parent rows shown first.
-  - Child rows shown directly under their parent, with a left indent (`pl-10`), a small `↳` glyph, and lighter background.
-- Add a per-parent-row action **"Add subcategory"** (small `+` button next to the edit/delete icons) that opens the editor pre-filled with `parentId` set to that parent.
-- Add a top-bar **"Add category"** button (already exists) — keeps creating top-level categories (`parentId: null`).
-- Each row keeps its own edit & delete actions. Deleting a parent that still has children: prompt the user → "This category has N subcategories. Delete them too, or move them to top-level?" with three buttons: *Cancel*, *Move to top-level*, *Delete all*.
-
-### 2c. Editor dialog changes (same file, `CategoryEditorDialog`)
-Add a **"Parent category"** field (a searchable `Select` from shadcn) right under the Slug field:
-- Options: `— Top-level —` plus every other category, **excluding the current category and any of its descendants** (cycle protection).
-- Saving with a different parent re-parents the category. This is exactly the "transfer subcategory between parents" capability requested.
-- Visual hint under the field: `"Leaving this empty makes it a top-level category."`
-
-### 2d. Public site usage (no behavior change required now)
-- `CategoryCarousel` and brand pages keep using the flat list. Subcategories will simply also appear in the carousel until you decide to filter them out — I'll add a one-line filter `categories.filter(c => !c.parentId)` in the carousel so only top-level categories show in marketing carousels by default. Subcategory pages will still resolve correctly via slug.
+- Import `useUnreadMessageCount` from `@/lib/db` (already exists, returns count of `messages` where `read = false`).
+- In the `NAV.map(...)` render, when the item is the Messages link and `unreadCount > 0`, render a small red pill at the right edge of the nav row:
+  - Style: `ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold`.
+  - Show `unreadCount` (cap display at `99+`).
+- The badge will auto-update because the existing mutations (`useMarkMessageRead`, `useDeleteMessages`, `useCreateMessage`) already invalidate `qk.unreadCount`.
 
 ---
 
-## Out of scope (will not change)
-- No DB migration (column exists).
-- No changes to product → category linking; products keep linking to whichever category (parent or child) is selected.
-- Visibility-per-page checkboxes from the previous request are not part of this turn (still pending the earlier proposal).
+## 2. Public site header — admin-only notification bell
 
-## Files touched
-- `src/pages/admin/AdminProducts.tsx`
-- `src/pages/admin/AdminCategories.tsx`
-- `src/pages/admin/AdminTags.tsx`
-- `src/lib/db.ts`
-- `src/components/site/CategoryCarousel.tsx` (one-line top-level filter)
+**File:** `src/components/site/SiteHeader.tsx`
+
+- Import `useAdminSession` from `@/lib/admin` and `useUnreadMessageCount` + `useMessages` from `@/lib/db`.
+- Render the bell only when `isAdmin === true`. Place it in the right-side button cluster, just before the language toggle.
+- Bell button:
+  - Icon: `Bell` from lucide-react, `variant="ghost" size="icon"`, `aria-label="Notifications"`.
+  - When `unreadCount > 0`, overlay a small red dot/badge in the top-right corner of the icon (absolute-positioned span with `bg-destructive`, count text if > 0, capped at `99+`).
+- Clicking the bell opens a **Sheet** (right-aligned slide-out) — use the existing `@/components/ui/sheet` component.
+
+### Slide-out panel content (Sheet)
+
+- **Header:** "Notifications" title + small subtitle "X unread of Y total".
+- **Body:** scrollable list of the most recent ~20 messages from `useMessages()`.
+  - Each row shows: sender name (bold if unread), subject (truncated), short preview of message, relative date, and a small red dot for unread.
+  - Hover state with `hover:bg-muted/50`.
+  - On click: close the sheet, then `navigate("/admin/messages", { state: { focusMessageId: m.id } })`.
+- **Footer:** "View all messages" button → navigates to `/admin/messages` and closes the sheet.
+- Empty state: `Bell` icon + "No messages yet."
+
+### Important: only fetch messages when needed
+
+The `messages` table SELECT policy requires `has_role(auth.uid(), 'admin')`, so calling `useMessages()` for non-admins would error. To avoid this:
+
+- Call `useUnreadMessageCount()` and `useMessages()` only when `isAdmin` is `true`. Implement by gating with `enabled: isAdmin` — easiest path is to add a small wrapper inside `SiteHeader` that conditionally renders an `<AdminBell />` subcomponent only when `isAdmin` is true; that subcomponent is the only place the hooks are called. This keeps the hook order stable for non-admins and avoids any RLS errors.
+
+---
+
+## 3. Auto-focus selected message in `/admin/messages`
+
+**File:** `src/pages/admin/AdminMessages.tsx`
+
+- Read `location.state?.focusMessageId` via `useLocation()`.
+- In a `useEffect` watching `[all, focusMessageId]`, when the message exists in the loaded list, call the existing `open(message)` flow (which sets `active` and marks it read).
+- After consuming, clear the state via `navigate(".", { replace: true, state: {} })` so refresh won't re-trigger.
+
+---
+
+## 4. Realtime updates (nice-to-have, kept simple)
+
+The existing React Query invalidations already keep the badge fresh after admin actions in this tab. For new incoming messages from public visitors, the badge will refresh whenever the admin navigates or React Query refetches on window focus (default behavior). No DB changes are needed for this request.
+
+If you'd like true push updates later (badge increments the moment a visitor submits the contact form), we can enable Supabase Realtime on the `messages` table in a follow-up — not included in this plan to keep the change minimal.
+
+---
+
+## Files to be edited
+
+- `src/components/admin/AdminLayout.tsx` — add unread badge to the Messages nav item.
+- `src/components/site/SiteHeader.tsx` — add admin-only `<AdminBell />` with `Sheet` slide-out and notification list.
+- `src/pages/admin/AdminMessages.tsx` — auto-open message when arriving with `state.focusMessageId`.
+
+No DB schema changes. No new dependencies (Sheet, Bell icon, and all hooks already exist).
