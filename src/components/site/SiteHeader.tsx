@@ -23,7 +23,7 @@ export function SiteHeader() {
           <img src={curemedLogo} alt="Curemed" className="h-20 w-auto" />
         </Link>
 
-        <nav className="hidden items-center gap-1 lg:flex">
+        <nav className="hidden items-center gap-3 xl:gap-5 lg:flex">
           <NavItem to="/curemed" label={t("nav.home")} active={isActive("/curemed")} />
           {BRAND_LIST.map((b) => (
             <NavItem
@@ -85,8 +85,11 @@ function NavItem({ to, label, active }: { to: string; label: string; active: boo
     <Link
       to={to}
       className={cn(
-        "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted",
-        active && "text-brand bg-muted",
+        "relative rounded-md px-4 py-2.5 text-base font-bold uppercase tracking-wide transition-all duration-300",
+        "after:content-[''] after:absolute after:left-4 after:right-4 after:bottom-1 after:h-0.5 after:bg-brand",
+        "after:scale-x-0 after:origin-left after:transition-transform after:duration-300",
+        "hover:text-brand hover:after:scale-x-100",
+        active && "text-brand after:scale-x-100",
       )}
     >
       {label}
