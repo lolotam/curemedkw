@@ -173,6 +173,8 @@ export const qk = {
   productReviews: (productId: string) => ["product_reviews", productId] as const,
   approvedReviews: ["product_reviews", "approved"] as const,
   adminReviews: ["product_reviews", "admin"] as const,
+  orders: ["orders"] as const,
+  order: (id: string) => ["orders", id] as const,
 };
 
 /* ============================================================
