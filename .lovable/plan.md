@@ -1,63 +1,56 @@
+## Plan
 
-## Plan: Add About Us & Contact Us Pages
+### 1. Header — remove About & Contact links
+**File:** `src/components/site/SiteHeader.tsx`
+- Delete the two `<NavItem>` entries for `/about` and `/contact` in the desktop `<nav>` block.
+- Delete the matching `<MobileItem>` entries in the mobile drawer.
+- Keep them in the footer (already present in `SiteFooter.tsx` under the brand quick‑links column).
 
-### 1. New Page — `src/pages/ContactUs.tsx`
-- Wrapped in `SiteLayout brand="curemed"`.
-- **Hero header**: "Get in touch" title + subtitle.
-- **Contact info cards** (3 columns on desktop): 
-  - **Address**: Kuwait – Hawally – Tunis St – Gulf Mart Complex – Second Floor, Office 2
-  - **Phone**: +965 6000 3759
-  - **Email**: info@curemed.com
-  - **Working Hours**: Sunday–Thursday, 8:00 AM – 4:00 PM (Friday & Saturday closed)
-- **Form section**: Reuse existing `<ContactSection brand="curemed" />` (the "Get in touch" form is already a self-contained component, so it'll continue to work on the home page too — but per request we will **remove it from the home page** so it lives only on Contact Us).
-- **Map section**: Embed Google Maps iframe (the provided embed URL) inside a rounded container with proper aspect ratio, full-width on the page.
+### 2. Restyle About Us page — modern, animated, branded
+**File:** `src/pages/AboutUs.tsx` (full visual refresh, content & translation keys preserved)
 
-### 2. New Page — `src/pages/AboutUs.tsx`
-- Wrapped in `SiteLayout brand="curemed"`.
-- **Hero header**: "About Curemed" with intro paragraph from the uploaded markdown ("Who We Are").
-- **Our Story** section — content from the markdown.
-- **Mission** section — quote-style highlighted block (the bold mission statement).
-- **Vision** section — quote-style highlighted block (the bold vision statement).
-- **Three Pillars** (Quality / Partnership / Accessibility) — icon cards grid.
-- **Why Choose Curemed** — 2-column feature list.
-- **Our Values** — bullet list with icons.
-- **Location section** at the bottom: 
-  - Address text + working hours
-  - Embedded Google Maps iframe (same as on Contact Us)
+#### Color palette (derived from the Curemed 3D logo: cyan/sky → blue → violet/pink)
+- Hero: animated gradient (sky-400 → blue-500 → violet-500 → pink-400) with floating blurred orbs.
+- Section accents: each card uses a unique gradient pair from the palette (sky, cyan, violet, pink, emerald-teal for "care").
+- Subtle grid / dot background overlays for depth.
 
-### 3. Routing — `src/App.tsx`
-- Add routes:
-  - `/contact` → `ContactUs`
-  - `/about` → `AboutUs`
+#### Animated sections (using existing Tailwind keyframes: `fade-in`, `scale-in`, `slide-in-right`, `hover-scale`)
+- Hero: `animate-fade-in` for headline, staggered delay on subtitle (`[animation-delay:150ms]`).
+- Story section: `animate-fade-in` triggered with a small `IntersectionObserver` hook (inline, lightweight) so it plays on scroll-into-view. Add a `useInView` helper at the top of the file (no new dependency).
+- Mission/Vision cards: `animate-scale-in` with reveal-on-scroll; add hover lift (`hover:-translate-y-2 hover:shadow-2xl`) and an animated gradient ring (`bg-gradient-to-r ... p-[1px]` wrapper).
+- Pillars & Values cards: stagger reveal (delays 0/100/200/300ms), `hover-scale`, glow on hover via `after:` pseudo gradient blur.
+- "Why choose" grid: tick items slide in from the side (`animate-slide-in-right`), with gradient check badges.
+- Map section: framed card with gradient border + soft shadow, hover scale on the iframe wrapper.
 
-### 4. Header navigation — `src/components/site/SiteHeader.tsx`
-- Add two new nav items after the brand list (desktop + mobile):
-  - "About" → `/about`
-  - "Contact" → `/contact`
-- Use existing `t("nav.about")` and `t("nav.contact")` translations (already present in i18n).
+#### "3D coloured icons" replacement
+Lucide is monochrome, so we will create a small inline `<Icon3D>` component inside `AboutUs.tsx` that renders each Lucide icon inside a **3D-style badge**:
+- Rounded-2xl/3xl badge with multi-stop conic/linear gradient background (per pillar/value).
+- Inner highlight (`::before` via absolute span) for glossy top sheen.
+- Inset & drop shadow combo (`shadow-[0_10px_30px_-5px_rgba(...)] ring-1 ring-white/20 inset-shadow`) for depth.
+- White Lucide icon on top (`text-white drop-shadow`), slight rotate on hover (`group-hover:rotate-6 transition-transform`).
+- Per-item color mapping:
+  - Quality / Integrity → sky→blue gradient
+  - Partnership → violet→fuchsia
+  - Accessibility → emerald→teal
+  - Excellence → amber→orange
+  - Care / Mission → rose→pink
+  - Innovation / Vision → indigo→violet
+  - Why-choose checks → cyan→sky
 
-### 5. Footer — `src/components/site/SiteFooter.tsx`
-- Update the static contact info to the real address: "Kuwait – Hawally – Tunis St – Gulf Mart Complex, Floor 2, Office 2".
-- Add quick links to `/about` and `/contact` in the right column.
+No new packages — pure Tailwind + inline SVG gradients give the "3D colored" look while staying consistent with the rest of the codebase.
 
-### 6. Home Page — `src/pages/CuremedHome.tsx`
-- **Remove** the inline `<ContactSection />` since contact form moves to its own page.
-- Keep Newsletter, Testimonials, FAQ as-is.
+#### Layout polish
+- Wider hero with animated gradient text on the title (`bg-clip-text text-transparent bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500`).
+- Section dividers: thin gradient line (`h-px bg-gradient-to-r from-transparent via-brand/40 to-transparent`).
+- Card corners bumped to `rounded-3xl`, borders softened (`border-border/60`), backgrounds use `bg-card/70 backdrop-blur` for a glassy feel.
+- Respect dark mode (all gradients use `/10`–`/20` opacity tints so they read well on both themes).
+- RTL-safe (no hard left/right utilities where direction matters).
 
-### 7. i18n additions — `src/lib/i18n.tsx`
-Add new translation keys (EN + AR) for:
-- `about.hero.title`, `about.hero.subtitle`
-- `about.story.title`, `about.story.body`
-- `about.mission.title`, `about.mission.body`
-- `about.vision.title`, `about.vision.body`
-- `about.pillars.title`, `about.pillars.quality.*`, `about.pillars.partnership.*`, `about.pillars.accessibility.*`
-- `about.values.title` + 5 value entries
-- `about.why.title` + feature rows
-- `contact.address.title`, `contact.address.body`
-- `contact.hours.title`, `contact.hours.weekdays`, `contact.hours.weekend`
-- `contact.location.title`
-- `contact.phone.title`, `contact.email.title`
+### 3. Out of scope (no changes)
+- Translations (`src/lib/i18n.tsx`) — all existing About keys stay the same.
+- ContactUs page, footer, routing.
+- Brand metadata.
 
-### Files to be created/modified
-- **Create**: `src/pages/ContactUs.tsx`, `src/pages/AboutUs.tsx`
-- **Edit**: `src/App.tsx`, `src/components/site/SiteHeader.tsx`, `src/components/site/SiteFooter.tsx`, `src/pages/CuremedHome.tsx`, `src/lib/i18n.tsx`
+### Files to edit
+- `src/components/site/SiteHeader.tsx`
+- `src/pages/AboutUs.tsx`
