@@ -11,32 +11,32 @@ const PALETTES = [
     grad: "from-sky-500 to-cyan-400",
     softTint: "from-sky-100/70 to-sky-50",
     blob: "bg-sky-400/30",
-    ring: "group-hover:shadow-sky-400/40",
-    titleHover: "group-hover:text-sky-600",
+    ring: "group-hover/card:shadow-sky-400/40",
+    titleHover: "group-hover/card:text-sky-600",
     badge: "bg-sky-500/10 text-sky-700",
   },
   {
     grad: "from-pink-500 to-rose-400",
     softTint: "from-pink-100/70 to-rose-50",
     blob: "bg-pink-400/30",
-    ring: "group-hover:shadow-pink-400/40",
-    titleHover: "group-hover:text-pink-600",
+    ring: "group-hover/card:shadow-pink-400/40",
+    titleHover: "group-hover/card:text-pink-600",
     badge: "bg-pink-500/10 text-pink-700",
   },
   {
     grad: "from-emerald-500 to-teal-400",
     softTint: "from-emerald-100/70 to-teal-50",
     blob: "bg-emerald-400/30",
-    ring: "group-hover:shadow-emerald-400/40",
-    titleHover: "group-hover:text-emerald-600",
+    ring: "group-hover/card:shadow-emerald-400/40",
+    titleHover: "group-hover/card:text-emerald-600",
     badge: "bg-emerald-500/10 text-emerald-700",
   },
   {
     grad: "from-violet-500 to-indigo-400",
     softTint: "from-violet-100/70 to-indigo-50",
     blob: "bg-violet-400/30",
-    ring: "group-hover:shadow-violet-400/40",
-    titleHover: "group-hover:text-violet-600",
+    ring: "group-hover/card:shadow-violet-400/40",
+    titleHover: "group-hover/card:text-violet-600",
     badge: "bg-violet-500/10 text-violet-700",
   },
 ] as const;
@@ -152,7 +152,7 @@ export function CategoryCarousel() {
                     <h3
                       className={cn(
                         "font-semibold text-sm md:text-base transition-colors duration-300",
-                        palette.titleHover.replace("group-hover:", "group-hover/card:"),
+                        palette.titleHover,
                       )}
                     >
                       {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
