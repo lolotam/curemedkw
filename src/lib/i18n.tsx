@@ -115,6 +115,138 @@ export const TRANSLATIONS: Dict = {
   "filter.discounted": { en: "Discounted only", ar: "العروض فقط" },
   "category.subcategories": { en: "Subcategories", ar: "الفئات الفرعية" },
   "viewing.now": { en: "viewing now", ar: "يتصفحون الآن" },
+
+  // About Us page
+  "about.hero.eyebrow": { en: "About Curemed", ar: "عن كيورميد" },
+  "about.hero.title": {
+    en: "Your trusted healthcare partner in Kuwait",
+    ar: "شريكك الموثوق في الرعاية الصحية في الكويت",
+  },
+  "about.hero.subtitle": {
+    en: "Curemed is a Kuwait-based pharmaceutical and medical supplies distribution company, bringing the world's most trusted health, wellness and beauty brands to the Kuwaiti market — backed by a highly trained medical and sales team.",
+    ar: "كيورميد شركة كويتية متخصصة في توزيع المستحضرات الصيدلانية والمستلزمات الطبية، تقدم أفضل العلامات العالمية في الصحة والعافية والجمال للسوق الكويتي — بدعم من فريق طبي ومبيعات مؤهل تأهيلاً عالياً.",
+  },
+
+  "about.story.title": { en: "Our Story", ar: "قصتنا" },
+  "about.story.body": {
+    en: "Curemed was built on a simple but powerful belief: that people in Kuwait deserve access to the same world-class health, skincare, and wellness innovations that are changing lives globally.\n\nWe started by identifying a gap in the Kuwaiti market — a lack of specialized, trustworthy distributors who could not only supply premium international brands but also educate, support, and serve the healthcare professionals and consumers who rely on them every day.\n\nFrom that foundation, Curemed has grown into a multi-brand distribution partner spanning dermatology, skincare, natural personal care, Ayurvedic nutrition, ENT and respiratory care, immune health supplements, and modern lifestyle wellness — all under one trusted Kuwaiti company.",
+    ar: "تأسست كيورميد على قناعة بسيطة وقوية: أن أهل الكويت يستحقون الوصول إلى نفس ابتكارات الصحة والعناية بالبشرة والعافية العالمية التي تغيّر حياة الناس حول العالم.\n\nبدأنا برصد فجوة في السوق الكويتي — نقص الموزعين المتخصصين الموثوقين القادرين ليس فقط على توفير العلامات العالمية المتميزة، بل أيضاً على تثقيف ودعم وخدمة المهنيين الصحيين والمستهلكين الذين يعتمدون عليها يومياً.\n\nمن هذا الأساس، نمت كيورميد لتصبح شريك توزيع متعدد العلامات يشمل الأمراض الجلدية والعناية بالبشرة والعناية الشخصية الطبيعية والتغذية الأيورفيدية وعناية الأنف والأذن والتنفس ومكملات المناعة وعافية نمط الحياة الحديث — كل ذلك تحت مظلة شركة كويتية موثوقة واحدة.",
+  },
+
+  "about.mission.title": { en: "Our Mission", ar: "مهمتنا" },
+  "about.mission.body": {
+    en: "To improve the quality of life of people in Kuwait by connecting them with the world's most trusted and effective health, wellness, and personal care solutions — supported by a professional, knowledgeable, and caring team.",
+    ar: "تحسين جودة حياة الناس في الكويت من خلال ربطهم بأكثر حلول الصحة والعافية والعناية الشخصية موثوقية وفعالية في العالم — بدعم من فريق محترف وعلى دراية ومهتم.",
+  },
+
+  "about.vision.title": { en: "Our Vision", ar: "رؤيتنا" },
+  "about.vision.body": {
+    en: "To be Kuwait's most trusted multi-specialty health and wellness distribution company — recognized for the quality of our portfolio, the depth of our expertise, and the lasting impact we make on the health of the communities we serve.",
+    ar: "أن نكون أكثر شركات توزيع الصحة والعافية متعددة التخصصات موثوقية في الكويت — معترفاً بنا لجودة محفظتنا وعمق خبرتنا والأثر الدائم الذي نُحدثه في صحة المجتمعات التي نخدمها.",
+  },
+
+  "about.pillars.title": { en: "Our Three Pillars", ar: "ركائزنا الثلاث" },
+  "about.pillars.subtitle": {
+    en: "How we deliver on our promise — every day.",
+    ar: "كيف نلتزم بوعدنا — كل يوم.",
+  },
+  "about.pillars.quality.title": { en: "Quality", ar: "الجودة" },
+  "about.pillars.quality.body": {
+    en: "Every brand and product we carry is held to the highest standards of efficacy, safety, and scientific credibility — products we'd recommend to our own families.",
+    ar: "كل علامة ومنتج نقدمه يخضع لأعلى معايير الفعالية والسلامة والمصداقية العلمية — منتجات نوصي بها لعائلاتنا أنفسنا.",
+  },
+  "about.pillars.partnership.title": { en: "Partnership", ar: "الشراكة" },
+  "about.pillars.partnership.body": {
+    en: "Great distribution is built on genuine relationships — with our brand principals, healthcare partners, and customers. We offer expertise, responsiveness, and a team that stands behind every product.",
+    ar: "يُبنى التوزيع الناجح على علاقات حقيقية — مع شركائنا في العلامات والصحة وعملائنا. نقدم الخبرة وسرعة الاستجابة وفريقاً يقف خلف كل منتج.",
+  },
+  "about.pillars.accessibility.title": { en: "Accessibility", ar: "إتاحة الوصول" },
+  "about.pillars.accessibility.body": {
+    en: "World-class health innovation should not be out of reach. We make our portfolio available to pharmacies, clinics, and consumers across Kuwait with fair pricing and reliable supply.",
+    ar: "يجب ألا تكون ابتكارات الصحة العالمية بعيدة المنال. نتيح محفظتنا للصيدليات والعيادات والمستهلكين في الكويت بأسعار عادلة وإمداد موثوق.",
+  },
+
+  "about.why.title": { en: "Why Choose Curemed", ar: "لماذا كيورميد" },
+  "about.why.subtitle": {
+    en: "What we offer, and what it means for you.",
+    ar: "ما نقدمه وما يعنيه لك.",
+  },
+  "about.why.portfolio.title": { en: "Curated international portfolio", ar: "محفظة عالمية منتقاة" },
+  "about.why.portfolio.body": {
+    en: "Access to proven, globally recognized brands selected with care.",
+    ar: "وصول إلى علامات عالمية مُثبتة ومعروفة، مُختارة بعناية.",
+  },
+  "about.why.team.title": { en: "Highly trained team", ar: "فريق مُدرّب باحترافية" },
+  "about.why.team.body": {
+    en: "Expert medical and sales representatives who guide and educate at every step.",
+    ar: "مندوبون طبيون ومبيعات خبراء يرشدونك ويوعّون في كل خطوة.",
+  },
+  "about.why.logistics.title": { en: "Reliable supply", ar: "إمداد موثوق" },
+  "about.why.logistics.body": {
+    en: "Consistent product availability — no disruption to your service.",
+    ar: "توفر دائم للمنتجات — دون انقطاع في خدمتك.",
+  },
+  "about.why.expertise.title": { en: "Multi-category expertise", ar: "خبرة متعددة الفئات" },
+  "about.why.expertise.body": {
+    en: "One trusted partner for skincare, supplements, ENT, nutrition and more.",
+    ar: "شريك موثوق واحد للعناية بالبشرة والمكملات والأنف والأذن والتغذية والمزيد.",
+  },
+  "about.why.presence.title": { en: "Local presence, global standards", ar: "حضور محلي بمعايير عالمية" },
+  "about.why.presence.body": {
+    en: "Fast, responsive service backed by international brand credibility.",
+    ar: "خدمة سريعة ومتجاوبة مدعومة بمصداقية العلامات العالمية.",
+  },
+  "about.why.support.title": { en: "Full distributor support", ar: "دعم توزيع كامل" },
+  "about.why.support.body": {
+    en: "Training, marketing materials and after-sales service included.",
+    ar: "يشمل التدريب والمواد التسويقية وخدمة ما بعد البيع.",
+  },
+
+  "about.values.title": { en: "Our Values", ar: "قيمنا" },
+  "about.values.integrity.title": { en: "Integrity", ar: "النزاهة" },
+  "about.values.integrity.body": {
+    en: "Transparent about what products can and cannot do.",
+    ar: "شفافية تامة بشأن ما تستطيع المنتجات وما لا تستطيع تقديمه.",
+  },
+  "about.values.excellence.title": { en: "Excellence", ar: "التميّز" },
+  "about.values.excellence.body": {
+    en: "High standards for ourselves and our brand partners.",
+    ar: "معايير عالية لأنفسنا ولشركائنا في العلامات.",
+  },
+  "about.values.care.title": { en: "Care", ar: "الاهتمام" },
+  "about.values.care.body": {
+    en: "Behind every product is a person who needs help.",
+    ar: "وراء كل منتج إنسان يحتاج إلى المساعدة.",
+  },
+  "about.values.innovation.title": { en: "Innovation", ar: "الابتكار" },
+  "about.values.innovation.body": {
+    en: "Seeking out brands offering genuine solutions to unmet needs.",
+    ar: "البحث عن علامات تقدم حلولاً حقيقية لاحتياجات لم تُلبَّ.",
+  },
+  "about.values.partnership.title": { en: "Partnership", ar: "الشراكة" },
+  "about.values.partnership.body": {
+    en: "We succeed when our clients and partners succeed.",
+    ar: "ننجح عندما ينجح عملاؤنا وشركاؤنا.",
+  },
+
+  // Contact page additions
+  "contact.address.title": { en: "Address", ar: "العنوان" },
+  "contact.address.body": {
+    en: "Kuwait – Hawally – Tunis St – Gulf Mart Complex, Floor 2, Office 2",
+    ar: "الكويت – حولي – شارع تونس – مجمع جلف مارت، الدور الثاني، مكتب 2",
+  },
+  "contact.phone.title": { en: "Phone", ar: "الهاتف" },
+  "contact.email.title": { en: "Email", ar: "البريد الإلكتروني" },
+  "contact.hours.title": { en: "Working Hours", ar: "ساعات العمل" },
+  "contact.hours.weekdays": {
+    en: "Sunday – Thursday: 8:00 AM – 4:00 PM",
+    ar: "الأحد – الخميس: 8:00 صباحاً – 4:00 مساءً",
+  },
+  "contact.hours.weekend": {
+    en: "Friday & Saturday: Closed",
+    ar: "الجمعة والسبت: مغلق",
+  },
+  "contact.location.title": { en: "Find us on the map", ar: "موقعنا على الخريطة" },
 };
 
 interface Ctx {

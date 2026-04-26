@@ -69,15 +69,26 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
         <div>
           <h4 className="font-semibold mb-3 text-sm">{t("nav.contact")}</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5" /> Kuwait City, Kuwait</li>
-            <li className="flex items-center gap-2"><Phone className="h-3.5 w-3.5" /> +965 6000 3759</li>
-            <li className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" /> info@curemed.com</li>
+            <li className="flex items-start gap-2">
+              <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span>Kuwait – Hawally – Tunis St – Gulf Mart Complex, Floor 2, Office 2</span>
+            </li>
+            <li className="flex items-center gap-2">
+              <Phone className="h-3.5 w-3.5" />
+              <a href="tel:+96560003759" className="hover:text-brand transition-colors">+965 6000 3759</a>
+            </li>
+            <li className="flex items-center gap-2">
+              <Mail className="h-3.5 w-3.5" />
+              <a href="mailto:info@curemed.com" className="hover:text-brand transition-colors">info@curemed.com</a>
+            </li>
           </ul>
         </div>
         <div>
           <h4 className="font-semibold mb-3 text-sm">{brandName}</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li><Link to="/curemed" className="hover:text-brand">{t("nav.home")}</Link></li>
+            <li><Link to="/about" className="hover:text-brand">{t("nav.about")}</Link></li>
+            <li><Link to="/contact" className="hover:text-brand">{t("nav.contact")}</Link></li>
             <li><Link to="/admin" className="hover:text-brand">{t("nav.admin")}</Link></li>
           </ul>
         </div>
