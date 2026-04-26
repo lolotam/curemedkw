@@ -4,7 +4,7 @@ import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { Mail, Phone, MapPin, Instagram } from "lucide-react";
 import curemedLogo from "@/assets/curemed-logo.png";
 
-const CUREMED_INSTAGRAM = "https://www.instagram.com/curemed.kw/";
+const CUREMED_INSTAGRAM = "https://www.instagram.com/curemedkw/";
 
 export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
   const { t, lang } = useI18n();
