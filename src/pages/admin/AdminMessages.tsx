@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +15,19 @@ export default function AdminMessages() {
   const delMany = useDeleteMessages();
   const [active, setActive] = useState<Message | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const focusMessageId = (location.state as { focusMessageId?: string } | null)?.focusMessageId;
   const open = (m: Message) => { setActive(m); if (!m.read) markRead.mutate({ id: m.id, read: true }); };
+  useEffect(() => {
+    if (!focusMessageId || !all.length) return;
+    const target = all.find((m) => m.id === focusMessageId);
+    if (target) {
+      open(target);
+      navigate(".", { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusMessageId, all]);
   const remove = (id: string) => { if (confirm("Delete this message?")) { delMany.mutate([id], { onSuccess: () => { if (active?.id === id) setActive(null); toast.success("Deleted"); } }); } };
   const removeSelected = () => { if (!selected.length) return; if (confirm(`Delete ${selected.length} message(s)?`)) { delMany.mutate(selected, { onSuccess: () => { setSelected([]); toast.success("Deleted"); } }); } };
   const toggleSelect = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
