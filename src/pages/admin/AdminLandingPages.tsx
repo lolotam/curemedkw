@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Image as ImageIcon, Sparkles, Home } from "lucide-react";
+import { ArrowRight, Image as ImageIcon, Sparkles, Home, ListFilter } from "lucide-react";
 import { HERO_PAGES, type HeroPageKey } from "@/lib/heroSlides";
 import { BRANDS } from "@/lib/brands";
 import type { BrandKey } from "@/lib/db";
@@ -8,6 +8,18 @@ import { cn } from "@/lib/utils";
 export default function AdminLandingPages() {
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      <div className="mb-4 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-sm text-foreground/80 flex items-center gap-2">
+          <ListFilter className="h-4 w-4 text-brand" />
+          Tip: use the unified editor with the page dropdown to switch quickly between brands.
+        </p>
+        <Link
+          to="/admin/landing"
+          className="text-sm font-semibold text-brand hover:underline inline-flex items-center gap-1"
+        >
+          Open unified editor <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
+      </div>
       <header className="mb-8 flex flex-wrap items-end justify-between gap-3">
         <div>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand">
