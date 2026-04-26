@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [activeImg, setActiveImg] = useState(0);
   const brandKey = brandSlug ? slugToBrand(brandSlug) : null;
   if (!brandKey) return <Navigate to="/curemed" replace />;
@@ -22,6 +22,20 @@ export default function ProductDetail() {
   const meta = BRANDS[brandKey];
   const related = brandList.filter((p) => p.id !== product.id).slice(0, 4);
   const images = [product.mainImage, ...product.gallery.filter((g) => g !== product.mainImage)];
+  const isAr = lang === "ar";
+  const name = isAr && product.nameAr ? product.nameAr : product.name;
+  const category = isAr && product.categoryAr ? product.categoryAr : product.category;
+  const shortDesc =
+    isAr && product.shortDescriptionAr ? product.shortDescriptionAr : product.shortDescription;
+  const longDesc =
+    isAr && product.longDescriptionAr ? product.longDescriptionAr : product.longDescription;
+  const usage = isAr && product.usageAr ? product.usageAr : product.usage;
+  const benefits =
+    isAr && product.benefitsAr && product.benefitsAr.length ? product.benefitsAr : product.benefits;
+  const ingredients =
+    isAr && product.ingredientsAr && product.ingredientsAr.length
+      ? product.ingredientsAr
+      : product.ingredients;
   const stockBadge = {
     in_stock: { label: t("common.inStock"), cls: "bg-green-500/10 text-green-700 dark:text-green-400" },
     low_stock: { label: t("common.lowStock"), cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
@@ -33,13 +47,13 @@ export default function ProductDetail() {
       <div className="bg-brand-soft border-b border-border/40">
         <div className="container py-3 text-sm text-muted-foreground flex items-center gap-2">
           <Link to={`/${meta.slug}`} className="inline-flex items-center gap-1 hover:text-brand"><ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {meta.name}</Link>
-          <span>/</span><span className="text-foreground line-clamp-1">{product.name}</span>
+          <span>/</span><span className="text-foreground line-clamp-1">{name}</span>
         </div>
       </div>
       <section className="container py-10 md:py-16 grid lg:grid-cols-2 gap-10 lg:gap-16">
         <div>
           <div className="aspect-square rounded-3xl overflow-hidden bg-brand-soft border border-border">
-            <img src={images[activeImg]} alt={product.name} className="h-full w-full object-cover" />
+            <img src={images[activeImg]} alt={name} className="h-full w-full object-cover" />
           </div>
           {images.length > 1 && (
             <div className="mt-4 grid grid-cols-4 gap-3">
@@ -52,12 +66,12 @@ export default function ProductDetail() {
           )}
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand">{meta.name} · {product.category}</p>
-          <h1 className="mt-2 text-3xl md:text-4xl font-bold">{product.name}</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand">{meta.name} · {category}</p>
+          <h1 className="mt-2 text-3xl md:text-4xl font-bold">{name}</h1>
           {product.featured && (
             <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-brand text-white px-2.5 py-1 text-xs font-semibold"><Star className="h-3 w-3 fill-current" /> {t("common.featured")}</span>
           )}
-          <p className="mt-4 text-base text-foreground/80">{product.shortDescription}</p>
+          <p className="mt-4 text-base text-foreground/80">{shortDesc}</p>
           <div className="mt-6 flex items-baseline gap-4">
             <span className="text-4xl font-bold">KD {product.price.toFixed(2)}</span>
             <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>{stockBadge.label}</span>
@@ -68,11 +82,11 @@ export default function ProductDetail() {
           </div>
           <div className="mt-8 space-y-6">
             <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.benefits")}</h3>
-              <ul className="grid gap-2 sm:grid-cols-2">{product.benefits.map((b, i) => <li key={i} className="flex items-start gap-2 text-sm"><Check className="h-4 w-4 text-brand mt-0.5 shrink-0" /> <span>{b}</span></li>)}</ul></div>
-            <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.description")}</h3><p className="text-sm leading-relaxed text-foreground/80">{product.longDescription}</p></div>
+              <ul className="grid gap-2 sm:grid-cols-2">{benefits.map((b, i) => <li key={i} className="flex items-start gap-2 text-sm"><Check className="h-4 w-4 text-brand mt-0.5 shrink-0" /> <span>{b}</span></li>)}</ul></div>
+            <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.description")}</h3><p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{longDesc}</p></div>
             <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.ingredients")}</h3>
-              <div className="flex flex-wrap gap-2">{product.ingredients.map((i, idx) => <span key={idx} className="text-xs px-2.5 py-1 rounded-full bg-muted">{i}</span>)}</div></div>
-            <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.usage")}</h3><p className="text-sm leading-relaxed text-foreground/80">{product.usage}</p></div>
+              <div className="flex flex-wrap gap-2">{ingredients.map((i, idx) => <span key={idx} className="text-xs px-2.5 py-1 rounded-full bg-muted">{i}</span>)}</div></div>
+            <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.usage")}</h3><p className="text-sm leading-relaxed text-foreground/80 whitespace-pre-line">{usage}</p></div>
           </div>
           <Button asChild size="lg" className="mt-8 bg-brand hover:bg-brand/90 text-white"><a href={`/${meta.slug}#contact`}>{t("product.inquire")}</a></Button>
         </div>
