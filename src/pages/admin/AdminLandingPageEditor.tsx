@@ -1,12 +1,13 @@
 import * as React from "react";
 import { Link, useParams, Navigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import {
   HERO_PAGES,
@@ -65,6 +66,7 @@ export default function AdminLandingPageEditor() {
         cta_href: "",
         sort_order: max + 1,
         is_active: true,
+        overlay_opacity: 80,
       });
       setSlides((prev) => [...prev, created]);
       toast({ title: "Slide added" });
