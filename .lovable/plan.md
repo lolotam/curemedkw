@@ -1,57 +1,43 @@
-## Plan: 3 enhancements
+## Goal
+Populate `/admin/tags` with every tag actually in use by products (currently ~150+ unique tags live on `products.tags[]` but the `tags` master table is empty), and keep it in sync going forward. The admin UI already supports add / rename / delete and shows a "Used in N products" count — those will start working as soon as the table is backfilled.
 
-### 1. Show/Hide password toggle on `/admin/login`
-**File:** `src/pages/admin/AdminLogin.tsx`
-- Add a `showPassword` state (default `false`).
-- Wrap the password `Input` in a `relative` container; change `type` to `showPassword ? "text" : "password"`.
-- Add an absolute-positioned eye toggle button (uses `Eye` / `EyeOff` from `lucide-react`) on the trailing edge inside the input (right padding `pr-10`).
-- Button is `type="button"` so it never submits the form; `aria-label` toggles between "Show password" / "Hide password".
+## 1. One-time backfill (SQL migration)
 
-### 2. Multiple categories per product (admin editor + filtering)
+New migration that scans `products.tags[]`, collects every distinct value (trimmed, non-empty), and inserts into `public.tags` with a slug. Uses `ON CONFLICT (slug) DO NOTHING` so it's idempotent and safe to re-run.
 
-**Database (new migration):**
-- Create junction table `public.product_categories` with columns:
-  - `product_id uuid NOT NULL REFERENCES products(id) ON DELETE CASCADE`
-  - `category_id uuid NOT NULL REFERENCES categories(id) ON DELETE CASCADE`
-  - `PRIMARY KEY (product_id, category_id)`
-  - `created_at timestamptz DEFAULT now()`
-- Enable RLS:
-  - Public `SELECT` (categories already public).
-  - Admin-only `INSERT`/`DELETE` via existing `has_role(auth.uid(), 'admin')` pattern (matches policies on `products`).
-- Backfill: for every product where `products.category_id IS NOT NULL`, insert a row into `product_categories`. The existing single `category_id` column is kept for backward compatibility (used as the "primary" category for sorting/breadcrumbs).
-- Indexes on `(category_id)` and `(product_id)`.
+```sql
+INSERT INTO public.tags (name, slug)
+SELECT DISTINCT
+  trim(t)                                           AS name,
+  regexp_replace(lower(trim(t)), '[^a-z0-9]+', '-', 'g') AS slug
+FROM public.products, unnest(products.tags) AS t
+WHERE trim(t) <> ''
+ON CONFLICT (slug) DO NOTHING;
+```
 
-**Data layer (`src/lib/db.ts`):**
-- Extend the `Product` type with `categoryIds: string[]` (in addition to existing `categoryId` which becomes the "primary" category).
-- Update `useProduct` / `useProducts` queries to also fetch joined `product_categories` rows; map into `categoryIds`.
-- Update `useCreateProduct` and `useUpdateProduct` to:
-  - Insert/update the product row (still writes `category_id` = first id in `categoryIds` for the legacy primary).
-  - After insert/update, sync `product_categories`: delete existing rows for that product, insert the new set (transactional via two awaited calls; acceptable for admin flow).
-- Update `useProductsByCategory` to query products via `product_categories` (so a product appearing in multiple categories is returned for each).
+This will create rows for every tag — e.g. `moisturizer` (used by 34 products), `tea tree` (28), `hydration` (18), `antibacterial` (10), `dry skin` (10) … down to single-use tags like `aloe vera`, `castor oil`, etc.
 
-**Admin editor (`src/pages/admin/AdminProductEditor.tsx`):**
-- Replace the single `Select` with a multi-select control: a popover containing a searchable checkbox list of categories (with "+ Create new category…" action preserved).
-- Display selected categories as removable badges above the popover trigger.
-- Form state stores `categoryIds: string[]`; `categoryId` (primary) is auto-set to the first selected id, kept in sync, and used for legacy display fields.
-- Save flow unchanged from the user's perspective (Save button), but now persists via the data-layer changes above.
+## 2. Auto-sync `tags` whenever products change (`src/lib/db.ts`)
 
-**Frontend filter (`src/pages/BrandPage.tsx`):**
-- Use `categoryIds` (fallback to `[categoryId]` when empty) when computing per-category counts and the active filter intersection so a product in multiple categories shows up under each.
+Add a small helper `syncProductTags(tags: string[])` that upserts each tag into the `tags` table (uses the existing `slug` unique constraint). Call it inside:
 
-### 3. Styled customer name in fake order notifications
-**File:** `src/components/site/LiveOrdersToast.tsx`
-- Refactor the rendered toast body so the customer name is its own `<span>` with `font-bold text-brand` (matches Curemed brand color), and the area name uses a subtle accent (`font-medium text-foreground`). Surrounding sentence text stays `text-muted-foreground` for hierarchy.
-- Both Arabic and English variants get the same treatment, with proper RTL ordering preserved by using JSX fragments instead of plain template strings:
-  - EN: **{name}** from *{area}* just ordered {product.name}
-  - AR: **{name.ar}** من *{area.ar}* طلب {productNameAr} قبل لحظات
-- No changes to interval, frequency, or product-selection logic.
+- `useCreateProduct` — after the product insert, before returning.
+- `useUpdateProduct` — when the patch contains `tags`, after the update.
 
-### Files to be edited
-- `src/pages/admin/AdminLogin.tsx`
-- `supabase/migrations/<new>.sql` (new junction table + RLS + backfill)
-- `src/lib/db.ts`
-- `src/pages/admin/AdminProductEditor.tsx`
-- `src/pages/BrandPage.tsx`
-- `src/components/site/LiveOrdersToast.tsx`
+Any tag the AI extractor or a manual edit produces is automatically registered in the master tag list, so `/admin/tags` always reflects reality. The mutations also invalidate `qk.tags` so the Tags admin refreshes immediately.
 
-`src/integrations/supabase/types.ts` will regenerate automatically after the migration.
+## 3. Add "Sync from products" button on `/admin/tags` (`src/pages/admin/AdminTags.tsx`)
+
+A small secondary button next to the "Add" input that runs the same scan/upsert on demand from the client (using `useProducts()` + `useUpsertTag` in a loop). Useful if anyone ever bulk-imports tags directly into a product without going through the editor.
+
+The existing add / rename / delete flows and the "Used in N products" count column already work correctly — they just had nothing to display because the table was empty.
+
+## Files to edit / create
+- `supabase/migrations/<new>.sql` — backfill `tags` from `products.tags[]`
+- `src/lib/db.ts` — add `syncProductTags`, call from `useCreateProduct` and `useUpdateProduct`
+- `src/pages/admin/AdminTags.tsx` — add "Sync from products" button
+
+## Out of scope (already in place)
+- Tags table, RLS policies, slug uniqueness — already exist.
+- Add / rename / delete tag mutations — already implemented.
+- "Used in" count column with link to filtered products list — already implemented.
