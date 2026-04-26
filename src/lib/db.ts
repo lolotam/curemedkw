@@ -1335,3 +1335,506 @@ export function useDeleteOrder() {
     },
   });
 }
+
+/* ============================================================
+ * Profile
+ * ============================================================ */
+
+export interface Profile {
+  id: string;
+  fullName: string;
+  phone: string;
+  avatarUrl: string;
+  city: string;
+  area: string;
+  block: string;
+  street: string;
+  building: string;
+  addressLine: string;
+  notes: string;
+  isBlocked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const rowToProfile = (r: any): Profile => ({
+  id: r.id,
+  fullName: r.full_name ?? "",
+  phone: r.phone ?? "",
+  avatarUrl: r.avatar_url ?? "",
+  city: r.city ?? "",
+  area: r.area ?? "",
+  block: r.block ?? "",
+  street: r.street ?? "",
+  building: r.building ?? "",
+  addressLine: r.address_line ?? "",
+  notes: r.notes ?? "",
+  isBlocked: !!r.is_blocked,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export function useProfile(userId: string | undefined) {
+  return useQuery({
+    queryKey: userId ? qk.profile(userId) : ["profile", "none"],
+    enabled: !!userId,
+    queryFn: async (): Promise<Profile | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data ? rowToProfile(data) : null;
+    },
+  });
+}
+
+export function useUpdateProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<Omit<Profile, "id" | "createdAt" | "updatedAt" | "isBlocked">>;
+    }) => {
+      const row: any = {};
+      if (patch.fullName !== undefined) row.full_name = patch.fullName;
+      if (patch.phone !== undefined) row.phone = patch.phone;
+      if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+      if (patch.city !== undefined) row.city = patch.city;
+      if (patch.area !== undefined) row.area = patch.area;
+      if (patch.block !== undefined) row.block = patch.block;
+      if (patch.street !== undefined) row.street = patch.street;
+      if (patch.building !== undefined) row.building = patch.building;
+      if (patch.addressLine !== undefined) row.address_line = patch.addressLine;
+      if (patch.notes !== undefined) row.notes = patch.notes;
+      // Upsert so first-time profile creation works (e.g. existing users from before trigger).
+      const { error } = await supabase
+        .from("profiles")
+        .upsert({ id, ...row }, { onConflict: "id" });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.profile(vars.id) });
+      qc.invalidateQueries({ queryKey: qk.adminUsers });
+    },
+  });
+}
+
+/* ============================================================
+ * My orders (signed-in user)
+ * ============================================================ */
+
+export function useMyOrders(userId: string | undefined) {
+  return useQuery({
+    queryKey: userId ? qk.myOrders(userId) : ["orders", "mine", "none"],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("user_id", userId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((r) => rowToOrder(r));
+    },
+  });
+}
+
+/* ============================================================
+ * Notifications
+ * ============================================================ */
+
+export type NotificationType = "order" | "system" | "message";
+
+export interface UserNotification {
+  id: string;
+  userId: string;
+  title: string;
+  body: string;
+  type: NotificationType;
+  link: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+const rowToNotification = (r: any): UserNotification => ({
+  id: r.id,
+  userId: r.user_id,
+  title: r.title,
+  body: r.body ?? "",
+  type: r.type,
+  link: r.link ?? null,
+  isRead: !!r.is_read,
+  createdAt: r.created_at,
+});
+
+export function useMyNotifications(userId: string | undefined) {
+  return useQuery({
+    queryKey: userId ? qk.myNotifications(userId) : ["notifications", "mine", "none"],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId!)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []).map(rowToNotification);
+    },
+  });
+}
+
+export function useMyUnreadNotificationCount(userId: string | undefined) {
+  return useQuery({
+    queryKey: userId ? qk.notificationsUnread(userId) : ["notifications", "unread", "none"],
+    enabled: !!userId,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId!)
+        .eq("is_read", false);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, userId }: { id: string; userId: string }) => {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("id", id);
+      if (error) throw error;
+      return userId;
+    },
+    onSuccess: (userId) => {
+      qc.invalidateQueries({ queryKey: qk.myNotifications(userId) });
+      qc.invalidateQueries({ queryKey: qk.notificationsUnread(userId) });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .eq("user_id", userId)
+        .eq("is_read", false);
+      if (error) throw error;
+      return userId;
+    },
+    onSuccess: (userId) => {
+      qc.invalidateQueries({ queryKey: qk.myNotifications(userId) });
+      qc.invalidateQueries({ queryKey: qk.notificationsUnread(userId) });
+    },
+  });
+}
+
+export interface CreateNotificationInput {
+  userId: string;
+  title: string;
+  body?: string;
+  type?: NotificationType;
+  link?: string | null;
+}
+
+export function useCreateNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateNotificationInput) => {
+      const { error } = await supabase.from("notifications").insert({
+        user_id: input.userId,
+        title: input.title,
+        body: input.body ?? "",
+        type: input.type ?? "system",
+        link: input.link ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.myNotifications(vars.userId) });
+      qc.invalidateQueries({ queryKey: qk.notificationsUnread(vars.userId) });
+    },
+  });
+}
+
+/* ============================================================
+ * Notification Templates (admin)
+ * ============================================================ */
+
+export interface NotificationTemplate {
+  id: string;
+  key: string;
+  subject: string;
+  body: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const rowToTemplate = (r: any): NotificationTemplate => ({
+  id: r.id,
+  key: r.key,
+  subject: r.subject,
+  body: r.body,
+  isActive: !!r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export function useNotificationTemplates() {
+  return useQuery({
+    queryKey: qk.notificationTemplates,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_notification_templates")
+        .select("*")
+        .order("key", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map(rowToTemplate);
+    },
+  });
+}
+
+export function useUpsertNotificationTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (t: { id?: string; key: string; subject: string; body: string; isActive: boolean }) => {
+      const row: any = { key: t.key, subject: t.subject, body: t.body, is_active: t.isActive };
+      if (t.id) {
+        const { error } = await supabase
+          .from("user_notification_templates")
+          .update(row)
+          .eq("id", t.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_notification_templates")
+          .insert(row);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.notificationTemplates });
+    },
+  });
+}
+
+export function useDeleteNotificationTemplate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("user_notification_templates")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.notificationTemplates });
+    },
+  });
+}
+
+/* ============================================================
+ * Coupons
+ * ============================================================ */
+
+export type CouponType = "percent" | "fixed";
+
+export interface Coupon {
+  id: string;
+  code: string;
+  description: string;
+  discountType: CouponType;
+  discountValue: number;
+  minOrderAmount: number;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const rowToCoupon = (r: any): Coupon => ({
+  id: r.id,
+  code: r.code,
+  description: r.description ?? "",
+  discountType: r.discount_type,
+  discountValue: Number(r.discount_value),
+  minOrderAmount: Number(r.min_order_amount ?? 0),
+  maxUses: r.max_uses ?? null,
+  usedCount: r.used_count ?? 0,
+  expiresAt: r.expires_at ?? null,
+  isActive: !!r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+});
+
+export function useCoupons() {
+  return useQuery({
+    queryKey: qk.coupons,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("coupons")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map(rowToCoupon);
+    },
+  });
+}
+
+export interface CouponInput {
+  id?: string;
+  code: string;
+  description?: string;
+  discountType: CouponType;
+  discountValue: number;
+  minOrderAmount?: number;
+  maxUses?: number | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+}
+
+export function useUpsertCoupon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (c: CouponInput) => {
+      const row: any = {
+        code: c.code.trim().toUpperCase(),
+        description: c.description ?? "",
+        discount_type: c.discountType,
+        discount_value: c.discountValue,
+        min_order_amount: c.minOrderAmount ?? 0,
+        max_uses: c.maxUses ?? null,
+        expires_at: c.expiresAt ?? null,
+        is_active: c.isActive ?? true,
+      };
+      if (c.id) {
+        const { error } = await supabase.from("coupons").update(row).eq("id", c.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("coupons").insert(row);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.coupons }),
+  });
+}
+
+export function useDeleteCoupon() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("coupons").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.coupons }),
+  });
+}
+
+export async function validateCoupon(code: string, subtotal: number): Promise<{ ok: true; coupon: Coupon; discount: number } | { ok: false; reason: string }> {
+  const { data, error } = await supabase
+    .from("coupons")
+    .select("*")
+    .eq("code", code.trim().toUpperCase())
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) return { ok: false, reason: error.message };
+  if (!data) return { ok: false, reason: "Invalid coupon code" };
+  const c = rowToCoupon(data);
+  if (c.expiresAt && new Date(c.expiresAt) < new Date()) return { ok: false, reason: "Coupon has expired" };
+  if (c.maxUses !== null && c.usedCount >= c.maxUses) return { ok: false, reason: "Coupon usage limit reached" };
+  if (subtotal < c.minOrderAmount) return { ok: false, reason: `Minimum order amount: KD ${c.minOrderAmount.toFixed(2)}` };
+  const discount = c.discountType === "percent"
+    ? Math.round((subtotal * c.discountValue) / 100 * 1000) / 1000
+    : Math.min(subtotal, c.discountValue);
+  return { ok: true, coupon: c, discount };
+}
+
+/* ============================================================
+ * Admin: Users
+ * ============================================================ */
+
+export interface AdminUserRow {
+  profile: Profile;
+  isAdmin: boolean;
+  orderCount: number;
+}
+
+export function useAdminUsers() {
+  return useQuery({
+    queryKey: qk.adminUsers,
+    queryFn: async (): Promise<AdminUserRow[]> => {
+      const [{ data: profiles, error: pErr }, { data: roles, error: rErr }, { data: orderCounts, error: oErr }] = await Promise.all([
+        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+        supabase.from("user_roles").select("user_id, role"),
+        supabase.from("orders").select("user_id"),
+      ]);
+      if (pErr) throw pErr;
+      if (rErr) throw rErr;
+      if (oErr) throw oErr;
+      const adminSet = new Set((roles ?? []).filter((r: any) => r.role === "admin").map((r: any) => r.user_id));
+      const orderMap = new Map<string, number>();
+      for (const o of (orderCounts ?? []) as { user_id: string | null }[]) {
+        if (!o.user_id) continue;
+        orderMap.set(o.user_id, (orderMap.get(o.user_id) ?? 0) + 1);
+      }
+      return (profiles ?? []).map((p: any) => ({
+        profile: rowToProfile(p),
+        isAdmin: adminSet.has(p.id),
+        orderCount: orderMap.get(p.id) ?? 0,
+      }));
+    },
+  });
+}
+
+export function useToggleAdminRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, makeAdmin }: { userId: string; makeAdmin: boolean }) => {
+      if (makeAdmin) {
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({ user_id: userId, role: "admin" });
+        if (error && !`${error.message}`.toLowerCase().includes("duplicate")) throw error;
+      } else {
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", "admin");
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminUsers }),
+  });
+}
+
+export function useToggleUserBlock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, blocked }: { userId: string; blocked: boolean }) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_blocked: blocked })
+        .eq("id", userId);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminUsers }),
+  });
+}
