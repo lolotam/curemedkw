@@ -33,7 +33,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "flexitol",
     categories: ["Foot Care", "Hand Care", "Lip Care", "Body Care"],
     logo: flexitolLogo,
-    instagram: "https://www.instagram.com/flexitol/",
+    instagram: "https://www.instagram.com/flexitolkw",
     seo: {
       en: "Flexitol Kuwait — Heel Balm, Hand Balm and intensive moisturizers for very dry skin and diabetic foot care.",
       ar: "فليكسيتول الكويت — بلسم الكعب واليدين ومرطبات مكثفة للبشرة شديدة الجفاف والعناية بقدم مرضى السكري.",
@@ -54,7 +54,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "kapiva",
     categories: ["Juices", "Capsules", "Gummies", "Wellness Foods"],
     logo: kapivaLogo,
-    instagram: "https://www.instagram.com/kapivaayurveda/",
+    instagram: "https://www.instagram.com/shilajitkapivakw",
     seo: {
       en: "Kapiva Kuwait — Ayurvedic juices, capsules and gummies for energy, fitness and natural wellness.",
       ar: "كابيفا الكويت — عصائر وكبسولات وحلوى أيورفيدية للطاقة واللياقة والعافية الطبيعية.",
@@ -75,7 +75,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "nada",
     categories: ["Raspberry", "Melon", "Peppermint", "Honey Lemon"],
     logo: nadaLogo,
-    instagram: "https://www.instagram.com/nada.kuwait/",
+    instagram: "https://www.instagram.com/nudemintkw",
     seo: {
       en: "NADA Kuwait — Sugar-free Japanese breath capsules for instant freshness and lasting confidence.",
       ar: "ندى الكويت — كبسولات يابانية خالية من السكر لانتعاش فوري للنفس وثقة تدوم طويلاً.",
@@ -96,7 +96,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "abc",
     categories: ["Body Wash", "Lotion", "Hair Care", "Deodorant"],
     logo: abcLogo,
-    instagram: "https://www.instagram.com/australianbodycare/",
+    instagram: "https://www.instagram.com/australianbodycarekw",
     seo: {
       en: "Australian Bodycare Kuwait — Natural Tea Tree Oil body wash, lotion and hair care for the whole family.",
       ar: "أستراليان بودي كير الكويت — غسول الجسم واللوشن والعناية بالشعر بزيت شجرة الشاي الطبيعي لجميع أفراد العائلة.",
