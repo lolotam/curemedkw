@@ -145,12 +145,21 @@ export default function BrandPage() {
 
       <section className="bg-brand-soft py-16 md:py-24">
         <div className="container">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">Why {meta.name}</h2>
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+            {t("brand.why.title").replace("{brand}", meta.name)}
+          </h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[{ icon: ShieldCheck, en: "Clinically tested", ar: "مختبر سريرياً" }, { icon: CheckCircle2, en: "Trusted quality", ar: "جودة موثوقة" }, { icon: Leaf, en: "Skin-friendly", ar: "لطيف على البشرة" }, { icon: Award, en: "Award-winning", ar: "حائز على جوائز" }].map((b, i) => (
+            {[
+              { icon: ShieldCheck, key: "brand.why.clinical" },
+              { icon: CheckCircle2, key: "brand.why.trusted" },
+              { icon: Leaf, key: "brand.why.skinFriendly" },
+              { icon: Award, key: "brand.why.awardWinning" },
+            ].map((b, i) => (
               <Card key={i} className="p-6 bg-background border-brand/10">
-                <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand"><b.icon className="h-6 w-6" /></div>
-                <h3 className="mt-4 font-semibold">{lang === "ar" ? b.ar : b.en}</h3>
+                <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand">
+                  <b.icon className="h-6 w-6" />
+                </div>
+                <h3 className="mt-4 font-semibold">{t(b.key)}</h3>
               </Card>
             ))}
           </div>

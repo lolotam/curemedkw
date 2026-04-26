@@ -62,12 +62,12 @@ export function SiteHeader() {
             size="sm"
             onClick={() => setLang(lang === "en" ? "ar" : "en")}
             className="gap-1.5"
-            aria-label="Toggle language"
+            aria-label={t("header.toggleLang")}
           >
             <Globe className="h-4 w-4" />
             <span className="text-xs font-semibold">{lang === "en" ? "AR" : "EN"}</span>
           </Button>
-          <Button variant="ghost" size="icon" onClick={toggle} aria-label="Toggle theme">
+          <Button variant="ghost" size="icon" onClick={toggle} aria-label={t("header.toggleTheme")}>
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
           <Button
@@ -75,7 +75,7 @@ export function SiteHeader() {
             size="icon"
             className="lg:hidden"
             onClick={() => setOpen(!open)}
-            aria-label="Menu"
+            aria-label={t("header.menu")}
           >
             {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
           </Button>

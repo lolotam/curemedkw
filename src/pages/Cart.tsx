@@ -100,7 +100,7 @@ export default function Cart() {
                           type="button"
                           onClick={() => setQuantity(item.productId, item.quantity - 1)}
                           className="h-8 w-8 inline-flex items-center justify-center hover:bg-muted rounded-l-full"
-                          aria-label="Decrease"
+                          aria-label={t("cart.decrease")}
                         >
                           <Minus className="h-3.5 w-3.5" />
                         </button>
@@ -109,7 +109,7 @@ export default function Cart() {
                           type="button"
                           onClick={() => setQuantity(item.productId, item.quantity + 1)}
                           className="h-8 w-8 inline-flex items-center justify-center hover:bg-muted rounded-r-full"
-                          aria-label="Increase"
+                          aria-label={t("cart.increase")}
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
@@ -122,7 +122,7 @@ export default function Cart() {
                           type="button"
                           onClick={() => remove(item.productId)}
                           className="text-destructive hover:opacity-80"
-                          aria-label="Remove"
+                          aria-label={t("cart.remove")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

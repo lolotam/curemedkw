@@ -46,7 +46,10 @@ export default function CategoryPage() {
               <p className="mt-2 text-lg text-muted-foreground" dir="rtl">{category.nameAr}</p>
             )}
             <p className="mt-4 text-sm text-muted-foreground">
-              {products.length} {products.length === 1 ? "product" : "products"}
+              {products.length}{" "}
+              {products.length === 1
+                ? t("category.productSingular")
+                : t("category.productPlural")}
             </p>
           </div>
         </div>

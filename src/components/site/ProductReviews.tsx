@@ -2,9 +2,11 @@ import { Star } from "lucide-react";
 import { useProductReviews } from "@/lib/db";
 import { ReviewForm } from "./ReviewForm";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 export function ProductReviews({ productId }: { productId: string }) {
   const { data: reviews = [] } = useProductReviews(productId);
+  const { t, lang } = useI18n();
   const avg =
     reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
 
@@ -12,7 +14,7 @@ export function ProductReviews({ productId }: { productId: string }) {
     <section className="container py-12 md:py-16 grid lg:grid-cols-[1fr_420px] gap-8">
       <div>
         <div className="flex items-baseline gap-3 mb-6">
-          <h2 className="text-2xl md:text-3xl font-bold">Customer reviews</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">{t("reviews.title")}</h2>
           {reviews.length > 0 && (
             <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
               <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
@@ -23,7 +25,7 @@ export function ProductReviews({ productId }: { productId: string }) {
         </div>
         {reviews.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            No reviews yet. Be the first to share your experience!
+            {t("reviews.empty")}
           </p>
         ) : (
           <div className="space-y-4">
@@ -39,7 +41,7 @@ export function ProductReviews({ productId }: { productId: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm">{r.reviewerName}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleDateString()}
+                      {new Date(r.createdAt).toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US")}
                     </p>
                   </div>
                   <div className="flex items-center gap-0.5">

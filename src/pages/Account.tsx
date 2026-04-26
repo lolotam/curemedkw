@@ -81,9 +81,9 @@ export default function Account() {
       if (upErr) throw upErr;
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       await updateProfile.mutateAsync({ id: user.id, patch: { avatarUrl: data.publicUrl } });
-      toast.success("Photo updated");
+      toast.success(t("account.uploadOk"));
     } catch (err: any) {
-      toast.error(err?.message || "Upload failed");
+      toast.error(err?.message || t("account.uploadFail"));
     } finally {
       setUploading(false);
     }
@@ -94,23 +94,23 @@ export default function Account() {
     if (!user) return;
     try {
       await updateProfile.mutateAsync({ id: user.id, patch: form });
-      toast.success("Profile saved");
+      toast.success(t("account.profileSaved"));
     } catch (err: any) {
-      toast.error(err?.message || "Save failed");
+      toast.error(err?.message || t("account.saveFail"));
     }
   };
 
   const changePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPw.length < 6) return toast.error("Password must be at least 6 characters");
+    if (newPw.length < 6) return toast.error(t("account.passwordMin"));
     setPwBusy(true);
     try {
       const { error } = await supabase.auth.updateUser({ password: newPw });
       if (error) throw error;
       setNewPw("");
-      toast.success("Password updated");
+      toast.success(t("account.passwordOk"));
     } catch (err: any) {
-      toast.error(err?.message || "Failed");
+      toast.error(err?.message || t("account.passwordFail"));
     } finally {
       setPwBusy(false);
     }

@@ -346,6 +346,69 @@ TRANSLATIONS["coupon.applied"] = { en: "Coupon applied", ar: "تم تطبيق ا
 TRANSLATIONS["coupon.remove"] = { en: "Remove", ar: "إزالة" };
 TRANSLATIONS["coupon.discount"] = { en: "Discount", ar: "الخصم" };
 
+// ============= Reviews =============
+TRANSLATIONS["reviews.title"] = { en: "Customer reviews", ar: "آراء العملاء" };
+TRANSLATIONS["reviews.empty"] = { en: "No reviews yet. Be the first to share your experience!", ar: "لا توجد مراجعات بعد. كن أول من يشارك تجربته!" };
+TRANSLATIONS["reviews.write"] = { en: "Write a review", ar: "اكتب مراجعة" };
+TRANSLATIONS["reviews.disclaimer"] = { en: "Reviews are visible after approval. Email is optional and never shown publicly.", ar: "تظهر المراجعات بعد الموافقة عليها. البريد الإلكتروني اختياري ولن يُعرض علنياً." };
+TRANSLATIONS["reviews.name"] = { en: "Your name *", ar: "الاسم *" };
+TRANSLATIONS["reviews.email"] = { en: "Email (optional)", ar: "البريد الإلكتروني (اختياري)" };
+TRANSLATIONS["reviews.rating"] = { en: "Rating *", ar: "التقييم *" };
+TRANSLATIONS["reviews.comment"] = { en: "Your review *", ar: "مراجعتك *" };
+TRANSLATIONS["reviews.commentPh"] = { en: "What did you like? How did it work for you?", ar: "ما الذي أعجبك؟ كيف كانت تجربتك معه؟" };
+TRANSLATIONS["reviews.submit"] = { en: "Submit review", ar: "إرسال المراجعة" };
+TRANSLATIONS["reviews.error.name"] = { en: "Please enter your name", ar: "يرجى إدخال اسمك" };
+TRANSLATIONS["reviews.error.rating"] = { en: "Please pick a rating", ar: "يرجى اختيار تقييم" };
+TRANSLATIONS["reviews.error.comment"] = { en: "Please write a short review", ar: "يرجى كتابة مراجعة قصيرة" };
+TRANSLATIONS["reviews.success"] = { en: "Thanks! Your review will appear once approved.", ar: "شكراً! ستظهر مراجعتك بعد الموافقة عليها." };
+TRANSLATIONS["reviews.submitFail"] = { en: "Failed to submit", ar: "تعذر الإرسال" };
+TRANSLATIONS["reviews.starsAria"] = { en: "stars", ar: "نجوم" };
+
+// ============= Cart aria labels =============
+TRANSLATIONS["cart.decrease"] = { en: "Decrease quantity", ar: "إنقاص الكمية" };
+TRANSLATIONS["cart.increase"] = { en: "Increase quantity", ar: "زيادة الكمية" };
+TRANSLATIONS["cart.remove"] = { en: "Remove item", ar: "إزالة المنتج" };
+
+// ============= Brand "Why" badges =============
+TRANSLATIONS["brand.why.title"] = { en: "Why {brand}", ar: "لماذا {brand}" };
+TRANSLATIONS["brand.why.clinical"] = { en: "Clinically tested", ar: "مختبر سريرياً" };
+TRANSLATIONS["brand.why.trusted"] = { en: "Trusted quality", ar: "جودة موثوقة" };
+TRANSLATIONS["brand.why.skinFriendly"] = { en: "Skin-friendly", ar: "لطيف على البشرة" };
+TRANSLATIONS["brand.why.awardWinning"] = { en: "Award-winning", ar: "حائز على جوائز" };
+
+// ============= 404 page =============
+TRANSLATIONS["notfound.title"] = { en: "Page not found", ar: "الصفحة غير موجودة" };
+TRANSLATIONS["notfound.subtitle"] = { en: "The page you're looking for doesn't exist or has been moved.", ar: "الصفحة التي تبحث عنها غير موجودة أو تم نقلها." };
+TRANSLATIONS["notfound.cta"] = { en: "Return to Home", ar: "العودة إلى الرئيسية" };
+
+// ============= Account extras =============
+TRANSLATIONS["account.viewOrder"] = { en: "View", ar: "عرض" };
+TRANSLATIONS["account.uploadOk"] = { en: "Photo updated", ar: "تم تحديث الصورة" };
+TRANSLATIONS["account.uploadFail"] = { en: "Upload failed", ar: "فشل الرفع" };
+TRANSLATIONS["account.profileSaved"] = { en: "Profile saved", ar: "تم حفظ الملف الشخصي" };
+TRANSLATIONS["account.saveFail"] = { en: "Save failed", ar: "فشل الحفظ" };
+TRANSLATIONS["account.passwordOk"] = { en: "Password updated", ar: "تم تحديث كلمة المرور" };
+TRANSLATIONS["account.passwordFail"] = { en: "Failed to update password", ar: "تعذر تحديث كلمة المرور" };
+TRANSLATIONS["account.passwordMin"] = { en: "Password must be at least 6 characters", ar: "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل" };
+
+// ============= Header / nav extras =============
+TRANSLATIONS["header.toggleLang"] = { en: "Toggle language", ar: "تغيير اللغة" };
+TRANSLATIONS["header.toggleTheme"] = { en: "Toggle theme", ar: "تغيير السمة" };
+TRANSLATIONS["header.menu"] = { en: "Menu", ar: "القائمة" };
+TRANSLATIONS["header.notifications"] = { en: "Notifications", ar: "الإشعارات" };
+TRANSLATIONS["header.account"] = { en: "Account", ar: "الحساب" };
+TRANSLATIONS["header.viewLink"] = { en: "View", ar: "عرض" };
+
+// ============= WhatsApp =============
+TRANSLATIONS["whatsapp.label"] = { en: "Chat on WhatsApp", ar: "تواصل عبر واتساب" };
+
+// ============= Category page extras =============
+TRANSLATIONS["category.productSingular"] = { en: "product", ar: "منتج" };
+TRANSLATIONS["category.productPlural"] = { en: "products", ar: "منتجات" };
+
+// ============= Product detail =============
+TRANSLATIONS["product.viewArrow"] = { en: "View →", ar: "عرض ←" };
+
 interface Ctx {
   lang: Lang;
   setLang: (l: Lang) => void;

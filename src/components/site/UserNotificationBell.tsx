@@ -52,7 +52,7 @@ export function UserNotificationBell() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        aria-label="Notifications"
+        aria-label={t("header.notifications")}
         className="relative"
       >
         <Bell className="h-4 w-4" />
@@ -101,7 +101,7 @@ export function UserNotificationBell() {
                             onClick={() => setOpen(false)}
                             className="text-xs text-brand hover:underline mt-1 inline-block"
                           >
-                            View →
+                            {t("product.viewArrow")}
                           </Link>
                         )}
                         <p className="text-[10px] text-muted-foreground mt-1">
