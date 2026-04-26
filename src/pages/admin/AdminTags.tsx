@@ -1,10 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Pencil, Trash2, Tag as TagIcon, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, Tag as TagIcon, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { useTags, useUpsertTag, useRenameTag, useDeleteTag, useProducts } from "@/lib/db";
+import { useTags, useUpsertTag, useRenameTag, useDeleteTag, useProducts, syncProductTags } from "@/lib/db";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/db";
 import { toast } from "sonner";
 
 export default function AdminTags() {
@@ -13,7 +15,9 @@ export default function AdminTags() {
   const upsert = useUpsertTag();
   const rename = useRenameTag();
   const remove = useDeleteTag();
+  const qc = useQueryClient();
   const [newName, setNewName] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -28,6 +32,27 @@ export default function AdminTags() {
     catch (e: any) { toast.error(e.message); }
   };
 
+  const syncFromProducts = async () => {
+    const all = Array.from(
+      new Set(products.flatMap((p) => p.tags).map((t) => (t ?? "").trim()).filter(Boolean)),
+    );
+    if (!all.length) {
+      toast.info("No product tags to sync");
+      return;
+    }
+    setSyncing(true);
+    try {
+      const before = tags.length;
+      await syncProductTags(all);
+      await qc.invalidateQueries({ queryKey: qk.tags });
+      toast.success(`Synced ${all.length} tag(s) from products${before ? ` (${all.length - before > 0 ? `+${all.length - before}` : "no new"} added)` : ""}`);
+    } catch (e: any) {
+      toast.error(e.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -38,6 +63,17 @@ export default function AdminTags() {
       <Card className="p-4 mb-4 flex gap-2">
         <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New tag name…" onKeyDown={(e) => e.key === "Enter" && add()} />
         <Button onClick={add} className="bg-brand hover:bg-brand/90 text-white gap-1.5"><Plus className="h-4 w-4" /> Add</Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={syncFromProducts}
+          disabled={syncing || products.length === 0}
+          className="gap-1.5 shrink-0"
+          title="Add every tag found on existing products to this list"
+        >
+          <RefreshCw className={"h-4 w-4 " + (syncing ? "animate-spin" : "")} />
+          {syncing ? "Syncing…" : "Sync from products"}
+        </Button>
       </Card>
 
       <Card className="overflow-hidden">

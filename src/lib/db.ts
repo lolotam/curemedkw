@@ -298,9 +298,15 @@ export function useCreateProduct() {
         const { error: linkErr } = await supabase.from("product_categories").insert(rows);
         if (linkErr) throw linkErr;
       }
+      // Sync any new tags into the master tags table
+      await syncProductTags(input.tags ?? []);
       return { ...product, categoryIds: ids };
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.products }); qc.invalidateQueries({ queryKey: qk.productsFeatured }); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.products });
+      qc.invalidateQueries({ queryKey: qk.productsFeatured });
+      qc.invalidateQueries({ queryKey: qk.tags });
+    },
   });
 }
 
@@ -327,14 +333,18 @@ export function useUpdateProduct() {
           const { error: insErr } = await supabase.from("product_categories").insert(rows);
           if (insErr) throw insErr;
         }
+        // Sync tags too if they were part of the patch
+        if (patch.tags !== undefined) await syncProductTags(patch.tags);
         return { ...product, categoryIds: ids };
       }
+      if (patch.tags !== undefined) await syncProductTags(patch.tags);
       return product;
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.products });
       qc.invalidateQueries({ queryKey: qk.product(vars.id) });
       qc.invalidateQueries({ queryKey: qk.productsFeatured });
+      qc.invalidateQueries({ queryKey: qk.tags });
     },
   });
 }
@@ -705,6 +715,25 @@ export function useTags() {
       return (data as TagRow[]).map(rowToTag);
     },
   });
+}
+
+/**
+ * Idempotently inserts every non-empty tag into the master `tags` table.
+ * Safe to call from product create/update flows or from a manual "sync" button.
+ */
+export async function syncProductTags(tags: string[] | undefined | null): Promise<number> {
+  const list = (tags ?? [])
+    .map((t) => (t ?? "").trim())
+    .filter((t) => t.length > 0);
+  if (!list.length) return 0;
+  const rows = Array.from(
+    new Map(list.map((name) => [slugify(name), { name, slug: slugify(name) }])).values(),
+  );
+  const { error } = await supabase
+    .from("tags")
+    .upsert(rows, { onConflict: "slug", ignoreDuplicates: true });
+  if (error) throw error;
+  return rows.length;
 }
 
 export function useUpsertTag() {
