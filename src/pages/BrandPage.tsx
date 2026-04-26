@@ -28,7 +28,8 @@ export default function BrandPage() {
   const { data: categories = [] } = useCategories();
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
 
-  // Build category list with counts (only categories that have products in this brand)
+  // Build category list with counts. Show ALL active categories (including
+  // those with 0 products in this brand) so users can see the full taxonomy.
   const brandCategories = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of brandProducts) {
@@ -38,7 +39,9 @@ export default function BrandPage() {
       }
     }
     return categories
-      .filter((c) => counts.has(c.id))
+      .filter((c) => c.isActive !== false)
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn))
       .map((c) => ({ ...c, count: counts.get(c.id) || 0 }));
   }, [categories, brandProducts]);
 
@@ -78,21 +81,41 @@ export default function BrandPage() {
                   <div className="border-t border-border mt-2 pt-3">
                     <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.areas")}</h4>
                     <div className="space-y-2.5">
-                      {brandCategories.map((c) => (
-                        <label
-                          key={c.id}
-                          className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-brand"
-                        >
-                          <Checkbox
-                            checked={selectedCats.has(c.id)}
-                            onCheckedChange={() => toggleCat(c.id)}
-                          />
-                          <span>
-                            {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}{" "}
-                            <span className="text-muted-foreground">({c.count})</span>
-                          </span>
-                        </label>
-                      ))}
+                      {brandCategories.map((c) => {
+                        const empty = c.count === 0;
+                        return (
+                          <label
+                            key={c.id}
+                            className={
+                              "flex items-center justify-between gap-2.5 text-sm transition-colors " +
+                              (empty
+                                ? "cursor-not-allowed opacity-60"
+                                : "cursor-pointer hover:text-brand")
+                            }
+                          >
+                            <span className="flex items-center gap-2.5 min-w-0">
+                              <Checkbox
+                                checked={selectedCats.has(c.id)}
+                                onCheckedChange={() => !empty && toggleCat(c.id)}
+                                disabled={empty}
+                              />
+                              <span className="truncate">
+                                {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
+                              </span>
+                            </span>
+                            <span
+                              className={
+                                "shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums " +
+                                (empty
+                                  ? "bg-muted text-muted-foreground"
+                                  : "bg-brand/10 text-brand")
+                              }
+                            >
+                              {c.count}
+                            </span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
