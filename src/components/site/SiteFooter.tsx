@@ -1,19 +1,35 @@
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
-import { BRAND_LIST } from "@/lib/brands";
-import { Mail, Phone, MapPin } from "lucide-react";
+import { BRAND_LIST, BRANDS } from "@/lib/brands";
+import { Mail, Phone, MapPin, Instagram } from "lucide-react";
 import curemedLogo from "@/assets/curemed-logo.png";
 
-export function SiteFooter() {
-  const { t } = useI18n();
+const CUREMED_INSTAGRAM = "https://www.instagram.com/curemed.kw/";
+
+export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
+  const { t, lang } = useI18n();
+  const brandMeta = Object.values(BRANDS).find((b) => b.themeAttr === brand);
+  const logo = brandMeta?.logo ?? curemedLogo;
+  const brandName = brandMeta?.name ?? "Curemed";
+  const seoText = brandMeta
+    ? brandMeta.seo[lang as "en" | "ar"] ?? brandMeta.seo.en
+    : t("about.body");
+  const instagram = brandMeta?.instagram ?? CUREMED_INSTAGRAM;
   return (
     <footer className="border-t border-border/50 bg-muted/30 mt-16">
       <div className="container py-12 grid gap-8 md:grid-cols-4">
         <div className="space-y-3">
-          <img src={curemedLogo} alt="Curemed" className="h-10 w-auto" />
-          <p className="text-sm text-muted-foreground max-w-xs">
-            {t("about.body")}
-          </p>
+          <img src={logo} alt={brandName} className="h-12 w-auto object-contain" />
+          <p className="text-sm text-muted-foreground max-w-xs">{seoText}</p>
+          <a
+            href={instagram}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label={`${brandName} on Instagram`}
+            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-brand transition-colors"
+          >
+            <Instagram className="h-4 w-4" /> Instagram
+          </a>
         </div>
         <div>
           <h4 className="font-semibold mb-3 text-sm">{t("nav.brands")}</h4>
@@ -36,7 +52,7 @@ export function SiteFooter() {
           </ul>
         </div>
         <div>
-          <h4 className="font-semibold mb-3 text-sm">Curemed</h4>
+          <h4 className="font-semibold mb-3 text-sm">{brandName}</h4>
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li><Link to="/curemed" className="hover:text-brand">{t("nav.home")}</Link></li>
             <li><Link to="/admin" className="hover:text-brand">{t("nav.admin")}</Link></li>
@@ -45,7 +61,7 @@ export function SiteFooter() {
       </div>
       <div className="border-t border-border/50 py-4">
         <div className="container text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Curemed. {t("footer.rights")}
+          © {new Date().getFullYear()} {brandName}. {t("footer.rights")}
         </div>
       </div>
     </footer>
