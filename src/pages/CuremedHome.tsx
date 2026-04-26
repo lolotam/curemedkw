@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { ArrowRight, Pill, HeartPulse, Sparkles, Stethoscope } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
 import { AutoCarousel } from "@/components/site/AutoCarousel";
@@ -56,16 +57,151 @@ export default function CuremedHome() {
         </div>
       </section>
 
-      <section className="bg-muted/40 py-16 md:py-24">
-        <div className="container">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">{t("pillars.title")}</h2>
+      <section className="relative overflow-hidden py-20 md:py-28 bg-gradient-to-b from-background via-muted/30 to-background">
+        {/* Decorative background blobs */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -top-24 -left-20 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl animate-blob-drift" />
+          <div className="absolute top-1/3 -right-24 h-80 w-80 rounded-full bg-pink-400/20 blur-3xl animate-blob-drift animation-delay-300" />
+          <div className="absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-emerald-400/15 blur-3xl animate-blob-drift animation-delay-200" />
+        </div>
+
+        <div className="container relative">
+          {/* Header */}
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand animate-pulse" />
+              {t("pillars.eyebrow")}
+            </span>
+            <h2 className="mt-4 text-3xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-sky-600 via-violet-600 to-pink-600 bg-clip-text text-transparent">
+              {t("pillars.title")}
+            </h2>
+            <p className="mt-4 text-base text-muted-foreground">{t("pillars.subtitle")}</p>
+          </div>
+
+          {/* Pillar cards */}
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[{ icon: Pill, key: "pharma" }, { icon: Sparkles, key: "skincare" }, { icon: HeartPulse, key: "wellness" }, { icon: Stethoscope, key: "medical" }].map(({ icon: Icon, key }) => (
-              <Card key={key} className="p-6 bg-background">
-                <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand"><Icon className="h-6 w-6" /></div>
-                <h3 className="mt-4 font-semibold">{t(`pillars.${key}.title`)}</h3>
-                <p className="mt-1.5 text-sm text-muted-foreground">{t(`pillars.${key}.body`)}</p>
-              </Card>
+            {[
+              {
+                icon: Pill,
+                key: "pharma",
+                grad: "from-sky-500 to-cyan-400",
+                ring: "group-hover:shadow-sky-400/40",
+                blob: "bg-sky-400/30",
+                title: "group-hover:text-sky-600",
+                arrow: "text-sky-600",
+              },
+              {
+                icon: Sparkles,
+                key: "skincare",
+                grad: "from-pink-500 to-rose-400",
+                ring: "group-hover:shadow-pink-400/40",
+                blob: "bg-pink-400/30",
+                title: "group-hover:text-pink-600",
+                arrow: "text-pink-600",
+              },
+              {
+                icon: HeartPulse,
+                key: "wellness",
+                grad: "from-emerald-500 to-teal-400",
+                ring: "group-hover:shadow-emerald-400/40",
+                blob: "bg-emerald-400/30",
+                title: "group-hover:text-emerald-600",
+                arrow: "text-emerald-600",
+              },
+              {
+                icon: Stethoscope,
+                key: "medical",
+                grad: "from-violet-500 to-indigo-400",
+                ring: "group-hover:shadow-violet-400/40",
+                blob: "bg-violet-400/30",
+                title: "group-hover:text-violet-600",
+                arrow: "text-violet-600",
+              },
+            ].map(({ icon: Icon, key, grad, ring, blob, title, arrow }, i) => (
+              <div
+                key={key}
+                className={cn(
+                  "group relative animate-fade-in-up",
+                  i === 0 && "animation-delay-100",
+                  i === 1 && "animation-delay-200",
+                  i === 2 && "animation-delay-300",
+                  i === 3 && "animation-delay-400",
+                )}
+              >
+                {/* Gradient halo behind card on hover */}
+                <div
+                  aria-hidden
+                  className={cn(
+                    "absolute -inset-0.5 rounded-3xl bg-gradient-to-br opacity-0 blur transition-opacity duration-500 group-hover:opacity-60",
+                    grad,
+                  )}
+                />
+                <Card
+                  className={cn(
+                    "relative h-full overflow-hidden rounded-3xl border border-border bg-card/80 p-6 backdrop-blur-sm transition-all duration-500 group-hover:-translate-y-2 group-hover:shadow-2xl",
+                    ring,
+                  )}
+                >
+                  {/* Decorative colored blob inside card */}
+                  <div
+                    aria-hidden
+                    className={cn(
+                      "absolute -top-10 -right-10 h-28 w-28 rounded-full blur-2xl animate-glow-pulse",
+                      blob,
+                    )}
+                  />
+
+                  {/* Editorial number */}
+                  <span className="absolute top-4 right-5 rtl:right-auto rtl:left-5 text-3xl font-black text-foreground/5 select-none">
+                    0{i + 1}
+                  </span>
+
+                  {/* Animated icon badge */}
+                  <div className="relative">
+                    <div
+                      className={cn(
+                        "h-14 w-14 rounded-2xl bg-gradient-to-br shadow-lg flex items-center justify-center text-white animate-float transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6",
+                        grad,
+                        i === 1 && "animation-delay-200",
+                        i === 2 && "animation-delay-300",
+                        i === 3 && "animation-delay-400",
+                      )}
+                    >
+                      <Icon className="h-7 w-7" />
+                    </div>
+                    <div
+                      aria-hidden
+                      className={cn(
+                        "absolute inset-0 h-14 w-14 rounded-2xl bg-gradient-to-br opacity-0 blur-md transition-opacity duration-500 group-hover:opacity-70",
+                        grad,
+                      )}
+                    />
+                  </div>
+
+                  <h3
+                    className={cn(
+                      "relative mt-5 text-lg font-semibold transition-colors duration-300",
+                      title,
+                    )}
+                  >
+                    {t(`pillars.${key}.title`)}
+                  </h3>
+                  <p className="relative mt-2 text-sm text-muted-foreground leading-relaxed">
+                    {t(`pillars.${key}.body`)}
+                  </p>
+
+                  {/* Animated arrow CTA */}
+                  <div
+                    className={cn(
+                      "relative mt-5 inline-flex items-center gap-1.5 text-sm font-semibold opacity-0 -translate-x-2 rtl:translate-x-2 transition-all duration-500 group-hover:opacity-100 group-hover:translate-x-0",
+                      arrow,
+                    )}
+                  >
+                    {t("common.discover")}
+                    <ArrowRight className="h-4 w-4 rtl:rotate-180" />
+                  </div>
+                </Card>
+              </div>
             ))}
           </div>
         </div>
