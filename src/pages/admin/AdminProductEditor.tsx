@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploadProductImage, useCategories, useCreateCategory, slugify, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
@@ -17,6 +18,8 @@ import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
 import type { ExtractedFields } from "@/lib/aiImport";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
+import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -118,6 +121,43 @@ export default function AdminProductEditor() {
   const fileMain = useRef<HTMLInputElement>(null);
   const fileGallery = useRef<HTMLInputElement>(null);
 
+  // Image preview + selection state
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
+
+  const toggleSelected = (idx: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const allSelected = form.gallery.length > 0 && selected.size === form.gallery.length;
+
+  const toggleSelectAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(form.gallery.map((_, i) => i)));
+  };
+
+  const downloadSelected = () => {
+    const urls = Array.from(selected).sort((a, b) => a - b).map((i) => form.gallery[i]).filter(Boolean);
+    if (!urls.length) return;
+    downloadImagesAsZip(urls, `${baseName}-selected.zip`, baseName);
+  };
+
+  const downloadAll = () => {
+    const urls = [form.mainImage, ...form.gallery].filter((u) => u && !u.startsWith("data:"));
+    if (!urls.length) {
+      toast.info("No downloadable images");
+      return;
+    }
+    downloadImagesAsZip(urls, `${baseName}-all.zip`, baseName);
+  };
+
   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -139,8 +179,17 @@ export default function AdminProductEditor() {
     e.target.value = "";
   };
 
-  const removeGalleryAt = (idx: number) =>
+  const removeGalleryAt = (idx: number) => {
     update("gallery", form.gallery.filter((_, i) => i !== idx));
+    setSelected((prev) => {
+      const next = new Set<number>();
+      prev.forEach((i) => {
+        if (i < idx) next.add(i);
+        else if (i > idx) next.add(i - 1);
+      });
+      return next;
+    });
+  };
 
   const setAsMain = (src: string) => {
     const oldMain = form.mainImage;
@@ -344,40 +393,174 @@ export default function AdminProductEditor() {
           <Card className="p-6 space-y-4">
             <h2 className="font-semibold">Media</h2>
             <div className="flex items-start gap-4">
-              <div className="relative h-32 w-32 rounded-lg overflow-hidden border border-border bg-muted shrink-0">
-                <img src={form.mainImage} alt="" className="h-full w-full object-cover" />
-                <span className="absolute top-1 left-1 bg-brand text-white text-[10px] font-bold px-1.5 py-0.5 rounded">MAIN</span>
+              <div className="relative h-32 w-32 rounded-lg overflow-hidden border border-border bg-muted shrink-0 group">
+                <button
+                  type="button"
+                  onClick={() => setPreviewSrc(form.mainImage)}
+                  className="block h-full w-full focus:outline-none focus:ring-2 focus:ring-ring"
+                  title="Preview"
+                >
+                  <img src={form.mainImage} alt="" className="h-full w-full object-cover" />
+                </button>
+                <span className="absolute top-1 left-1 bg-brand text-white text-[10px] font-bold px-1.5 py-0.5 rounded pointer-events-none">MAIN</span>
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 pointer-events-none">
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 pointer-events-auto"
+                    onClick={() => setPreviewSrc(form.mainImage)}
+                    title="Preview"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 pointer-events-auto"
+                    onClick={() => downloadImage(form.mainImage, `${baseName}-main`)}
+                    title="Download"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Main image</p>
                 <p className="text-xs text-muted-foreground">PNG/JPG, under 1.5MB. Stored locally in your browser.</p>
                 <input type="file" ref={fileMain} accept="image/*" onChange={uploadMain} className="hidden" />
-                <Button type="button" variant="outline" size="sm" onClick={() => fileMain.current?.click()} className="gap-1.5">
-                  <Upload className="h-3.5 w-3.5" /> Upload
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileMain.current?.click()} className="gap-1.5">
+                    <Upload className="h-3.5 w-3.5" /> Upload
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadImage(form.mainImage, `${baseName}-main`)}
+                    className="gap-1.5"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download
+                  </Button>
+                </div>
               </div>
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-medium">Gallery ({form.gallery.length})</p>
-                <input type="file" ref={fileGallery} accept="image/*" multiple onChange={uploadGallery} className="hidden" />
-                <Button type="button" variant="outline" size="sm" onClick={() => fileGallery.current?.click()} className="gap-1.5">
-                  <Plus className="h-3.5 w-3.5" /> Add images
-                </Button>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium">Gallery ({form.gallery.length})</p>
+                  {form.gallery.length > 0 && (
+                    <>
+                      <Button type="button" variant="ghost" size="sm" onClick={toggleSelectAll} className="h-7 text-xs">
+                        {allSelected ? "Clear" : "Select all"}
+                      </Button>
+                      {selected.size > 0 && (
+                        <span className="text-xs text-muted-foreground">{selected.size} selected</span>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={selected.size === 0}
+                    onClick={downloadSelected}
+                    className="gap-1.5"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download selected
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={form.gallery.length === 0 && form.mainImage.startsWith("data:")}
+                    onClick={downloadAll}
+                    className="gap-1.5"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Download all
+                  </Button>
+                  <input type="file" ref={fileGallery} accept="image/*" multiple onChange={uploadGallery} className="hidden" />
+                  <Button type="button" variant="outline" size="sm" onClick={() => fileGallery.current?.click()} className="gap-1.5">
+                    <Plus className="h-3.5 w-3.5" /> Add images
+                  </Button>
+                </div>
               </div>
               {form.gallery.length === 0 ? (
                 <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg p-6 text-center">No gallery images yet.</p>
               ) : (
                 <div className="grid grid-cols-4 gap-2">
                   {form.gallery.map((src, i) => (
-                    <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-border">
-                      <img src={src} alt="" className="h-full w-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                        <Button type="button" size="sm" variant="secondary" onClick={() => setAsMain(src)} title="Set as main">
+                    <div
+                      key={i}
+                      className={cn(
+                        "relative group aspect-square rounded-lg overflow-hidden border border-border",
+                        selected.has(i) && "ring-2 ring-brand ring-offset-1",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setPreviewSrc(src)}
+                        className="block h-full w-full focus:outline-none"
+                        title="Preview"
+                      >
+                        <img src={src} alt="" className="h-full w-full object-cover" />
+                      </button>
+                      <div
+                        className={cn(
+                          "absolute top-1.5 left-1.5 z-10 rounded bg-background/80 backdrop-blur-sm p-0.5 transition-opacity",
+                          selected.has(i) ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                        )}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={selected.has(i)}
+                          onCheckedChange={() => toggleSelected(i)}
+                          aria-label="Select image"
+                        />
+                      </div>
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 pointer-events-none">
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          className="h-7 w-7 pointer-events-auto"
+                          onClick={() => setPreviewSrc(src)}
+                          title="Preview"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          className="h-7 w-7 pointer-events-auto"
+                          onClick={() => downloadImage(src, `${baseName}-${i + 1}`)}
+                          title="Download"
+                        >
+                          <Download className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          className="h-7 w-7 pointer-events-auto"
+                          onClick={() => setAsMain(src)}
+                          title="Set as main"
+                        >
                           <Star className="h-3 w-3" />
                         </Button>
-                        <Button type="button" size="sm" variant="destructive" onClick={() => removeGalleryAt(i)}>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="destructive"
+                          className="h-7 w-7 pointer-events-auto"
+                          onClick={() => removeGalleryAt(i)}
+                          title="Remove"
+                        >
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
@@ -449,6 +632,13 @@ export default function AdminProductEditor() {
           </Card>
         </div>
       </div>
+
+      <ImagePreviewDialog
+        src={previewSrc}
+        open={!!previewSrc}
+        onOpenChange={(o) => !o && setPreviewSrc(null)}
+        filename={previewSrc === form.mainImage ? `${baseName}-main` : baseName}
+      />
     </form>
   );
 }

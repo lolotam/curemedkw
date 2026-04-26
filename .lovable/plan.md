@@ -1,78 +1,64 @@
-## Problem
+## Goal
+Enhance the **Media** section in `src/pages/admin/AdminProductEditor.tsx` so admins can:
+1. **Preview** any image (main or gallery) full-size in a lightbox by clicking it.
+2. **Download** any individual image (hover overlay button + lightbox button).
+3. **Select multiple gallery images** with checkboxes and **bulk-download** them as a ZIP, plus a "Download all" shortcut.
 
-In **Edit category** (and Add category) on `/admin/categories`, the dialog footer only shows **Cancel** — the **Save** button is invisible/clipped, as the screenshot confirms.
+No backend changes required — all client-side.
 
-## Root cause
+---
 
-`DialogContent` (from `src/components/ui/dialog.tsx`) is a CSS **`grid`** container by default. In `AdminCategories.tsx` we override it with `flex flex-col max-h-[90vh] p-0`, but the base `grid` class is still applied first, so the layout is a grid container that ignores `flex-col`/`flex-1`. Result:
+## Changes
 
-1. The scroll area's `flex-1` does nothing → it grows to fit content instead of scrolling.
-2. The footer's `sticky bottom-0` has no flex parent to anchor to → it can sit mid-dialog while the form fields overflow beneath it.
-3. On narrow viewports `DialogFooter` uses `flex-col-reverse` (Save above Cancel). With the broken layout, Save ends up scrolled off-screen.
+### 1. New component: `src/components/admin/ImagePreviewDialog.tsx`
+A reusable lightbox built on the existing shadcn `Dialog`:
+- Receives `src`, `alt`, `open`, `onOpenChange`.
+- Shows the image at `max-h-[85vh] object-contain`, centered on a dark backdrop.
+- Includes a **Download** button in the dialog footer (calls a shared `downloadImage(url, filename)` helper).
+- Closes on overlay click / X / Escape (built-in Dialog behavior).
 
-So the Save button is rendered in the DOM but hidden below the visible viewport.
+### 2. New helper: `src/lib/downloadImage.ts`
+Small utility module:
+- `downloadImage(url, filename?)` — fetches the image as a blob, creates an object URL, triggers `<a download>` click, then revokes. Falls back to opening in a new tab if CORS blocks the fetch (Supabase Storage URLs are CORS-enabled, so this should work for our own uploads).
+- `downloadImagesAsZip(urls, zipName)` — uses **JSZip** to bundle multiple images into one `.zip`. Each file named `image-1.jpg`, `image-2.jpg`, …, derived from the URL's extension when available.
+- Show `toast.loading` → `toast.success`/`toast.error` for feedback.
 
-## Fix (one file: `src/pages/admin/AdminCategories.tsx`)
+**New dependency:** `jszip` (lightweight, ~100KB gzipped, well-maintained).
 
-### 1. Neutralize the conflicting `grid` on `DialogContent`
+### 3. Update `src/pages/admin/AdminProductEditor.tsx` — Media card
 
-Change the className on the editor's `DialogContent` from:
+**Main image block:**
+- Make the thumbnail clickable → opens `ImagePreviewDialog`.
+- Add a small **Download** icon button next to the existing **Upload** button.
 
-```tsx
-<DialogContent className="max-w-lg flex flex-col max-h-[90vh] p-0">
-```
+**Gallery block:**
+- Add local state: `selected: Set<number>` and `previewUrl: string | null`.
+- Add a header row above the grid with:
+  - "Select all" / "Clear" toggle (only when gallery has images).
+  - **Download selected** button (disabled when none selected) → `downloadImagesAsZip(selectedUrls, "{sku}-selected.zip")`.
+  - **Download all** button → ZIP of all gallery images + main.
+  - Existing "Add images" button stays on the right.
+- Each gallery tile gets:
+  - A small **checkbox** in the top-left corner (always visible, semi-transparent, becomes solid on hover/checked) to toggle selection.
+  - The hover overlay gains two new icon buttons: **Eye** (preview → opens lightbox) and **Download** (single-image download). Existing **Star** (set as main) and **X** (remove) remain.
+  - Clicking the image itself (outside the checkbox/overlay buttons) opens the lightbox preview.
+- A selected tile shows a brand-colored ring (`ring-2 ring-brand`) for clear visual feedback.
 
-to:
+**Imports added:** `Download`, `Eye`, `CheckSquare`, `Square` from `lucide-react`; `Checkbox` from `@/components/ui/checkbox`; the new `ImagePreviewDialog` and download helpers.
 
-```tsx
-<DialogContent className="max-w-lg !grid-cols-1 grid-rows-[auto_1fr_auto] max-h-[90vh] p-0 gap-0 overflow-hidden">
-```
+### 4. Filename heuristics
+- Single download filename: `{sku || slug(name) || "product"}-main.{ext}` for main, `{sku}-{index+1}.{ext}` for gallery items.
+- ZIP name: `{sku || "product"}-images.zip` or `{sku}-selected.zip`.
 
-This keeps the shadcn `grid` layout but pins it to a 3-row template (header / scroll area / footer) so the middle row is the only one that scrolls, and the footer is always visible at the bottom.
+---
 
-### 2. Make the middle section the scrollable row
+## Files touched
+- **New:** `src/components/admin/ImagePreviewDialog.tsx`
+- **New:** `src/lib/downloadImage.ts`
+- **Modified:** `src/pages/admin/AdminProductEditor.tsx` (Media card only — no other sections affected)
+- **Dependency added:** `jszip`
 
-Change the inner wrapper from:
-
-```tsx
-<div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">
-```
-
-to:
-
-```tsx
-<div className="space-y-4 px-6 py-4 overflow-y-auto min-h-0">
-```
-
-(`min-h-0` lets a grid row shrink so `overflow-y-auto` actually scrolls.)
-
-### 3. Force the footer onto a single row so Save is never hidden
-
-Change:
-
-```tsx
-<DialogFooter className="px-6 py-4 border-t border-border bg-background sticky bottom-0">
-```
-
-to:
-
-```tsx
-<DialogFooter className="px-6 py-4 border-t border-border bg-background flex-row justify-end gap-2">
-```
-
-Removes `sticky` (no longer needed — the grid row anchors it) and forces `flex-row` so on narrow screens Save isn't pushed off-screen by `flex-col-reverse`.
-
-## Verification
-
-After changes, on `/admin/categories` → click pencil on any category → confirm:
-
-- The dialog is capped at 90vh.
-- Form fields scroll inside the middle area.
-- Footer with **Cancel** *and* the brand-blue **Save** button is always pinned to the bottom of the dialog and fully visible.
-- Save is enabled when name + slug are filled and shows "Saving…" while submitting.
-
-## Files to edit
-
-- `src/pages/admin/AdminCategories.tsx` — the three className tweaks described above on the dialog's `DialogContent`, scroll wrapper, and `DialogFooter`.
-
-No DB or other component changes required.
+## Out of scope
+- Drag-to-reorder gallery (not requested).
+- Server-side ZIP generation — client-side is sufficient for typical 1–20 product images.
+- Public product detail page lightbox — this plan covers the **admin editor** only, per the request.
