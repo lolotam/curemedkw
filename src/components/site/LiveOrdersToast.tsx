@@ -33,7 +33,8 @@ export function LiveOrdersToast() {
       const isFemale = Math.random() > 0.55;
       const name = pickRandom(isFemale ? KW_WOMEN_NAMES : KW_MEN_NAMES);
       const area = pickRandom(KW_AREAS);
-      const ar = `${name.ar} من ${area.ar} طلب ${product.name} قبل لحظات`;
+      const productNameAr = product.nameAr?.trim() || product.name;
+      const ar = `${name.ar} من ${area.ar} طلب ${productNameAr} قبل لحظات`;
       const en = `${name.en} from ${area.en} just ordered ${product.name}`;
       toast(
         <div className="flex items-center gap-3">
