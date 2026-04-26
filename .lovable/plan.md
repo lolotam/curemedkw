@@ -1,75 +1,78 @@
-## Goal
+## Problem
 
-Give admins a clear, real-time view of unread contact messages in two places:
+In **Edit category** (and Add category) on `/admin/categories`, the dialog footer only shows **Cancel** — the **Save** button is invisible/clipped, as the screenshot confirms.
 
-1. A small **red unread-count badge** next to the "Messages" item in the admin sidebar nav.
-2. A **bell notification icon in the public site header** (visible only to admins) that opens a **slide-out panel** listing recent messages. Clicking any message navigates to `/admin/messages` with that message preselected.
+## Root cause
 
----
+`DialogContent` (from `src/components/ui/dialog.tsx`) is a CSS **`grid`** container by default. In `AdminCategories.tsx` we override it with `flex flex-col max-h-[90vh] p-0`, but the base `grid` class is still applied first, so the layout is a grid container that ignores `flex-col`/`flex-1`. Result:
 
-## 1. Admin sidebar — red unread badge on "Messages"
+1. The scroll area's `flex-1` does nothing → it grows to fit content instead of scrolling.
+2. The footer's `sticky bottom-0` has no flex parent to anchor to → it can sit mid-dialog while the form fields overflow beneath it.
+3. On narrow viewports `DialogFooter` uses `flex-col-reverse` (Save above Cancel). With the broken layout, Save ends up scrolled off-screen.
 
-**File:** `src/components/admin/AdminLayout.tsx`
+So the Save button is rendered in the DOM but hidden below the visible viewport.
 
-- Import `useUnreadMessageCount` from `@/lib/db` (already exists, returns count of `messages` where `read = false`).
-- In the `NAV.map(...)` render, when the item is the Messages link and `unreadCount > 0`, render a small red pill at the right edge of the nav row:
-  - Style: `ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold`.
-  - Show `unreadCount` (cap display at `99+`).
-- The badge will auto-update because the existing mutations (`useMarkMessageRead`, `useDeleteMessages`, `useCreateMessage`) already invalidate `qk.unreadCount`.
+## Fix (one file: `src/pages/admin/AdminCategories.tsx`)
 
----
+### 1. Neutralize the conflicting `grid` on `DialogContent`
 
-## 2. Public site header — admin-only notification bell
+Change the className on the editor's `DialogContent` from:
 
-**File:** `src/components/site/SiteHeader.tsx`
+```tsx
+<DialogContent className="max-w-lg flex flex-col max-h-[90vh] p-0">
+```
 
-- Import `useAdminSession` from `@/lib/admin` and `useUnreadMessageCount` + `useMessages` from `@/lib/db`.
-- Render the bell only when `isAdmin === true`. Place it in the right-side button cluster, just before the language toggle.
-- Bell button:
-  - Icon: `Bell` from lucide-react, `variant="ghost" size="icon"`, `aria-label="Notifications"`.
-  - When `unreadCount > 0`, overlay a small red dot/badge in the top-right corner of the icon (absolute-positioned span with `bg-destructive`, count text if > 0, capped at `99+`).
-- Clicking the bell opens a **Sheet** (right-aligned slide-out) — use the existing `@/components/ui/sheet` component.
+to:
 
-### Slide-out panel content (Sheet)
+```tsx
+<DialogContent className="max-w-lg !grid-cols-1 grid-rows-[auto_1fr_auto] max-h-[90vh] p-0 gap-0 overflow-hidden">
+```
 
-- **Header:** "Notifications" title + small subtitle "X unread of Y total".
-- **Body:** scrollable list of the most recent ~20 messages from `useMessages()`.
-  - Each row shows: sender name (bold if unread), subject (truncated), short preview of message, relative date, and a small red dot for unread.
-  - Hover state with `hover:bg-muted/50`.
-  - On click: close the sheet, then `navigate("/admin/messages", { state: { focusMessageId: m.id } })`.
-- **Footer:** "View all messages" button → navigates to `/admin/messages` and closes the sheet.
-- Empty state: `Bell` icon + "No messages yet."
+This keeps the shadcn `grid` layout but pins it to a 3-row template (header / scroll area / footer) so the middle row is the only one that scrolls, and the footer is always visible at the bottom.
 
-### Important: only fetch messages when needed
+### 2. Make the middle section the scrollable row
 
-The `messages` table SELECT policy requires `has_role(auth.uid(), 'admin')`, so calling `useMessages()` for non-admins would error. To avoid this:
+Change the inner wrapper from:
 
-- Call `useUnreadMessageCount()` and `useMessages()` only when `isAdmin` is `true`. Implement by gating with `enabled: isAdmin` — easiest path is to add a small wrapper inside `SiteHeader` that conditionally renders an `<AdminBell />` subcomponent only when `isAdmin` is true; that subcomponent is the only place the hooks are called. This keeps the hook order stable for non-admins and avoids any RLS errors.
+```tsx
+<div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">
+```
 
----
+to:
 
-## 3. Auto-focus selected message in `/admin/messages`
+```tsx
+<div className="space-y-4 px-6 py-4 overflow-y-auto min-h-0">
+```
 
-**File:** `src/pages/admin/AdminMessages.tsx`
+(`min-h-0` lets a grid row shrink so `overflow-y-auto` actually scrolls.)
 
-- Read `location.state?.focusMessageId` via `useLocation()`.
-- In a `useEffect` watching `[all, focusMessageId]`, when the message exists in the loaded list, call the existing `open(message)` flow (which sets `active` and marks it read).
-- After consuming, clear the state via `navigate(".", { replace: true, state: {} })` so refresh won't re-trigger.
+### 3. Force the footer onto a single row so Save is never hidden
 
----
+Change:
 
-## 4. Realtime updates (nice-to-have, kept simple)
+```tsx
+<DialogFooter className="px-6 py-4 border-t border-border bg-background sticky bottom-0">
+```
 
-The existing React Query invalidations already keep the badge fresh after admin actions in this tab. For new incoming messages from public visitors, the badge will refresh whenever the admin navigates or React Query refetches on window focus (default behavior). No DB changes are needed for this request.
+to:
 
-If you'd like true push updates later (badge increments the moment a visitor submits the contact form), we can enable Supabase Realtime on the `messages` table in a follow-up — not included in this plan to keep the change minimal.
+```tsx
+<DialogFooter className="px-6 py-4 border-t border-border bg-background flex-row justify-end gap-2">
+```
 
----
+Removes `sticky` (no longer needed — the grid row anchors it) and forces `flex-row` so on narrow screens Save isn't pushed off-screen by `flex-col-reverse`.
 
-## Files to be edited
+## Verification
 
-- `src/components/admin/AdminLayout.tsx` — add unread badge to the Messages nav item.
-- `src/components/site/SiteHeader.tsx` — add admin-only `<AdminBell />` with `Sheet` slide-out and notification list.
-- `src/pages/admin/AdminMessages.tsx` — auto-open message when arriving with `state.focusMessageId`.
+After changes, on `/admin/categories` → click pencil on any category → confirm:
 
-No DB schema changes. No new dependencies (Sheet, Bell icon, and all hooks already exist).
+- The dialog is capped at 90vh.
+- Form fields scroll inside the middle area.
+- Footer with **Cancel** *and* the brand-blue **Save** button is always pinned to the bottom of the dialog and fully visible.
+- Save is enabled when name + slug are filled and shows "Saving…" while submitting.
+
+## Files to edit
+
+- `src/pages/admin/AdminCategories.tsx` — the three className tweaks described above on the dialog's `DialogContent`, scroll wrapper, and `DialogFooter`.
+
+No DB or other component changes required.

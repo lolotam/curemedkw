@@ -372,13 +372,13 @@ function CategoryEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg flex flex-col max-h-[90vh] p-0">
+      <DialogContent className="max-w-lg !grid-cols-1 grid-rows-[auto_1fr_auto] max-h-[90vh] p-0 gap-0 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="px-6 pt-6">
             {isNew ? (seedParentId ? "Add subcategory" : "Add category") : "Edit category"}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 px-6 py-4 overflow-y-auto flex-1">
+        <div className="space-y-4 px-6 py-4 overflow-y-auto min-h-0">
           <div className="flex items-start gap-4">
             <div className="relative h-32 w-32 rounded-xl overflow-hidden border border-border bg-muted shrink-0">
               {form.imageUrl ? (
@@ -467,7 +467,7 @@ function CategoryEditorDialog({
             </div>
           </div>
         </div>
-        <DialogFooter className="px-6 py-4 border-t border-border bg-background sticky bottom-0">
+        <DialogFooter className="px-6 py-4 border-t border-border bg-background flex-row justify-end gap-2">
           <Button variant="ghost" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button
             className="bg-brand hover:bg-brand/90 text-white"
