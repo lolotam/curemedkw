@@ -15,6 +15,7 @@ export interface BrandMeta {
   key: BrandKey;
   slug: string;
   name: string;
+  shortName?: string;
   tagline: { en: string; ar: string };
   about: { en: string; ar: string };
   themeAttr: string;
@@ -92,6 +93,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "abc",
     slug: "australian-bodycare",
     name: "Australian Bodycare",
+    shortName: "ABC",
     tagline: {
       en: "Tea Tree Oil care for healthy skin every day",
       ar: "عناية بزيت شجرة الشاي لبشرة صحية كل يوم",
@@ -134,6 +136,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "hartington",
     slug: "hartington",
     name: "Hartington Pharmaceutical",
+    shortName: "Hartington",
     tagline: {
       en: "Trusted pharmaceutical care",
       ar: "رعاية صيدلانية موثوقة",
