@@ -854,3 +854,238 @@ export function useTestimonials() {
     },
   });
 }
+
+/* ============================================================
+ * Site settings (key/value)
+ * ============================================================ */
+
+export interface PriceVisibility {
+  global: boolean;
+  brands: Record<BrandKey, boolean>;
+}
+
+const DEFAULT_PRICE_VISIBILITY: PriceVisibility = {
+  global: false,
+  brands: {
+    flexitol: false,
+    kapiva: false,
+    nada: false,
+    abc: false,
+    lafes: false,
+    hartington: false,
+    phytophar: false,
+  },
+};
+
+export function usePriceVisibility() {
+  return useQuery({
+    queryKey: qk.siteSetting("price_visibility"),
+    queryFn: async (): Promise<PriceVisibility> => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "price_visibility")
+        .maybeSingle();
+      if (error) throw error;
+      const raw = (data?.value ?? null) as Partial<PriceVisibility> | null;
+      return {
+        global: raw?.global ?? DEFAULT_PRICE_VISIBILITY.global,
+        brands: { ...DEFAULT_PRICE_VISIBILITY.brands, ...(raw?.brands ?? {}) },
+      };
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdatePriceVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (next: PriceVisibility) => {
+      const { error } = await supabase
+        .from("site_settings")
+        .upsert({ key: "price_visibility", value: next as any }, { onConflict: "key" });
+      if (error) throw error;
+      return next;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.siteSetting("price_visibility") });
+    },
+  });
+}
+
+export function useSiteSetting<T = unknown>(key: string, fallback: T) {
+  return useQuery({
+    queryKey: qk.siteSetting(key),
+    queryFn: async (): Promise<T> => {
+      const { data, error } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", key)
+        .maybeSingle();
+      if (error) throw error;
+      return ((data?.value ?? fallback) as T);
+    },
+    staleTime: 30_000,
+  });
+}
+
+export function useUpdateSiteSetting() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: unknown }) => {
+      const { error } = await supabase
+        .from("site_settings")
+        .upsert({ key, value: value as any }, { onConflict: "key" });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.siteSetting(vars.key) });
+    },
+  });
+}
+
+/* ============================================================
+ * Product reviews
+ * ============================================================ */
+
+export interface ProductReview {
+  id: string;
+  productId: string;
+  reviewerName: string;
+  reviewerEmail: string | null;
+  rating: number;
+  comment: string;
+  isApproved: boolean;
+  createdAt: string;
+}
+
+type ReviewRow = {
+  id: string;
+  product_id: string;
+  reviewer_name: string;
+  reviewer_email: string | null;
+  rating: number;
+  comment: string;
+  is_approved: boolean;
+  created_at: string;
+};
+
+const rowToReview = (r: ReviewRow): ProductReview => ({
+  id: r.id,
+  productId: r.product_id,
+  reviewerName: r.reviewer_name,
+  reviewerEmail: r.reviewer_email,
+  rating: r.rating,
+  comment: r.comment,
+  isApproved: r.is_approved,
+  createdAt: r.created_at,
+});
+
+export function useProductReviews(productId: string | undefined) {
+  return useQuery({
+    queryKey: productId ? qk.productReviews(productId) : ["product_reviews", "none"],
+    enabled: !!productId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_reviews")
+        .select("*")
+        .eq("product_id", productId!)
+        .eq("is_approved", true)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data as ReviewRow[]).map(rowToReview);
+    },
+  });
+}
+
+export function useApprovedReviews() {
+  return useQuery({
+    queryKey: qk.approvedReviews,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_reviews")
+        .select("*")
+        .eq("is_approved", true)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data as ReviewRow[]).map(rowToReview);
+    },
+  });
+}
+
+export function useAdminReviews() {
+  return useQuery({
+    queryKey: qk.adminReviews,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("product_reviews")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data as ReviewRow[]).map(rowToReview);
+    },
+  });
+}
+
+export interface CreateReviewInput {
+  productId: string;
+  reviewerName: string;
+  reviewerEmail?: string;
+  rating: number;
+  comment: string;
+}
+
+export function useCreateReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateReviewInput) => {
+      const { error } = await supabase.from("product_reviews").insert({
+        product_id: input.productId,
+        reviewer_name: input.reviewerName.trim(),
+        reviewer_email: input.reviewerEmail?.trim() || null,
+        rating: Math.max(1, Math.min(5, Math.round(input.rating))),
+        comment: input.comment.trim(),
+        is_approved: false,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.productReviews(vars.productId) });
+      qc.invalidateQueries({ queryKey: qk.adminReviews });
+    },
+  });
+}
+
+export function useApproveReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, approve }: { id: string; approve: boolean }) => {
+      const { error } = await supabase
+        .from("product_reviews")
+        .update({ is_approved: approve })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.adminReviews });
+      qc.invalidateQueries({ queryKey: qk.approvedReviews });
+      qc.invalidateQueries({ queryKey: ["product_reviews"] });
+    },
+  });
+}
+
+export function useDeleteReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("product_reviews").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.adminReviews });
+      qc.invalidateQueries({ queryKey: qk.approvedReviews });
+      qc.invalidateQueries({ queryKey: ["product_reviews"] });
+    },
+  });
+}
