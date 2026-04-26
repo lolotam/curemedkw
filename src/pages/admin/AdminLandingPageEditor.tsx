@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Link, useParams, Navigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw } from "lucide-react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw, ExternalLink, LayoutGrid, MousePointerClick } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BRANDS } from "@/lib/brands";
+import type { BrandKey } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
   HERO_PAGES,
@@ -24,10 +28,11 @@ type Draft = Omit<HeroSlide, "created_at" | "updated_at"> & { _dirty?: boolean; 
 
 export default function AdminLandingPageEditor() {
   const { pageKey } = useParams<{ pageKey: string }>();
-  const meta = HERO_PAGES.find((p) => p.key === pageKey);
+  const navigate = useNavigate();
+  const meta = pageKey ? HERO_PAGES.find((p) => p.key === pageKey) : undefined;
   const { toast } = useToast();
   const [slides, setSlides] = React.useState<Draft[]>([]);
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(false);
 
   const refresh = React.useCallback(async () => {
     if (!meta) return;
@@ -42,15 +47,30 @@ export default function AdminLandingPageEditor() {
     }
   }, [meta, toast]);
 
-  React.useEffect(() => { refresh(); }, [refresh]);
+  React.useEffect(() => {
+    // Reset slides when switching pages so stale data doesn't flash
+    setSlides([]);
+    if (meta) refresh();
+  }, [meta, refresh]);
 
-  if (!meta) return <Navigate to="/admin/landing" replace />;
+  const hasUnsaved = slides.some((s) => s._dirty);
+
+  const switchToPage = (key: string) => {
+    if (key === pageKey) return;
+    if (hasUnsaved && !confirm("You have unsaved changes on this page. Discard them?")) {
+      return;
+    }
+    navigate(`/admin/landing/${key}`);
+  };
+
+  const activeCount = slides.filter((s) => s.is_active).length;
 
   const patchLocal = (id: string, patch: Partial<Draft>) => {
     setSlides((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch, _dirty: true } : s)));
   };
 
   const addSlide = async () => {
+    if (!meta) return;
     try {
       const max = slides.reduce((m, s) => Math.max(m, s.sort_order), -1);
       const created = await createSlide({
@@ -153,25 +173,80 @@ export default function AdminLandingPageEditor() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-5xl mx-auto">
-      <header className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <Button asChild variant="ghost" size="sm" className="-ml-2 mb-2">
-            <Link to="/admin/landing"><ArrowLeft className="h-4 w-4 mr-1" /> All landing pages</Link>
+    <div className="p-6 md:p-8 max-w-6xl mx-auto">
+      {/* Sticky toolbar with page dropdown */}
+      <div className="sticky top-0 z-20 -mx-6 md:-mx-8 px-6 md:px-8 py-4 mb-6 bg-background/85 backdrop-blur border-b border-border">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button asChild variant="ghost" size="sm" className="gap-1">
+            <Link to="/admin/landing/all">
+              <LayoutGrid className="h-4 w-4" /> Browse all
+            </Link>
           </Button>
-          <h1 className="text-2xl md:text-3xl font-bold">{meta.label} — Hero slides</h1>
-          <p className="text-sm text-muted-foreground mt-1">Upload images or videos. Inactive slides are hidden from the live site.</p>
-        </div>
-        <Button onClick={addSlide}><Plus className="h-4 w-4 mr-1" /> Add slide</Button>
-      </header>
 
-      {loading ? (
+          <div className="flex-1 min-w-[240px] max-w-md">
+            <Select value={pageKey ?? ""} onValueChange={switchToPage}>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Choose a landing page…">
+                  {meta && <PageOption pageKey={meta.key} label={meta.label} route={meta.route} compact />}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {HERO_PAGES.map((p) => (
+                  <SelectItem key={p.key} value={p.key} className="py-2.5">
+                    <PageOption pageKey={p.key} label={p.label} route={p.route} />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {meta && (
+            <span className="text-xs font-medium text-muted-foreground bg-muted/50 rounded-full px-3 py-1.5 border border-border">
+              {slides.length} slides · {activeCount} active
+            </span>
+          )}
+
+          <div className="ml-auto flex items-center gap-2">
+            {meta && (
+              <Button asChild variant="outline" size="sm" className="gap-1">
+                <a href={meta.route} target="_blank" rel="noreferrer">
+                  <ExternalLink className="h-4 w-4" /> View live
+                </a>
+              </Button>
+            )}
+            <Button onClick={addSlide} disabled={!meta} className="gap-1">
+              <Plus className="h-4 w-4" /> Add slide
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {meta ? (
+        <header className="mb-6 flex items-center gap-3">
+          <PageBadge pageKey={meta.key} />
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold leading-tight">
+              Hero slides — {meta.label}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Upload images or videos. Inactive slides are hidden from the live site.
+            </p>
+          </div>
+        </header>
+      ) : null}
+
+      {!meta ? (
+        <EmptyPickerState onPick={switchToPage} />
+      ) : loading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading…
         </div>
       ) : slides.length === 0 ? (
         <Card className="p-10 text-center">
           <p className="text-muted-foreground">No slides yet. Add one to start customizing this landing page.</p>
+          <Button onClick={addSlide} className="mt-4 gap-1">
+            <Plus className="h-4 w-4" /> Add first slide
+          </Button>
         </Card>
       ) : (
         <div className="space-y-4">
@@ -322,5 +397,83 @@ export default function AdminLandingPageEditor() {
         </div>
       )}
     </div>
+  );
+}
+
+/* ---------- Helper components ---------- */
+
+function PageOption({
+  pageKey,
+  label,
+  route,
+  compact,
+}: {
+  pageKey: HeroPageKey;
+  label: string;
+  route: string;
+  compact?: boolean;
+}) {
+  const isMain = pageKey === "curemed";
+  const meta = isMain ? null : BRANDS[pageKey as BrandKey];
+  return (
+    <span className="flex items-center gap-2.5 min-w-0">
+      {meta ? (
+        <span className="h-7 w-7 rounded-lg bg-white shadow-sm ring-1 ring-black/5 p-0.5 flex items-center justify-center shrink-0">
+          <img src={meta.logo} alt="" className="max-h-full max-w-full object-contain" />
+        </span>
+      ) : (
+        <span className="h-7 w-7 rounded-lg bg-gradient-to-br from-brand to-brand/60 text-white shadow-sm flex items-center justify-center font-black text-xs shrink-0">
+          C
+        </span>
+      )}
+      <span className={cn("font-medium truncate", compact ? "text-sm" : "text-sm")}>
+        {label}
+      </span>
+      {!compact && (
+        <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+          {route}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PageBadge({ pageKey }: { pageKey: HeroPageKey }) {
+  const isMain = pageKey === "curemed";
+  const meta = isMain ? null : BRANDS[pageKey as BrandKey];
+  return meta ? (
+    <div className="h-12 w-12 rounded-xl bg-white shadow-md ring-1 ring-black/5 p-1.5 flex items-center justify-center shrink-0">
+      <img src={meta.logo} alt={meta.name} className="max-h-full max-w-full object-contain" />
+    </div>
+  ) : (
+    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-brand to-brand/60 text-white shadow-md flex items-center justify-center font-black text-xl shrink-0">
+      C
+    </div>
+  );
+}
+
+function EmptyPickerState({ onPick }: { onPick: (key: string) => void }) {
+  return (
+    <Card className="p-10 md:p-14 text-center">
+      <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-brand/10 text-brand mb-4">
+        <MousePointerClick className="h-7 w-7" />
+      </div>
+      <h2 className="text-xl font-bold">Pick a landing page</h2>
+      <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">
+        Choose a brand from the dropdown above, or click one of the quick links below to start adding hero slides.
+      </p>
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
+        {HERO_PAGES.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            onClick={() => onPick(p.key)}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-card hover:bg-muted/50 hover:border-brand/40 transition-colors px-3 py-1.5 text-sm"
+          >
+            <PageOption pageKey={p.key} label={p.label} route={p.route} compact />
+          </button>
+        ))}
+      </div>
+    </Card>
   );
 }

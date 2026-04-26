@@ -51,7 +51,8 @@ const App = () => {
                   <Route path="products/:id" element={<AdminProductEditor />} />
                   <Route path="categories" element={<AdminCategories />} />
                   <Route path="tags" element={<AdminTags />} />
-                  <Route path="landing" element={<AdminLandingPages />} />
+                  <Route path="landing" element={<AdminLandingPageEditor />} />
+                  <Route path="landing/all" element={<AdminLandingPages />} />
                   <Route path="landing/:pageKey" element={<AdminLandingPageEditor />} />
                   <Route path="models" element={<AdminModels />} />
                   <Route path="messages" element={<AdminMessages />} />
