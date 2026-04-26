@@ -175,6 +175,13 @@ export const qk = {
   adminReviews: ["product_reviews", "admin"] as const,
   orders: ["orders"] as const,
   order: (id: string) => ["orders", id] as const,
+  profile: (id: string) => ["profile", id] as const,
+  myOrders: (uid: string) => ["orders", "mine", uid] as const,
+  myNotifications: (uid: string) => ["notifications", "mine", uid] as const,
+  notificationsUnread: (uid: string) => ["notifications", "unread", uid] as const,
+  coupons: ["coupons"] as const,
+  notificationTemplates: ["notification_templates"] as const,
+  adminUsers: ["admin", "users"] as const,
 };
 
 /* ============================================================
