@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil, ExternalLink, Eye } from "lucide-react";
+import { Plus, Search, Star, Trash2, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useProducts, useDeleteProduct, useBulkDeleteProducts } from "@/lib/db";
+import { useProducts, useDeleteProduct, useBulkDeleteProducts, useUpdateProduct } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ export default function AdminProducts() {
   const { data: allProducts = [] } = useProducts();
   const del = useDeleteProduct();
   const bulkDel = useBulkDeleteProducts();
+  const updateProduct = useUpdateProduct();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const brandFilter = searchParams.get("brand") || "all";
   const list = useMemo(() => {
@@ -83,7 +84,9 @@ export default function AdminProducts() {
               <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
               <th className="px-4 py-3 w-12 text-left">#</th>
               <th className="text-left px-4 py-3">Product</th><th className="text-left px-4 py-3">Brand</th>
-              <th className="text-left px-4 py-3">Category</th><th className="text-left px-4 py-3">Price</th>
+              <th className="text-left px-4 py-3">Category</th>
+              <th className="text-left px-4 py-3">Price</th>
+              <th className="text-left px-4 py-3">Original price</th>
               <th className="text-left px-4 py-3">Stock</th><th className="text-left px-4 py-3">Featured</th>
               <th className="text-right px-4 py-3">Actions</th></tr></thead>
             <tbody>
@@ -96,7 +99,29 @@ export default function AdminProducts() {
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
                   <td className="px-4 py-3">{BRANDS[p.brand].name}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.category}</td>
-                  <td className="px-4 py-3 font-medium">KD {p.price.toFixed(2)}</td>
+                  <td className="px-4 py-3">
+                    <InlinePriceCell
+                      value={p.price}
+                      saving={updateProduct.isPending}
+                      onSave={(v) =>
+                        updateProduct.mutateAsync({ id: p.id, patch: { price: v ?? 0 } })
+                          .then(() => toast.success("Price updated"))
+                          .catch((e) => toast.error(e.message))
+                      }
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <InlinePriceCell
+                      value={p.originalPrice}
+                      allowEmpty
+                      saving={updateProduct.isPending}
+                      onSave={(v) =>
+                        updateProduct.mutateAsync({ id: p.id, patch: { originalPrice: v } })
+                          .then(() => toast.success("Original price updated"))
+                          .catch((e) => toast.error(e.message))
+                      }
+                    />
+                  </td>
                   <td className="px-4 py-3"><StockPill status={p.stockStatus} /></td>
                   <td className="px-4 py-3">{p.featured && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}</td>
                   <td className="px-4 py-3 text-right"><div className="inline-flex gap-1">
@@ -105,7 +130,7 @@ export default function AdminProducts() {
                   </div></td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
+              {list.length === 0 && <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">No products found.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -113,6 +138,109 @@ export default function AdminProducts() {
     </div>
   );
 }
+
+function InlinePriceCell({
+  value,
+  onSave,
+  allowEmpty = false,
+  saving = false,
+}: {
+  value: number | null;
+  onSave: (v: number | null) => Promise<unknown>;
+  allowEmpty?: boolean;
+  saving?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<string>(value === null ? "" : value.toFixed(2));
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDraft(value === null ? "" : value.toFixed(2));
+  }, [value]);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  const commit = async () => {
+    const trimmed = draft.trim();
+    let next: number | null;
+    if (trimmed === "") {
+      if (!allowEmpty) {
+        setDraft(value === null ? "" : value.toFixed(2));
+        setEditing(false);
+        return;
+      }
+      next = null;
+    } else {
+      const n = Number(trimmed);
+      if (Number.isNaN(n) || n < 0) {
+        toast.error("Enter a valid price");
+        setDraft(value === null ? "" : value.toFixed(2));
+        setEditing(false);
+        return;
+      }
+      next = n;
+    }
+    if (next === value) {
+      setEditing(false);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onSave(next);
+    } finally {
+      setBusy(false);
+      setEditing(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="group inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 -mx-1.5 hover:bg-muted/60 transition-colors"
+        title="Click to edit"
+      >
+        <span className={cn("font-medium tabular-nums", value === null && "text-muted-foreground")}>
+          {value === null ? "—" : `KD ${value.toFixed(2)}`}
+        </span>
+        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="inline-flex items-center gap-1">
+      <Input
+        ref={inputRef}
+        type="number"
+        step="0.01"
+        min={0}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            setDraft(value === null ? "" : value.toFixed(2));
+            setEditing(false);
+          }
+        }}
+        disabled={busy || saving}
+        className="h-8 w-24 text-sm tabular-nums"
+        autoFocus
+      />
+      {(busy || saving) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+    </div>
+  );
+}
+
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors", active ? "bg-brand text-white" : "bg-muted hover:bg-muted/70")}>{children}</button>;
 }
