@@ -112,7 +112,7 @@ export const TRANSLATIONS: Dict = {
   "pillars.pharma.body": { en: "Trusted medicines and OTC solutions.", ar: "أدوية موثوقة وحلول صحية متاحة دون وصفة." },
   "pillars.skincare.title": { en: "Skincare", ar: "العناية بالبشرة" },
   "pillars.skincare.body": { en: "Dermatologically tested daily care.", ar: "عناية يومية مختبرة جلدياً." },
-  "pillars.wellness.title": { en: "Wellness", ar: "العافية" },
+  "pillars.wellness.title": { en: "Food Supplement", ar: "المكملات الغذائية" },
   "pillars.wellness.body": { en: "Modern Ayurveda and self-care.", ar: "أيورفيدا حديثة وعناية ذاتية." },
   "pillars.medical.title": { en: "Medical supplies", ar: "المستلزمات الطبية" },
   "pillars.medical.body": { en: "Equipment for clinics and homes.", ar: "معدات للعيادات والمنازل." },
