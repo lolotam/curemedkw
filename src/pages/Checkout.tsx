@@ -1,6 +1,18 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Banknote, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CreditCard,
+  Banknote,
+  Loader2,
+  User,
+  MapPin,
+  Wallet,
+  ReceiptText,
+  Sparkles,
+  Tag,
+  ShoppingBag,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +27,14 @@ import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
 import { KW_AREAS } from "@/lib/kuwaitData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import {
+  ColorfulHeroBg,
+  GlowCard,
+  Icon3D,
+  Reveal,
+  type GradientKey,
+} from "@/components/site/ColorfulFx";
+import type { LucideIcon } from "lucide-react";
 
 const COUPON_KEY = "curemed.appliedCoupon";
 function loadCoupon(): AppliedCoupon | null {
@@ -84,11 +104,30 @@ export default function Checkout() {
   if (items.length === 0) {
     return (
       <SiteLayout>
-        <section className="container py-16 text-center">
-          <h1 className="text-2xl font-bold">{t("cart.empty.title")}</h1>
-          <Button asChild className="mt-6 bg-brand hover:bg-brand/90 text-white">
-            <Link to="/curemed">{t("cart.empty.cta")}</Link>
-          </Button>
+        <section className="relative overflow-hidden py-24 md:py-32">
+          <ColorfulHeroBg />
+          <div className="container max-w-xl text-center">
+            <Reveal>
+              <div className="flex justify-center">
+                <Icon3D icon={ShoppingBag} variant="violet" size="lg" />
+              </div>
+              <h1 className="mt-6 text-4xl md:text-5xl font-bold tracking-tight">
+                <span className="bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 bg-clip-text text-transparent">
+                  {t("cart.empty.title")}
+                </span>
+              </h1>
+              <Button
+                asChild
+                size="lg"
+                className="mt-8 rounded-full bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 text-white shadow-lg shadow-violet-500/30 hover:scale-105 transition-all"
+              >
+                <Link to="/curemed">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {t("cart.empty.cta")}
+                </Link>
+              </Button>
+            </Reveal>
+          </div>
         </section>
       </SiteLayout>
     );
@@ -130,148 +169,264 @@ export default function Checkout() {
 
   return (
     <SiteLayout>
-      <div className="bg-brand-soft border-b border-border/40">
-        <div className="container py-3 text-sm text-muted-foreground">
-          <Link to="/cart" className="inline-flex items-center gap-1 hover:text-brand">
+      {/* ===================== HERO ===================== */}
+      <section className="relative overflow-hidden py-16 md:py-20">
+        <ColorfulHeroBg />
+        <div className="container">
+          <Link
+            to="/cart"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-brand transition-colors animate-fade-in"
+          >
             <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {t("cart.title")}
           </Link>
+          <h1 className="mt-4 text-4xl md:text-6xl font-bold tracking-tight animate-fade-in [animation-delay:120ms]">
+            <span className="bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 bg-clip-text text-transparent">
+              {t("checkout.title")}
+            </span>
+          </h1>
         </div>
-      </div>
-      <section className="container py-10 md:py-14">
-        <h1 className="text-3xl font-bold mb-8">{t("checkout.title")}</h1>
+      </section>
+
+      {/* ===================== FORM + SUMMARY ===================== */}
+      <section className="container pb-20 md:pb-24">
         <form onSubmit={submit} className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <h2 className="font-bold text-lg mb-4">{t("checkout.contact")}</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <Label>{t("checkout.fullName")} *</Label>
-                  <Input value={form.customerName} onChange={(e) => set("customerName", e.target.value)} required />
+          <div className="lg:col-span-2 space-y-7">
+            {/* Contact */}
+            <Reveal>
+              <SectionCard
+                icon={User}
+                variant="sky"
+                title={t("checkout.contact")}
+              >
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="sm:col-span-2">
+                    <Label>{t("checkout.fullName")} *</Label>
+                    <Input
+                      value={form.customerName}
+                      onChange={(e) => set("customerName", e.target.value)}
+                      required
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("checkout.email")} *</Label>
+                    <Input
+                      type="email"
+                      value={form.customerEmail}
+                      onChange={(e) => set("customerEmail", e.target.value)}
+                      required
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-sky-500"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("checkout.phone")} *</Label>
+                    <Input
+                      type="tel"
+                      value={form.customerPhone}
+                      onChange={(e) => set("customerPhone", e.target.value)}
+                      required
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-sky-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>{t("checkout.email")} *</Label>
-                  <Input type="email" value={form.customerEmail} onChange={(e) => set("customerEmail", e.target.value)} required />
-                </div>
-                <div>
-                  <Label>{t("checkout.phone")} *</Label>
-                  <Input type="tel" value={form.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} required />
-                </div>
-              </div>
-            </div>
+              </SectionCard>
+            </Reveal>
 
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <h2 className="font-bold text-lg mb-4">{t("checkout.address")}</h2>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>{t("checkout.city")}</Label>
-                  <Input value={form.city} onChange={(e) => set("city", e.target.value)} />
+            {/* Address */}
+            <Reveal delay={100}>
+              <SectionCard
+                icon={MapPin}
+                variant="emerald"
+                title={t("checkout.address")}
+              >
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t("checkout.city")}</Label>
+                    <Input
+                      value={form.city}
+                      onChange={(e) => set("city", e.target.value)}
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("checkout.area")} *</Label>
+                    <select
+                      value={form.area}
+                      onChange={(e) => set("area", e.target.value)}
+                      required
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">{t("checkout.areaSelect")}</option>
+                      {KW_AREAS.map((a) => (
+                        <option key={a.en} value={a.en}>
+                          {lang === "ar" ? a.ar : a.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>{t("checkout.block")} *</Label>
+                    <Input
+                      value={form.block}
+                      onChange={(e) => set("block", e.target.value)}
+                      required
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("checkout.street")} *</Label>
+                    <Input
+                      value={form.street}
+                      onChange={(e) => set("street", e.target.value)}
+                      required
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("checkout.building")}</Label>
+                    <Input
+                      value={form.building}
+                      onChange={(e) => set("building", e.target.value)}
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>{t("checkout.addressLine")}</Label>
+                    <Input
+                      value={form.addressLine}
+                      onChange={(e) => set("addressLine", e.target.value)}
+                      placeholder={t("checkout.addressLinePh")}
+                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <Label>{t("checkout.notes")}</Label>
+                    <Textarea
+                      rows={3}
+                      value={form.notes}
+                      onChange={(e) => set("notes", e.target.value)}
+                      className="mt-1.5 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <Label>{t("checkout.area")} *</Label>
-                  <select
-                    value={form.area}
-                    onChange={(e) => set("area", e.target.value)}
-                    required
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">{t("checkout.areaSelect")}</option>
-                    {KW_AREAS.map((a) => (
-                      <option key={a.en} value={a.en}>
-                        {lang === "ar" ? a.ar : a.en}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label>{t("checkout.block")} *</Label>
-                  <Input value={form.block} onChange={(e) => set("block", e.target.value)} required />
-                </div>
-                <div>
-                  <Label>{t("checkout.street")} *</Label>
-                  <Input value={form.street} onChange={(e) => set("street", e.target.value)} required />
-                </div>
-                <div>
-                  <Label>{t("checkout.building")}</Label>
-                  <Input value={form.building} onChange={(e) => set("building", e.target.value)} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label>{t("checkout.addressLine")}</Label>
-                  <Input value={form.addressLine} onChange={(e) => set("addressLine", e.target.value)} placeholder={t("checkout.addressLinePh")} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label>{t("checkout.notes")}</Label>
-                  <Textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-                </div>
-              </div>
-            </div>
+              </SectionCard>
+            </Reveal>
 
-            <div className="rounded-2xl border border-border bg-card p-6">
-              <h2 className="font-bold text-lg mb-4">{t("checkout.payment")}</h2>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <PaymentOption
-                  selected={paymentMethod === "cod"}
-                  onSelect={() => setPaymentMethod("cod")}
-                  icon={<Banknote className="h-5 w-5" />}
-                  title={t("checkout.cod")}
-                  desc={t("checkout.codDesc")}
-                />
-                <PaymentOption
-                  selected={paymentMethod === "pay_by_link"}
-                  onSelect={() => setPaymentMethod("pay_by_link")}
-                  icon={<CreditCard className="h-5 w-5" />}
-                  title={t("checkout.payByLink")}
-                  desc={t("checkout.payByLinkDesc")}
-                />
-              </div>
-            </div>
+            {/* Payment */}
+            <Reveal delay={200}>
+              <SectionCard
+                icon={Wallet}
+                variant="amber"
+                title={t("checkout.payment")}
+              >
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <PaymentOption
+                    selected={paymentMethod === "cod"}
+                    onSelect={() => setPaymentMethod("cod")}
+                    icon={Banknote}
+                    title={t("checkout.cod")}
+                    desc={t("checkout.codDesc")}
+                    variant="amber"
+                  />
+                  <PaymentOption
+                    selected={paymentMethod === "pay_by_link"}
+                    onSelect={() => setPaymentMethod("pay_by_link")}
+                    icon={CreditCard}
+                    title={t("checkout.payByLink")}
+                    desc={t("checkout.payByLinkDesc")}
+                    variant="violet"
+                  />
+                </div>
+              </SectionCard>
+            </Reveal>
           </div>
 
-          <aside className="rounded-2xl border border-border bg-card p-6 h-fit lg:sticky lg:top-28">
-            <h2 className="font-bold text-lg mb-4">{t("cart.summary")}</h2>
-            <ul className="divide-y divide-border mb-4">
-              {items.map((i) => (
-                <li key={i.productId} className="flex gap-3 py-2.5 text-sm">
-                  <img src={i.image} alt="" className="h-12 w-12 rounded-lg object-cover bg-brand-soft" />
-                  <div className="flex-1 min-w-0">
-                    <p className="line-clamp-1 font-medium">{lang === "ar" && i.nameAr ? i.nameAr : i.name}</p>
-                    <p className="text-xs text-muted-foreground">×{i.quantity}</p>
-                  </div>
-                  <p className="font-semibold">KD {(i.price * i.quantity).toFixed(2)}</p>
-                </li>
-              ))}
-            </ul>
-            <div className="mb-3">
-              <CouponInput
-                subtotal={subtotal}
-                applied={applied}
-                onApply={(a) => { setApplied(a); saveCoupon(a); }}
-                onRemove={() => { setApplied(null); saveCoupon(null); }}
-              />
-            </div>
-            <div className="space-y-1 text-sm border-t border-border pt-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("cart.subtotal")}</span>
-                <span>KD {subtotal.toFixed(2)}</span>
-              </div>
-              {applied && (
-                <div className="flex justify-between text-brand">
-                  <span>{t("coupon.discount")} ({applied.coupon.code})</span>
-                  <span className="font-semibold">−KD {discount.toFixed(2)}</span>
+          {/* Summary */}
+          <aside className="h-fit lg:sticky lg:top-28">
+            <Reveal delay={150}>
+              <GlowCard variant="violet" className="p-6 md:p-7">
+                <div className="flex items-center gap-3 mb-5">
+                  <Icon3D icon={ReceiptText} variant="violet" size="sm" />
+                  <h2 className="font-bold text-lg">
+                    <span className="bg-gradient-to-r from-violet-500 to-pink-500 bg-clip-text text-transparent">
+                      {t("cart.summary")}
+                    </span>
+                  </h2>
                 </div>
-              )}
-              <div className="flex justify-between text-base font-bold pt-2">
-                <span>{t("cart.total")}</span>
-                <span>KD {total.toFixed(2)}</span>
-              </div>
-            </div>
-            <Button
-              type="submit"
-              disabled={createOrder.isPending}
-              className="mt-5 w-full bg-brand hover:bg-brand/90 text-white"
-            >
-              {createOrder.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {t("checkout.placeOrder")}
-            </Button>
+
+                <ul className="divide-y divide-border/60 mb-4 max-h-72 overflow-y-auto pr-1 -mr-1">
+                  {items.map((i) => (
+                    <li key={i.productId} className="flex gap-3 py-3 text-sm">
+                      <img
+                        src={i.image}
+                        alt=""
+                        className="h-12 w-12 rounded-xl object-cover bg-brand-soft ring-1 ring-border/60"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="line-clamp-1 font-medium">
+                          {lang === "ar" && i.nameAr ? i.nameAr : i.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">×{i.quantity}</p>
+                      </div>
+                      <p className="font-semibold">
+                        KD {(i.price * i.quantity).toFixed(2)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mb-4">
+                  <CouponInput
+                    subtotal={subtotal}
+                    applied={applied}
+                    onApply={(a) => { setApplied(a); saveCoupon(a); }}
+                    onRemove={() => { setApplied(null); saveCoupon(null); }}
+                  />
+                </div>
+
+                <div className="space-y-3 text-sm border-t border-border/60 pt-4">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">{t("cart.subtotal")}</span>
+                    <span className="font-semibold">KD {subtotal.toFixed(2)}</span>
+                  </div>
+                  {applied && (
+                    <div className="flex justify-between items-center rounded-xl bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 px-3 py-2 border border-emerald-500/20">
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                        <Tag className="h-3.5 w-3.5" />
+                        {applied.coupon.code}
+                      </span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                        −KD {discount.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-baseline pt-2">
+                    <span className="font-semibold text-base">{t("cart.total")}</span>
+                    <span className="font-extrabold text-2xl bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 bg-clip-text text-transparent">
+                      KD {total.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  disabled={createOrder.isPending}
+                  className={cn(
+                    "mt-6 w-full rounded-full font-semibold text-white",
+                    "bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500",
+                    "shadow-lg shadow-violet-500/30 hover:shadow-violet-500/60",
+                    "transition-all duration-300 hover:scale-[1.02]",
+                  )}
+                >
+                  {createOrder.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {t("checkout.placeOrder")}
+                </Button>
+              </GlowCard>
+            </Reveal>
           </aside>
         </form>
       </section>
@@ -279,31 +434,65 @@ export default function Checkout() {
   );
 }
 
+function SectionCard({
+  icon,
+  variant,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  variant: GradientKey;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <GlowCard variant={variant} className="p-6 md:p-7">
+      <div className="flex items-center gap-3 mb-5">
+        <Icon3D icon={icon} variant={variant} size="sm" />
+        <h2 className="font-bold text-lg md:text-xl">{title}</h2>
+      </div>
+      {children}
+    </GlowCard>
+  );
+}
+
 function PaymentOption({
-  selected, onSelect, icon, title, desc,
+  selected,
+  onSelect,
+  icon: Icon,
+  title,
+  desc,
+  variant,
 }: {
   selected: boolean;
   onSelect: () => void;
-  icon: React.ReactNode;
+  icon: LucideIcon;
   title: string;
   desc: string;
+  variant: GradientKey;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
       className={cn(
-        "text-left rounded-xl border-2 p-4 transition-colors",
-        selected ? "border-brand bg-brand/5" : "border-border hover:border-brand/40",
+        "group relative text-left rounded-2xl p-5 transition-all duration-300",
+        "border-2 backdrop-blur",
+        selected
+          ? "border-transparent bg-gradient-to-br from-sky-500/10 via-violet-500/10 to-pink-500/10 shadow-lg shadow-violet-500/20 scale-[1.02]"
+          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-1 hover:shadow-md",
       )}
     >
-      <div className="flex items-center gap-2 font-semibold">
-        <span className={cn("h-8 w-8 rounded-full inline-flex items-center justify-center", selected ? "bg-brand text-white" : "bg-muted")}>
-          {icon}
+      {selected && (
+        <span className="absolute -top-2 -right-2 rtl:right-auto rtl:-left-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 via-violet-500 to-pink-500 text-white text-[10px] font-bold shadow-md">
+          ✓
         </span>
-        {title}
+      )}
+      <div className="flex items-center gap-3 font-semibold">
+        <Icon3D icon={Icon} variant={variant} size="sm" />
+        <span className="text-base">{title}</span>
       </div>
-      <p className="text-xs text-muted-foreground mt-2">{desc}</p>
+      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{desc}</p>
     </button>
   );
 }
