@@ -5,7 +5,8 @@ import type { HeroSlide } from "@/lib/heroSlides";
 import { SlidePreview } from "@/components/site/SlidePreview";
 
 interface Props {
-  slide: HeroSlide;
+  // Accepts both saved slides and editor drafts (which omit created_at/updated_at).
+  slide: Omit<HeroSlide, "created_at" | "updated_at"> & Partial<Pick<HeroSlide, "created_at" | "updated_at">>;
 }
 
 /**

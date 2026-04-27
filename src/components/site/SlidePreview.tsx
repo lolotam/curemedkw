@@ -7,7 +7,7 @@ import { fontCss } from "@/lib/slideFonts";
 import { SlideAnimatedText } from "./SlideAnimatedText";
 
 export interface SlidePreviewProps {
-  slide: HeroSlide;
+  slide: Omit<HeroSlide, "created_at" | "updated_at"> & Partial<Pick<HeroSlide, "created_at" | "updated_at">>;
   lang: "en" | "ar";
   /** Bumped to replay all text animations (slide change, manual replay button). */
   playKey: number;

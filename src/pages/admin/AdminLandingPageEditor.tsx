@@ -351,7 +351,7 @@ export default function AdminLandingPageEditor() {
                   </div>
 
                   {/* Live preview reflects every change instantly */}
-                  <SlideLivePreview slide={s} />
+                  <SlideLivePreview slide={s as any} />
                 </div>
 
                 {/* Fields */}
@@ -408,7 +408,7 @@ export default function AdminLandingPageEditor() {
                     </div>
                   </div>
 
-                  <SlideStylePanel slide={s as HeroSlide} onPatch={(patch) => patchLocal(s.id, patch as Partial<Draft>)} />
+                  <SlideStylePanel slide={s as any} onPatch={(patch) => patchLocal(s.id, patch as Partial<Draft>)} />
 
                   <div className="flex justify-end">
                     <Button onClick={() => handleSave(s)} disabled={!s._dirty || s._saving} size="sm">
