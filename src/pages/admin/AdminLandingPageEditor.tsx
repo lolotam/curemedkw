@@ -10,6 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BRANDS } from "@/lib/brands";
+import { SlideStylePanel } from "@/components/admin/SlideStylePanel";
+import { SlideLivePreview } from "@/components/admin/SlideLivePreview";
+import { HeroIntervalCard } from "@/components/admin/HeroIntervalCard";
 import type { BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -83,10 +86,21 @@ export default function AdminLandingPageEditor() {
         subtitle_ar: "",
         cta_label_en: "",
         cta_label_ar: "",
-        cta_href: "",
+        cta_href: "#",
         sort_order: max + 1,
         is_active: true,
         overlay_opacity: 80,
+        font_family_en: "Inter",
+        font_family_ar: "Cairo",
+        h1_font_size: 60,
+        h2_font_size: 20,
+        cta_font_size: 16,
+        h1_animation: "fade-in-up",
+        h2_animation: "fade-in-up",
+        cta_animation: "fade-in-up",
+        text_position_x: 10,
+        text_position_y: 50,
+        text_align: "left",
       });
       setSlides((prev) => [...prev, created]);
       toast({ title: "Slide added" });
