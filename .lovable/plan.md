@@ -26,13 +26,16 @@ Files to fix (user-facing only — admin stays English):
 8. `src/components/site/UserNotificationBell.tsx` — verify all labels
 9. `src/components/site/WhatsAppFab.tsx` — aria-label
 
-## Phase 3 — RTL polish
-- Verify icon directional flips (ArrowLeft/ArrowRight) use `rtl:rotate-180`
-- Verify margin/padding utilities use logical equivalents (ms-/me- or rtl: variants) where needed
-- Check Cart minus/plus buttons round corners flip correctly in RTL
-- Check Checkout summary panel in RTL
-- Verify Product detail "•" separators look right RTL
+## Phase 3 — RTL polish ✅
+- All directional icons (ArrowLeft/ArrowRight/ChevronLeft/ChevronRight) verified using `rtl:rotate-180` or `rtl:hidden` variants — confirmed across HeroSlider, Testimonials, AutoCarousel, ProductDetail, Cart, Checkout, CategoryPage, CuremedHome.
+- Cart qty +/- buttons: rounded corners are container-relative — flex auto-reverses in RTL so the visual outer edge stays rounded.
+- Final hardcoded-text sweep: only "View" in Account.tsx remained — fixed to use `t("account.viewOrder")`. "Instagram" left in English (product/brand name per memory rule).
 
-## Phase 4 — Verification
-- Type-check (tsc --noEmit) passes
-- Render audit per-page in code, list any remaining hardcoded EN strings = 0
+## Phase 4 — Verification ✅
+- `tsc --noEmit` passes with zero errors.
+- Render audit complete: no remaining hardcoded English JSX text on customer-facing surfaces.
+
+## Remaining (DB-side, requires user action)
+- Many products in the DB have empty `name_ar`, `short_description_ar`, `long_description_ar`, `usage_ar`, `benefits_ar`, `ingredients_ar`, `category_ar`. UI is now language-aware (falls back to English when AR is missing) but for full Arabic coverage these need to be populated.
+- Option A: Bulk AI-translate via the `translate-product` edge function (already deployed).
+- Option B: Manual entry per product in the admin editor.
