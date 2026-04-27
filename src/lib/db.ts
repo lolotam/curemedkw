@@ -1125,6 +1125,8 @@ export interface Order {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  country: string;
+  governorate: string;
   city: string;
   area: string;
   block: string;
@@ -1152,6 +1154,8 @@ const rowToOrder = (r: any, items?: OrderItem[]): Order => ({
   customerName: r.customer_name,
   customerEmail: r.customer_email,
   customerPhone: r.customer_phone,
+  country: r.country ?? "Kuwait",
+  governorate: r.governorate ?? "",
   city: r.city ?? "",
   area: r.area ?? "",
   block: r.block ?? "",
@@ -1188,6 +1192,8 @@ export interface CreateOrderInput {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  country: string;
+  governorate: string;
   city: string;
   area: string;
   block: string;
@@ -1223,6 +1229,8 @@ export function useCreateOrder() {
           customer_name: input.customerName,
           customer_email: input.customerEmail,
           customer_phone: input.customerPhone,
+          country: input.country,
+          governorate: input.governorate,
           city: input.city,
           area: input.area,
           block: input.block,
