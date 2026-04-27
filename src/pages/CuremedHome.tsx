@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Pill, HeartPulse, Sparkles, Stethoscope } from "lucide-react";
+import { ArrowRight, Pill, Leaf, Sparkles, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
@@ -132,7 +132,7 @@ export default function CuremedHome() {
                 arrow: "text-pink-600",
               },
               {
-                icon: HeartPulse,
+                icon: Leaf,
                 key: "wellness",
                 grad: "from-emerald-500 to-teal-400",
                 ring: "group-hover:shadow-emerald-400/40",
