@@ -276,12 +276,37 @@ export default function Checkout() {
               >
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>{t("checkout.city")}</Label>
-                    <Input
-                      value={form.city}
-                      onChange={(e) => set("city", e.target.value)}
-                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
-                    />
+                    <Label>{t("checkout.country")} *</Label>
+                    <select
+                      value={form.country}
+                      onChange={(e) => onCountryChange(e.target.value)}
+                      required
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">{t("checkout.countrySelect")}</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.en}>
+                          {lang === "ar" ? c.ar : c.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>{t("checkout.governorate")} *</Label>
+                    <select
+                      value={form.governorate}
+                      onChange={(e) => onGovChange(e.target.value)}
+                      required
+                      disabled={!selectedCountry}
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+                    >
+                      <option value="">{t("checkout.governorateSelect")}</option>
+                      {govOptions.map((g) => (
+                        <option key={g.en} value={g.en}>
+                          {lang === "ar" ? g.ar : g.en}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label>{t("checkout.area")} *</Label>
@@ -289,10 +314,11 @@ export default function Checkout() {
                       value={form.area}
                       onChange={(e) => set("area", e.target.value)}
                       required
-                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      disabled={!selectedGov}
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
                     >
                       <option value="">{t("checkout.areaSelect")}</option>
-                      {KW_AREAS.map((a) => (
+                      {areaOptions.map((a) => (
                         <option key={a.en} value={a.en}>
                           {lang === "ar" ? a.ar : a.en}
                         </option>
@@ -317,7 +343,7 @@ export default function Checkout() {
                       className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <Label>{t("checkout.building")}</Label>
                     <Input
                       value={form.building}
