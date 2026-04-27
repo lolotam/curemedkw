@@ -1,22 +1,27 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { listSlidesForPage, type HeroPageKey, type HeroSlide } from "@/lib/heroSlides";
+import { useSiteSetting } from "@/lib/db";
+import { SlidePreview } from "./SlidePreview";
 
 interface Props {
   pageKey: HeroPageKey;
   /** Fallback rendered when no slides are configured yet. */
   fallback?: React.ReactNode;
+  /** Optional override; otherwise per-page setting (or 5500ms default) is used. */
   intervalMs?: number;
 }
 
-export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
-  const { lang, dir } = useI18n();
+type IntervalsMap = Record<string, number>;
+
+export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
+  const { lang } = useI18n();
   const [slides, setSlides] = React.useState<HeroSlide[] | null>(null);
   const [index, setIndex] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
+  const { data: intervals } = useSiteSetting<IntervalsMap>("hero_intervals", {});
+  const effectiveInterval = intervalMs ?? intervals?.[pageKey] ?? 5500;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -30,9 +35,9 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
 
   React.useEffect(() => {
     if (paused || count <= 1) return;
-    const t = setInterval(() => setIndex((i) => (i + 1) % count), intervalMs);
+    const t = setInterval(() => setIndex((i) => (i + 1) % count), Math.max(1000, effectiveInterval));
     return () => clearInterval(t);
-  }, [paused, count, intervalMs]);
+  }, [paused, count, effectiveInterval]);
 
   if (slides === null) {
     return <div className="bg-brand-soft w-full aspect-[16/9] max-h-[85vh] animate-pulse" />;
@@ -54,73 +59,14 @@ export function HeroSlider({ pageKey, fallback, intervalMs = 5500 }: Props) {
       aria-roledescription="carousel"
     >
       {slides.map((s, i) => {
-        const title = lang === "ar" ? s.title_ar : s.title_en;
-        const subtitle = lang === "ar" ? s.subtitle_ar : s.subtitle_en;
-        const ctaLabel = lang === "ar" ? s.cta_label_ar : s.cta_label_en;
         const isActive = i === index;
-        const op = (s.overlay_opacity ?? 80) / 100;
         return (
           <div
             key={s.id}
             className={`absolute inset-0 transition-opacity duration-700 ease-out ${isActive ? "opacity-100 z-10" : "opacity-0 z-0"}`}
             aria-hidden={!isActive}
           >
-            {s.media_type === "video" ? (
-              <video
-                src={s.media_url}
-                className="absolute inset-0 w-full h-full object-cover"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-            ) : (
-              <img
-                src={s.media_url}
-                alt={title || "Hero slide"}
-                className="absolute inset-0 w-full h-full object-cover"
-                loading={i === 0 ? "eager" : "lazy"}
-              />
-            )}
-            {op > 0 && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: `linear-gradient(to right, hsl(var(--background) / ${op}), hsl(var(--background) / ${op * 0.5}), hsl(var(--background) / ${op * 0.125}))`,
-                }}
-              />
-            )}
-            <div className="relative z-10 container h-full flex items-center">
-              <div className="max-w-2xl text-foreground">
-                {title && (
-                  <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-tight animate-fade-in-up">
-                    {title}
-                  </h1>
-                )}
-                {subtitle && (
-                  <p className="mt-5 text-lg md:text-xl text-foreground/80 max-w-xl animate-fade-in-up">
-                    {subtitle}
-                  </p>
-                )}
-                {ctaLabel && s.cta_href && (
-                  <div className="mt-8 animate-fade-in-up">
-                    {s.cta_href.startsWith("/") ? (
-                      <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
-                        <Link to={s.cta_href}>
-                          {ctaLabel} <ArrowRight className="ml-2 h-4 w-4 rtl:rotate-180" />
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
-                        <a href={s.cta_href}>
-                          {ctaLabel} <ArrowRight className="ml-2 h-4 w-4 rtl:rotate-180" />
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
+            <SlidePreview slide={s} lang={lang as "en" | "ar"} playKey={isActive ? index : -1} />
           </div>
         );
       })}
