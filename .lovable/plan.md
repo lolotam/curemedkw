@@ -1,129 +1,113 @@
-# Checkout upgrade plan
+# Slide Editor: Debug + Major Upgrade
 
-Two features for `/checkout`:
+## 1. Debug — CTA not appearing on the live slide
 
-1. **Edit cart inline** — qty +/−, remove item, live totals.
-2. **Hierarchical address** — Country → Governorate → Area cascading dropdowns + Block / Street / Building / Additional details, with full lists for the 8 countries you listed.
+**Root cause:** In `src/components/site/HeroSlider.tsx` the CTA only renders when **both** `ctaLabel` AND `s.cta_href` are set:
+```tsx
+{ctaLabel && s.cta_href && (...)}
+```
+If the admin filled CTA label but left the link empty (or vice-versa), nothing shows, with no warning in the form.
 
----
+**Fix:**
+- Render the CTA when `ctaLabel` is set; if `cta_href` is empty, render a non-navigating button styled the same so the admin sees it.
+- In the editor, add an inline warning when `cta_label_*` is set but `cta_href` is missing ("Add a link so the button navigates").
+- Default `cta_href` to `#` in DB insert path so a freshly created slide with a label always renders.
 
-## 1. New data file — `src/lib/regionsData.ts`
+## 2. New per-slide fields (DB columns added to `hero_slides`)
 
-A typed hierarchy `COUNTRIES → governorates → areas`, every entry bilingual (`{ en, ar }`). Compiled from official sources (Wikipedia governorate lists, Saudi Post, UAE Federal Competitiveness, Bahrain CIO, etc.).
+| Column | Type | Default | Purpose |
+|---|---|---|---|
+| `font_family_en` | text | `'Inter'` | English font choice |
+| `font_family_ar` | text | `'Cairo'` | Arabic font choice |
+| `h1_font_size` | smallint | `60` | Title size in px (mobile auto-scales) |
+| `h2_font_size` | smallint | `20` | Subtitle size in px |
+| `cta_font_size` | smallint | `16` | CTA size in px |
+| `h1_animation` | text | `'fade-in-up'` | Title animation key |
+| `h2_animation` | text | `'fade-in-up'` | Subtitle animation key |
+| `cta_animation` | text | `'fade-in-up'` | CTA animation key |
+| `text_position_x` | smallint | `10` | Horizontal % (0=left, 100=right) |
+| `text_position_y` | smallint | `50` | Vertical % (0=top, 100=bottom) |
+| `text_align` | text | `'left'` | left / center / right |
 
-Approximate counts per country:
+**10 English fonts:** Inter, Roboto, Poppins, Montserrat, Playfair Display, Lora, Oswald, Raleway, Merriweather, Bebas Neue.
 
-| Country | Governorates | Total areas |
-|---|---|---|
-| 🇰🇼 Kuwait | 6 (Capital, Hawalli, Farwaniya, Mubarak Al-Kabeer, Ahmadi, Jahra) | ~120 areas (e.g. Hawalli → Salmiya, Rumaithiya, Bayan, Mishref, Jabriya, Salwa, Shaab, Hittin…; Capital → Sharq, Mirqab, Dasman, Qibla, Daiya, Mansouriya, Adailiya, Khaldiya, Shamiya, Faiha, Nuzha, Surra…; Farwaniya → Farwaniya, Khaitan, Riggae, Andalous, Ardiya, Jleeb, Sabah Al-Nasser, Rabia, Ishbiliya, Firdous…; Ahmadi → Fahaheel, Mahboula, Mangaf, Abu Halifa, Fintas, Sabah Al-Salem, Egaila, Wafra…; Jahra → Jahra, Saad Al-Abdullah, Naseem, Oyoun, Qasr, Taima, Sulaibiya…; Mubarak Al-Kabeer → Adan, Qurain, Qusour, Messila, Sabah Al-Salem, Funaitees, Abu Al Hasaniya, Abu Fatira…) |
-| 🇦🇪 UAE | 7 emirates | ~70 areas (Dubai → Deira, Bur Dubai, Jumeirah, Marina, JLT, Downtown, Business Bay, Al Barsha, Mirdif, Al Qusais, Discovery Gardens, JVC, Silicon Oasis…; Abu Dhabi → Corniche, Khalidiya, Al Bateen, Al Reem, Yas, Saadiyat, Mussafah, Al Ain, Madinat Zayed…; Sharjah, Ajman, RAK, UAQ, Fujairah core areas) |
-| 🇸🇦 Saudi Arabia | 13 provinces | ~80 cities (Riyadh, Jeddah, Mecca, Medina, Dammam, Khobar, Dhahran, Taif, Tabuk, Abha, Khamis Mushait, Hail, Jubail, Yanbu, Najran, Jazan, Qassim/Buraidah/Unaizah, Al-Ahsa/Hofuf, Madinat Yanbu Al-Sinaiyah, Arar, Sakaka…) |
-| 🇶🇦 Qatar | 8 municipalities (Doha, Al Rayyan, Al Wakrah, Al Khor, Umm Salal, Al Daayen, Al Shamal, Al Shahaniya) | ~40 areas (West Bay, The Pearl, Lusail, Msheireb, Al Sadd, Bin Mahmoud, Al Waab, Aspire, Education City…) |
-| 🇧🇭 Bahrain | 4 governorates (Capital, Muharraq, Northern, Southern) | ~30 areas (Manama, Juffair, Adliya, Seef, Hoora, Riffa, Hamad Town, Isa Town, Sitra, Saar…) |
-| 🇴🇲 Oman | 11 governorates | ~30 wilayats (Muscat → Muttrah, Bawshar, Seeb, Al Amerat, Qurm, Madinat Sultan Qaboos…; Dhofar/Salalah; Al Batinah North/South; Dakhiliyah/Nizwa; Sharqiyah N/S/Sur; Buraimi; Musandam/Khasab; Dhahirah/Ibri; Al Wusta) |
-| 🇱🇧 Lebanon | 8 governorates (Beirut, Mount Lebanon, North, Akkar, Bekaa, Baalbek-Hermel, South, Nabatieh) | ~50 cities/districts (Beirut → Achrafieh, Hamra, Verdun, Gemmayzeh, Mar Mikhael, Badaro…; Tripoli, Jounieh, Byblos, Tyre, Sidon, Zahlé, Baalbek, Nabatieh…) |
-| 🇯🇴 Jordan | 12 governorates | ~40 cities (Amman → Abdoun, Sweifieh, Jabal Amman, Shmeisani, Khalda, Dabouq, Tla Al-Ali, Marj Al-Hamam, Jubeiha…; Zarqa, Irbid, Aqaba, Salt, Madaba, Karak, Tafilah, Ma'an, Mafraq, Jerash, Ajloun…) |
+**10 Arabic fonts:** Cairo, Tajawal, Almarai, Amiri, Noto Naskh Arabic, Markazi Text, Reem Kufi, Lateef, Scheherazade New, Changa.
 
-Shape:
-```ts
-export type LocalizedName = { en: string; ar: string };
-export type Area = LocalizedName;
-export type Governorate = LocalizedName & { areas: Area[] };
-export type Country = LocalizedName & {
-  code: string;       // "KW" | "AE" | "SA" | "QA" | "BH" | "OM" | "LB" | "JO"
-  dialCode: string;   // "+965" etc — for future phone formatting
-  governorates: Governorate[];
-};
-export const COUNTRIES: Country[] = [...];
+All loaded from Google Fonts via `index.html` `<link>` tags.
+
+**10 text animations** (dropdown for each of H1/H2/CTA):
+1. None
+2. Fade in
+3. Fade in up
+4. Fade in down
+5. Slide in left
+6. Slide in right
+7. Zoom in
+8. Typewriter (char-by-char reveal)
+9. Blur in
+10. Bounce in
+
+Keyframes added to `tailwind.config.ts` + helper `slideAnimations.ts` mapping key → className. Typewriter implemented as a small React component using a CSS `steps()` animation on `width`.
+
+## 3. Live preview inside the editor
+
+Inside each slide card, replace the current static media tile with a **scaled mini hero preview** (16:9, ~480px wide) that renders exactly what the live `HeroSlider` shows for that slide:
+
+- Background image/video + overlay opacity
+- H1 / H2 / CTA with chosen font, size, animation, position
+- Language toggle button (EN / AR) above the preview to switch which translation is shown
+- "Replay animations" button to re-trigger the animations on demand
+- Updates in real time as the admin types or moves sliders — no save needed
+
+Implementation: extract the slide-render JSX from `HeroSlider.tsx` into `SlidePreview.tsx` and reuse it in both the live slider and the editor preview.
+
+## 4. Positioning sliders
+
+Add two sliders + an alignment toggle in the slide form:
+- **Horizontal position** (0–100%) — moves the text block left↔right inside the slide
+- **Vertical position** (0–100%) — moves it top↔bottom
+- **Align** segmented control: Left / Center / Right
+
+The text block in `SlidePreview` is absolutely positioned using `left: x%`, `top: y%`, `transform: translate(-x%, -y%)` so the anchor stays where the admin puts it. Live preview reflects each slider tick.
+
+## 5. Per-landing-page auto-slide interval
+
+**New DB row** in `site_settings`:
+```
+key = 'hero_intervals'
+value = { "curemed": 5500, "flexitol": 5500, ... }   // milliseconds per page_key
 ```
 
-Default country = Kuwait (top of list).
+- In `AdminLandingPageEditor`, add a top-of-page card: "Auto-advance interval (seconds)" — number input, default 5.5, range 1–60. Save button next to it persists to `site_settings`.
+- `HeroSlider` reads `site_settings.hero_intervals[pageKey]` on mount and uses it instead of the hard-coded 5500ms prop.
+- Backwards-compatible: missing value falls back to 5500ms.
 
----
+## 6. Editor layout changes
 
-## 2. Database migration
+The slide card grows, so the form is reorganised into 3 collapsible sections:
 
-Add two nullable text columns — non-breaking, defaults preserve existing rows:
+1. **Media & Overlay** (existing) — image upload, overlay slider
+2. **Content** (existing) — EN/AR title, subtitle, CTA label, CTA link
+3. **Style & Motion** (NEW) — fonts, sizes, animations, position sliders, alignment
 
-```sql
-ALTER TABLE public.orders
-  ADD COLUMN IF NOT EXISTS country text NOT NULL DEFAULT 'Kuwait',
-  ADD COLUMN IF NOT EXISTS governorate text NOT NULL DEFAULT '';
+The **live preview** sits sticky at the top of the card so it stays visible while editing any section.
 
-ALTER TABLE public.profiles
-  ADD COLUMN IF NOT EXISTS country text NOT NULL DEFAULT 'Kuwait',
-  ADD COLUMN IF NOT EXISTS governorate text NOT NULL DEFAULT '';
-```
+## Technical details
 
-Then update `useCreateOrder` (in `src/lib/db.ts`) and the profile read/write paths to include the two new fields. (Supabase types regenerate automatically.)
+**Files to edit:**
+- `supabase/migrations/<new>.sql` — add 11 columns to `hero_slides` with defaults
+- `src/lib/heroSlides.ts` — extend `HeroSlide` interface
+- `src/lib/slideFonts.ts` (new) — font lists + CSS family strings
+- `src/lib/slideAnimations.ts` (new) — animation key → className map + keyframes registration
+- `src/components/site/SlidePreview.tsx` (new) — shared render component
+- `src/components/site/HeroSlider.tsx` — use `SlidePreview`, read interval from settings, fix CTA render condition
+- `src/components/admin/SlideStylePanel.tsx` (new) — fonts/sizes/animations/position UI
+- `src/components/admin/SlideLivePreview.tsx` (new) — wraps `SlidePreview` with EN/AR toggle + replay
+- `src/pages/admin/AdminLandingPageEditor.tsx` — integrate panel, preview, and per-page interval card
+- `src/lib/db.ts` — add `getHeroInterval(pageKey)` / `setHeroInterval(pageKey, ms)` helpers using `site_settings`
+- `tailwind.config.ts` — add 10 keyframes/animations
+- `index.html` — add Google Fonts `<link>` for all 20 fonts (with `display=swap`)
 
----
+**Backwards compatibility:** All new columns are nullable with sensible defaults so existing slides render unchanged.
 
-## 3. `/checkout` — inline cart editing
-
-Replace the read-only summary list (lines 357–376) with editable rows:
-
-- `−` / qty / `+` rounded pill (matches the cart-page styling, gradient hover)
-- `🗑` remove button (red)
-- Per-line subtotal updates instantly
-- If user empties the cart they're redirected back to `/cart`
-- All driven by the existing `useCart()` hook (`setQuantity`, `remove`) — no new state needed.
-
----
-
-## 4. `/checkout` — new address section
-
-Replace the `City + Area` row with **4 cascading selects** + 4 text inputs, in this order:
-
-1. **Country** (select) — defaults to Kuwait, 8 options.
-2. **Governorate** (select) — options derived from selected country. Resets when country changes.
-3. **Area** (select) — options derived from selected governorate. Resets when governorate changes.
-4. **Block** (text, required)
-5. **Street** (text, required)
-6. **Building / House** (text, required — was optional, now required as you implied)
-7. **Additional details** (text, optional — floor / apartment / landmark)
-8. **Order notes** (textarea, kept as-is)
-
-The dropdowns render the AR or EN label automatically based on `useI18n().lang`. The stored value is always the **English canonical name** (so admin order list stays consistent).
-
-The old `city` field is dropped from the form (governorate replaces it). For backwards-compatibility, on submit we also write `city = governorate` so existing admin views and the orders table's `city` column keep working.
-
----
-
-## 5. New i18n keys (added to `src/lib/i18n.tsx`)
-
-| Key | EN | AR |
-|---|---|---|
-| `checkout.country` | Country | الدولة |
-| `checkout.countrySelect` | Select country | اختر الدولة |
-| `checkout.governorate` | Governorate | المحافظة |
-| `checkout.governorateSelect` | Select governorate | اختر المحافظة |
-| `checkout.editCart` | Edit your cart | تعديل سلتك |
-| `checkout.error.country` | Please select a country and governorate. | يرجى اختيار الدولة والمحافظة. |
-
-Reuse existing `checkout.area`, `checkout.areaSelect`, `checkout.block`, `checkout.street`, `checkout.building`, `checkout.addressLine`, `checkout.addressLinePh`, `cart.decrease`, `cart.increase`, `cart.remove`.
-
----
-
-## 6. Files touched
-
-| File | Change |
-|---|---|
-| `src/lib/regionsData.ts` | **new** — full 8-country hierarchy |
-| `supabase/migrations/<ts>_add_country_governorate.sql` | **new** — adds 2 columns to `orders` + `profiles` |
-| `src/lib/db.ts` | extend `CreateOrderInput` + profile typing with `country`, `governorate` |
-| `src/pages/Checkout.tsx` | replace address block with cascading selects; add inline cart editor in the summary; wire validation |
-| `src/lib/i18n.tsx` | add 6 new keys |
-| `src/pages/Account.tsx` | (light) accept the new profile fields if it currently writes the address |
-
-The visual style (animated gradient hero, GlowCards, Icon3D badges, Reveal-on-scroll, gradient CTA) is **fully preserved** — selects keep the same emerald-ring style, cart rows reuse the gradient hover from `/cart`.
-
----
-
-## Open questions
-
-I'll proceed with these defaults unless you want them changed:
-
-- **Default country** = Kuwait.
-- **Building / House** becomes **required** (currently optional). Say "no" if you'd rather keep it optional.
-- **Phone field** stays as a single free-text input (we don't auto-prefix the country dial code). Say "yes" if you want a dial-code dropdown driven by the selected country.
+**No breaking changes** to RLS — `hero_slides` and `site_settings` policies already allow admin writes / public read.
