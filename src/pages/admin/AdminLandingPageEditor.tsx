@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw, ExternalLink, LayoutGrid, MousePointerClick } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw, ExternalLink, LayoutGrid, MousePointerClick, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -264,9 +264,10 @@ export default function AdminLandingPageEditor() {
         </Card>
       ) : (
         <div className="space-y-4">
+          <HeroIntervalCard pageKey={meta.key as HeroPageKey} />
           {slides.map((s, i) => (
             <Card key={s.id} className="p-5">
-              <div className="grid lg:grid-cols-[280px,1fr] gap-5">
+              <div className="grid lg:grid-cols-[300px,1fr] gap-5">
                 {/* Media */}
                 <div className="space-y-3">
                   <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-muted flex items-center justify-center">
@@ -348,6 +349,9 @@ export default function AdminLandingPageEditor() {
                       0% shows the photo in full color. Higher values darken the image so text stays readable.
                     </p>
                   </div>
+
+                  {/* Live preview reflects every change instantly */}
+                  <SlideLivePreview slide={s} />
                 </div>
 
                 {/* Fields */}
@@ -395,8 +399,16 @@ export default function AdminLandingPageEditor() {
                     <div className="sm:col-span-2">
                       <Label className="text-xs">CTA link</Label>
                       <Input value={s.cta_href ?? ""} onChange={(e) => patchLocal(s.id, { cta_href: e.target.value })} placeholder="/flexitol or https://…" />
+                      {(s.cta_label_en || s.cta_label_ar) && !s.cta_href?.trim() && (
+                        <p className="mt-1 text-[11px] text-amber-600 inline-flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3" />
+                          You set a CTA label but no link — the button will appear but won't navigate. Add a path like <code className="font-mono">/flexitol</code> or a full URL.
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  <SlideStylePanel slide={s as HeroSlide} onPatch={(patch) => patchLocal(s.id, patch as Partial<Draft>)} />
 
                   <div className="flex justify-end">
                     <Button onClick={() => handleSave(s)} disabled={!s._dirty || s._saving} size="sm">
