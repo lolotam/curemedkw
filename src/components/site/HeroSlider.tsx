@@ -20,6 +20,9 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   const [slides, setSlides] = React.useState<HeroSlide[] | null>(null);
   const [index, setIndex] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
+  // width / height — auto-detected from the tallest uploaded slide image
+  // so the hero section grows to fully display the image without cropping.
+  const [aspect, setAspect] = React.useState<number>(16 / 9);
   const { data: intervals } = useSiteSetting<IntervalsMap>("hero_intervals", {});
   const effectiveInterval = intervalMs ?? intervals?.[pageKey] ?? 5500;
 
@@ -31,6 +34,33 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
     return () => { cancelled = true; };
   }, [pageKey]);
 
+  // Probe natural dimensions of each image slide and adopt the tallest aspect
+  // (smallest width/height ratio), capped so very tall images do not exceed
+  // ~5:4 (i.e. height never more than 1.25× width).
+  React.useEffect(() => {
+    if (!slides || slides.length === 0) return;
+    let cancelled = false;
+    const imageSlides = slides.filter((s) => s.media_type === "image" && !!s.media_url);
+    if (imageSlides.length === 0) return;
+    Promise.all(
+      imageSlides.map(
+        (s) =>
+          new Promise<number>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img.naturalWidth / Math.max(1, img.naturalHeight));
+            img.onerror = () => resolve(16 / 9);
+            img.src = s.media_url;
+          })
+      )
+    ).then((ratios) => {
+      if (cancelled || ratios.length === 0) return;
+      const tallest = Math.min(...ratios); // smallest w/h = tallest image
+      const safe = Math.max(tallest, 4 / 5); // never taller than 5:4
+      setAspect(safe);
+    });
+    return () => { cancelled = true; };
+  }, [slides]);
+
   const count = slides?.length ?? 0;
 
   React.useEffect(() => {
@@ -40,7 +70,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   }, [paused, count, effectiveInterval]);
 
   if (slides === null) {
-    return <div className="bg-brand-soft w-full aspect-[16/9] max-h-[85vh] animate-pulse" />;
+    return <div className="bg-brand-soft w-full animate-pulse" style={{ aspectRatio: `${aspect}` }} />;
   }
 
   if (slides.length === 0) {
@@ -53,7 +83,8 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   return (
     <>
     <section
-      className="relative w-full aspect-[16/9] max-h-[85vh] overflow-hidden bg-brand-deep"
+      className="relative w-full overflow-hidden bg-brand-deep"
+      style={{ aspectRatio: `${aspect}` }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       aria-roledescription="carousel"
