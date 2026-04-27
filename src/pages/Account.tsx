@@ -200,7 +200,7 @@ export default function Account() {
                       <div className="flex items-center gap-2">
                         <OrderStatusBadge status={o.orderStatus} />
                         <span className="font-bold">KD {o.total.toFixed(2)}</span>
-                        <Button asChild size="sm" variant="outline"><Link to={`/order-confirmation/${o.id}`}>View</Link></Button>
+                        <Button asChild size="sm" variant="outline"><Link to={`/order-confirmation/${o.id}`}>{t("account.viewOrder")}</Link></Button>
                       </div>
                     </li>
                   ))}
