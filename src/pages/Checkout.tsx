@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,6 +12,10 @@ import {
   Sparkles,
   Tag,
   ShoppingBag,
+  Globe,
+  Plus,
+  Minus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +28,7 @@ import { useCreateOrder, useProfile, type PaymentMethod } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
 import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
-import { KW_AREAS } from "@/lib/kuwaitData";
+import { COUNTRIES, findCountry, findGovernorate } from "@/lib/regionsData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -49,7 +53,7 @@ function saveCoupon(c: AppliedCoupon | null) {
 }
 
 export default function Checkout() {
-  const { items, subtotal, clear } = useCart();
+  const { items, subtotal, clear, setQuantity, remove } = useCart();
   const { t, lang } = useI18n();
   const navigate = useNavigate();
   const createOrder = useCreateOrder();
@@ -60,7 +64,8 @@ export default function Checkout() {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
-    city: "Kuwait",
+    country: "Kuwait",
+    governorate: "",
     area: "",
     block: "",
     street: "",
@@ -89,7 +94,8 @@ export default function Checkout() {
       customerName: f.customerName || profile.fullName,
       customerEmail: f.customerEmail || user?.email || "",
       customerPhone: f.customerPhone || profile.phone,
-      city: profile.city || f.city,
+      country: profile.country || f.country,
+      governorate: profile.governorate || f.governorate,
       area: f.area || profile.area,
       block: f.block || profile.block,
       street: f.street || profile.street,
@@ -100,6 +106,19 @@ export default function Checkout() {
 
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const selectedCountry = useMemo(() => findCountry(form.country), [form.country]);
+  const selectedGov = useMemo(
+    () => findGovernorate(form.country, form.governorate),
+    [form.country, form.governorate],
+  );
+  const govOptions = selectedCountry?.governorates ?? [];
+  const areaOptions = selectedGov?.areas ?? [];
+
+  const onCountryChange = (val: string) =>
+    setForm((f) => ({ ...f, country: val, governorate: "", area: "" }));
+  const onGovChange = (val: string) =>
+    setForm((f) => ({ ...f, governorate: val, area: "" }));
 
   if (items.length === 0) {
     return (
@@ -139,13 +158,29 @@ export default function Checkout() {
       toast.error(t("checkout.error.required"));
       return;
     }
+    if (!form.country || !form.governorate) {
+      toast.error(t("checkout.error.country"));
+      return;
+    }
     if (!form.area || !form.block.trim() || !form.street.trim()) {
       toast.error(t("checkout.error.address"));
       return;
     }
     try {
       const order = await createOrder.mutateAsync({
-        ...form,
+        customerName: form.customerName,
+        customerEmail: form.customerEmail,
+        customerPhone: form.customerPhone,
+        country: form.country,
+        governorate: form.governorate,
+        // Keep `city` populated for backwards-compatible admin views.
+        city: form.governorate,
+        area: form.area,
+        block: form.block,
+        street: form.street,
+        building: form.building,
+        addressLine: form.addressLine,
+        notes: form.notes,
         paymentMethod,
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
@@ -241,12 +276,37 @@ export default function Checkout() {
               >
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>{t("checkout.city")}</Label>
-                    <Input
-                      value={form.city}
-                      onChange={(e) => set("city", e.target.value)}
-                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
-                    />
+                    <Label>{t("checkout.country")} *</Label>
+                    <select
+                      value={form.country}
+                      onChange={(e) => onCountryChange(e.target.value)}
+                      required
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="">{t("checkout.countrySelect")}</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.en}>
+                          {lang === "ar" ? c.ar : c.en}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label>{t("checkout.governorate")} *</Label>
+                    <select
+                      value={form.governorate}
+                      onChange={(e) => onGovChange(e.target.value)}
+                      required
+                      disabled={!selectedCountry}
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
+                    >
+                      <option value="">{t("checkout.governorateSelect")}</option>
+                      {govOptions.map((g) => (
+                        <option key={g.en} value={g.en}>
+                          {lang === "ar" ? g.ar : g.en}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <Label>{t("checkout.area")} *</Label>
@@ -254,10 +314,11 @@ export default function Checkout() {
                       value={form.area}
                       onChange={(e) => set("area", e.target.value)}
                       required
-                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      disabled={!selectedGov}
+                      className="mt-1.5 flex h-11 w-full rounded-xl border border-input bg-background/70 backdrop-blur px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60"
                     >
                       <option value="">{t("checkout.areaSelect")}</option>
-                      {KW_AREAS.map((a) => (
+                      {areaOptions.map((a) => (
                         <option key={a.en} value={a.en}>
                           {lang === "ar" ? a.ar : a.en}
                         </option>
@@ -282,7 +343,7 @@ export default function Checkout() {
                       className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-emerald-500"
                     />
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <Label>{t("checkout.building")}</Label>
                     <Input
                       value={form.building}
@@ -354,21 +415,54 @@ export default function Checkout() {
                   </h2>
                 </div>
 
-                <ul className="divide-y divide-border/60 mb-4 max-h-72 overflow-y-auto pr-1 -mr-1">
+                <p className="text-xs font-medium text-muted-foreground mb-2">
+                  {t("checkout.editCart")}
+                </p>
+                <ul className="divide-y divide-border/60 mb-4 max-h-80 overflow-y-auto pr-1 -mr-1">
                   {items.map((i) => (
                     <li key={i.productId} className="flex gap-3 py-3 text-sm">
                       <img
                         src={i.image}
                         alt=""
-                        className="h-12 w-12 rounded-xl object-cover bg-brand-soft ring-1 ring-border/60"
+                        className="h-14 w-14 rounded-xl object-cover bg-brand-soft ring-1 ring-border/60 shrink-0"
                       />
-                      <div className="flex-1 min-w-0">
-                        <p className="line-clamp-1 font-medium">
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <p className="line-clamp-2 font-medium leading-snug">
                           {lang === "ar" && i.nameAr ? i.nameAr : i.name}
                         </p>
-                        <p className="text-xs text-muted-foreground">×{i.quantity}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="inline-flex items-center rounded-full border border-border/70 bg-background/70 backdrop-blur overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setQuantity(i.productId, i.quantity - 1)}
+                              aria-label={t("cart.decrease")}
+                              className="h-7 w-7 grid place-items-center hover:bg-gradient-to-br hover:from-sky-500/20 hover:to-violet-500/20 transition-colors"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="px-2 min-w-[1.75rem] text-center text-xs font-bold tabular-nums">
+                              {i.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setQuantity(i.productId, i.quantity + 1)}
+                              aria-label={t("cart.increase")}
+                              className="h-7 w-7 grid place-items-center hover:bg-gradient-to-br hover:from-sky-500/20 hover:to-violet-500/20 transition-colors"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => remove(i.productId)}
+                            aria-label={t("cart.remove")}
+                            className="h-7 w-7 grid place-items-center rounded-full border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <p className="font-semibold">
+                      <p className="font-semibold whitespace-nowrap self-start">
                         KD {(i.price * i.quantity).toFixed(2)}
                       </p>
                     </li>

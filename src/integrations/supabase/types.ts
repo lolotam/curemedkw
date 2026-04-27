@@ -363,12 +363,14 @@ export type Database = {
           block: string
           building: string
           city: string
+          country: string
           coupon_code: string | null
           created_at: string
           customer_email: string
           customer_name: string
           customer_phone: string
           discount_amount: number
+          governorate: string
           id: string
           notes: string
           order_number: string
@@ -388,12 +390,14 @@ export type Database = {
           block?: string
           building?: string
           city?: string
+          country?: string
           coupon_code?: string | null
           created_at?: string
           customer_email: string
           customer_name: string
           customer_phone: string
           discount_amount?: number
+          governorate?: string
           id?: string
           notes?: string
           order_number?: string
@@ -413,12 +417,14 @@ export type Database = {
           block?: string
           building?: string
           city?: string
+          country?: string
           coupon_code?: string | null
           created_at?: string
           customer_email?: string
           customer_name?: string
           customer_phone?: string
           discount_amount?: number
+          governorate?: string
           id?: string
           notes?: string
           order_number?: string
@@ -619,8 +625,10 @@ export type Database = {
           block: string
           building: string
           city: string
+          country: string
           created_at: string
           full_name: string
+          governorate: string
           id: string
           is_blocked: boolean
           notes: string
@@ -635,8 +643,10 @@ export type Database = {
           block?: string
           building?: string
           city?: string
+          country?: string
           created_at?: string
           full_name?: string
+          governorate?: string
           id: string
           is_blocked?: boolean
           notes?: string
@@ -651,8 +661,10 @@ export type Database = {
           block?: string
           building?: string
           city?: string
+          country?: string
           created_at?: string
           full_name?: string
+          governorate?: string
           id?: string
           is_blocked?: boolean
           notes?: string

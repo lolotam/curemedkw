@@ -1125,6 +1125,8 @@ export interface Order {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  country: string;
+  governorate: string;
   city: string;
   area: string;
   block: string;
@@ -1152,6 +1154,8 @@ const rowToOrder = (r: any, items?: OrderItem[]): Order => ({
   customerName: r.customer_name,
   customerEmail: r.customer_email,
   customerPhone: r.customer_phone,
+  country: r.country ?? "Kuwait",
+  governorate: r.governorate ?? "",
   city: r.city ?? "",
   area: r.area ?? "",
   block: r.block ?? "",
@@ -1188,6 +1192,8 @@ export interface CreateOrderInput {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  country: string;
+  governorate: string;
   city: string;
   area: string;
   block: string;
@@ -1223,6 +1229,8 @@ export function useCreateOrder() {
           customer_name: input.customerName,
           customer_email: input.customerEmail,
           customer_phone: input.customerPhone,
+          country: input.country,
+          governorate: input.governorate,
           city: input.city,
           area: input.area,
           block: input.block,
@@ -1372,6 +1380,8 @@ export interface Profile {
   fullName: string;
   phone: string;
   avatarUrl: string;
+  country: string;
+  governorate: string;
   city: string;
   area: string;
   block: string;
@@ -1389,6 +1399,8 @@ const rowToProfile = (r: any): Profile => ({
   fullName: r.full_name ?? "",
   phone: r.phone ?? "",
   avatarUrl: r.avatar_url ?? "",
+  country: r.country ?? "Kuwait",
+  governorate: r.governorate ?? "",
   city: r.city ?? "",
   area: r.area ?? "",
   block: r.block ?? "",
@@ -1431,6 +1443,8 @@ export function useUpdateProfile() {
       if (patch.fullName !== undefined) row.full_name = patch.fullName;
       if (patch.phone !== undefined) row.phone = patch.phone;
       if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+      if (patch.country !== undefined) row.country = patch.country;
+      if (patch.governorate !== undefined) row.governorate = patch.governorate;
       if (patch.city !== undefined) row.city = patch.city;
       if (patch.area !== undefined) row.area = patch.area;
       if (patch.block !== undefined) row.block = patch.block;
