@@ -38,6 +38,20 @@ export interface HeroSlide {
   overlay_opacity: number;
   created_at: string;
   updated_at: string;
+  // Typography
+  font_family_en: string;
+  font_family_ar: string;
+  h1_font_size: number;
+  h2_font_size: number;
+  cta_font_size: number;
+  // Motion
+  h1_animation: string;
+  h2_animation: string;
+  cta_animation: string;
+  // Position (percent of slide width/height where the text block anchors)
+  text_position_x: number;
+  text_position_y: number;
+  text_align: "left" | "center" | "right";
 }
 
 export type HeroSlideInput = Omit<HeroSlide, "id" | "created_at" | "updated_at">;

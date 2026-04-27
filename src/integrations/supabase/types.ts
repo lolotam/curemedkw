@@ -178,9 +178,17 @@ export type Database = {
       hero_slides: {
         Row: {
           created_at: string
+          cta_animation: string
+          cta_font_size: number
           cta_href: string | null
           cta_label_ar: string | null
           cta_label_en: string | null
+          font_family_ar: string
+          font_family_en: string
+          h1_animation: string
+          h1_font_size: number
+          h2_animation: string
+          h2_font_size: number
           id: string
           is_active: boolean
           media_type: string
@@ -190,15 +198,26 @@ export type Database = {
           sort_order: number
           subtitle_ar: string | null
           subtitle_en: string | null
+          text_align: string
+          text_position_x: number
+          text_position_y: number
           title_ar: string | null
           title_en: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
+          cta_animation?: string
+          cta_font_size?: number
           cta_href?: string | null
           cta_label_ar?: string | null
           cta_label_en?: string | null
+          font_family_ar?: string
+          font_family_en?: string
+          h1_animation?: string
+          h1_font_size?: number
+          h2_animation?: string
+          h2_font_size?: number
           id?: string
           is_active?: boolean
           media_type?: string
@@ -208,15 +227,26 @@ export type Database = {
           sort_order?: number
           subtitle_ar?: string | null
           subtitle_en?: string | null
+          text_align?: string
+          text_position_x?: number
+          text_position_y?: number
           title_ar?: string | null
           title_en?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
+          cta_animation?: string
+          cta_font_size?: number
           cta_href?: string | null
           cta_label_ar?: string | null
           cta_label_en?: string | null
+          font_family_ar?: string
+          font_family_en?: string
+          h1_animation?: string
+          h1_font_size?: number
+          h2_animation?: string
+          h2_font_size?: number
           id?: string
           is_active?: boolean
           media_type?: string
@@ -226,6 +256,9 @@ export type Database = {
           sort_order?: number
           subtitle_ar?: string | null
           subtitle_en?: string | null
+          text_align?: string
+          text_position_x?: number
+          text_position_y?: number
           title_ar?: string | null
           title_en?: string | null
           updated_at?: string
