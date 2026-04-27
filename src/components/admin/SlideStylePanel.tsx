@@ -10,7 +10,8 @@ import type { HeroSlide } from "@/lib/heroSlides";
 import { AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 
 interface Props {
-  slide: HeroSlide;
+  // Accepts both saved slides and editor drafts.
+  slide: Omit<HeroSlide, "created_at" | "updated_at"> & Partial<Pick<HeroSlide, "created_at" | "updated_at">>;
   onPatch: (patch: Partial<HeroSlide>) => void;
 }
 
