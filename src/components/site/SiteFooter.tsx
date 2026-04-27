@@ -15,6 +15,7 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
     ? brandMeta.seo[lang as "en" | "ar"] ?? brandMeta.seo.en
     : t("about.body");
   const instagram = brandMeta?.instagram ?? CUREMED_INSTAGRAM;
+  const instagramHandle = `@${instagram.replace(/\/+$/, "").split("/").pop()}`;
   return (
     <footer className="border-t border-border/50 bg-muted/30 mt-16">
       <div className="container py-12 grid gap-8 md:grid-cols-4">
@@ -51,7 +52,7 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
                 <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
               </svg>
             </span>
-            Instagram
+            {instagramHandle}
           </a>
         </div>
         <div>
