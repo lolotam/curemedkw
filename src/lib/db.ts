@@ -1380,6 +1380,8 @@ export interface Profile {
   fullName: string;
   phone: string;
   avatarUrl: string;
+  country: string;
+  governorate: string;
   city: string;
   area: string;
   block: string;
@@ -1397,6 +1399,8 @@ const rowToProfile = (r: any): Profile => ({
   fullName: r.full_name ?? "",
   phone: r.phone ?? "",
   avatarUrl: r.avatar_url ?? "",
+  country: r.country ?? "Kuwait",
+  governorate: r.governorate ?? "",
   city: r.city ?? "",
   area: r.area ?? "",
   block: r.block ?? "",
@@ -1439,6 +1443,8 @@ export function useUpdateProfile() {
       if (patch.fullName !== undefined) row.full_name = patch.fullName;
       if (patch.phone !== undefined) row.phone = patch.phone;
       if (patch.avatarUrl !== undefined) row.avatar_url = patch.avatarUrl;
+      if (patch.country !== undefined) row.country = patch.country;
+      if (patch.governorate !== undefined) row.governorate = patch.governorate;
       if (patch.city !== undefined) row.city = patch.city;
       if (patch.area !== undefined) row.area = patch.area;
       if (patch.block !== undefined) row.block = patch.block;
