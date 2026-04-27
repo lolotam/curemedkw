@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,6 +12,10 @@ import {
   Sparkles,
   Tag,
   ShoppingBag,
+  Globe,
+  Plus,
+  Minus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +28,7 @@ import { useCreateOrder, useProfile, type PaymentMethod } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
 import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
-import { KW_AREAS } from "@/lib/kuwaitData";
+import { COUNTRIES, findCountry, findGovernorate } from "@/lib/regionsData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import {
@@ -60,7 +64,8 @@ export default function Checkout() {
     customerName: "",
     customerEmail: "",
     customerPhone: "",
-    city: "Kuwait",
+    country: "Kuwait",
+    governorate: "",
     area: "",
     block: "",
     street: "",
@@ -89,7 +94,8 @@ export default function Checkout() {
       customerName: f.customerName || profile.fullName,
       customerEmail: f.customerEmail || user?.email || "",
       customerPhone: f.customerPhone || profile.phone,
-      city: profile.city || f.city,
+      country: profile.country || f.country,
+      governorate: profile.governorate || f.governorate,
       area: f.area || profile.area,
       block: f.block || profile.block,
       street: f.street || profile.street,
@@ -100,6 +106,19 @@ export default function Checkout() {
 
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const selectedCountry = useMemo(() => findCountry(form.country), [form.country]);
+  const selectedGov = useMemo(
+    () => findGovernorate(form.country, form.governorate),
+    [form.country, form.governorate],
+  );
+  const govOptions = selectedCountry?.governorates ?? [];
+  const areaOptions = selectedGov?.areas ?? [];
+
+  const onCountryChange = (val: string) =>
+    setForm((f) => ({ ...f, country: val, governorate: "", area: "" }));
+  const onGovChange = (val: string) =>
+    setForm((f) => ({ ...f, governorate: val, area: "" }));
 
   if (items.length === 0) {
     return (
@@ -139,13 +158,29 @@ export default function Checkout() {
       toast.error(t("checkout.error.required"));
       return;
     }
+    if (!form.country || !form.governorate) {
+      toast.error(t("checkout.error.country"));
+      return;
+    }
     if (!form.area || !form.block.trim() || !form.street.trim()) {
       toast.error(t("checkout.error.address"));
       return;
     }
     try {
       const order = await createOrder.mutateAsync({
-        ...form,
+        customerName: form.customerName,
+        customerEmail: form.customerEmail,
+        customerPhone: form.customerPhone,
+        country: form.country,
+        governorate: form.governorate,
+        // Keep `city` populated for backwards-compatible admin views.
+        city: form.governorate,
+        area: form.area,
+        block: form.block,
+        street: form.street,
+        building: form.building,
+        addressLine: form.addressLine,
+        notes: form.notes,
         paymentMethod,
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
