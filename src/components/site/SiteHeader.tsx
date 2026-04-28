@@ -8,7 +8,7 @@ import { BRAND_LIST } from "@/lib/brands";
 import { cn } from "@/lib/utils";
 import defaultLogo from "@/assets/curemed-logo.png";
 import { useAdminSession } from "@/lib/admin";
-import { useMessages, useUnreadMessageCount, useBrandingLogo } from "@/lib/db";
+import { useMessages, useUnreadMessageCount, useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
 import { CartIcon } from "@/components/site/CartIcon";
 import { useAuth } from "@/lib/auth";
 import { UserNotificationBell } from "@/components/site/UserNotificationBell";
@@ -31,6 +31,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const { isAdmin } = useAdminSession();
   const { data: brandingLogo } = useBrandingLogo();
+  const { data: removeBg } = useBrandingLogoRemoveBg();
   const logoSrc = brandingLogo?.trim() || defaultLogo;
 
   const isActive = (path: string) => location.pathname === path;
@@ -39,7 +40,11 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
       <div className="container flex h-24 items-center justify-between gap-4">
         <Link to="/curemed" className="flex items-center gap-2">
-          <img src={logoSrc} alt="Curemed" className="h-20 w-auto" />
+          <img
+            src={logoSrc}
+            alt="Curemed"
+            className={cn("h-20 w-auto brand-logo-img", removeBg && "brand-logo-img--remove-white")}
+          />
         </Link>
 
         <nav className="hidden items-center gap-3 xl:gap-5 lg:flex">

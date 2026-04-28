@@ -6,7 +6,7 @@ import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import defaultLogo from "@/assets/curemed-logo.png";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { useUnreadMessageCount, useBrandingLogo } from "@/lib/db";
+import { useUnreadMessageCount, useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
 
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Overview", end: true },
@@ -32,6 +32,7 @@ export function AdminLayout() {
   const { user, isAdmin, loading } = useAdminSession();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
   const { data: brandingLogo } = useBrandingLogo();
+  const { data: removeBg } = useBrandingLogoRemoveBg();
   const logoSrc = brandingLogo?.trim() || defaultLogo;
 
   if (loading) {
@@ -76,7 +77,11 @@ export function AdminLayout() {
       <aside className="w-64 bg-background border-r border-border min-h-screen sticky top-0 flex flex-col">
         <div className="p-5 border-b border-border flex flex-col items-center text-center">
           <Link to="/curemed" aria-label="Go to main page">
-            <img src={logoSrc} alt="Curemed" className="h-16 w-auto object-contain" />
+            <img
+              src={logoSrc}
+              alt="Curemed"
+              className={cn("h-16 w-auto object-contain brand-logo-img", removeBg && "brand-logo-img--remove-white")}
+            />
           </Link>
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground mt-2 font-semibold">Admin Dashboard</p>
         </div>

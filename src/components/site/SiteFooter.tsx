@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { Mail, Phone, MapPin } from "lucide-react";
 import defaultLogo from "@/assets/curemed-logo.png";
-import { useBrandingLogo } from "@/lib/db";
+import { useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
 
 const CUREMED_INSTAGRAM = "https://www.instagram.com/curemedkw/";
 
@@ -11,6 +11,7 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
   const { t, lang } = useI18n();
   const brandMeta = Object.values(BRANDS).find((b) => b.themeAttr === brand);
   const { data: brandingLogo } = useBrandingLogo();
+  const { data: removeBg } = useBrandingLogoRemoveBg();
   const logo = brandMeta?.logo ?? (brandingLogo?.trim() || defaultLogo);
   const brandName = brandMeta?.name ?? "Curemed";
   const seoText = brandMeta
@@ -22,7 +23,11 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
     <footer className="border-t border-border/50 bg-muted/30 mt-16">
       <div className="container py-12 grid gap-8 md:grid-cols-4">
         <div className="space-y-3">
-          <img src={logo} alt={brandName} className="h-12 w-auto object-contain" />
+          <img
+            src={logo}
+            alt={brandName}
+            className={`h-12 w-auto object-contain brand-logo-img ${!brandMeta && removeBg ? "brand-logo-img--remove-white" : ""}`}
+          />
           <p className="text-sm text-muted-foreground max-w-xs">{seoText}</p>
           <a
             href={instagram}

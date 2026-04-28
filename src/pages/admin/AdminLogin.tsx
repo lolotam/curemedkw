@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import defaultLogo from "@/assets/curemed-logo.png";
-import { useBrandingLogo } from "@/lib/db";
+import { useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function AdminLogin() {
@@ -17,6 +17,7 @@ export default function AdminLogin() {
   const { t } = useI18n();
   const { user, loading } = useAdminSession();
   const { data: brandingLogo } = useBrandingLogo();
+  const { data: removeBg } = useBrandingLogoRemoveBg();
   const logoSrc = brandingLogo?.trim() || defaultLogo;
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
@@ -75,7 +76,11 @@ export default function AdminLogin() {
     <div data-brand="curemed" className="min-h-screen flex items-center justify-center bg-brand-soft p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-6">
-          <img src={logoSrc} alt="Curemed" className="h-24 w-auto mx-auto object-contain" />
+          <img
+            src={logoSrc}
+            alt="Curemed"
+            className={`h-24 w-auto mx-auto object-contain brand-logo-img ${removeBg ? "brand-logo-img--remove-white" : ""}`}
+          />
           <h1 className="mt-5 text-2xl font-bold">
             {mode === "signin" ? t("admin.login.title") : "Create admin account"}
           </h1>
