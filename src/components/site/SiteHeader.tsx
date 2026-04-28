@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
-import { BRAND_LIST } from "@/lib/brands";
+import { BRAND_LIST, slugToBrand } from "@/lib/brands";
 import { cn } from "@/lib/utils";
 import defaultLogo from "@/assets/curemed-logo.png";
 import { useAdminSession } from "@/lib/admin";
-import { useMessages, useUnreadMessageCount, useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
+import { useMessages, useUnreadMessageCount, useBrandingLogo, useBrandingLogoRemoveBg, useBrandingBrandLogo } from "@/lib/db";
 import { CartIcon } from "@/components/site/CartIcon";
 import { useAuth } from "@/lib/auth";
 import { UserNotificationBell } from "@/components/site/UserNotificationBell";
@@ -32,7 +32,14 @@ export function SiteHeader() {
   const { isAdmin } = useAdminSession();
   const { data: brandingLogo } = useBrandingLogo();
   const { data: removeBg } = useBrandingLogoRemoveBg();
-  const logoSrc = brandingLogo?.trim() || defaultLogo;
+  // Detect a brand-specific page from the URL (e.g. /flexitol or /australian-bodycare/...)
+  const firstSegment = location.pathname.split("/").filter(Boolean)[0] ?? "";
+  const activeBrandKey = slugToBrand(firstSegment);
+  const { data: brandLogo } = useBrandingBrandLogo(activeBrandKey);
+  const logoSrc =
+    (activeBrandKey && brandLogo?.trim()) ||
+    brandingLogo?.trim() ||
+    defaultLogo;
 
   const isActive = (path: string) => location.pathname === path;
 
