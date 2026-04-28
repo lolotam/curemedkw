@@ -32,6 +32,8 @@ import AdminOrders from "./pages/admin/AdminOrders";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminNotificationTemplates from "./pages/admin/AdminNotificationTemplates";
+import AdminBranding from "./pages/admin/AdminBranding";
+import { BrandingHead } from "@/components/site/BrandingHead";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
@@ -53,6 +55,7 @@ const App = () => {
             <TooltipProvider>
             <Toaster />
             <Sonner />
+            <BrandingHead />
             <BrowserRouter>
               <Routes>
                 <Route path="/" element={<Loading />} />
@@ -85,6 +88,7 @@ const App = () => {
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="coupons" element={<AdminCoupons />} />
                   <Route path="notifications" element={<AdminNotificationTemplates />} />
+                  <Route path="branding" element={<AdminBranding />} />
                 </Route>
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/:brand/product/:id" element={<ProductDetail />} />
