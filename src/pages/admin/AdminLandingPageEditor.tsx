@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw, ExternalLink, LayoutGrid, MousePointerClick, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Loader2, Upload, Save, EyeOff, RotateCcw, ExternalLink, LayoutGrid, MousePointerClick, AlertTriangle, CircleDot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,18 @@ export default function AdminLandingPageEditor() {
   }, [meta, refresh]);
 
   const hasUnsaved = slides.some((s) => s._dirty);
+  const dirtyCount = slides.filter((s) => s._dirty).length;
+
+  // Warn if the user tries to close/refresh the tab with unsaved drafts.
+  React.useEffect(() => {
+    if (!hasUnsaved) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsaved]);
 
   const switchToPage = (key: string) => {
     if (key === pageKey) return;
@@ -119,6 +131,55 @@ export default function AdminLandingPageEditor() {
     } catch (e: any) {
       setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, _saving: false } : x)));
       toast({ title: "Save failed", description: e.message, variant: "destructive" });
+    }
+  };
+
+  // Quietly persist a slide without showing a toast (used by auto-save on blur).
+  const autoSaveSlide = React.useCallback(async (slideId: string) => {
+    let target: Draft | undefined;
+    setSlides((prev) => {
+      target = prev.find((x) => x.id === slideId && x._dirty && !x._saving);
+      if (!target) return prev;
+      return prev.map((x) => (x.id === slideId ? { ...x, _saving: true } : x));
+    });
+    if (!target) return;
+    try {
+      const { id, _dirty, _saving, ...rest } = target as any;
+      await updateSlide(target.id, rest);
+      setSlides((prev) => prev.map((x) => (x.id === slideId ? { ...x, _dirty: false, _saving: false } : x)));
+    } catch (e: any) {
+      setSlides((prev) => prev.map((x) => (x.id === slideId ? { ...x, _saving: false } : x)));
+      toast({ title: "Auto-save failed", description: e.message, variant: "destructive" });
+    }
+  }, [toast]);
+
+  const handleSaveAll = async () => {
+    const dirty = slides.filter((s) => s._dirty && !s._saving);
+    if (dirty.length === 0) return;
+    setSlides((prev) => prev.map((x) => (x._dirty ? { ...x, _saving: true } : x)));
+    let okCount = 0;
+    const failures: string[] = [];
+    await Promise.all(
+      dirty.map(async (s) => {
+        try {
+          const { id, _dirty, _saving, ...rest } = s as any;
+          await updateSlide(s.id, rest);
+          setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, _dirty: false, _saving: false } : x)));
+          okCount++;
+        } catch (e: any) {
+          setSlides((prev) => prev.map((x) => (x.id === s.id ? { ...x, _saving: false } : x)));
+          failures.push(e.message ?? "Unknown error");
+        }
+      })
+    );
+    if (failures.length === 0) {
+      toast({ title: `Saved ${okCount} slide${okCount === 1 ? "" : "s"}` });
+    } else {
+      toast({
+        title: `Saved ${okCount}, failed ${failures.length}`,
+        description: failures[0],
+        variant: "destructive",
+      });
     }
   };
 
@@ -221,6 +282,16 @@ export default function AdminLandingPageEditor() {
           )}
 
           <div className="ml-auto flex items-center gap-2">
+            {dirtyCount > 0 && (
+              <Button
+                onClick={handleSaveAll}
+                size="sm"
+                variant="default"
+                className="gap-1 bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                <Save className="h-4 w-4" /> Save all ({dirtyCount})
+              </Button>
+            )}
             {meta && (
               <Button asChild variant="outline" size="sm" className="gap-1">
                 <a href={meta.route} target="_blank" rel="noreferrer">
@@ -266,7 +337,7 @@ export default function AdminLandingPageEditor() {
         <div className="space-y-4">
           <HeroIntervalCard pageKey={meta.key as HeroPageKey} />
           {slides.map((s, i) => (
-            <Card key={s.id} className="p-5">
+            <Card key={s.id} className={cn("p-5 transition-colors", s._dirty && "ring-2 ring-amber-400/60 border-amber-300")}>
               <div className="grid lg:grid-cols-[300px,1fr] gap-5">
                 {/* Media */}
                 <div className="space-y-3">
@@ -359,6 +430,12 @@ export default function AdminLandingPageEditor() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-semibold text-muted-foreground">Slide #{i + 1}</span>
+                      {s._dirty && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 text-[10px] font-semibold">
+                          <CircleDot className="h-2.5 w-2.5 fill-amber-500 text-amber-500" />
+                          Unsaved
+                        </span>
+                      )}
                       <div className="flex items-center gap-1.5 ml-2">
                         <Switch checked={s.is_active} onCheckedChange={(v) => toggleActive(s, v)} disabled={s._saving} />
                         <Label className="text-xs">{s.is_active ? "Active" : "Hidden"}</Label>
@@ -374,31 +451,31 @@ export default function AdminLandingPageEditor() {
                   <div className="grid sm:grid-cols-2 gap-3">
                     <div>
                       <Label className="text-xs">Title (English)</Label>
-                      <Input value={s.title_en ?? ""} onChange={(e) => patchLocal(s.id, { title_en: e.target.value })} />
+                      <Input value={s.title_en ?? ""} onChange={(e) => patchLocal(s.id, { title_en: e.target.value })} onBlur={() => autoSaveSlide(s.id)} />
                     </div>
                     <div>
                       <Label className="text-xs">Title (Arabic)</Label>
-                      <Input value={s.title_ar ?? ""} onChange={(e) => patchLocal(s.id, { title_ar: e.target.value })} dir="rtl" />
+                      <Input value={s.title_ar ?? ""} onChange={(e) => patchLocal(s.id, { title_ar: e.target.value })} onBlur={() => autoSaveSlide(s.id)} dir="rtl" />
                     </div>
                     <div>
                       <Label className="text-xs">Subtitle (English)</Label>
-                      <Textarea rows={2} value={s.subtitle_en ?? ""} onChange={(e) => patchLocal(s.id, { subtitle_en: e.target.value })} />
+                      <Textarea rows={2} value={s.subtitle_en ?? ""} onChange={(e) => patchLocal(s.id, { subtitle_en: e.target.value })} onBlur={() => autoSaveSlide(s.id)} />
                     </div>
                     <div>
                       <Label className="text-xs">Subtitle (Arabic)</Label>
-                      <Textarea rows={2} value={s.subtitle_ar ?? ""} onChange={(e) => patchLocal(s.id, { subtitle_ar: e.target.value })} dir="rtl" />
+                      <Textarea rows={2} value={s.subtitle_ar ?? ""} onChange={(e) => patchLocal(s.id, { subtitle_ar: e.target.value })} onBlur={() => autoSaveSlide(s.id)} dir="rtl" />
                     </div>
                     <div>
                       <Label className="text-xs">CTA label (English)</Label>
-                      <Input value={s.cta_label_en ?? ""} onChange={(e) => patchLocal(s.id, { cta_label_en: e.target.value })} placeholder="Shop now" />
+                      <Input value={s.cta_label_en ?? ""} onChange={(e) => patchLocal(s.id, { cta_label_en: e.target.value })} onBlur={() => autoSaveSlide(s.id)} placeholder="Shop now" />
                     </div>
                     <div>
                       <Label className="text-xs">CTA label (Arabic)</Label>
-                      <Input value={s.cta_label_ar ?? ""} onChange={(e) => patchLocal(s.id, { cta_label_ar: e.target.value })} dir="rtl" placeholder="تسوّق الآن" />
+                      <Input value={s.cta_label_ar ?? ""} onChange={(e) => patchLocal(s.id, { cta_label_ar: e.target.value })} onBlur={() => autoSaveSlide(s.id)} dir="rtl" placeholder="تسوّق الآن" />
                     </div>
                     <div className="sm:col-span-2">
                       <Label className="text-xs">CTA link</Label>
-                      <Input value={s.cta_href ?? ""} onChange={(e) => patchLocal(s.id, { cta_href: e.target.value })} placeholder="/flexitol or https://…" />
+                      <Input value={s.cta_href ?? ""} onChange={(e) => patchLocal(s.id, { cta_href: e.target.value })} onBlur={() => autoSaveSlide(s.id)} placeholder="/flexitol or https://…" />
                       {(s.cta_label_en || s.cta_label_ar) && !s.cta_href?.trim() && (
                         <p className="mt-1 text-[11px] text-amber-600 inline-flex items-center gap-1">
                           <AlertTriangle className="h-3 w-3" />
