@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package } from "lucide-react";
+import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -42,14 +42,9 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-3 xl:gap-5 lg:flex">
           <NavItem to="/curemed" label={t("nav.home")} active={isActive("/curemed")} />
-          {BRAND_LIST.map((b) => (
-            <NavItem
-              key={b.key}
-              to={`/${b.slug}`}
-              label={b.shortName ?? b.name}
-              active={location.pathname.startsWith(`/${b.slug}`)}
-            />
-          ))}
+          <PartnersMenu active={BRAND_LIST.some((b) => location.pathname.startsWith(`/${b.slug}`))} label={t("nav.partners")} />
+          <NavItem to="/about" label={t("nav.about")} active={isActive("/about")} />
+          <NavItem to="/contact" label={t("nav.contact")} active={isActive("/contact")} />
         </nav>
 
         <div className="flex items-center gap-1">
@@ -86,18 +81,54 @@ export function SiteHeader() {
         <div className="border-t border-border/50 bg-background lg:hidden">
           <div className="container flex flex-col gap-1 py-3">
             <MobileItem to="/curemed" label={t("nav.home")} onClick={() => setOpen(false)} />
+            <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {t("nav.partners")}
+            </div>
             {BRAND_LIST.map((b) => (
               <MobileItem
                 key={b.key}
                 to={`/${b.slug}`}
                 label={b.shortName ?? b.name}
                 onClick={() => setOpen(false)}
+                indent
               />
             ))}
+            <MobileItem to="/about" label={t("nav.about")} onClick={() => setOpen(false)} />
+            <MobileItem to="/contact" label={t("nav.contact")} onClick={() => setOpen(false)} />
           </div>
         </div>
       )}
     </header>
+  );
+}
+
+function PartnersMenu({ active, label }: { active: boolean; label: string }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          className={cn(
+            "relative inline-flex items-center gap-1 rounded-md px-4 py-2.5 text-base font-bold uppercase tracking-wide transition-all duration-300",
+            "after:content-[''] after:absolute after:left-4 after:right-4 after:bottom-1 after:h-0.5 after:bg-brand",
+            "after:scale-x-0 after:origin-left after:transition-transform after:duration-300",
+            "hover:text-brand hover:after:scale-x-100 focus:outline-none",
+            active && "text-brand after:scale-x-100",
+          )}
+        >
+          {label}
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        {BRAND_LIST.map((b) => (
+          <DropdownMenuItem key={b.key} asChild>
+            <Link to={`/${b.slug}`} className="cursor-pointer font-medium">
+              {b.shortName ?? b.name}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -211,12 +242,15 @@ function NavItem({ to, label, active }: { to: string; label: string; active: boo
   );
 }
 
-function MobileItem({ to, label, onClick }: { to: string; label: string; onClick: () => void }) {
+function MobileItem({ to, label, onClick, indent }: { to: string; label: string; onClick: () => void; indent?: boolean }) {
   return (
     <Link
       to={to}
       onClick={onClick}
-      className="rounded-md px-3 py-2.5 text-sm font-medium hover:bg-muted"
+      className={cn(
+        "rounded-md px-3 py-2.5 text-sm font-medium hover:bg-muted",
+        indent && "ms-4",
+      )}
     >
       {label}
     </Link>
