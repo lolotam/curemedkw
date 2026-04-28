@@ -10,11 +10,14 @@ import {
   BRANDING_FAVICON_KEY,
   BRANDING_LOGO_KEY,
   BRANDING_LOGO_REMOVE_BG_KEY,
+  BRANDING_BRAND_LOGO_KEY,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
+  useBrandingBrandLogo,
   useUpdateSiteSetting,
 } from "@/lib/db";
+import { BRAND_LIST } from "@/lib/brands";
 
 export default function AdminBranding() {
   return (
@@ -49,6 +52,27 @@ export default function AdminBranding() {
         useValue={useBrandingFavicon}
         previewClassName="h-8 w-8 object-contain"
       />
+
+      <div className="pt-4">
+        <h2 className="text-xl font-bold">Per-brand page logos</h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Each brand page can have its own header logo. When a visitor opens a brand page
+          (e.g. <span className="font-mono">/flexitol</span>), the header logo automatically
+          swaps to that brand's logo. Leave empty to use the global Curemed logo.
+        </p>
+      </div>
+
+      {BRAND_LIST.map((b) => (
+        <BrandingField
+          key={b.key}
+          title={`${b.name} logo`}
+          description={`Shown in the header on /${b.slug} and its sub-pages.`}
+          settingKey={BRANDING_BRAND_LOGO_KEY(b.key)}
+          useValue={() => useBrandingBrandLogo(b.key)}
+          previewClassName="h-20 w-auto max-w-[260px] object-contain"
+          showTransparencyCheck
+        />
+      ))}
     </div>
   );
 }

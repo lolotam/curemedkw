@@ -976,6 +976,13 @@ export function useBrandingLogoRemoveBg() {
   return useSiteSetting<boolean>(BRANDING_LOGO_REMOVE_BG_KEY, false);
 }
 
+/** Per-brand header logo (overrides the global Curemed logo on that brand's pages). */
+export const BRANDING_BRAND_LOGO_KEY = (brand: BrandKey) => `branding_brand_logo_${brand}`;
+
+export function useBrandingBrandLogo(brand: BrandKey | null | undefined) {
+  return useSiteSetting<string>(brand ? BRANDING_BRAND_LOGO_KEY(brand) : "branding_brand_logo_none", "");
+}
+
 /* ============================================================
  * Product reviews
  * ============================================================ */
