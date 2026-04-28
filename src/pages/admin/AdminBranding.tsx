@@ -3,13 +3,16 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle } from "lucide-react";
+import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle, Info, CheckCircle2, XCircle } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   BRANDING_FAVICON_KEY,
   BRANDING_LOGO_KEY,
+  BRANDING_LOGO_REMOVE_BG_KEY,
   useBrandingFavicon,
   useBrandingLogo,
+  useBrandingLogoRemoveBg,
   useUpdateSiteSetting,
 } from "@/lib/db";
 
@@ -34,8 +37,10 @@ export default function AdminBranding() {
         settingKey={BRANDING_LOGO_KEY}
         useValue={useBrandingLogo}
         previewClassName="h-20 w-auto max-w-[260px] object-contain"
-        previewBg="bg-muted"
+        showTransparencyCheck
       />
+
+      <RemoveWhiteBgToggle />
 
       <BrandingField
         title="Favicon"
@@ -43,7 +48,6 @@ export default function AdminBranding() {
         settingKey={BRANDING_FAVICON_KEY}
         useValue={useBrandingFavicon}
         previewClassName="h-8 w-8 object-contain"
-        previewBg="bg-muted"
       />
     </div>
   );
@@ -55,23 +59,44 @@ interface FieldProps {
   settingKey: string;
   useValue: () => { data: string | undefined; isLoading: boolean };
   previewClassName: string;
-  previewBg: string;
+  showTransparencyCheck?: boolean;
 }
 
-function BrandingField({ title, description, settingKey, useValue, previewClassName, previewBg }: FieldProps) {
+function BrandingField({ title, description, settingKey, useValue, previewClassName, showTransparencyCheck }: FieldProps) {
   const { data: saved, isLoading } = useValue();
   const update = useUpdateSiteSetting();
   const [draft, setDraft] = React.useState("");
   const [touched, setTouched] = React.useState(false);
+  const [contentType, setContentType] = React.useState<string | null>(null);
+  const [probing, setProbing] = React.useState(false);
 
   // Initialize the draft once data arrives.
   React.useEffect(() => {
     if (!touched) setDraft(saved ?? "");
   }, [saved, touched]);
 
-  const dirty = (saved ?? "") !== draft;
   const trimmed = draft.trim();
+
+  // Probe the URL's Content-Type to warn when host serves JPEG (no transparency).
+  React.useEffect(() => {
+    if (!showTransparencyCheck || !trimmed || !/^https?:\/\//i.test(trimmed)) {
+      setContentType(null);
+      return;
+    }
+    let cancelled = false;
+    setProbing(true);
+    fetch(trimmed, { method: "HEAD" })
+      .then((r) => { if (!cancelled) setContentType(r.headers.get("content-type")); })
+      .catch(() => { if (!cancelled) setContentType(null); })
+      .finally(() => { if (!cancelled) setProbing(false); });
+    return () => { cancelled = true; };
+  }, [trimmed, showTransparencyCheck]);
+
+  const dirty = (saved ?? "") !== draft;
   const looksValid = !trimmed || /^https?:\/\//i.test(trimmed) || trimmed.startsWith("/");
+  const ctLower = (contentType || "").toLowerCase();
+  const isJpeg = ctLower.includes("jpeg") || ctLower.includes("jpg");
+  const isTransparentCapable = ctLower.includes("png") || ctLower.includes("svg") || ctLower.includes("webp") || ctLower.includes("gif");
 
   const handleSave = async () => {
     try {
@@ -102,7 +127,7 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
         <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
       </div>
 
-      <div className="grid md:grid-cols-[1fr,auto] gap-4 items-start">
+      <div className="space-y-4">
         <div className="space-y-2">
           <Label className="text-xs">Image URL</Label>
           <Input
@@ -117,6 +142,19 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
               URL should start with https:// or / (for files in the public folder).
             </p>
           )}
+          {showTransparencyCheck && trimmed && contentType && (
+            <p className={`text-[11px] inline-flex items-center gap-1 ${isJpeg ? "text-amber-600" : "text-muted-foreground"}`}>
+              {isJpeg ? <XCircle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
+              Server returns <span className="font-mono">{contentType}</span>
+              {isJpeg && " — JPEG cannot be transparent. Re-upload as PNG/SVG."}
+              {!isJpeg && isTransparentCapable && " — format supports transparency."}
+            </p>
+          )}
+          {probing && (
+            <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+              <Loader2 className="h-3 w-3 animate-spin" /> Checking image format…
+            </p>
+          )}
           {saved && (
             <p className="text-[11px] text-muted-foreground break-all">
               Currently saved: <span className="font-mono">{saved}</span>
@@ -124,18 +162,40 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
           )}
         </div>
 
-        <div className={`rounded-lg border border-border ${previewBg} p-3 flex items-center justify-center min-w-[120px] min-h-[88px]`}>
-          {trimmed ? (
-            <img
-              src={trimmed}
-              alt="Preview"
-              className={previewClassName}
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.3"; }}
-            />
-          ) : (
-            <span className="text-[11px] text-muted-foreground">No image</span>
-          )}
-        </div>
+        {showTransparencyCheck ? (
+          <div className="space-y-2">
+            <Label className="text-xs">Transparency check</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <PreviewTile label="Checkerboard (true transparency)" tileClass="checkerboard-bg">
+                {trimmed ? <img src={trimmed} alt="Preview" className={previewClassName} /> : <EmptyHint />}
+              </PreviewTile>
+              <PreviewTile label="Dark surface" tileClass="bg-slate-900">
+                {trimmed ? <img src={trimmed} alt="Preview" className={previewClassName} /> : <EmptyHint dark />}
+              </PreviewTile>
+            </div>
+            <p className="text-[11px] text-muted-foreground inline-flex items-start gap-1.5 pt-1">
+              <Info className="h-3 w-3 mt-0.5 shrink-0" />
+              <span>
+                If you see a <strong>white box</strong> behind the logo on either tile, the PNG itself
+                is not transparent — re-export it from your design tool with a transparent background,
+                or enable the workaround below.
+              </span>
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-lg border border-border bg-muted p-3 flex items-center justify-center min-h-[88px]">
+            {trimmed ? (
+              <img
+                src={trimmed}
+                alt="Preview"
+                className={previewClassName}
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.3"; }}
+              />
+            ) : (
+              <span className="text-[11px] text-muted-foreground">No image</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2 justify-end">
@@ -159,6 +219,52 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
           {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Save
         </Button>
+      </div>
+    </Card>
+  );
+}
+
+function PreviewTile({ label, tileClass, children }: { label: string; tileClass: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <div className={`rounded-lg border border-border ${tileClass} p-3 flex items-center justify-center min-h-[100px]`}>
+        {children}
+      </div>
+      <p className="text-[10px] text-muted-foreground text-center">{label}</p>
+    </div>
+  );
+}
+
+function EmptyHint({ dark }: { dark?: boolean }) {
+  return <span className={`text-[11px] ${dark ? "text-slate-400" : "text-muted-foreground"}`}>No image</span>;
+}
+
+function RemoveWhiteBgToggle() {
+  const { data: enabled = false } = useBrandingLogoRemoveBg();
+  const update = useUpdateSiteSetting();
+
+  const onToggle = async (next: boolean) => {
+    try {
+      await update.mutateAsync({ key: BRANDING_LOGO_REMOVE_BG_KEY, value: next });
+      toast.success(next ? "White background removal enabled" : "White background removal disabled");
+    } catch (e: any) {
+      toast.error("Update failed", { description: e?.message ?? "Unknown error" });
+    }
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold">Workaround: remove white background from logo</h3>
+          <p className="text-xs text-muted-foreground max-w-prose">
+            If your logo file has a white background baked in (not truly transparent), enable this to
+            visually drop the white using a CSS blend mode. <strong>Tradeoff:</strong> very light parts of
+            the logo may also disappear and colored logos can look washed out. The proper fix is to
+            re-export the logo as a true transparent PNG or SVG.
+          </p>
+        </div>
+        <Switch checked={!!enabled} onCheckedChange={onToggle} disabled={update.isPending} />
       </div>
     </Card>
   );
