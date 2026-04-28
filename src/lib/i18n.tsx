@@ -316,6 +316,7 @@ TRANSLATIONS["nav.signup"] = { en: "Sign up", ar: "إنشاء حساب" };
 TRANSLATIONS["nav.signout"] = { en: "Sign out", ar: "تسجيل الخروج" };
 TRANSLATIONS["nav.myOrders"] = { en: "My orders", ar: "طلباتي" };
 TRANSLATIONS["nav.notifications"] = { en: "Notifications", ar: "الإشعارات" };
+TRANSLATIONS["nav.partners"] = { en: "Partners", ar: "شركاؤنا" };
 
 TRANSLATIONS["auth.email"] = { en: "Email", ar: "البريد الإلكتروني" };
 TRANSLATIONS["auth.password"] = { en: "Password", ar: "كلمة المرور" };
