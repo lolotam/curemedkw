@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle, Info, CheckCircle2, XCircle } from "lucide-react";
+import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle, Info, CheckCircle2, XCircle, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
@@ -16,6 +16,7 @@ import {
   useBrandingLogoRemoveBg,
   useBrandingBrandLogo,
   useUpdateSiteSetting,
+  uploadBrandingImage,
 } from "@/lib/db";
 import { BRAND_LIST } from "@/lib/brands";
 
@@ -41,6 +42,7 @@ export default function AdminBranding() {
         useValue={useBrandingLogo}
         previewClassName="h-20 w-auto max-w-[260px] object-contain"
         showTransparencyCheck
+        uploadPrefix="logo"
       />
 
       <RemoveWhiteBgToggle />
@@ -51,6 +53,7 @@ export default function AdminBranding() {
         settingKey={BRANDING_FAVICON_KEY}
         useValue={useBrandingFavicon}
         previewClassName="h-8 w-8 object-contain"
+        uploadPrefix="favicon"
       />
 
       <div className="pt-4">
@@ -71,6 +74,7 @@ export default function AdminBranding() {
           useValue={() => useBrandingBrandLogo(b.key)}
           previewClassName="h-20 w-auto max-w-[260px] object-contain"
           showTransparencyCheck
+          uploadPrefix={`brand-${b.key}`}
         />
       ))}
     </div>
@@ -84,15 +88,18 @@ interface FieldProps {
   useValue: () => { data: string | undefined; isLoading: boolean };
   previewClassName: string;
   showTransparencyCheck?: boolean;
+  uploadPrefix: string;
 }
 
-function BrandingField({ title, description, settingKey, useValue, previewClassName, showTransparencyCheck }: FieldProps) {
+function BrandingField({ title, description, settingKey, useValue, previewClassName, showTransparencyCheck, uploadPrefix }: FieldProps) {
   const { data: saved, isLoading } = useValue();
   const update = useUpdateSiteSetting();
   const [draft, setDraft] = React.useState("");
   const [touched, setTouched] = React.useState(false);
   const [contentType, setContentType] = React.useState<string | null>(null);
   const [probing, setProbing] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // Initialize the draft once data arrives.
   React.useEffect(() => {
@@ -144,6 +151,33 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
     }
   };
 
+  const handleFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Invalid file", { description: "Please pick an image (PNG, SVG, WebP, JPEG, ICO)." });
+      return;
+    }
+    const MAX = 4 * 1024 * 1024;
+    if (file.size > MAX) {
+      toast.error("File too large", { description: "Maximum size is 4 MB." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadBrandingImage(file, uploadPrefix);
+      await update.mutateAsync({ key: settingKey, value: url });
+      setDraft(url);
+      setTouched(false);
+      toast.success(`${title} uploaded and saved`);
+    } catch (err: any) {
+      toast.error("Upload failed", { description: err?.message ?? "Unknown error" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <Card className="p-5 space-y-4">
       <div>
@@ -154,12 +188,36 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
       <div className="space-y-4">
         <div className="space-y-2">
           <Label className="text-xs">Image URL</Label>
-          <Input
-            value={draft}
-            onChange={(e) => { setDraft(e.target.value); setTouched(true); }}
-            placeholder="https://example.com/logo.png"
-            disabled={isLoading}
-          />
+          <div className="flex gap-2">
+            <Input
+              value={draft}
+              onChange={(e) => { setDraft(e.target.value); setTouched(true); }}
+              placeholder="https://example.com/logo.png"
+              disabled={isLoading || uploading}
+              className="flex-1"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/svg+xml,image/webp,image/jpeg,image/x-icon,image/vnd.microsoft.icon"
+              className="hidden"
+              onChange={handleFilePicked}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="default"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading || update.isPending}
+              className="gap-1 shrink-0"
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+              Upload
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Paste a URL above, or upload a file (PNG / SVG / WebP / JPEG / ICO, max 4 MB). Uploads are saved automatically.
+          </p>
           {!looksValid && (
             <p className="text-[11px] text-amber-600 inline-flex items-center gap-1">
               <AlertTriangle className="h-3 w-3" />

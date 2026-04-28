@@ -1,88 +1,97 @@
-## Goals
+## Goal
 
-1. **Featured-products marquee on `/curemed`** — Replace the current small auto-carousel with a full-width **infinite marquee** styled exactly like the existing brands marquee (same card width ~288–320px, same brand-soft top panel with image, same hover lift, same edge fade mask, same pause-on-hover). Products are picked via the existing **"Featured"** toggle in the product editor — no schema change needed (`products.featured` already exists).
+In `/admin/branding`, every image URL field (global Curemed logo, favicon, and the 7 per-brand logos) should support **two ways** of setting the image:
 
-2. **Per-brand logos in `/admin/branding`** — Today only the global Curemed logo is configurable. Add a dedicated logo URL input for **each brand page** (Flexitol, Kapiva, ABC, NADA, Lafe's, Hartington, Phytophar). When a user is on `/flexitol`, `/australian-bodycare`, etc., the header logo automatically swaps to that brand's configured logo. The Curemed logo is used on `/curemed`, `/about`, `/contact`, `/admin/*`, etc. (anywhere not under a brand slug).
+1. Paste a URL (current behavior — keep working).
+2. Upload a file from the computer — the file is uploaded to the storage bucket, and the resulting public URL is auto-filled into the same field and saved.
 
----
-
-## Section 1 — Featured products marquee (CuremedHome)
-
-### What changes
-- Remove the existing small `AutoCarousel` block (the `t("spotlight.title")` section at the bottom of `src/pages/CuremedHome.tsx`).
-- Add a new section that mirrors the **brands marquee** structure (same wrapper, same edge mask, same `marquee` animation, same `group-hover:[animation-play-state:paused]`, same card width `w-72 md:w-80`, same `mr-5`, same hover `-translate-y-1 hover:shadow-xl`).
-- Each card layout (matches brand card visually):
-  - Top panel: `bg-brand-soft` (brand-tinted) containing `product.mainImage` in an `aspect-square`/fixed-height container, `object-contain` on white inner tile so transparent product PNGs look clean (same trick used for brand logos that have `l.isImage`).
-  - Bottom panel: product **name** (localized), short description (1–2 lines clamp), price (respecting existing `usePriceVisibility` hidden-price logic), discount badge if `originalPrice > price`, and a "Discover" arrow row.
-- The whole card is a `<Link>` to `/${brand.slug}/product/${product.id}` and carries `data-brand={brand.themeAttr}` so the brand color theme tints `bg-brand-soft` per product.
-- Data source: existing `useFeaturedProducts()` hook — no DB change. Marketing flow stays: admins tick **"Featured"** in `/admin/products/:id` editor; product appears here automatically.
-- Duplicate the items once (`[...items, ...items]`) to enable seamless infinite marquee, exactly like brands.
-- Section heading reuses `t("spotlight.title")`; subtitle reuses an existing string or adds one new key (e.g. `spotlight.subtitle`).
-
-### Empty state
-- If `featured.length === 0`, the section is hidden (current behavior).
+Both paths end up writing the same string (a public URL) into the existing `site_settings` rows, so there is **no schema change** and the header / favicon / per-brand logo logic keeps working unchanged.
 
 ---
 
-## Section 2 — Per-brand logos in Admin Branding
+## Storage
 
-### Data model (no migration)
-Reuse the existing `site_settings` (key/value JSONB) table. Add 7 new keys, one per brand:
-- `branding_brand_logo_flexitol`
-- `branding_brand_logo_kapiva`
-- `branding_brand_logo_abc`
-- `branding_brand_logo_nada`
-- `branding_brand_logo_lafes`
-- `branding_brand_logo_hartington`
-- `branding_brand_logo_phytophar`
+Reuse the existing public bucket **`brands-images`** (already in the project, already public, already RLS-configured for admins to write). All branding uploads go into a dedicated folder inside it:
 
-Each holds a single string URL (same shape as `branding_logo_url`). Empty/missing string → fall back to the default Curemed logo. RLS already allows admins to write and the public to read `site_settings`.
+```
+brands-images/
+  branding/
+    logo-<timestamp>.png            ← global Curemed logo
+    favicon-<timestamp>.png         ← favicon
+    brand-flexitol-<timestamp>.png  ← per-brand logos
+    brand-kapiva-<timestamp>.svg
+    ...
+```
+
+- Filename pattern: `${prefix}-${Date.now()}.${ext}` — keeps history, avoids collisions, no overwrite of older versions.
+- Public URL obtained via `supabase.storage.from("brands-images").getPublicUrl(path)`.
+- No DB migration needed (bucket already exists and is public).
+
+---
+
+## UI changes — `src/pages/admin/AdminBranding.tsx`
+
+Inside the existing `BrandingField` card, next to the URL input add an **"Upload file"** button (and a hidden `<input type="file" accept="image/png,image/svg+xml,image/webp,image/jpeg,image/x-icon">`).
+
+Layout per field:
+
+```
+[ URL input ..........................................  ]  [ Upload ]
+[ format / transparency check messages ]
+[ preview tiles ]
+[ Reset ]                                              [ Save ]
+```
+
+Behavior on file pick:
+1. Validate: image mime, max size (e.g. 4 MB).
+2. Show inline progress (spinner on the Upload button, disable Save).
+3. Upload to `brands-images` under the storage path described above using the field's `storagePrefix` prop (`logo`, `favicon`, `brand-<key>`).
+4. On success: get the public URL, set it as the draft value, then immediately call the existing save mutation so the user does not have to click Save (toast: "Logo uploaded and saved").
+5. On error: toast with the error message; leave the existing saved value untouched.
+
+The URL input and existing Save / Reset / preview tiles / transparency probe all keep working exactly as today — uploading just becomes a shortcut that fills the URL automatically.
+
+---
+
+## Code changes
 
 ### `src/lib/db.ts`
-- Add `BRANDING_BRAND_LOGO_KEY(brandKey: BrandKey)` helper that returns `branding_brand_logo_${brandKey}`.
-- Add `useBrandingBrandLogo(brandKey: BrandKey)` hook (thin wrapper around the existing `useSiteSetting<string>`) returning the saved URL or empty string.
+Add one small helper used by all branding fields:
+
+```ts
+export async function uploadBrandingImage(
+  file: File,
+  prefix: string,                  // "logo" | "favicon" | "brand-flexitol" | ...
+): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+  const path = `branding/${prefix}-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("brands-images")
+    .upload(path, file, { upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("brands-images").getPublicUrl(path).data.publicUrl;
+}
+```
 
 ### `src/pages/admin/AdminBranding.tsx`
-- Below the existing global logo card, add a new **"Per-brand page logos"** section.
-- One `BrandingField` card per brand (loop over `BRAND_LIST`), each with:
-  - Title: brand name (e.g. "Flexitol logo").
-  - Description: "Shown in the header when visitors are on `/flexitol`."
-  - URL input + same checkerboard transparency preview + JPEG warning + Save / Reset buttons (reuse the existing `BrandingField` component, parameterized by `settingKey` + `useValue`).
-- The existing global logo + favicon + remove-white-bg toggle remain unchanged at the top.
+- Add an `uploadPrefix: string` prop to `BrandingField` (`"logo"`, `"favicon"`, `\`brand-${b.key}\``).
+- Add internal state: `uploading: boolean`, `inputRef`.
+- Add the Upload button + hidden file input.
+- On change → call `uploadBrandingImage`, then `update.mutateAsync({ key: settingKey, value: url })`, then update `draft` and toast.
+- Keep all existing behavior: URL probe, transparency tiles, JPEG warning, Reset, manual Save.
 
-### `src/components/site/SiteHeader.tsx` (logo selection logic)
-- Determine the active brand from the URL using existing `slugToBrand()`:
-  - Strip leading `/`, take the first path segment (e.g. `australian-bodycare` from `/australian-bodycare/product/123`).
-  - If `slugToBrand(segment)` returns a `BrandKey`, fetch that brand's logo via `useBrandingBrandLogo(brandKey)`.
-- Logo resolution order:
-  1. Brand-specific configured URL (if on a brand route and value is non-empty)
-  2. Global configured Curemed logo (`useBrandingLogo`)
-  3. Bundled `defaultLogo` asset
-- The header `<Link to="/curemed">` and the `removeBg` blend-mode toggle continue to work as today.
-
-### Optional follow-on (not in this change)
-- `SiteFooter` and `AdminLayout` keep using the global Curemed logo (per the user's request: per-brand swap is for the **header on brand pages**).
+### Files NOT changed
+- DB schema, RLS, buckets — none.
+- `SiteHeader.tsx`, `BrandingHead.tsx`, `SiteFooter.tsx`, `AdminLayout.tsx` — they read the URL from `site_settings` exactly as today.
+- All other admin pages.
 
 ---
-
-## Files to modify
-
-- `src/lib/db.ts` — add per-brand logo key helper + hook (~15 lines).
-- `src/pages/admin/AdminBranding.tsx` — render 7 brand-logo cards in a new section.
-- `src/components/site/SiteHeader.tsx` — choose brand-specific logo based on current route.
-- `src/pages/CuremedHome.tsx` — replace the small featured `AutoCarousel` with a full-width marquee styled like the brands marquee.
-- `src/lib/i18n.tsx` — (optional) add a short subtitle string for the new featured-products section.
-
-## Files NOT changed
-
-- Database schema (no migration — reuses `site_settings`).
-- `products` table (the existing `featured` boolean is the marker).
-- `src/components/site/ProductCard.tsx` (kept as-is; the new marquee renders its own brand-style card so it can match the brands cards exactly).
-- `src/components/site/SiteFooter.tsx`, `AdminLayout.tsx`, `AdminLogin.tsx` (continue using the global logo).
 
 ## Acceptance checks
 
-- Toggling **Featured** on a product in `/admin/products/:id` makes it appear/disappear in the new marquee on `/curemed` after a refresh.
-- Marquee auto-scrolls infinitely, pauses on hover, fades at the edges, cards match the brand-card width and lift effect.
-- In `/admin/branding`, pasting a Flexitol logo URL and saving makes that logo show in the header when visiting `/flexitol` and any sub-route like `/flexitol/product/123`. Visiting `/curemed` still shows the global Curemed logo.
-- Resetting a brand logo (empty value) reverts the header on that brand page to the global Curemed logo.
+- In `/admin/branding`, each of: global logo, favicon, and the 7 brand logos shows a URL input **and** an Upload button.
+- Pasting a URL + clicking Save still works (current flow unchanged).
+- Clicking Upload → picking a PNG → file is uploaded to `brands-images/branding/...`, the URL auto-fills the input, and the setting is saved automatically.
+- After upload, the header (or brand-page header / browser tab favicon) immediately reflects the new image without manual save.
+- Invalid (non-image) or > 4 MB files are rejected with a toast and no upload happens.
+- Reset still clears the value back to the bundled default.

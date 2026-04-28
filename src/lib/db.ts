@@ -433,6 +433,22 @@ export async function uploadProductImage(file: File): Promise<string> {
   return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
 }
 
+/**
+ * Uploads a branding image (logo / favicon / per-brand logo) to the
+ * public `brands-images` bucket under a `branding/` folder, and returns
+ * the public URL. Used by the Admin Branding page.
+ */
+export async function uploadBrandingImage(file: File, prefix: string): Promise<string> {
+  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const path = `branding/${safePrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext || "png"}`;
+  const { error } = await supabase.storage
+    .from("brands-images")
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("brands-images").getPublicUrl(path).data.publicUrl;
+}
+
 /* ============================================================
  * Categories
  * ============================================================ */
