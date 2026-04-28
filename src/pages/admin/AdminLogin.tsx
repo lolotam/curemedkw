@@ -8,13 +8,16 @@ import { useAdminSession } from "@/lib/admin";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
-import curemedLogo from "@/assets/curemed-logo.png";
+import defaultLogo from "@/assets/curemed-logo.png";
+import { useBrandingLogo } from "@/lib/db";
 import { Loader2, Eye, EyeOff } from "lucide-react";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const { user, loading } = useAdminSession();
+  const { data: brandingLogo } = useBrandingLogo();
+  const logoSrc = brandingLogo?.trim() || defaultLogo;
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
