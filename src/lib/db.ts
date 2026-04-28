@@ -954,6 +954,23 @@ export function useUpdateSiteSetting() {
 }
 
 /* ============================================================
+ * Branding (logo + favicon) — backed by site_settings
+ * ============================================================ */
+
+export const BRANDING_LOGO_KEY = "branding_logo_url";
+export const BRANDING_FAVICON_KEY = "branding_favicon_url";
+
+/** Returns the configured logo URL, or empty string when unset (caller falls back). */
+export function useBrandingLogo() {
+  return useSiteSetting<string>(BRANDING_LOGO_KEY, "");
+}
+
+/** Returns the configured favicon URL, or empty string when unset. */
+export function useBrandingFavicon() {
+  return useSiteSetting<string>(BRANDING_FAVICON_KEY, "");
+}
+
+/* ============================================================
  * Product reviews
  * ============================================================ */
 
