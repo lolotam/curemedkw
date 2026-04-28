@@ -959,6 +959,7 @@ export function useUpdateSiteSetting() {
 
 export const BRANDING_LOGO_KEY = "branding_logo_url";
 export const BRANDING_FAVICON_KEY = "branding_favicon_url";
+export const BRANDING_LOGO_REMOVE_BG_KEY = "branding_logo_remove_bg";
 
 /** Returns the configured logo URL, or empty string when unset (caller falls back). */
 export function useBrandingLogo() {
@@ -968,6 +969,11 @@ export function useBrandingLogo() {
 /** Returns the configured favicon URL, or empty string when unset. */
 export function useBrandingFavicon() {
   return useSiteSetting<string>(BRANDING_FAVICON_KEY, "");
+}
+
+/** Whether to apply a blend-mode hack to "remove" white background from a non-transparent logo. */
+export function useBrandingLogoRemoveBg() {
+  return useSiteSetting<boolean>(BRANDING_LOGO_REMOVE_BG_KEY, false);
 }
 
 /* ============================================================
