@@ -2,14 +2,16 @@ import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { Mail, Phone, MapPin } from "lucide-react";
-import curemedLogo from "@/assets/curemed-logo.png";
+import defaultLogo from "@/assets/curemed-logo.png";
+import { useBrandingLogo } from "@/lib/db";
 
 const CUREMED_INSTAGRAM = "https://www.instagram.com/curemedkw/";
 
 export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
   const { t, lang } = useI18n();
   const brandMeta = Object.values(BRANDS).find((b) => b.themeAttr === brand);
-  const logo = brandMeta?.logo ?? curemedLogo;
+  const { data: brandingLogo } = useBrandingLogo();
+  const logo = brandMeta?.logo ?? (brandingLogo?.trim() || defaultLogo);
   const brandName = brandMeta?.name ?? "Curemed";
   const seoText = brandMeta
     ? brandMeta.seo[lang as "en" | "ar"] ?? brandMeta.seo.en
