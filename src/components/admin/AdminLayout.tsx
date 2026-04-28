@@ -1,12 +1,12 @@
 import { Link, NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon, Sparkles, Tags, Tag, Flag, Star, ShoppingBag, Ticket, UserCog, Bell } from "lucide-react";
+import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon, Sparkles, Tags, Tag, Flag, Star, ShoppingBag, Ticket, UserCog, Bell, Palette } from "lucide-react";
 import { adminLogout, useAdminSession } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import curemedLogo from "@/assets/curemed-logo.png";
+import defaultLogo from "@/assets/curemed-logo.png";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { useUnreadMessageCount } from "@/lib/db";
+import { useUnreadMessageCount, useBrandingLogo } from "@/lib/db";
 
 const NAV = [
   { to: "/admin", icon: LayoutDashboard, label: "Overview", end: true },
@@ -20,6 +20,7 @@ const NAV = [
   { to: "/admin/models", icon: Sparkles, label: "AI Models" },
   { to: "/admin/reviews", icon: Star, label: "Reviews" },
   { to: "/admin/notifications", icon: Bell, label: "Notifications" },
+  { to: "/admin/branding", icon: Palette, label: "Branding" },
   { to: "/admin/flags", icon: Flag, label: "Site Flags" },
   { to: "/admin/messages", icon: Mail, label: "Messages" },
   { to: "/admin/subscribers", icon: Users, label: "Subscribers" },
@@ -30,6 +31,8 @@ export function AdminLayout() {
   const { theme, toggle } = useTheme();
   const { user, isAdmin, loading } = useAdminSession();
   const { data: unreadCount = 0 } = useUnreadMessageCount();
+  const { data: brandingLogo } = useBrandingLogo();
+  const logoSrc = brandingLogo?.trim() || defaultLogo;
 
   if (loading) {
     return (
@@ -73,7 +76,7 @@ export function AdminLayout() {
       <aside className="w-64 bg-background border-r border-border min-h-screen sticky top-0 flex flex-col">
         <div className="p-5 border-b border-border flex flex-col items-center text-center">
           <Link to="/curemed" aria-label="Go to main page">
-            <img src={curemedLogo} alt="Curemed" className="h-16 w-auto object-contain" />
+            <img src={logoSrc} alt="Curemed" className="h-16 w-auto object-contain" />
           </Link>
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground mt-2 font-semibold">Admin Dashboard</p>
         </div>
