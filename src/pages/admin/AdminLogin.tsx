@@ -75,7 +75,7 @@ export default function AdminLogin() {
     <div data-brand="curemed" className="min-h-screen flex items-center justify-center bg-brand-soft p-4">
       <Card className="w-full max-w-md p-8">
         <div className="text-center mb-6">
-          <img src={curemedLogo} alt="Curemed" className="h-24 w-auto mx-auto object-contain" />
+          <img src={logoSrc} alt="Curemed" className="h-24 w-auto mx-auto object-contain" />
           <h1 className="mt-5 text-2xl font-bold">
             {mode === "signin" ? t("admin.login.title") : "Create admin account"}
           </h1>
