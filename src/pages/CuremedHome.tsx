@@ -4,14 +4,13 @@ import { ArrowRight, Pill, Leaf, Sparkles, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
-import { AutoCarousel } from "@/components/site/AutoCarousel";
 import { Testimonials } from "@/components/site/Testimonials";
 import { FAQ } from "@/components/site/FAQ";
 import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
-import { BRAND_LIST } from "@/lib/brands";
+import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { useFeaturedProducts } from "@/lib/db";
 import { getBrandLogo } from "@/lib/placeholder";
 
@@ -240,11 +239,62 @@ export default function CuremedHome() {
       </section>
 
       {featured.length > 0 && (
-        <section className="w-full px-4 md:px-8 py-16 md:py-24">
-          <h2 className="text-3xl md:text-4xl font-bold mb-10 text-center">{t("spotlight.title")}</h2>
-          <AutoCarousel intervalMs={5000}>
-            {featured.map((p) => <ProductCard key={p.id} product={p} />)}
-          </AutoCarousel>
+        <section id="featured" className="py-16 md:py-24">
+          <div className="w-full px-4 md:px-8">
+            <div className="text-center max-w-2xl mx-auto mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold">{t("spotlight.title")}</h2>
+            </div>
+          </div>
+          <div
+            className="group relative overflow-hidden"
+            style={{
+              maskImage:
+                "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+              WebkitMaskImage:
+                "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
+            }}
+          >
+            <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
+              {[...featured, ...featured].map((p, idx) => {
+                const brand = BRANDS[p.brand];
+                const isClone = idx >= featured.length;
+                const name = lang === "ar" && p.nameAr ? p.nameAr : p.name;
+                const desc =
+                  lang === "ar" && p.shortDescriptionAr ? p.shortDescriptionAr : p.shortDescription;
+                return (
+                  <Link
+                    key={`${p.id}-${idx}`}
+                    to={`/${brand.slug}/product/${p.id}`}
+                    data-brand={brand.themeAttr}
+                    aria-hidden={isClone ? "true" : undefined}
+                    tabIndex={isClone ? -1 : undefined}
+                    className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
+                  >
+                    <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
+                      <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
+                        <img
+                          src={p.mainImage}
+                          alt={name}
+                          loading="lazy"
+                          className="max-h-[140px] max-w-full w-auto h-auto object-contain"
+                        />
+                      </div>
+                    </div>
+                    <div className="p-6 flex flex-col items-center text-center">
+                      <h3 className="text-xl font-bold text-brand line-clamp-2">{name}</h3>
+                      {desc && (
+                        <p className="mt-2 text-sm text-foreground/80 line-clamp-3">{desc}</p>
+                      )}
+                      <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
+                        {t("common.discover")}{" "}
+                        <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
         </section>
       )}
 
