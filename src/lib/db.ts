@@ -1001,6 +1001,13 @@ export function useBrandingBrandLogo(brand: BrandKey | null | undefined) {
   return useSiteSetting<string>(brand ? BRANDING_BRAND_LOGO_KEY(brand) : "branding_brand_logo_none", "");
 }
 
+/** Per-brand card logo shown inside the brand tile in the "Our brands" carousel on /curemed. */
+export const BRANDING_BRAND_CARD_LOGO_KEY = (brand: BrandKey) => `branding_brand_card_logo_${brand}`;
+
+export function useBrandingBrandCardLogo(brand: BrandKey | null | undefined) {
+  return useSiteSetting<string>(brand ? BRANDING_BRAND_CARD_LOGO_KEY(brand) : "branding_brand_card_logo_none", "");
+}
+
 /* ============================================================
  * Product reviews
  * ============================================================ */
