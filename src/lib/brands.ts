@@ -10,6 +10,7 @@ const abcLogo = `${BRAND_LOGO_BASE}/Australian%20Bodycare.png`;
 const lafesLogo = `${BRAND_LOGO_BASE}/Lafes.png`;
 const hartingtonLogo = `${BRAND_LOGO_BASE}/Hartington.png`;
 const phytopharLogo = `${BRAND_LOGO_BASE}/Phytophar.png`;
+const hualunhongliLogo = `${BRAND_LOGO_BASE}/Hualunhongli.png`;
 
 export interface BrandMeta {
   key: BrandKey;
@@ -175,6 +176,34 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
       ar: "فيتوفار الكويت — مكملات نباتية للعلاج بالأعشاب ومنتجات عافية طبيعية.",
     },
   },
+  hualunhongli: {
+    key: "hualunhongli",
+    slug: "hualunhongli",
+    name: "Hualunhongli",
+    shortName: "Hualunhongli",
+    tagline: {
+      en: "Self-heating relief & trusted wound care",
+      ar: "راحة ذاتية التسخين ورعاية موثوقة للجروح",
+    },
+    about: {
+      en: "Specialists in self-heating FIR therapy patches, wound dressings and pain-relief plasters — clinically designed for lasting comfort and recovery.",
+      ar: "متخصصون في لاصقات العلاج بالأشعة تحت الحمراء ذاتية التسخين، وضمادات الجروح، ولاصقات تخفيف الألم — مصممة سريرياً لراحة وتعافٍ يدومان طويلاً.",
+    },
+    themeAttr: "hualunhongli",
+    categories: [
+      "Heat Therapy Patches",
+      "Joint Pain Patches",
+      "Menstrual Pain Patches",
+      "Back Pain Patches",
+      "Wound Dressing",
+    ],
+    logo: hualunhongliLogo,
+    instagram: "",
+    seo: {
+      en: "Hualunhongli Kuwait — Self-heating FIR therapy patches, wound dressings and pain-relief plasters.",
+      ar: "هوالنهونغلي الكويت — لاصقات علاجية ذاتية التسخين بالأشعة تحت الحمراء، ضمادات جروح ولاصقات لتخفيف الألم.",
+    },
+  },
 };
 
 export const BRAND_LIST: BrandMeta[] = [
@@ -185,6 +214,7 @@ export const BRAND_LIST: BrandMeta[] = [
   BRANDS.lafes,
   BRANDS.hartington,
   BRANDS.phytophar,
+  BRANDS.hualunhongli,
 ];
 
 export const slugToBrand = (slug: string): BrandKey | null => {
