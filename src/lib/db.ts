@@ -8,7 +8,8 @@ export type BrandKey =
   | "abc"
   | "lafes"
   | "hartington"
-  | "phytophar";
+  | "phytophar"
+  | "hualunhongli";
 export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
 
 /* ============================================================
@@ -899,6 +900,7 @@ const DEFAULT_PRICE_VISIBILITY: PriceVisibility = {
     lafes: false,
     hartington: false,
     phytophar: false,
+    hualunhongli: false,
   },
 };
 
