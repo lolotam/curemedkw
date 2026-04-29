@@ -162,13 +162,29 @@ export default function AdminProductEditor() {
   };
 
   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     try {
-      const url = await uploadProductImage(file);
-      update("mainImage", url);
-      toast.success("Main image updated");
-    } catch (err: any) { toast.error(err.message); }
+      const urls = await Promise.all(files.map(uploadProductImage));
+      const mainIsPlaceholder = !form.mainImage || form.mainImage.startsWith("data:");
+      if (mainIsPlaceholder) {
+        const [first, ...rest] = urls;
+        update("mainImage", first);
+        update("gallery", [...form.gallery, ...rest]);
+        toast.success(
+          urls.length === 1
+            ? "Image uploaded and set as main"
+            : `${urls.length} images uploaded — first set as main`,
+        );
+      } else {
+        update("gallery", [...form.gallery, ...urls]);
+        toast.success(
+          `${urls.length} image(s) added to gallery. Hover any image and click ★ to set as main.`,
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
     e.target.value = "";
   };
 
@@ -566,8 +582,8 @@ export default function AdminProductEditor() {
               </div>
               <div className="space-y-2">
                 <p className="text-sm font-medium">Main image</p>
-                <p className="text-xs text-muted-foreground">PNG/JPG, under 1.5MB. Stored locally in your browser.</p>
-                <input type="file" ref={fileMain} accept="image/*" onChange={uploadMain} className="hidden" />
+                <p className="text-xs text-muted-foreground">Uploads are added to the gallery. Hover any gallery image and click ★ to make it the main image.</p>
+                <input type="file" ref={fileMain} accept="image/*" multiple onChange={uploadMain} className="hidden" />
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => fileMain.current?.click()} className="gap-1.5">
                     <Upload className="h-3.5 w-3.5" /> Upload
