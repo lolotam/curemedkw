@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil, Loader2 } from "lucide-react";
+import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -125,8 +125,13 @@ export default function AdminProducts() {
                   <td className="px-4 py-3"><StockPill status={p.stockStatus} /></td>
                   <td className="px-4 py-3">{p.featured && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}</td>
                   <td className="px-4 py-3 text-right"><div className="inline-flex gap-1">
-                    <Button asChild variant="ghost" size="sm"><Link to={`/admin/products/${p.id}`}><Pencil className="h-3.5 w-3.5" /></Link></Button>
-                    <Button variant="ghost" size="sm" onClick={() => remove(p.id, p.name)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    <Button asChild variant="ghost" size="sm" title="View product page">
+                      <Link to={`/${BRANDS[p.brand].slug}/product/${p.id}`}>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                    <Button asChild variant="ghost" size="sm" title="Edit product"><Link to={`/admin/products/${p.id}`}><Pencil className="h-3.5 w-3.5" /></Link></Button>
+                    <Button variant="ghost" size="sm" onClick={() => remove(p.id, p.name)} className="text-destructive hover:text-destructive" title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div></td>
                 </tr>
               ))}
