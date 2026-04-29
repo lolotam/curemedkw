@@ -1,6 +1,6 @@
 import { useParams, Link, Navigate } from "react-router-dom";
 import { useState } from "react";
-import { ArrowLeft, Star, Check, MessageCircle } from "lucide-react";
+import { ArrowLeft, Star, Check, MessageCircle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
@@ -10,6 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { ProductReviews } from "@/components/site/ProductReviews";
 import { AddToCartButton } from "@/components/site/AddToCartButton";
+import { useAdminSession } from "@/lib/admin";
 
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
@@ -20,6 +21,7 @@ export default function ProductDetail() {
   const { data: product, isLoading } = useProduct(id);
   const { data: brandList = [] } = useProductsByBrand(brandKey);
   const { data: visibility } = usePriceVisibility();
+  const { isAdmin } = useAdminSession();
   if (isLoading) return null;
   if (!product || product.brand !== brandKey) return <Navigate to={`/${brandSlug}`} replace />;
   const meta = BRANDS[brandKey];
@@ -51,7 +53,16 @@ export default function ProductDetail() {
       <div className="bg-brand-soft border-b border-border/40">
         <div className="container py-3 text-sm text-muted-foreground flex items-center gap-2">
           <Link to={`/${meta.slug}`} className="inline-flex items-center gap-1 hover:text-brand"><ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {meta.name}</Link>
-          <span>/</span><span className="text-foreground line-clamp-1">{name}</span>
+          <span>/</span><span className="text-foreground line-clamp-1 flex-1">{name}</span>
+          {isAdmin && (
+            <Link
+              to={`/admin/products/${product.id}`}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-brand text-white px-3 py-1.5 text-xs font-semibold hover:bg-brand/90 shrink-0"
+              title="Edit product"
+            >
+              <Pencil className="h-3.5 w-3.5" /> Edit
+            </Link>
+          )}
         </div>
       </div>
       <section className="container py-10 md:py-16 grid lg:grid-cols-2 gap-10 lg:gap-16">
