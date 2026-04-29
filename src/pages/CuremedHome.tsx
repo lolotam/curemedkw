@@ -11,7 +11,8 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { useFeaturedProducts } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo } from "@/lib/db";
+import type { BrandMeta } from "@/lib/brands";
 import { getBrandLogo } from "@/lib/placeholder";
 
 export default function CuremedHome() {
@@ -42,48 +43,15 @@ export default function CuremedHome() {
           }}
         >
           <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
-            {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => {
-              const l = getBrandLogo(b.themeAttr, b.name);
-              const isClone = idx >= BRAND_LIST.length;
-              return (
-                <Link
-                  key={`${b.key}-${idx}`}
-                  to={`/${b.slug}`}
-                  data-brand={b.themeAttr}
-                  aria-hidden={isClone ? "true" : undefined}
-                  tabIndex={isClone ? -1 : undefined}
-                  className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <div className="p-6 bg-brand-deep flex items-center justify-center h-[200px]">
-                    {l.isImage ? (
-                      <div className="bg-white rounded-xl p-3 w-full h-full flex items-center justify-center overflow-hidden">
-                        <img
-                          src={l.src}
-                          alt={b.name}
-                          className="max-h-full max-w-full w-auto h-auto object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <img
-                        src={l.src}
-                        alt={b.name}
-                        className="h-12 w-auto drop-shadow object-contain"
-                      />
-                    )}
-                  </div>
-                  <div className="p-6 flex flex-col items-center text-center">
-                    <h3 className="text-xl font-bold text-brand">{b.name}</h3>
-                    <p className="mt-2 text-sm text-foreground/80 line-clamp-3">
-                      {b.tagline[lang]}
-                    </p>
-                    <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
-                      {t("common.discover")}{" "}
-                      <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+            {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
+              <BrandMarqueeCard
+                key={`${b.key}-${idx}`}
+                brand={b}
+                isClone={idx >= BRAND_LIST.length}
+                discoverLabel={t("common.discover")}
+                tagline={b.tagline[lang]}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -302,5 +270,54 @@ export default function CuremedHome() {
       <FAQ />
       <Newsletter />
     </SiteLayout>
+  );
+}
+
+interface BrandMarqueeCardProps {
+  brand: BrandMeta;
+  isClone: boolean;
+  discoverLabel: string;
+  tagline: string;
+}
+
+function BrandMarqueeCard({ brand: b, isClone, discoverLabel, tagline }: BrandMarqueeCardProps) {
+  const { data: customCard } = useBrandingBrandCardLogo(b.key);
+  const fallback = getBrandLogo(b.themeAttr, b.name);
+  const src = customCard && customCard.trim() ? customCard.trim() : fallback.src;
+  const isImage = (customCard && customCard.trim()) ? true : fallback.isImage;
+  return (
+    <Link
+      to={`/${b.slug}`}
+      data-brand={b.themeAttr}
+      aria-hidden={isClone ? "true" : undefined}
+      tabIndex={isClone ? -1 : undefined}
+      className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
+    >
+      <div className="p-6 bg-brand-deep flex items-center justify-center h-[200px]">
+        {isImage ? (
+          <div className="bg-white rounded-xl p-3 w-full h-full flex items-center justify-center overflow-hidden">
+            <img
+              src={src}
+              alt={b.name}
+              className="max-h-full max-w-full w-auto h-auto object-contain"
+            />
+          </div>
+        ) : (
+          <img
+            src={src}
+            alt={b.name}
+            className="h-12 w-auto drop-shadow object-contain"
+          />
+        )}
+      </div>
+      <div className="p-6 flex flex-col items-center text-center">
+        <h3 className="text-xl font-bold text-brand">{b.name}</h3>
+        <p className="mt-2 text-sm text-foreground/80 line-clamp-3">{tagline}</p>
+        <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
+          {discoverLabel}{" "}
+          <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
+        </p>
+      </div>
+    </Link>
   );
 }

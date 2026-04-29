@@ -1,33 +1,59 @@
-# Resize Hualunhongli brand card logo to match other brands
+# Branding admin: add per-brand "card logo" + fix logo upload
 
-## Problem
+## Problems
 
-On `/curemed`, the brands marquee (`#brands` section) renders identical card containers for every brand. All cards use the same outer dark panel (`min-h-[140px]`) and inner white logo tile (`min-h-[120px]`). However, the **Hualunhongli** logo PNG has very little internal whitespace and a wider aspect ratio, so its image visually fills the white tile edge-to-edge while other brand logos sit comfortably inside with breathing room. This makes the Hualunhongli card look "bigger" / heavier than the rest.
+1. **Upload to `brands-images` is broken.** The `uploadBrandingImage()` helper writes to the public `brands-images` storage bucket, but `storage.objects` has **no RLS policies for that bucket** (nor for `favicone`, `buket-images`). Admins can read but not insert, so every Branding upload silently fails with a permission error.
 
-The user selected the outer brand panel (line 57) and the inner white logo tile (line 59) of the Hualunhongli card and wants only this brand's image constrained so it matches the visual footprint of the other logos. No other brand should change.
+2. **Brand cards on `/curemed` "Our brands" section have no admin control over the card logo.** Today the card image comes from `getBrandLogo()` -> hardcoded `BRANDS[].logo` constant. There's no way to change it without code edits, and the Admin Branding page only manages the **header** logo, not the card logo.
+
+3. The Branding page lists every brand with the same single field, mixing "Curemed" (which has no card) into the same per-brand section.
 
 ## Approach
 
-Apply a brand-specific image cap **only when `b.key === 'hualunhongli'`** — keep the shared container sizes identical (so layout stays consistent) and just tighten the image's `max-height` (and add a touch of horizontal inset) so the logo sits inside the white tile with the same visual padding the other logos have.
+- Add storage RLS policies so admins can upload/update/delete in `brands-images` (and the other unprotected branding buckets).
+- Add a second site-setting per brand for the **card logo** (separate from the header logo).
+- Restructure the Admin Branding page so each brand has **two** image controls: header logo + card logo, each with paste-URL + upload. The Curemed parent stays as a single header logo (no card).
+- Wire `/curemed` "Our brands" cards to read the new card-logo setting (fall back to the existing hardcoded `BRANDS[].logo` when unset).
 
 ## Changes
 
-### `src/pages/CuremedHome.tsx` — brand marquee card (around lines 56–72)
+### 1. Storage RLS migration
 
-In the `BRAND_LIST.map(...)` block where each brand card is rendered, only inside the `l.isImage` branch:
+For bucket `brands-images` (and `favicone`, `buket-images` for safety) add three `storage.objects` policies — INSERT/UPDATE/DELETE gated by `has_role(auth.uid(), 'admin')`. Public SELECT already works because the buckets are public.
 
-- Detect Hualunhongli: `const isHualun = b.key === "hualunhongli";`
-- On the inner `<img>` for the brand logo, append conditional classes when `isHualun`:
-  - cap height: `max-h-20` (instead of `max-h-full`)
-  - cap width: `max-w-[80%]`
-  - keep `object-contain` and `w-auto h-auto`
-- Leave the outer `min-h-[140px]` panel and the inner white `min-h-[120px]` tile **unchanged** — this preserves grid alignment with the other 7 cards.
-- Do not touch the featured-products marquee further down (different data source).
+### 2. `src/lib/db.ts`
 
-Result: the Hualunhongli logo renders at the same optical size as the other brand logos inside an identically-sized card.
+- Add `BRANDING_BRAND_CARD_LOGO_KEY(brand)` returning `branding_brand_card_logo_${brand}`.
+- Add `useBrandingBrandCardLogo(brand)` hook (mirrors `useBrandingBrandLogo`).
+- No change to `uploadBrandingImage()` once RLS is fixed.
+
+### 3. `src/pages/admin/AdminBranding.tsx`
+
+- Keep top "Site logo", "Remove white bg" toggle, and "Favicon" sections as-is (Curemed parent — header logo only, no card).
+- Replace the per-brand `BRAND_LIST.map(...)` block with a grouped section per brand showing **two** `BrandingField` cards side-by-side (or stacked):
+  - **`{Brand} — Header logo`** (existing key `BRANDING_BRAND_LOGO_KEY(b.key)`, prefix `brand-${b.key}-header`).
+  - **`{Brand} — Card logo`** (new key `BRANDING_BRAND_CARD_LOGO_KEY(b.key)`, prefix `brand-${b.key}-card`). Description: "Shown inside this brand's tile in the 'Our brands' section on the Curemed home page."
+- Wrap each brand in a titled group (e.g. small heading with brand name) so it's clear the two fields belong together.
+- The existing `useValue: () => useBrandingBrandLogo(b.key)` pattern is reused for the new field with `useBrandingBrandCardLogo`.
+
+### 4. `src/lib/placeholder.ts`
+
+No change — keep `getBrandLogo()` as the static fallback.
+
+### 5. `src/pages/CuremedHome.tsx` — brand marquee
+
+In the `BRAND_LIST.map(...)` for the `#brands` section:
+
+- For each brand, read the saved card-logo URL. Because it's a fixed list rendered twice (BRAND_LIST + clones), call a small helper component `BrandMarqueeCard` per item so we can use the `useBrandingBrandCardLogo(b.key)` hook safely (one hook call per stable brand row — Rules of Hooks compliant).
+- If the hook returns a non-empty URL, use it for `<img src>` and treat it as `isImage=true`. Otherwise fall back to existing `getBrandLogo()` result.
+- Keep the layout/sizing exactly as it is now (`h-[200px]` panel, white inner tile, `object-contain`).
 
 ## Out of scope
 
-- The featured products carousel
-- Other brand logos
-- Any container/card sizing changes (cards remain the same size; only the image inside Hualunhongli's tile is constrained)
+- Changing card sizes, the featured-products marquee, or the BrandPage header logo logic (still uses existing `useBrandingBrandLogo`).
+- Adding card logo for Curemed parent (it has no card per the request).
+
+## Technical notes
+
+- New site_settings keys are created lazily on first save; no DB migration needed for them (the existing `site_settings` table + `useSiteSetting`/`useUpdateSiteSetting` already handle arbitrary keys).
+- The only DB migration is the storage RLS policies for `brands-images` (and the two other unprotected branding buckets). After this, the existing Upload button will start working immediately.
