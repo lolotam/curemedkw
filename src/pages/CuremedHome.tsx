@@ -45,6 +45,7 @@ export default function CuremedHome() {
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => {
               const l = getBrandLogo(b.themeAttr, b.name);
               const isClone = idx >= BRAND_LIST.length;
+              const isHualun = b.key === "hualunhongli";
               return (
                 <Link
                   key={`${b.key}-${idx}`}
@@ -60,7 +61,10 @@ export default function CuremedHome() {
                         <img
                           src={l.src}
                           alt={b.name}
-                          className="max-h-full max-w-full w-auto h-auto object-contain"
+                          className={cn(
+                            "w-auto h-auto object-contain",
+                            isHualun ? "max-h-20 max-w-[80%]" : "max-h-full max-w-full",
+                          )}
                         />
                       </div>
                     ) : (
