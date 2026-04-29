@@ -95,6 +95,10 @@ export const TRANSLATIONS: Dict = {
   "brands.subtitle": { en: "Four trusted brands, one curated portfolio.", ar: "أربع علامات موثوقة، باقة واحدة منتقاة." },
 
   "spotlight.title": { en: "Featured products", ar: "منتجات مميزة" },
+  "featured.subtitle": {
+    en: "Hand-picked favourites from across our brands.",
+    ar: "منتجات منتقاة بعناية من جميع علاماتنا.",
+  },
 
   "about.title": { en: "About Curemed", ar: "عن كيورميد" },
   "about.body": {
