@@ -5,6 +5,7 @@ dist
 .vscode
 .idea
 .lovable
+.env
 .env.local
 .env.*.local
 npm-debug.log*
@@ -13,8 +14,5 @@ yarn-error.log*
 pnpm-debug.log*
 coverage
 .DS_Store
-Dockerfile
-docker-compose.yml
-.dockerignore
-README.md
 *.log
+README.md
