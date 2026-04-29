@@ -1,0 +1,1 @@
+ALTER TYPE public.brand_key ADD VALUE IF NOT EXISTS 'hualunhongli';

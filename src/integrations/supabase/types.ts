@@ -887,6 +887,7 @@ export type Database = {
         | "lafes"
         | "hartington"
         | "phytophar"
+        | "hualunhongli"
       coupon_type: "percent" | "fixed"
       notification_type: "order" | "system" | "message"
       order_status:
@@ -1035,6 +1036,7 @@ export const Constants = {
         "lafes",
         "hartington",
         "phytophar",
+        "hualunhongli",
       ],
       coupon_type: ["percent", "fixed"],
       notification_type: ["order", "system", "message"],
