@@ -900,6 +900,7 @@ const DEFAULT_PRICE_VISIBILITY: PriceVisibility = {
     lafes: false,
     hartington: false,
     phytophar: false,
+    hualunhongli: false,
   },
 };
 

@@ -48,6 +48,11 @@ All colors MUST be HSL.
     --phytophar-secondary: 82 48% 50%;
     --phytophar-accent: 33 91% 57%;
 
+    /* Hualunhongli — vivid red wordmark on dark, with teal CTA accent */
+    --hualunhongli-primary: 358 79% 49%;
+    --hualunhongli-secondary: 358 80% 36%;
+    --hualunhongli-accent: 175 71% 42%;
+
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -202,6 +207,13 @@ All colors MUST be HSL.
     --brand-secondary: var(--phytophar-secondary);
     --brand-bg: 222 100% 96%;
     --brand-bg-deep: 222 60% 90%;
+    --brand-ink: var(--curemed-ink);
+  }
+  [data-brand="hualunhongli"] {
+    --brand-primary: var(--hualunhongli-primary);
+    --brand-secondary: var(--hualunhongli-secondary);
+    --brand-bg: 357 80% 96%;
+    --brand-bg-deep: 358 60% 88%;
     --brand-ink: var(--curemed-ink);
   }
 
