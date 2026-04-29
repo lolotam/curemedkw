@@ -1,59 +1,70 @@
-# Branding admin: add per-brand "card logo" + fix logo upload
+# Featured Products Carousel on Home Page
 
-## Problems
+Add a shop-style horizontal carousel of featured products on `/curemed`, automatically populated from the products database. Any product marked `featured = true` in the admin will show up here.
 
-1. **Upload to `brands-images` is broken.** The `uploadBrandingImage()` helper writes to the public `brands-images` storage bucket, but `storage.objects` has **no RLS policies for that bucket** (nor for `favicone`, `buket-images`). Admins can read but not insert, so every Branding upload silently fails with a permission error.
+## What the user will see
 
-2. **Brand cards on `/curemed` "Our brands" section have no admin control over the card logo.** Today the card image comes from `getBrandLogo()` -> hardcoded `BRANDS[].logo` constant. There's no way to change it without code edits, and the Admin Branding page only manages the **header** logo, not the card logo.
+A new "Featured Products" section on the Curemed home page (replacing the current text-only marquee spotlight) that looks and feels like a shop:
 
-3. The Branding page lists every brand with the same single field, mixing "Curemed" (which has no card) into the same per-brand section.
+- Section header with title (EN/AR) and subtitle.
+- Horizontal slider showing product cards (image, brand, name, price/discount badge, add-to-cart button) — same `ProductCard` component already used across the site, so styling stays consistent.
+- Left/right arrow navigation buttons.
+- Dot/scroll indicators at the bottom.
+- Responsive: 2 cards on mobile, 3 on tablet, 4–5 on desktop.
+- Smooth swipe on touch devices.
+- "View all" link that goes to a filtered product listing (all featured items).
+- If no products are flagged featured, the section is hidden automatically.
 
-## Approach
+## How featured products work (already in place)
 
-- Add storage RLS policies so admins can upload/update/delete in `brands-images` (and the other unprotected branding buckets).
-- Add a second site-setting per brand for the **card logo** (separate from the header logo).
-- Restructure the Admin Branding page so each brand has **two** image controls: header logo + card logo, each with paste-URL + upload. The Curemed parent stays as a single header logo (no card).
-- Wire `/curemed` "Our brands" cards to read the new card-logo setting (fall back to the existing hardcoded `BRANDS[].logo` when unset).
+- The `products` table already has a `featured` boolean column.
+- Admin can toggle a product as featured from `/admin/products` and the product editor.
+- The `useFeaturedProducts()` hook in `src/lib/db.ts` already fetches them.
 
-## Changes
+The new section just consumes that hook — no DB changes required.
 
-### 1. Storage RLS migration
+## Technical details
 
-For bucket `brands-images` (and `favicone`, `buket-images` for safety) add three `storage.objects` policies — INSERT/UPDATE/DELETE gated by `has_role(auth.uid(), 'admin')`. Public SELECT already works because the buckets are public.
+### Files
 
-### 2. `src/lib/db.ts`
+- **New:** `src/components/site/FeaturedProductsCarousel.tsx`
+  - Uses the existing shadcn `Carousel` (Embla-based) from `src/components/ui/carousel.tsx`.
+  - Renders each item with `<ProductCard product={p} />` from `src/components/site/ProductCard.tsx` for visual consistency with the rest of the shop.
+  - Configures Embla with `align: "start"`, `loop: true`, `direction` driven by `useI18n()` lang for RTL support.
+  - Responsive item widths via Tailwind: `basis-1/2 sm:basis-1/3 lg:basis-1/4 xl:basis-1/5`.
+  - `CarouselPrevious` / `CarouselNext` buttons, plus a small dot indicator row tied to Embla's `selectedScrollSnap`.
+  - "View all" link → `/curemed/featured` (or existing search/category route if preferred).
 
-- Add `BRANDING_BRAND_CARD_LOGO_KEY(brand)` returning `branding_brand_card_logo_${brand}`.
-- Add `useBrandingBrandCardLogo(brand)` hook (mirrors `useBrandingBrandLogo`).
-- No change to `uploadBrandingImage()` once RLS is fixed.
+- **Edit:** `src/pages/CuremedHome.tsx`
+  - Remove the current marquee-based "spotlight" block.
+  - Insert `<FeaturedProductsCarousel />` in its place, between the Pillars section and Testimonials.
+  - Keep the section hidden when the hook returns an empty array.
 
-### 3. `src/pages/admin/AdminBranding.tsx`
+- **Edit:** `src/lib/i18n.tsx`
+  - Add translation keys: `featured.title`, `featured.subtitle`, `featured.viewAll` for both EN and AR.
 
-- Keep top "Site logo", "Remove white bg" toggle, and "Favicon" sections as-is (Curemed parent — header logo only, no card).
-- Replace the per-brand `BRAND_LIST.map(...)` block with a grouped section per brand showing **two** `BrandingField` cards side-by-side (or stacked):
-  - **`{Brand} — Header logo`** (existing key `BRANDING_BRAND_LOGO_KEY(b.key)`, prefix `brand-${b.key}-header`).
-  - **`{Brand} — Card logo`** (new key `BRANDING_BRAND_CARD_LOGO_KEY(b.key)`, prefix `brand-${b.key}-card`). Description: "Shown inside this brand's tile in the 'Our brands' section on the Curemed home page."
-- Wrap each brand in a titled group (e.g. small heading with brand name) so it's clear the two fields belong together.
-- The existing `useValue: () => useBrandingBrandLogo(b.key)` pattern is reused for the new field with `useBrandingBrandCardLogo`.
+### Data flow
 
-### 4. `src/lib/placeholder.ts`
+```text
+admin toggles "featured" on product
+           │
+           ▼
+products.featured = true   (Supabase)
+           │
+           ▼
+useFeaturedProducts()  →  React Query cache
+           │
+           ▼
+FeaturedProductsCarousel  →  ProductCard (links to /:brand/product/:id)
+```
 
-No change — keep `getBrandLogo()` as the static fallback.
+### Behavior notes
 
-### 5. `src/pages/CuremedHome.tsx` — brand marquee
-
-In the `BRAND_LIST.map(...)` for the `#brands` section:
-
-- For each brand, read the saved card-logo URL. Because it's a fixed list rendered twice (BRAND_LIST + clones), call a small helper component `BrandMarqueeCard` per item so we can use the `useBrandingBrandCardLogo(b.key)` hook safely (one hook call per stable brand row — Rules of Hooks compliant).
-- If the hook returns a non-empty URL, use it for `<img src>` and treat it as `isImage=true`. Otherwise fall back to existing `getBrandLogo()` result.
-- Keep the layout/sizing exactly as it is now (`h-[200px]` panel, white inner tile, `object-contain`).
+- Reuses `ProductCard`, so price hiding, discount badges, "Add to cart", featured star, and brand theming all work out of the box.
+- No new RLS or storage changes needed.
+- React Query auto-refetches on focus, so newly featured products appear without a manual reload.
 
 ## Out of scope
 
-- Changing card sizes, the featured-products marquee, or the BrandPage header logo logic (still uses existing `useBrandingBrandLogo`).
-- Adding card logo for Curemed parent (it has no card per the request).
-
-## Technical notes
-
-- New site_settings keys are created lazily on first save; no DB migration needed for them (the existing `site_settings` table + `useSiteSetting`/`useUpdateSiteSetting` already handle arbitrary keys).
-- The only DB migration is the storage RLS policies for `brands-images` (and the two other unprotected branding buckets). After this, the existing Upload button will start working immediately.
+- Auto-rotating slides (carousel is user-controlled; can be added later if desired).
+- A separate "featured" landing page (the "View all" link can point to an existing filter route — confirm during implementation).
