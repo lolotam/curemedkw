@@ -54,13 +54,13 @@ export default function CuremedHome() {
                   tabIndex={isClone ? -1 : undefined}
                   className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
                 >
-                  <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
+                  <div className="p-6 bg-brand-deep flex items-center justify-center h-[140px]">
                     {l.isImage ? (
-                      <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
+                      <div className="bg-white rounded-xl px-4 py-2 inline-flex items-center justify-center">
                         <img
                           src={l.src}
                           alt={b.name}
-                          className="max-h-full max-w-full w-auto h-auto object-contain"
+                          className="h-12 w-auto object-contain"
                         />
                       </div>
                     ) : (
