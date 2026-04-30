@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle, Info, CheckCircle2, XCircle, Upload } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import {
   BRANDING_FAVICON_KEY,
@@ -12,11 +13,13 @@ import {
   BRANDING_LOGO_REMOVE_BG_KEY,
   BRANDING_BRAND_LOGO_KEY,
   BRANDING_BRAND_CARD_LOGO_KEY,
+  FEATURED_GLASS_OPACITY_KEY,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
   useBrandingBrandLogo,
   useBrandingBrandCardLogo,
+  useFeaturedGlassOpacity,
   useUpdateSiteSetting,
   uploadBrandingImage,
 } from "@/lib/db";
@@ -57,6 +60,8 @@ export default function AdminBranding() {
         previewClassName="h-8 w-8 object-contain"
         uploadPrefix="favicon"
       />
+
+      <FeaturedGlassOpacityControl />
 
       <div className="pt-4">
         <h2 className="text-xl font-bold">Per-brand page logos</h2>
@@ -365,3 +370,72 @@ function RemoveWhiteBgToggle() {
     </Card>
   );
 }
+
+function FeaturedGlassOpacityControl() {
+  const { data: saved = 70 } = useFeaturedGlassOpacity();
+  const update = useUpdateSiteSetting();
+  const [value, setValue] = React.useState<number>(saved);
+  const [touched, setTouched] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!touched) setValue(saved);
+  }, [saved, touched]);
+
+  const save = (v: number) => {
+    update.mutate(
+      { key: FEATURED_GLASS_OPACITY_KEY, value: v },
+      {
+        onSuccess: () => {
+          setTouched(false);
+          toast.success("Opacity updated");
+        },
+        onError: (e: any) => toast.error(e?.message || "Failed to update"),
+      },
+    );
+  };
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h3 className="text-base font-semibold">Featured card — glass strip opacity</h3>
+          <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+            Controls the background transparency of the frosted info strip on featured product
+            cards. Lower values reveal more of the product image. Text and price stay fully
+            readable.
+          </p>
+        </div>
+        <div className="text-2xl font-bold tabular-nums text-brand">{value}%</div>
+      </div>
+
+      <Slider
+        value={[value]}
+        min={0}
+        max={100}
+        step={5}
+        onValueChange={(v) => {
+          setTouched(true);
+          setValue(v[0] ?? 0);
+        }}
+        onValueCommit={(v) => save(v[0] ?? 0)}
+      />
+
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setTouched(true);
+            setValue(70);
+            save(70);
+          }}
+          disabled={update.isPending}
+        >
+          <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset to 70%
+        </Button>
+        {update.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+    </Card>
+  );
+}
+
