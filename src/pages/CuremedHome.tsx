@@ -11,7 +11,7 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { useFeaturedProducts, useBrandingBrandCardLogo, type Product } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, type Product } from "@/lib/db";
 import { useCart } from "@/lib/cart";
 import { toast } from "sonner";
 import { getBrandLogo } from "@/lib/placeholder";
@@ -303,6 +303,8 @@ function FeaturedGlassCard({
 }) {
   const { lang, t } = useI18n();
   const { add } = useCart();
+  const { data: glassOpacity = 70 } = useFeaturedGlassOpacity();
+  const opacity = Math.max(0, Math.min(100, Number(glassOpacity) || 0)) / 100;
   const name = lang === "ar" && product.nameAr ? product.nameAr : product.name;
   const price = Number(product.price) || 0;
   const original = product.originalPrice ? Number(product.originalPrice) : null;
@@ -341,9 +343,14 @@ function FeaturedGlassCard({
         </div>
       )}
 
-      {/* Frosted glass info strip */}
-      <div className="absolute inset-x-3 bottom-3 rounded-2xl overflow-hidden backdrop-blur-md bg-white/70 dark:bg-black/40 border border-white/40 dark:border-white/10 shadow-lg transition-all duration-300">
-        <div className="p-4">
+      {/* Frosted glass info strip — bg layer is opacity-controlled, text stays fully opaque */}
+      <div className="absolute inset-x-3 bottom-3 rounded-2xl overflow-hidden border border-white/40 dark:border-white/10 shadow-lg transition-all duration-300">
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 backdrop-blur-md bg-white dark:bg-black transition-opacity duration-300"
+          style={{ opacity }}
+        />
+        <div className="relative p-4">
           <h3 className="text-base font-bold text-foreground line-clamp-2 leading-snug">{name}</h3>
 
           <div className="mt-1.5 flex items-end justify-between gap-2">
