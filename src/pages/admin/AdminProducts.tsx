@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink } from "lucide-react";
+import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useProducts, useDeleteProduct, useBulkDeleteProducts, useUpdateProduct } from "@/lib/db";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useProducts, useDeleteProduct, useBulkDeleteProducts, useUpdateProduct, useCategories, type Category, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,7 @@ export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState("");
   const { data: allProducts = [] } = useProducts();
+  const { data: categories = [] } = useCategories();
   const del = useDeleteProduct();
   const bulkDel = useBulkDeleteProducts();
   const updateProduct = useUpdateProduct();
@@ -97,8 +100,8 @@ export default function AdminProducts() {
                   <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
                     <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
-                  <td className="px-4 py-3">{BRANDS[p.brand].name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{p.category}</td>
+                  <td className="px-4 py-3"><InlineBrandCell product={p} /></td>
+                  <td className="px-4 py-3"><InlineCategoriesCell product={p} categories={categories} /></td>
                   <td className="px-4 py-3">
                     <InlinePriceCell
                       value={p.price}
@@ -297,4 +300,150 @@ function StockPill({ status }: { status: string }) {
   };
   const m = map[status] || map.in_stock;
   return <span className={cn("px-2 py-0.5 text-xs font-medium rounded-full", m.cls)}>{m.label}</span>;
+}
+
+function InlineBrandCell({ product }: { product: Product }) {
+  const updateProduct = useUpdateProduct();
+  const [busy, setBusy] = useState(false);
+  const onChange = async (next: string) => {
+    if (next === product.brand) return;
+    setBusy(true);
+    try {
+      await updateProduct.mutateAsync({ id: product.id, patch: { brand: next as BrandKey } });
+      toast.success("Brand updated");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update brand");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <Select value={product.brand} onValueChange={onChange} disabled={busy}>
+        <SelectTrigger className="h-8 w-[140px] text-sm">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {BRAND_LIST.map((b) => (
+            <SelectItem key={b.key} value={b.key}>{b.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+    </div>
+  );
+}
+
+function InlineCategoriesCell({ product, categories }: { product: Product; categories: Category[] }) {
+  const updateProduct = useUpdateProduct();
+  const initial = useMemo(() => {
+    const ids = product.categoryIds && product.categoryIds.length > 0
+      ? product.categoryIds
+      : (product.categoryId ? [product.categoryId] : []);
+    return new Set(ids);
+  }, [product.categoryIds, product.categoryId]);
+
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<Set<string>>(initial);
+  const [search, setSearch] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open) setDraft(initial);
+  }, [open, initial]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return categories;
+    return categories.filter((c) => c.nameEn.toLowerCase().includes(q) || c.nameAr.toLowerCase().includes(q));
+  }, [categories, search]);
+
+  const toggle = (id: string) => {
+    setDraft((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const commit = async () => {
+    const before = Array.from(initial).sort().join(",");
+    const after = Array.from(draft).sort().join(",");
+    setOpen(false);
+    if (before === after) return;
+    setBusy(true);
+    try {
+      await updateProduct.mutateAsync({ id: product.id, patch: { categoryIds: Array.from(draft) } });
+      toast.success("Categories updated");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update categories");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const selectedCats = categories.filter((c) => initial.has(c.id));
+  const summary = selectedCats.length === 0
+    ? (product.category || "—")
+    : selectedCats.length === 1
+      ? selectedCats[0].nameEn
+      : `${selectedCats[0].nameEn} +${selectedCats.length - 1}`;
+
+  return (
+    <div className="inline-flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+      <Popover open={open} onOpenChange={(o) => { if (!o) commit(); else setOpen(true); }}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-input bg-background text-sm text-left hover:bg-muted/60 transition-colors min-w-[140px] max-w-[220px]"
+            title="Click to edit categories"
+          >
+            <span className={cn("truncate flex-1", selectedCats.length === 0 && "text-muted-foreground")}>{summary}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-0" align="start">
+          <div className="p-2 border-b">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search categories…"
+              className="h-8 text-sm"
+              autoFocus
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {filtered.length === 0 && (
+              <p className="px-3 py-4 text-sm text-muted-foreground text-center">No categories</p>
+            )}
+            {filtered.map((c) => {
+              const checked = draft.has(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => toggle(c.id)}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/60 text-left"
+                >
+                  <span className={cn(
+                    "h-4 w-4 rounded border flex items-center justify-center shrink-0",
+                    checked ? "bg-primary border-primary text-primary-foreground" : "border-input",
+                  )}>
+                    {checked && <Check className="h-3 w-3" />}
+                  </span>
+                  <span className="truncate">{c.nameEn}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between gap-2 p-2 border-t">
+            <span className="text-xs text-muted-foreground">{draft.size} selected</span>
+            <Button size="sm" className="h-7" onClick={commit}>Done</Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+      {busy && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
+    </div>
+  );
 }
