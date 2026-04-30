@@ -262,6 +262,14 @@ All colors MUST be HSL.
     to { transform: translateX(50%); }
   }
 
+  @keyframes loader-progress {
+    0%   { width: 0%; }
+    100% { width: 100%; }
+  }
+  .animate-loader-progress {
+    animation: loader-progress 3.2s ease-out forwards;
+  }
+
   .cat-marquee {
     animation: cat-marquee 35s linear infinite;
   }
