@@ -446,7 +446,13 @@ export async function uploadBrandingImage(file: File, prefix: string): Promise<s
   const { error } = await supabase.storage
     .from("brands-images")
     .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
-  if (error) throw error;
+  if (error) {
+    const msg = (error.message || "").toLowerCase();
+    if (msg.includes("row-level security") || msg.includes("unauthorized") || msg.includes("denied") || msg.includes("403")) {
+      throw new Error("Upload denied — make sure you are signed in as an admin.");
+    }
+    throw error;
+  }
   return supabase.storage.from("brands-images").getPublicUrl(path).data.publicUrl;
 }
 
@@ -999,6 +1005,13 @@ export const BRANDING_BRAND_LOGO_KEY = (brand: BrandKey) => `branding_brand_logo
 
 export function useBrandingBrandLogo(brand: BrandKey | null | undefined) {
   return useSiteSetting<string>(brand ? BRANDING_BRAND_LOGO_KEY(brand) : "branding_brand_logo_none", "");
+}
+
+/** Per-brand card logo (shown inside the brand tile in the Curemed home "Our brands" carousel). */
+export const BRANDING_BRAND_CARD_LOGO_KEY = (brand: BrandKey) => `branding_brand_card_logo_${brand}`;
+
+export function useBrandingBrandCardLogo(brand: BrandKey | null | undefined) {
+  return useSiteSetting<string>(brand ? BRANDING_BRAND_CARD_LOGO_KEY(brand) : "branding_brand_card_logo_none", "");
 }
 
 /* ============================================================
