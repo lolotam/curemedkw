@@ -11,8 +11,9 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { useFeaturedProducts } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo } from "@/lib/db";
 import { getBrandLogo } from "@/lib/placeholder";
+import type { BrandMeta } from "@/lib/brands";
 
 export default function CuremedHome() {
   const { t, lang } = useI18n();
@@ -42,48 +43,13 @@ export default function CuremedHome() {
           }}
         >
           <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
-            {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => {
-              const l = getBrandLogo(b.themeAttr, b.name);
-              const isClone = idx >= BRAND_LIST.length;
-              return (
-                <Link
-                  key={`${b.key}-${idx}`}
-                  to={`/${b.slug}`}
-                  data-brand={b.themeAttr}
-                  aria-hidden={isClone ? "true" : undefined}
-                  tabIndex={isClone ? -1 : undefined}
-                  className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
-                    {l.isImage ? (
-                      <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
-                        <img
-                          src={l.src}
-                          alt={b.name}
-                          className="max-h-full max-w-full w-auto h-auto object-contain"
-                        />
-                      </div>
-                    ) : (
-                      <img
-                        src={l.src}
-                        alt={b.name}
-                        className="h-12 w-auto drop-shadow object-contain"
-                      />
-                    )}
-                  </div>
-                  <div className="p-6 flex flex-col items-center text-center">
-                    <h3 className="text-xl font-bold text-brand">{b.name}</h3>
-                    <p className="mt-2 text-sm text-foreground/80 line-clamp-3">
-                      {b.tagline[lang]}
-                    </p>
-                    <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
-                      {t("common.discover")}{" "}
-                      <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+            {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
+              <BrandTile
+                key={`${b.key}-${idx}`}
+                brand={b}
+                isClone={idx >= BRAND_LIST.length}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -302,5 +268,50 @@ export default function CuremedHome() {
       <FAQ />
       <Newsletter />
     </SiteLayout>
+  );
+}
+
+function BrandTile({ brand: b, isClone }: { brand: BrandMeta; isClone: boolean }) {
+  const { t, lang } = useI18n();
+  const { data: cardLogo } = useBrandingBrandCardLogo(b.key);
+  const fallback = getBrandLogo(b.themeAttr, b.name);
+  const src = cardLogo && cardLogo.trim() ? cardLogo.trim() : fallback.src;
+  const useImageTile = !!(cardLogo && cardLogo.trim()) || fallback.isImage;
+  return (
+    <Link
+      to={`/${b.slug}`}
+      data-brand={b.themeAttr}
+      aria-hidden={isClone ? "true" : undefined}
+      tabIndex={isClone ? -1 : undefined}
+      className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
+    >
+      <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
+        {useImageTile ? (
+          <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
+            <img
+              src={src}
+              alt={b.name}
+              className="max-h-full max-w-full w-auto h-auto object-contain"
+            />
+          </div>
+        ) : (
+          <img
+            src={src}
+            alt={b.name}
+            className="h-12 w-auto drop-shadow object-contain"
+          />
+        )}
+      </div>
+      <div className="p-6 flex flex-col items-center text-center">
+        <h3 className="text-xl font-bold text-brand">{b.name}</h3>
+        <p className="mt-2 text-sm text-foreground/80 line-clamp-3">
+          {b.tagline[lang]}
+        </p>
+        <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
+          {t("common.discover")}{" "}
+          <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
+        </p>
+      </div>
+    </Link>
   );
 }
