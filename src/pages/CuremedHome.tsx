@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Card } from "@/components/ui/card";
-import { ArrowRight, Pill, Leaf, Sparkles, Stethoscope } from "lucide-react";
+import { ArrowRight, Pill, Leaf, Sparkles, Stethoscope, ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
@@ -11,7 +11,9 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { useFeaturedProducts, useBrandingBrandCardLogo } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo, type Product } from "@/lib/db";
+import { useCart } from "@/lib/cart";
+import { toast } from "sonner";
 import { getBrandLogo } from "@/lib/placeholder";
 import type { BrandMeta } from "@/lib/brands";
 
@@ -224,39 +226,13 @@ export default function CuremedHome() {
               {[...featured, ...featured].map((p, idx) => {
                 const brand = BRANDS[p.brand];
                 const isClone = idx >= featured.length;
-                const name = lang === "ar" && p.nameAr ? p.nameAr : p.name;
-                const desc =
-                  lang === "ar" && p.shortDescriptionAr ? p.shortDescriptionAr : p.shortDescription;
                 return (
-                  <Link
+                  <FeaturedGlassCard
                     key={`${p.id}-${idx}`}
-                    to={`/${brand.slug}/product/${p.id}`}
-                    data-brand={brand.themeAttr}
-                    aria-hidden={isClone ? "true" : undefined}
-                    tabIndex={isClone ? -1 : undefined}
-                    className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
-                  >
-                    <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
-                      <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center">
-                        <img
-                          src={p.mainImage}
-                          alt={name}
-                          loading="lazy"
-                          className="max-h-[140px] max-w-full w-auto h-auto object-contain"
-                        />
-                      </div>
-                    </div>
-                    <div className="p-6 flex flex-col items-center text-center">
-                      <h3 className="text-xl font-bold text-brand line-clamp-2">{name}</h3>
-                      {desc && (
-                        <p className="mt-2 text-sm text-foreground/80 line-clamp-3">{desc}</p>
-                      )}
-                      <p className="mt-4 text-sm font-semibold text-brand inline-flex items-center gap-1">
-                        {t("common.discover")}{" "}
-                        <ArrowRight className="h-4 w-4 rtl:rotate-180 transition-transform group-hover/card:translate-x-1" />
-                      </p>
-                    </div>
-                  </Link>
+                    product={p}
+                    brand={brand}
+                    isClone={isClone}
+                  />
                 );
               })}
             </div>
@@ -315,3 +291,93 @@ function BrandTile({ brand: b, isClone }: { brand: BrandMeta; isClone: boolean }
     </Link>
   );
 }
+
+function FeaturedGlassCard({
+  product,
+  brand,
+  isClone,
+}: {
+  product: Product;
+  brand: BrandMeta;
+  isClone: boolean;
+}) {
+  const { lang, t } = useI18n();
+  const { add } = useCart();
+  const name = lang === "ar" && product.nameAr ? product.nameAr : product.name;
+  const price = Number(product.price) || 0;
+  const original = product.originalPrice ? Number(product.originalPrice) : null;
+  const hasDiscount = original !== null && original > price;
+
+  const handleAdd = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    add(product, 1);
+    toast.success(lang === "ar" ? "تمت الإضافة إلى السلة" : "Added to cart");
+  };
+
+  return (
+    <Link
+      to={`/${brand.slug}/product/${product.id}`}
+      data-brand={brand.themeAttr}
+      aria-hidden={isClone ? "true" : undefined}
+      tabIndex={isClone ? -1 : undefined}
+      className="group/card relative shrink-0 w-72 md:w-80 h-96 mr-5 rounded-3xl overflow-hidden bg-brand-soft border border-border transition-all hover:-translate-y-1 hover:shadow-2xl"
+    >
+      {/* Full-bleed image */}
+      <img
+        src={product.mainImage}
+        alt={name}
+        loading="lazy"
+        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
+      />
+
+      {/* Top gradient for legibility of the discount badge */}
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
+
+      {/* Discount badge */}
+      {hasDiscount && (
+        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-brand text-brand-foreground text-xs font-semibold shadow-md">
+          -{Math.round(((original! - price) / original!) * 100)}%
+        </div>
+      )}
+
+      {/* Frosted glass info strip */}
+      <div className="absolute inset-x-3 bottom-3 rounded-2xl overflow-hidden backdrop-blur-md bg-white/70 dark:bg-black/40 border border-white/40 dark:border-white/10 shadow-lg transition-all duration-300">
+        <div className="p-4">
+          <h3 className="text-base font-bold text-foreground line-clamp-2 leading-snug">{name}</h3>
+
+          <div className="mt-1.5 flex items-end justify-between gap-2">
+            <div className="flex items-baseline gap-2 min-w-0">
+              <span className="text-lg font-bold text-brand tabular-nums">
+                {price.toFixed(3)} <span className="text-xs font-medium opacity-80">KD</span>
+              </span>
+              {hasDiscount && (
+                <span className="text-xs text-muted-foreground line-through tabular-nums">
+                  {original!.toFixed(3)}
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleAdd}
+              aria-label={t("common.addToCart") || "Add to cart"}
+              className="shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full bg-brand text-brand-foreground shadow-md hover:scale-110 active:scale-95 transition-transform"
+            >
+              <ShoppingBag className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Reveal-on-hover discover link */}
+          <div className="mt-0 max-h-0 opacity-0 overflow-hidden group-hover/card:max-h-10 group-hover/card:opacity-100 group-hover/card:mt-2 transition-all duration-300">
+            <p className="text-xs font-semibold text-brand inline-flex items-center gap-1">
+              {t("common.discover")}
+              <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
+            </p>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
