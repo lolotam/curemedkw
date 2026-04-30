@@ -14,6 +14,9 @@ import {
   BRANDING_BRAND_LOGO_KEY,
   BRANDING_BRAND_CARD_LOGO_KEY,
   FEATURED_GLASS_OPACITY_KEY,
+  LOADER_BAR_KEY,
+  LOADER_BAR_DEFAULTS,
+  useLoaderBarSettings,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
@@ -62,6 +65,8 @@ export default function AdminBranding() {
       />
 
       <FeaturedGlassOpacityControl />
+
+      <LoaderBarControl />
 
       <div className="pt-4">
         <h2 className="text-xl font-bold">Per-brand page logos</h2>
@@ -322,6 +327,155 @@ function BrandingField({ title, description, settingKey, useValue, previewClassN
         </Button>
       </div>
     </Card>
+  );
+}
+
+function LoaderBarControl() {
+  const { data: saved } = useLoaderBarSettings();
+  const update = useUpdateSiteSetting();
+  const initial = saved ?? LOADER_BAR_DEFAULTS;
+  const [cfg, setCfg] = React.useState(initial);
+  const [touched, setTouched] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!touched && saved) setCfg(saved);
+  }, [saved, touched]);
+
+  const commit = (next: typeof initial) => {
+    update.mutate(
+      { key: LOADER_BAR_KEY, value: next },
+      {
+        onSuccess: () => {
+          setTouched(false);
+          toast.success("Loader bar updated");
+        },
+        onError: (e: any) => toast.error(e?.message || "Failed to update"),
+      },
+    );
+  };
+
+  const reset = () => {
+    setTouched(true);
+    setCfg(LOADER_BAR_DEFAULTS);
+    commit(LOADER_BAR_DEFAULTS);
+  };
+
+  const update1 = (patch: Partial<typeof initial>) => {
+    setTouched(true);
+    setCfg((c) => ({ ...c, ...patch }));
+  };
+
+  return (
+    <Card className="p-5 space-y-5">
+      <div>
+        <h3 className="text-base font-semibold">Loading page — gradient progress bar</h3>
+        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+          Controls the duration, position and width of the loading bar shown on top of the
+          intro video. Same logic as the H1 / H2 / CTA position controls in the hero slides:
+          X and Y are percentages of the screen, with 50% being centered.
+        </p>
+      </div>
+
+      <SliderRow
+        label="Animation duration"
+        valueLabel={`${(cfg.durationMs / 1000).toFixed(1)} s`}
+        min={1000}
+        max={8000}
+        step={100}
+        value={cfg.durationMs}
+        onChange={(v) => update1({ durationMs: v })}
+        onCommit={(v) => commit({ ...cfg, durationMs: v })}
+      />
+      <SliderRow
+        label="Horizontal position (X)"
+        valueLabel={`${cfg.positionX}%`}
+        min={0}
+        max={100}
+        step={1}
+        value={cfg.positionX}
+        onChange={(v) => update1({ positionX: v })}
+        onCommit={(v) => commit({ ...cfg, positionX: v })}
+      />
+      <SliderRow
+        label="Vertical position (Y)"
+        valueLabel={`${cfg.positionY}%`}
+        min={0}
+        max={100}
+        step={1}
+        value={cfg.positionY}
+        onChange={(v) => update1({ positionY: v })}
+        onCommit={(v) => commit({ ...cfg, positionY: v })}
+      />
+      <SliderRow
+        label="Bar width"
+        valueLabel={`${cfg.widthPx} px`}
+        min={120}
+        max={600}
+        step={10}
+        value={cfg.widthPx}
+        onChange={(v) => update1({ widthPx: v })}
+        onCommit={(v) => commit({ ...cfg, widthPx: v })}
+      />
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">Position preview</Label>
+        <div className="relative w-full aspect-video rounded-lg bg-slate-900 overflow-hidden border border-border">
+          <div
+            className="absolute -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${cfg.positionX}%`, top: `${cfg.positionY}%` }}
+          >
+            <div
+              className="h-1 rounded-full bg-gradient-to-r from-[hsl(var(--curemed-blue-soft))] via-[hsl(var(--curemed-blue))] to-[hsl(var(--curemed-teal))] shadow-[0_0_8px_hsl(var(--curemed-blue)/0.7)]"
+              style={{ width: Math.max(40, cfg.widthPx / 3) }}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" onClick={reset} disabled={update.isPending}>
+          <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset to defaults
+        </Button>
+        {update.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+      </div>
+    </Card>
+  );
+}
+
+function SliderRow({
+  label,
+  valueLabel,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+  onCommit,
+}: {
+  label: string;
+  valueLabel: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (v: number) => void;
+  onCommit: (v: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs">{label}</Label>
+        <span className="text-sm font-semibold tabular-nums text-brand">{valueLabel}</span>
+      </div>
+      <Slider
+        value={[value]}
+        min={min}
+        max={max}
+        step={step}
+        onValueChange={(v) => onChange(v[0] ?? min)}
+        onValueCommit={(v) => onCommit(v[0] ?? min)}
+      />
+    </div>
   );
 }
 

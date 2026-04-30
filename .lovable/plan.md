@@ -1,59 +1,89 @@
 ## Goal
 
-Restructure `src/pages/Loading.tsx` into a full-screen video splash:
+Add an admin control panel for the **loading-page gradient progress bar** so the admin can:
 
-1. **Full-screen background video** plays automatically on every site visit using:
-   `https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/hero-media//CureMed_logo_loading_animation_202604300936.mp4`
-2. **Remove the Curemed logo image and the tagline text** entirely — only the video shows.
-3. A single **stylish loading bar** is centered on the screen (middle), animating **left → right** in Curemed brand blue.
-4. The loader shows on **every fresh visit** (remove the `sessionStorage` skip).
+1. Change the bar's **animation duration** (seconds) — like the `intervalMs` control for hero slides.
+2. Change the bar's **position** on the loading page — using percent-based **X / Y sliders** (0–100), the same logic used by `text_position_x` / `text_position_y` on hero slides.
+
+Settings persist in `site_settings` (one JSON row, key `loader_bar`) so changes apply instantly with no migrations needed.
 
 ## Changes
 
-### 1. `src/pages/Loading.tsx` (rewrite)
+### 1. `src/lib/db.ts` — add settings hook
 
-- Remove `curemedLogo` import, the logo `<img>`, the tagline `<p>`, and the `SEEN_KEY` sessionStorage gate.
-- Keep `useEffect` timer → `navigate("/curemed", { replace: true })` after ~3500ms (give the video time to play).
-- Structure:
-  - Root: `fixed inset-0 overflow-hidden bg-black`
-  - `<video>` absolutely positioned to fill the viewport:
-    - `className="absolute inset-0 h-full w-full object-cover"`
-    - Attributes: `autoPlay muted playsInline loop preload="auto"`
-    - `src={VIDEO_URL}`
-  - Centered overlay container: `absolute inset-0 flex items-center justify-center pointer-events-none`
-    - Inside: the stylish progress bar
-      - Track: `h-1.5 w-64 md:w-80 rounded-full bg-white/15 backdrop-blur-sm overflow-hidden shadow-lg`
-      - Fill: `h-full rounded-full bg-gradient-to-r from-[hsl(var(--curemed-blue-soft))] via-[hsl(var(--curemed-blue))] to-[hsl(var(--curemed-teal))] animate-loader-progress shadow-[0_0_12px_hsl(var(--curemed-blue)/0.6)]`
+Append a new typed setting:
 
-### 2. `src/index.css`
-
-Add the left-to-right fill keyframe + utility (only if not already present):
-
-```css
-@keyframes loader-progress {
-  0%   { width: 0%; }
-  100% { width: 100%; }
+```ts
+export interface LoaderBarSettings {
+  durationMs: number;   // total time bar takes to fill (default 3200)
+  positionX: number;    // 0–100 % of viewport width  (default 50)
+  positionY: number;    // 0–100 % of viewport height (default 50)
+  widthPx: number;      // bar width in px            (default 256)
 }
-.animate-loader-progress {
-  animation: loader-progress 3.2s ease-out forwards;
+export const LOADER_BAR_KEY = "loader_bar";
+export const LOADER_BAR_DEFAULTS: LoaderBarSettings = {
+  durationMs: 3200, positionX: 50, positionY: 50, widthPx: 256,
+};
+export function useLoaderBarSettings() {
+  return useSiteSetting<LoaderBarSettings>(LOADER_BAR_KEY, LOADER_BAR_DEFAULTS);
 }
 ```
 
-## Visual layout
+### 2. `src/pages/Loading.tsx` — consume the settings
+
+- Remove the hard-coded `animate-loader-progress` utility class and `w-64 md:w-80`.
+- Read `useLoaderBarSettings()`. While loading, fall back to defaults.
+- Keep the navigate timer aligned with the bar duration: `setTimeout(... , durationMs + 300)`.
+- Replace the centered flex container with an absolutely positioned wrapper anchored at `(positionX%, positionY%)` and translated by `-50%` so the bar's center sits exactly on that point:
+
+```tsx
+<div
+  className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+  style={{ left: `${positionX}%`, top: `${positionY}%`, width: widthPx }}
+>
+  <div className="h-1.5 w-full rounded-full bg-white/15 backdrop-blur-sm overflow-hidden shadow-lg">
+    <div
+      className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--curemed-blue-soft))] via-[hsl(var(--curemed-blue))] to-[hsl(var(--curemed-teal))] shadow-[0_0_12px_hsl(var(--curemed-blue)/0.6)]"
+      style={{ animation: `loader-progress ${durationMs}ms ease-out forwards` }}
+    />
+  </div>
+</div>
+```
+
+(The `loader-progress` keyframe already exists in `src/index.css`; we just drive it with an inline `animation` string so duration is dynamic.)
+
+### 3. `src/pages/admin/AdminBranding.tsx` — new "Loading page bar" card
+
+Add a new `<LoaderBarControl />` card (rendered just below `<FeaturedGlassOpacityControl />`) modeled exactly on `FeaturedGlassOpacityControl`, using shadcn `Slider` + `Button`:
+
+Card sections:
+- **Animation duration** slider — range `1000–8000` ms, step `100`, displays `X.Xs`.
+- **Horizontal position (X)** slider — range `0–100`, step `1`, displays `X%`.
+- **Vertical position (Y)** slider — range `0–100`, step `1`, displays `Y%`.
+- **Bar width** slider — range `120–600` px, step `10`, displays `Npx`.
+- A small **live preview box** (16:9, dark background) showing a miniature dot at the chosen X/Y so the admin can see where the bar will sit before saving.
+- **Reset to defaults** button.
+
+Save behavior matches existing pattern: update on `onValueCommit` via `useUpdateSiteSetting().mutate({ key: LOADER_BAR_KEY, value: nextSettings })`, with a `toast.success("Loader bar updated")`.
+
+## No DB / RLS changes
+
+The `site_settings` table already exists with admin-only write RLS and public read RLS — exactly what we need. No migration required.
+
+## Visual layout (admin card)
 
 ```text
-┌──────────────────────────────────┐
-│                                  │
-│        [ full-screen video ]     │
-│                                  │
-│       ─────████──────────        │  ← gradient progress bar (center)
-│                                  │
-│                                  │
-└──────────────────────────────────┘
+┌─ Loading page — gradient progress bar ──────────────┐
+│ Animation duration       3.2 s    [────●────────]   │
+│ Horizontal position (X)   50 %    [────●────────]   │
+│ Vertical position (Y)     50 %    [────●────────]   │
+│ Bar width               256 px    [──●──────────]   │
+│                                                     │
+│ ┌─ Preview ──────────────────────────────┐          │
+│ │                                        │          │
+│ │                  ●                     │  ← dot   │
+│ │                                        │          │
+│ └────────────────────────────────────────┘          │
+│                                  [Reset to defaults]│
+└─────────────────────────────────────────────────────┘
 ```
-
-## Notes
-
-- `muted` + `playsInline` + `autoPlay` are required so mobile browsers auto-play the video without user interaction.
-- The bar uses a subtle white-tinted glass track so it stays readable on any frame of the video.
-- No DB, RLS, or storage changes needed — the asset is already public in the `hero-media` bucket.

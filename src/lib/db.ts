@@ -1021,6 +1021,24 @@ export function useFeaturedGlassOpacity() {
   return useSiteSetting<number>(FEATURED_GLASS_OPACITY_KEY, 70);
 }
 
+// Loading page gradient progress bar settings.
+export interface LoaderBarSettings {
+  durationMs: number;   // total time bar takes to fill
+  positionX: number;    // 0-100 % of viewport width
+  positionY: number;    // 0-100 % of viewport height
+  widthPx: number;      // bar width in px
+}
+export const LOADER_BAR_KEY = "loader_bar";
+export const LOADER_BAR_DEFAULTS: LoaderBarSettings = {
+  durationMs: 3200,
+  positionX: 50,
+  positionY: 50,
+  widthPx: 256,
+};
+export function useLoaderBarSettings() {
+  return useSiteSetting<LoaderBarSettings>(LOADER_BAR_KEY, LOADER_BAR_DEFAULTS);
+}
+
 /* ============================================================
  * Product reviews
  * ============================================================ */
