@@ -11,12 +11,10 @@ import {
   BRANDING_LOGO_KEY,
   BRANDING_LOGO_REMOVE_BG_KEY,
   BRANDING_BRAND_LOGO_KEY,
-  BRANDING_BRAND_CARD_LOGO_KEY,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
   useBrandingBrandLogo,
-  useBrandingBrandCardLogo,
   useUpdateSiteSetting,
   uploadBrandingImage,
 } from "@/lib/db";
@@ -59,41 +57,25 @@ export default function AdminBranding() {
       />
 
       <div className="pt-4">
-        <h2 className="text-xl font-bold">Per-brand logos</h2>
+        <h2 className="text-xl font-bold">Per-brand page logos</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Each brand has two logos you can manage independently:
-          a <strong>header logo</strong> (shown in the site header when visitors browse that brand's pages,
-          e.g. <span className="font-mono">/flexitol</span>) and a <strong>card logo</strong>
-          (shown inside that brand's tile in the "Our brands" section of the Curemed home page).
-          Leave a field empty to use the default.
+          Each brand page can have its own header logo. When a visitor opens a brand page
+          (e.g. <span className="font-mono">/flexitol</span>), the header logo automatically
+          swaps to that brand's logo. Leave empty to use the global Curemed logo.
         </p>
       </div>
 
       {BRAND_LIST.map((b) => (
-        <div key={b.key} className="space-y-3">
-          <div className="flex items-center gap-2 pt-2">
-            <div className="h-1.5 w-8 rounded-full bg-brand" />
-            <h3 className="text-base font-semibold">{b.name}</h3>
-          </div>
-          <BrandingField
-            title={`${b.name} — Header logo`}
-            description={`Shown in the site header on /${b.slug} and its sub-pages.`}
-            settingKey={BRANDING_BRAND_LOGO_KEY(b.key)}
-            useValue={() => useBrandingBrandLogo(b.key)}
-            previewClassName="h-20 w-auto max-w-[260px] object-contain"
-            showTransparencyCheck
-            uploadPrefix={`brand-${b.key}-header`}
-          />
-          <BrandingField
-            title={`${b.name} — Card logo`}
-            description={`Shown inside this brand's tile in the "Our brands" carousel on the Curemed home page. Leave empty to use the built-in logo.`}
-            settingKey={BRANDING_BRAND_CARD_LOGO_KEY(b.key)}
-            useValue={() => useBrandingBrandCardLogo(b.key)}
-            previewClassName="h-20 w-auto max-w-[260px] object-contain"
-            showTransparencyCheck
-            uploadPrefix={`brand-${b.key}-card`}
-          />
-        </div>
+        <BrandingField
+          key={b.key}
+          title={`${b.name} logo`}
+          description={`Shown in the header on /${b.slug} and its sub-pages.`}
+          settingKey={BRANDING_BRAND_LOGO_KEY(b.key)}
+          useValue={() => useBrandingBrandLogo(b.key)}
+          previewClassName="h-20 w-auto max-w-[260px] object-contain"
+          showTransparencyCheck
+          uploadPrefix={`brand-${b.key}`}
+        />
       ))}
     </div>
   );

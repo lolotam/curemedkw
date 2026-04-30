@@ -1,70 +1,33 @@
-# Featured Products Carousel on Home Page
+# Resize Hualunhongli brand card logo to match other brands
 
-Add a shop-style horizontal carousel of featured products on `/curemed`, automatically populated from the products database. Any product marked `featured = true` in the admin will show up here.
+## Problem
 
-## What the user will see
+On `/curemed`, the brands marquee (`#brands` section) renders identical card containers for every brand. All cards use the same outer dark panel (`min-h-[140px]`) and inner white logo tile (`min-h-[120px]`). However, the **Hualunhongli** logo PNG has very little internal whitespace and a wider aspect ratio, so its image visually fills the white tile edge-to-edge while other brand logos sit comfortably inside with breathing room. This makes the Hualunhongli card look "bigger" / heavier than the rest.
 
-A new "Featured Products" section on the Curemed home page (replacing the current text-only marquee spotlight) that looks and feels like a shop:
+The user selected the outer brand panel (line 57) and the inner white logo tile (line 59) of the Hualunhongli card and wants only this brand's image constrained so it matches the visual footprint of the other logos. No other brand should change.
 
-- Section header with title (EN/AR) and subtitle.
-- Horizontal slider showing product cards (image, brand, name, price/discount badge, add-to-cart button) — same `ProductCard` component already used across the site, so styling stays consistent.
-- Left/right arrow navigation buttons.
-- Dot/scroll indicators at the bottom.
-- Responsive: 2 cards on mobile, 3 on tablet, 4–5 on desktop.
-- Smooth swipe on touch devices.
-- "View all" link that goes to a filtered product listing (all featured items).
-- If no products are flagged featured, the section is hidden automatically.
+## Approach
 
-## How featured products work (already in place)
+Apply a brand-specific image cap **only when `b.key === 'hualunhongli'`** — keep the shared container sizes identical (so layout stays consistent) and just tighten the image's `max-height` (and add a touch of horizontal inset) so the logo sits inside the white tile with the same visual padding the other logos have.
 
-- The `products` table already has a `featured` boolean column.
-- Admin can toggle a product as featured from `/admin/products` and the product editor.
-- The `useFeaturedProducts()` hook in `src/lib/db.ts` already fetches them.
+## Changes
 
-The new section just consumes that hook — no DB changes required.
+### `src/pages/CuremedHome.tsx` — brand marquee card (around lines 56–72)
 
-## Technical details
+In the `BRAND_LIST.map(...)` block where each brand card is rendered, only inside the `l.isImage` branch:
 
-### Files
+- Detect Hualunhongli: `const isHualun = b.key === "hualunhongli";`
+- On the inner `<img>` for the brand logo, append conditional classes when `isHualun`:
+  - cap height: `max-h-20` (instead of `max-h-full`)
+  - cap width: `max-w-[80%]`
+  - keep `object-contain` and `w-auto h-auto`
+- Leave the outer `min-h-[140px]` panel and the inner white `min-h-[120px]` tile **unchanged** — this preserves grid alignment with the other 7 cards.
+- Do not touch the featured-products marquee further down (different data source).
 
-- **New:** `src/components/site/FeaturedProductsCarousel.tsx`
-  - Uses the existing shadcn `Carousel` (Embla-based) from `src/components/ui/carousel.tsx`.
-  - Renders each item with `<ProductCard product={p} />` from `src/components/site/ProductCard.tsx` for visual consistency with the rest of the shop.
-  - Configures Embla with `align: "start"`, `loop: true`, `direction` driven by `useI18n()` lang for RTL support.
-  - Responsive item widths via Tailwind: `basis-1/2 sm:basis-1/3 lg:basis-1/4 xl:basis-1/5`.
-  - `CarouselPrevious` / `CarouselNext` buttons, plus a small dot indicator row tied to Embla's `selectedScrollSnap`.
-  - "View all" link → `/curemed/featured` (or existing search/category route if preferred).
-
-- **Edit:** `src/pages/CuremedHome.tsx`
-  - Remove the current marquee-based "spotlight" block.
-  - Insert `<FeaturedProductsCarousel />` in its place, between the Pillars section and Testimonials.
-  - Keep the section hidden when the hook returns an empty array.
-
-- **Edit:** `src/lib/i18n.tsx`
-  - Add translation keys: `featured.title`, `featured.subtitle`, `featured.viewAll` for both EN and AR.
-
-### Data flow
-
-```text
-admin toggles "featured" on product
-           │
-           ▼
-products.featured = true   (Supabase)
-           │
-           ▼
-useFeaturedProducts()  →  React Query cache
-           │
-           ▼
-FeaturedProductsCarousel  →  ProductCard (links to /:brand/product/:id)
-```
-
-### Behavior notes
-
-- Reuses `ProductCard`, so price hiding, discount badges, "Add to cart", featured star, and brand theming all work out of the box.
-- No new RLS or storage changes needed.
-- React Query auto-refetches on focus, so newly featured products appear without a manual reload.
+Result: the Hualunhongli logo renders at the same optical size as the other brand logos inside an identically-sized card.
 
 ## Out of scope
 
-- Auto-rotating slides (carousel is user-controlled; can be added later if desired).
-- A separate "featured" landing page (the "View all" link can point to an existing filter route — confirm during implementation).
+- The featured products carousel
+- Other brand logos
+- Any container/card sizing changes (cards remain the same size; only the image inside Hualunhongli's tile is constrained)
