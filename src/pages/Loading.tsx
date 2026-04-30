@@ -34,11 +34,11 @@ export default function Loading() {
         className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
         style={{ left: `${positionX}%`, top: `${positionY}%`, width: widthPx }}
       >
-        <div className="h-1.5 w-full rounded-full bg-white/15 backdrop-blur-sm overflow-hidden shadow-lg">
+        <div className="h-2.5 w-full rounded-full bg-white/15 backdrop-blur-sm overflow-hidden shadow-lg">
           <div
             key={`${durationMs}-${widthPx}`}
             className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--curemed-blue-soft))] via-[hsl(var(--curemed-blue))] to-[hsl(var(--curemed-teal))] shadow-[0_0_12px_hsl(var(--curemed-blue)/0.6)]"
-            style={{ animation: `loader-progress ${durationMs}ms ease-out forwards` }}
+            style={{ animation: `loader-progress ${durationMs}ms ease-out infinite` }}
           />
         </div>
       </div>

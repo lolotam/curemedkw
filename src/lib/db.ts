@@ -1033,7 +1033,7 @@ export const LOADER_BAR_DEFAULTS: LoaderBarSettings = {
   durationMs: 3200,
   positionX: 50,
   positionY: 50,
-  widthPx: 256,
+  widthPx: 420,
 };
 export function useLoaderBarSettings() {
   return useSiteSetting<LoaderBarSettings>(LOADER_BAR_KEY, LOADER_BAR_DEFAULTS);
