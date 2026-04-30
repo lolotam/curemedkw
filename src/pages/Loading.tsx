@@ -21,9 +21,6 @@ export default function Loading() {
 
   return (
     <div data-brand="curemed" className="fixed inset-0 overflow-hidden bg-black">
-      {/* Scale the video up and shift it so the built-in progress bar at the
-          bottom of the source MP4 is pushed off-screen. Only our custom
-          React-rendered gradient bar remains visible. */}
       <video
         src={VIDEO_URL}
         autoPlay
@@ -31,8 +28,7 @@ export default function Loading() {
         playsInline
         loop
         preload="auto"
-        className="absolute inset-0 h-full w-full object-cover origin-center"
-        style={{ transform: "scale(1.18) translateY(-6%)" }}
+        className="absolute inset-0 h-full w-full object-cover"
       />
       <div
         className="absolute -translate-x-1/2 -translate-y-1/2 pointer-events-none"
