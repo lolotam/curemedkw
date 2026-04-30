@@ -1,48 +1,59 @@
-# Inline Brand + Categories editing in Admin Products table
-
 ## Goal
-On `/admin/products`, make the **Brand** and **Category** columns editable directly from the table — no need to open the product editor.
 
-## UX
+Restructure `src/pages/Loading.tsx` into a full-screen video splash:
 
-### Brand column (single-select)
-- Click the brand cell → compact dropdown opens listing all brands from `BRAND_LIST`.
-- Picking a brand updates the row immediately (optimistic) and shows a toast "Brand updated".
-- Spinner replaces the chevron while saving.
+1. **Full-screen background video** plays automatically on every site visit using:
+   `https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/hero-media//CureMed_logo_loading_animation_202604300936.mp4`
+2. **Remove the Curemed logo image and the tagline text** entirely — only the video shows.
+3. A single **stylish loading bar** is centered on the screen (middle), animating **left → right** in Curemed brand blue.
+4. The loader shows on **every fresh visit** (remove the `sessionStorage` skip).
 
-### Category column (multi-select)
-- Click the cell → popover with a searchable checkbox list of all categories (from `useCategories()`).
-- User can tick/untick multiple. A "Done" button (or click-outside) commits the change.
-- Cell displays:
-  - `—` when no categories
-  - The single category name when 1 selected
-  - `Skin care +2` style chip-with-count when more than 1
-- Toast: "Categories updated".
+## Changes
 
-Both stay quiet (no confirmation modal) and use the existing `useUpdateProduct` mutation, which already syncs `category_id` + `product_categories` link rows.
+### 1. `src/pages/Loading.tsx` (rewrite)
 
-## Implementation (technical)
-File: `src/pages/admin/AdminProducts.tsx`
+- Remove `curemedLogo` import, the logo `<img>`, the tagline `<p>`, and the `SEEN_KEY` sessionStorage gate.
+- Keep `useEffect` timer → `navigate("/curemed", { replace: true })` after ~3500ms (give the video time to play).
+- Structure:
+  - Root: `fixed inset-0 overflow-hidden bg-black`
+  - `<video>` absolutely positioned to fill the viewport:
+    - `className="absolute inset-0 h-full w-full object-cover"`
+    - Attributes: `autoPlay muted playsInline loop preload="auto"`
+    - `src={VIDEO_URL}`
+  - Centered overlay container: `absolute inset-0 flex items-center justify-center pointer-events-none`
+    - Inside: the stylish progress bar
+      - Track: `h-1.5 w-64 md:w-80 rounded-full bg-white/15 backdrop-blur-sm overflow-hidden shadow-lg`
+      - Fill: `h-full rounded-full bg-gradient-to-r from-[hsl(var(--curemed-blue-soft))] via-[hsl(var(--curemed-blue))] to-[hsl(var(--curemed-teal))] animate-loader-progress shadow-[0_0_12px_hsl(var(--curemed-blue)/0.6)]`
 
-1. Add imports: `Popover, PopoverTrigger, PopoverContent`, `Select, SelectTrigger, SelectContent, SelectItem, SelectValue` from shadcn ui; `useCategories` from `@/lib/db`; `ChevronDown, Check` from lucide.
-2. Fetch `const { data: categories = [] } = useCategories();` once at top of `AdminProducts`.
-3. Replace `<td>{BRANDS[p.brand].name}</td>` with `<InlineBrandCell product={p} />`.
-4. Replace `<td>{p.category}</td>` with `<InlineCategoriesCell product={p} categories={categories} />`.
+### 2. `src/index.css`
 
-5. `InlineBrandCell` — uses shadcn `Select`:
-   - `value={p.brand}`, `onValueChange={(b) => updateProduct.mutateAsync({ id: p.id, patch: { brand: b as BrandKey } })}`.
-   - Compact trigger styled like the existing inline editors (`h-8`, ghost border).
-   - Loading spinner overlay while pending.
+Add the left-to-right fill keyframe + utility (only if not already present):
 
-6. `InlineCategoriesCell` — uses `Popover` + a small list of `Checkbox` rows:
-   - Local draft `Set<string>` initialized from `product.categoryIds` (fallback to `[product.categoryId]` if empty).
-   - On popover close (or "Done" click), if the set differs from current, call `updateProduct.mutateAsync({ id: product.id, patch: { categoryIds: Array.from(draft) } })`.
-   - Trigger button shows the summary text described above.
-   - Includes a small search input filtering categories by `nameEn`.
+```css
+@keyframes loader-progress {
+  0%   { width: 0%; }
+  100% { width: 100%; }
+}
+.animate-loader-progress {
+  animation: loader-progress 3.2s ease-out forwards;
+}
+```
 
-7. Both new cells stop event propagation so they don't trigger row-level handlers.
+## Visual layout
 
-## Out of scope
-- No DB schema changes (uses existing `brand`, `category_id`, `product_categories`).
-- No changes to Arabic category text or to the product editor page.
-- No changes to filters or column headers.
+```text
+┌──────────────────────────────────┐
+│                                  │
+│        [ full-screen video ]     │
+│                                  │
+│       ─────████──────────        │  ← gradient progress bar (center)
+│                                  │
+│                                  │
+└──────────────────────────────────┘
+```
+
+## Notes
+
+- `muted` + `playsInline` + `autoPlay` are required so mobile browsers auto-play the video without user interaction.
+- The bar uses a subtle white-tinted glass track so it stays readable on any frame of the video.
+- No DB, RLS, or storage changes needed — the asset is already public in the `hero-media` bucket.
