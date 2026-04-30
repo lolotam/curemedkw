@@ -14,6 +14,9 @@ import {
   BRANDING_BRAND_LOGO_KEY,
   BRANDING_BRAND_CARD_LOGO_KEY,
   FEATURED_GLASS_OPACITY_KEY,
+  LOADER_BAR_KEY,
+  LOADER_BAR_DEFAULTS,
+  useLoaderBarSettings,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
@@ -62,6 +65,8 @@ export default function AdminBranding() {
       />
 
       <FeaturedGlassOpacityControl />
+
+      <LoaderBarControl />
 
       <div className="pt-4">
         <h2 className="text-xl font-bold">Per-brand page logos</h2>
