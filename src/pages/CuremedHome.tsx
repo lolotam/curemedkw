@@ -233,13 +233,13 @@ function BrandMarqueeCard({ brand: b, isClone, discoverLabel, tagline }: BrandMa
       tabIndex={isClone ? -1 : undefined}
       className="group/card shrink-0 w-72 md:w-80 mr-5 rounded-3xl border border-border bg-brand-soft overflow-hidden transition-all hover:-translate-y-1 hover:shadow-xl"
     >
-      <div className="p-6 bg-brand-deep flex items-center justify-center h-[200px]">
+      <div className="p-6 bg-brand-deep flex items-center justify-center min-h-[140px]">
         {isImage ? (
-          <div className="bg-white rounded-xl p-3 w-full h-full flex items-center justify-center overflow-hidden">
+          <div className="bg-white rounded-xl p-3 w-full h-full min-h-[120px] flex items-center justify-center overflow-hidden">
             <img
               src={src}
               alt={b.name}
-              className="max-h-full max-w-full w-auto h-auto object-contain"
+              className="max-h-[140px] max-w-full w-auto h-auto object-contain"
             />
           </div>
         ) : (
