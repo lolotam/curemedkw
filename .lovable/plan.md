@@ -1,30 +1,48 @@
-# Inline Featured toggle in Admin Products table
+# Inline Brand + Categories editing in Admin Products table
 
 ## Goal
-On `/admin/products`, turn the **Featured** column into a one-click toggle. Clicking the star in a row immediately flags/unflags that product as featured — which controls whether it appears in the **Featured Products carousel** on the `/curemed` home page. No need to open the product editor.
+On `/admin/products`, make the **Brand** and **Category** columns editable directly from the table — no need to open the product editor.
 
 ## UX
-- Replace the read-only star with a clickable star button in each row.
-- **Filled amber star** = featured (shown on home carousel).
-- **Outline grey star** = not featured. Hovering shows a faint amber preview.
-- Click toggles instantly with optimistic UI; a tiny spinner replaces the star while saving.
-- Toast confirms: "Added to featured" / "Removed from featured".
-- Tooltip on hover: "Click to feature on home page" / "Click to remove from featured".
-- Column header stays "Featured".
+
+### Brand column (single-select)
+- Click the brand cell → compact dropdown opens listing all brands from `BRAND_LIST`.
+- Picking a brand updates the row immediately (optimistic) and shows a toast "Brand updated".
+- Spinner replaces the chevron while saving.
+
+### Category column (multi-select)
+- Click the cell → popover with a searchable checkbox list of all categories (from `useCategories()`).
+- User can tick/untick multiple. A "Done" button (or click-outside) commits the change.
+- Cell displays:
+  - `—` when no categories
+  - The single category name when 1 selected
+  - `Skin care +2` style chip-with-count when more than 1
+- Toast: "Categories updated".
+
+Both stay quiet (no confirmation modal) and use the existing `useUpdateProduct` mutation, which already syncs `category_id` + `product_categories` link rows.
 
 ## Implementation (technical)
 File: `src/pages/admin/AdminProducts.tsx`
-- Add a small `FeaturedToggleCell` component (same file, like `InlinePriceCell`).
-- It receives `{ id, featured }` and uses the existing `useUpdateProduct` mutation:
-  ```ts
-  updateProduct.mutateAsync({ id, patch: { featured: !featured } })
-  ```
-- Renders a `<button>` with `Star` (lucide) — `fill-amber-400 text-amber-400` when featured, `text-muted-foreground` otherwise, with `hover:text-amber-400` for affordance.
-- While the mutation is pending for that row, show `Loader2` spinner instead of the star and disable the button.
-- Replace the current static `{p.featured && <Star ... />}` cell with `<FeaturedToggleCell id={p.id} featured={p.featured} />`.
-- Stop event propagation so the row's other interactions aren't triggered.
+
+1. Add imports: `Popover, PopoverTrigger, PopoverContent`, `Select, SelectTrigger, SelectContent, SelectItem, SelectValue` from shadcn ui; `useCategories` from `@/lib/db`; `ChevronDown, Check` from lucide.
+2. Fetch `const { data: categories = [] } = useCategories();` once at top of `AdminProducts`.
+3. Replace `<td>{BRANDS[p.brand].name}</td>` with `<InlineBrandCell product={p} />`.
+4. Replace `<td>{p.category}</td>` with `<InlineCategoriesCell product={p} categories={categories} />`.
+
+5. `InlineBrandCell` — uses shadcn `Select`:
+   - `value={p.brand}`, `onValueChange={(b) => updateProduct.mutateAsync({ id: p.id, patch: { brand: b as BrandKey } })}`.
+   - Compact trigger styled like the existing inline editors (`h-8`, ghost border).
+   - Loading spinner overlay while pending.
+
+6. `InlineCategoriesCell` — uses `Popover` + a small list of `Checkbox` rows:
+   - Local draft `Set<string>` initialized from `product.categoryIds` (fallback to `[product.categoryId]` if empty).
+   - On popover close (or "Done" click), if the set differs from current, call `updateProduct.mutateAsync({ id: product.id, patch: { categoryIds: Array.from(draft) } })`.
+   - Trigger button shows the summary text described above.
+   - Includes a small search input filtering categories by `nameEn`.
+
+7. Both new cells stop event propagation so they don't trigger row-level handlers.
 
 ## Out of scope
-- No DB schema changes (the `featured` boolean already exists on `products` and the home carousel already reads it).
-- No changes to filters, brand chips, or the rest of the table.
-- No changes to the home page — it already renders featured products.
+- No DB schema changes (uses existing `brand`, `category_id`, `product_categories`).
+- No changes to Arabic category text or to the product editor page.
+- No changes to filters or column headers.

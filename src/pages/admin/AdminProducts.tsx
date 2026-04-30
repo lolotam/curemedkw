@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink } from "lucide-react";
+import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink, ChevronDown, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useProducts, useDeleteProduct, useBulkDeleteProducts, useUpdateProduct } from "@/lib/db";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useProducts, useDeleteProduct, useBulkDeleteProducts, useUpdateProduct, useCategories, type Category, type Product, type BrandKey } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,7 @@ export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState("");
   const { data: allProducts = [] } = useProducts();
+  const { data: categories = [] } = useCategories();
   const del = useDeleteProduct();
   const bulkDel = useBulkDeleteProducts();
   const updateProduct = useUpdateProduct();
@@ -97,8 +100,8 @@ export default function AdminProducts() {
                   <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
                     <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
-                  <td className="px-4 py-3">{BRANDS[p.brand].name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{p.category}</td>
+                  <td className="px-4 py-3"><InlineBrandCell product={p} /></td>
+                  <td className="px-4 py-3"><InlineCategoriesCell product={p} categories={categories} /></td>
                   <td className="px-4 py-3">
                     <InlinePriceCell
                       value={p.price}
