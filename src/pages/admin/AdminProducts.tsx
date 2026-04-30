@@ -123,7 +123,7 @@ export default function AdminProducts() {
                     />
                   </td>
                   <td className="px-4 py-3"><StockPill status={p.stockStatus} /></td>
-                  <td className="px-4 py-3">{p.featured && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}</td>
+                  <td className="px-4 py-3"><FeaturedToggleCell id={p.id} featured={p.featured} /></td>
                   <td className="px-4 py-3 text-right"><div className="inline-flex gap-1">
                     <Button asChild variant="ghost" size="sm" title="View product page">
                       <Link to={`/${BRANDS[p.brand].slug}/product/${p.id}`}>
