@@ -249,6 +249,46 @@ function InlinePriceCell({
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors", active ? "bg-brand text-white" : "bg-muted hover:bg-muted/70")}>{children}</button>;
 }
+
+function FeaturedToggleCell({ id, featured }: { id: string; featured: boolean }) {
+  const updateProduct = useUpdateProduct();
+  const [busy, setBusy] = useState(false);
+  const toggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    try {
+      await updateProduct.mutateAsync({ id, patch: { featured: !featured } });
+      toast.success(!featured ? "Added to featured" : "Removed from featured");
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to update");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={busy}
+      title={featured ? "Click to remove from featured" : "Click to feature on home page"}
+      className="inline-flex items-center justify-center h-7 w-7 rounded-md hover:bg-muted/60 transition-colors disabled:opacity-60"
+    >
+      {busy ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : (
+        <Star
+          className={cn(
+            "h-4 w-4 transition-colors",
+            featured ? "fill-amber-400 text-amber-400" : "text-muted-foreground hover:text-amber-400",
+          )}
+        />
+      )}
+    </button>
+  );
+}
+
 function StockPill({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
     in_stock: { label: "In stock", cls: "bg-green-500/10 text-green-700 dark:text-green-400" },
