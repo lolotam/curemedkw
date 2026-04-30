@@ -11,10 +11,12 @@ import {
   BRANDING_LOGO_KEY,
   BRANDING_LOGO_REMOVE_BG_KEY,
   BRANDING_BRAND_LOGO_KEY,
+  BRANDING_BRAND_CARD_LOGO_KEY,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
   useBrandingBrandLogo,
+  useBrandingBrandCardLogo,
   useUpdateSiteSetting,
   uploadBrandingImage,
 } from "@/lib/db";
@@ -59,23 +61,35 @@ export default function AdminBranding() {
       <div className="pt-4">
         <h2 className="text-xl font-bold">Per-brand page logos</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Each brand page can have its own header logo. When a visitor opens a brand page
-          (e.g. <span className="font-mono">/flexitol</span>), the header logo automatically
-          swaps to that brand's logo. Leave empty to use the global Curemed logo.
+          Each brand has two logos: a <strong>Header logo</strong> shown in the header on that
+          brand's pages (e.g. <span className="font-mono">/flexitol</span>), and a{" "}
+          <strong>Card logo</strong> shown inside the brand tile in the "Our brands" carousel on{" "}
+          <span className="font-mono">/curemed</span>. Leave empty to use the built-in defaults.
         </p>
       </div>
 
       {BRAND_LIST.map((b) => (
-        <BrandingField
-          key={b.key}
-          title={`${b.name} logo`}
-          description={`Shown in the header on /${b.slug} and its sub-pages.`}
-          settingKey={BRANDING_BRAND_LOGO_KEY(b.key)}
-          useValue={() => useBrandingBrandLogo(b.key)}
-          previewClassName="h-20 w-auto max-w-[260px] object-contain"
-          showTransparencyCheck
-          uploadPrefix={`brand-${b.key}`}
-        />
+        <div key={b.key} className="space-y-3">
+          <h3 className="text-base font-semibold pl-1">{b.name}</h3>
+          <BrandingField
+            title="Header logo"
+            description={`Shown in the site header on /${b.slug} and its sub-pages.`}
+            settingKey={BRANDING_BRAND_LOGO_KEY(b.key)}
+            useValue={() => useBrandingBrandLogo(b.key)}
+            previewClassName="h-20 w-auto max-w-[260px] object-contain"
+            showTransparencyCheck
+            uploadPrefix={`brand-${b.key}-header`}
+          />
+          <BrandingField
+            title="Card logo"
+            description={`Shown inside the ${b.name} tile in the "Our brands" carousel on /curemed.`}
+            settingKey={BRANDING_BRAND_CARD_LOGO_KEY(b.key)}
+            useValue={() => useBrandingBrandCardLogo(b.key)}
+            previewClassName="h-20 w-auto max-w-[260px] object-contain"
+            showTransparencyCheck
+            uploadPrefix={`brand-${b.key}-card`}
+          />
+        </div>
       ))}
     </div>
   );

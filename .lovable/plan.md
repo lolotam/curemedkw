@@ -1,59 +1,45 @@
-## Issue
+## Goal
 
-In `/admin/products/:id` → **Media** card, the "Upload" button next to the main image thumbnail calls `uploadMain`, which **replaces** `form.mainImage` instead of adding the file to the gallery. The user expects all uploads to land in the gallery, then to choose which one becomes the main image.
+On `/admin/branding`, give every brand **two** logo controls (URL + Upload for each):
+1. **Header logo** — already exists, used in the brand site header.
+2. **Card logo** — NEW, used inside the brand tile in the "Our brands" carousel on `/curemed`.
 
-Good news: the gallery already has a per-image "Set as main" star button (calls `setAsMain`), so we just need to change the upload behavior.
+The Curemed parent stays as-is (Site logo + Favicon, no card section). Brand colors and card sizes on `/curemed` are not touched.
 
-## Changes (single file)
+Also verify/fix the upload flow.
 
-`src/pages/admin/AdminProductEditor.tsx`
+## Investigation findings
 
-1. **Replace `uploadMain` with append-to-gallery logic** (lines 164–173). Allow multiple files (consistent with `uploadGallery`). If the current `mainImage` is still the placeholder (`startsWith("data:")`) and there is no real main yet, automatically promote the first uploaded image to main so the product card isn't empty. Otherwise just append all uploads to `form.gallery`.
+- Storage bucket `brands-images` is public and already has correct RLS policies (`Admins can upload brands images` with `has_role(auth.uid(),'admin')`). The previous "missing RLS policies" claim was incorrect — uploads should already work for logged-in admins. If the user still sees an upload failure, the most likely cause is **not being signed in as an admin** in the browser session. We will surface a clearer error message when the upload returns an RLS error so the admin understands why.
+- `BRANDING_BRAND_LOGO_KEY(brand)` already stores the per-brand header logo via `site_settings`. We will add a parallel `BRANDING_BRAND_CARD_LOGO_KEY(brand)` using the same pattern — no schema migration needed (`site_settings` is a generic key/value table).
+- `/curemed` brand cards currently use `getBrandLogo(...)` (the built-in static logo). They need to fall back to the saved card logo when present.
 
-   ```ts
-   const uploadMain = async (e: React.ChangeEvent<HTMLInputElement>) => {
-     const files = Array.from(e.target.files || []);
-     if (!files.length) return;
-     try {
-       const urls = await Promise.all(files.map(uploadProductImage));
-       const mainIsPlaceholder = !form.mainImage || form.mainImage.startsWith("data:");
-       if (mainIsPlaceholder) {
-         const [first, ...rest] = urls;
-         update("mainImage", first);
-         update("gallery", [...form.gallery, ...rest]);
-         toast.success(
-           urls.length === 1
-             ? "Image uploaded and set as main"
-             : `${urls.length} images uploaded — first set as main`,
-         );
-       } else {
-         update("gallery", [...form.gallery, ...urls]);
-         toast.success(
-           `${urls.length} image(s) added to gallery. Hover any image and click ★ to set as main.`,
-         );
-       }
-     } catch (err: any) {
-       toast.error(err.message);
-     }
-     e.target.value = "";
-   };
-   ```
+## Changes
 
-2. **Allow multi-file selection on the main upload input** (line 570): add `multiple`.
+### 1. `src/lib/db.ts`
+- Add `BRANDING_BRAND_CARD_LOGO_KEY(brand)` and `useBrandingBrandCardLogo(brand)` mirroring the existing header-logo helpers.
+- Add a small `useAllBrandCardLogos()` helper that returns `Record<BrandKey, string>` so the home page can read them in one render without N hooks (read each via `useSiteSetting` inside a `useQueries`-style aggregate, or simply expose individual hooks consumed by a small subcomponent).
+- In `uploadBrandingImage`, on error inspect the message; when it indicates RLS / unauthorized, throw a friendlier message: "Upload denied — make sure you are signed in as an admin."
 
-   ```tsx
-   <input type="file" ref={fileMain} accept="image/*" multiple onChange={uploadMain} className="hidden" />
-   ```
+### 2. `src/pages/admin/AdminBranding.tsx`
+- Restructure the per-brand list. For each brand render a single `Card` containing:
+  - Brand name as the card title.
+  - Two stacked `BrandingField` sub-sections (no longer a full Card each — convert `BrandingField` to render either as a Card or as a plain section; simplest: extract the inner body into a `BrandingFieldBody` component and reuse). Labels: "Header logo" and "Card logo".
+- Pass the new `BRANDING_BRAND_CARD_LOGO_KEY(b.key)` + `useBrandingBrandCardLogo` for the second field, with `uploadPrefix={`brand-${b.key}-card`}`.
+- Keep the global "Site logo", "Favicon", and "Remove white background" sections unchanged (Curemed parent has no card section).
 
-3. **Tweak the helper text** under "Main image" (line 569) so the new behavior is obvious:
+### 3. `src/pages/CuremedHome.tsx`
+- In the brand-cards marquee, replace the static `getBrandLogo(...)` call with a resolver that prefers the admin-saved card logo and falls back to the existing logo. To avoid one hook per brand inside a `.map`, render each tile via a small `BrandTile` subcomponent that calls `useBrandingBrandCardLogo(b.key)` itself.
+- DO NOT change card width/height/padding/colors — only the `<img src>` source.
 
-   > "Uploads are added to the gallery. Hover any gallery image and click ★ to make it the main image."
+### 4. No DB migration required
+- `site_settings` already supports arbitrary keys.
+- Storage policies are already in place; no SQL changes.
 
-No other code needs to change. `setAsMain` (line 197) already swaps the chosen gallery image into `mainImage` and pushes the previous main back into the gallery, which is exactly the workflow the user described.
+## Acceptance
 
-## Outcome
-
-- Clicking **Upload** next to the main image no longer overwrites the existing main image.
-- New uploads always go to the gallery.
-- For brand-new products (placeholder main), the very first upload still auto-fills the main slot for convenience.
-- User picks the main image any time via the existing ★ button on a gallery thumbnail.
+- `/admin/branding` shows, for each brand, one card with two upload+URL fields ("Header logo" and "Card logo").
+- Uploading a card logo for e.g. Flexitol immediately changes the logo shown inside the Flexitol tile in the "Our brands" carousel on `/curemed`, while the header logo on `/flexitol` keeps using the header-logo setting.
+- Curemed parent section on `/admin/branding` is unchanged (Site logo + Favicon only).
+- Brand card sizes, colors, and layout on `/curemed` remain identical.
+- If an upload fails due to RLS, the toast clearly says the user must be signed in as an admin.
