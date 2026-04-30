@@ -1014,6 +1014,13 @@ export function useBrandingBrandCardLogo(brand: BrandKey | null | undefined) {
   return useSiteSetting<string>(brand ? BRANDING_BRAND_CARD_LOGO_KEY(brand) : "branding_brand_card_logo_none", "");
 }
 
+// Featured product card glass-strip background opacity (0-100). Default 70.
+export const FEATURED_GLASS_OPACITY_KEY = "featured_glass_opacity";
+
+export function useFeaturedGlassOpacity() {
+  return useSiteSetting<number>(FEATURED_GLASS_OPACITY_KEY, 70);
+}
+
 /* ============================================================
  * Product reviews
  * ============================================================ */
