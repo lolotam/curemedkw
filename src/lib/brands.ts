@@ -128,7 +128,8 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "lafes",
     categories: ["Deodorant", "Body Care"],
     logo: lafesLogo,
-    instagram: "https://www.instagram.com/curemedkw/",
+    instagram: "https://www.instagram.com/lafes/",
+    instagramHandle: "Lafes",
     seo: {
       en: "Lafe's Kuwait — Natural aluminum-free deodorants and clean personal care for the whole family.",
       ar: "لافيز الكويت — مزيلات عرق طبيعية خالية من الألومنيوم وعناية شخصية نقية لجميع أفراد العائلة.",
