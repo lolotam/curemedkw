@@ -172,6 +172,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     categories: ["Supplements", "Wellness"],
     logo: phytopharLogo,
     instagram: "https://www.instagram.com/curemedkw/",
+    instagramHandle: "phtophar",
     seo: {
       en: "Phytophar Kuwait — Plant-based phytotherapy supplements and natural wellness products.",
       ar: "فيتوفار الكويت — مكملات نباتية للعلاج بالأعشاب ومنتجات عافية طبيعية.",
