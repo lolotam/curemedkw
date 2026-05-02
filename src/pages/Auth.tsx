@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthRedirectUrl } from "@/lib/authRedirect";
 
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -58,7 +59,7 @@ export default function Auth() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/account";
+  const next = params.get("next") || "/";
   const initialMode = (params.get("mode") as Mode) || "signin";
 
   const [mode, setMode] = useState<Mode>(initialMode);
@@ -119,7 +120,7 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: getAuthRedirectUrl(),
           queryParams: { prompt: "select_account" },
         },
       });

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useAdminSession } from "@/lib/admin";
 import { supabase } from "@/integrations/supabase/client";
+import { getAuthRedirectUrl } from "@/lib/authRedirect";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
 import defaultLogo from "@/assets/curemed-logo.png";
@@ -61,7 +62,7 @@ export default function AdminLogin() {
     setBusy(true);
     try {
       sessionStorage.setItem("auth:next", "/admin");
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const redirectUrl = getAuthRedirectUrl();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: redirectUrl },
