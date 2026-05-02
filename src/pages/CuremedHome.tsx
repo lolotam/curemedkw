@@ -268,6 +268,7 @@ function BrandTile({ brand: b, isClone }: { brand: BrandMeta; isClone: boolean }
               src={src}
               alt={b.name}
               className="max-h-full max-w-full w-auto h-auto object-contain"
+              loading="lazy"
             />
           </div>
         ) : (
@@ -275,6 +276,7 @@ function BrandTile({ brand: b, isClone }: { brand: BrandMeta; isClone: boolean }
             src={src}
             alt={b.name}
             className="h-12 w-auto drop-shadow object-contain"
+            loading="lazy"
           />
         )}
       </div>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -7,41 +7,51 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import Loading from "./pages/Loading";
-import CuremedHome from "./pages/CuremedHome";
-import BrandPage from "./pages/BrandPage";
-import ProductDetail from "./pages/ProductDetail";
-import CategoryPage from "./pages/CategoryPage";
-import AboutUs from "./pages/AboutUs";
-import ContactUs from "./pages/ContactUs";
-import NotFound from "./pages/NotFound";
-import { AdminLayout } from "@/components/admin/AdminLayout";
-import AdminLogin from "./pages/admin/AdminLogin";
-import AdminOverview from "./pages/admin/AdminOverview";
-import AdminProducts from "./pages/admin/AdminProducts";
-import AdminProductEditor from "./pages/admin/AdminProductEditor";
-import AdminCategories from "./pages/admin/AdminCategories";
-import AdminMessages from "./pages/admin/AdminMessages";
-import AdminSubscribers from "./pages/admin/AdminSubscribers";
-import AdminLandingPages from "./pages/admin/AdminLandingPages";
-import AdminLandingPageEditor from "./pages/admin/AdminLandingPageEditor";
-import AdminModels from "./pages/admin/AdminModels";
-import AdminTags from "./pages/admin/AdminTags";
-import AdminFlags from "./pages/admin/AdminFlags";
-import AdminReviews from "./pages/admin/AdminReviews";
-import AdminOrders from "./pages/admin/AdminOrders";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminCoupons from "./pages/admin/AdminCoupons";
-import AdminNotificationTemplates from "./pages/admin/AdminNotificationTemplates";
-import AdminBranding from "./pages/admin/AdminBranding";
 import { BrandingHead } from "@/components/site/BrandingHead";
-import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import OrderConfirmation from "./pages/OrderConfirmation";
-import Auth from "./pages/Auth";
-import ResetPassword from "./pages/ResetPassword";
-import Account from "./pages/Account";
 import { CartProvider } from "@/lib/cart";
 import { AuthProvider } from "@/lib/auth";
+
+/* ---- Lazy-loaded pages ---- */
+const CuremedHome = lazy(() => import("./pages/CuremedHome"));
+const BrandPage = lazy(() => import("./pages/BrandPage"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const CategoryPage = lazy(() => import("./pages/CategoryPage"));
+const AboutUs = lazy(() => import("./pages/AboutUs"));
+const ContactUs = lazy(() => import("./pages/ContactUs"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Cart = lazy(() => import("./pages/Cart"));
+const Checkout = lazy(() => import("./pages/Checkout"));
+const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
+const Auth = lazy(() => import("./pages/Auth"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Account = lazy(() => import("./pages/Account"));
+
+/* Admin */
+const AdminLayout = lazy(() => import("@/components/admin/AdminLayout").then(m => ({ default: m.AdminLayout })));
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
+const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
+const AdminProducts = lazy(() => import("./pages/admin/AdminProducts"));
+const AdminProductEditor = lazy(() => import("./pages/admin/AdminProductEditor"));
+const AdminCategories = lazy(() => import("./pages/admin/AdminCategories"));
+const AdminMessages = lazy(() => import("./pages/admin/AdminMessages"));
+const AdminSubscribers = lazy(() => import("./pages/admin/AdminSubscribers"));
+const AdminLandingPages = lazy(() => import("./pages/admin/AdminLandingPages"));
+const AdminLandingPageEditor = lazy(() => import("./pages/admin/AdminLandingPageEditor"));
+const AdminModels = lazy(() => import("./pages/admin/AdminModels"));
+const AdminTags = lazy(() => import("./pages/admin/AdminTags"));
+const AdminFlags = lazy(() => import("./pages/admin/AdminFlags"));
+const AdminReviews = lazy(() => import("./pages/admin/AdminReviews"));
+const AdminOrders = lazy(() => import("./pages/admin/AdminOrders"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
+const AdminNotificationTemplates = lazy(() => import("./pages/admin/AdminNotificationTemplates"));
+const AdminBranding = lazy(() => import("./pages/admin/AdminBranding"));
+
+const PageFallback = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+  </div>
+);
 
 const queryClient = new QueryClient();
 
@@ -57,6 +67,7 @@ const App = () => {
             <Sonner />
             <BrandingHead />
             <BrowserRouter>
+              <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<Loading />} />
                 <Route path="/curemed" element={<CuremedHome />} />
@@ -95,6 +106,7 @@ const App = () => {
                 <Route path="/:brand" element={<BrandPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
             </BrowserRouter>
             </TooltipProvider>
             </CartProvider>

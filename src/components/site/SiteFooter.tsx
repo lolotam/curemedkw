@@ -27,6 +27,7 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
             src={logo}
             alt={brandName}
             className={`h-12 w-auto object-contain brand-logo-img ${!brandMeta && removeBg ? "brand-logo-img--remove-white" : ""}`}
+            loading="lazy"
           />
           <p className="text-sm text-muted-foreground max-w-xs">{seoText}</p>
           <a

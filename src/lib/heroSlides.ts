@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { convertToWebP } from "@/lib/imageConvert";
 
 export type HeroPageKey =
   | "curemed"
@@ -90,12 +91,13 @@ export async function deleteSlide(id: string) {
 }
 
 export async function uploadHeroMedia(file: File): Promise<{ url: string; type: "image" | "video" }> {
-  const ext = file.name.split(".").pop() || "bin";
+  const converted = file.type.startsWith("image/") ? await convertToWebP(file) : file;
+  const ext = converted.name.split(".").pop() || "bin";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from("hero-media").upload(path, file, {
+  const { error } = await supabase.storage.from("hero-media").upload(path, converted, {
     cacheControl: "3600",
     upsert: false,
-    contentType: file.type,
+    contentType: converted.type,
   });
   if (error) throw error;
   const { data } = supabase.storage.from("hero-media").getPublicUrl(path);

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, CheckCheck, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { convertToWebP } from "@/lib/imageConvert";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -75,9 +76,10 @@ export default function Account() {
     if (!user) return;
     setUploading(true);
     try {
-      const ext = file.name.split(".").pop() || "jpg";
+      const converted = await convertToWebP(file);
+      const ext = converted.name.split(".").pop() || "webp";
       const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from("avatars").upload(path, file, { upsert: true });
+      const { error: upErr } = await supabase.storage.from("avatars").upload(path, converted, { upsert: true });
       if (upErr) throw upErr;
       const { data } = supabase.storage.from("avatars").getPublicUrl(path);
       await updateProfile.mutateAsync({ id: user.id, patch: { avatarUrl: data.publicUrl } });

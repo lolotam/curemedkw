@@ -71,6 +71,7 @@ export function SlidePreview({
             src={s.media_url}
             alt={title || "Hero slide"}
             className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
           />
         )
       ) : (

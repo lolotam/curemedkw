@@ -425,6 +425,7 @@ export default function Checkout() {
                         src={i.image}
                         alt=""
                         className="h-14 w-14 rounded-xl object-cover bg-brand-soft ring-1 ring-border/60 shrink-0"
+                        loading="lazy"
                       />
                       <div className="flex-1 min-w-0 flex flex-col justify-between">
                         <p className="line-clamp-2 font-medium leading-snug">
