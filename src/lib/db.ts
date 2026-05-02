@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { convertToWebP } from "@/lib/imageConvert";
 
 export type BrandKey =
   | "flexitol"
@@ -425,11 +426,12 @@ export function useProductsByCategory(categoryId: string | undefined) {
  * ============================================================ */
 
 export async function uploadProductImage(file: File): Promise<string> {
-  const ext = file.name.split(".").pop() || "bin";
+  const converted = await convertToWebP(file);
+  const ext = converted.name.split(".").pop() || "webp";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage
     .from("product-images")
-    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });
   if (error) throw error;
   return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
 }
@@ -440,12 +442,13 @@ export async function uploadProductImage(file: File): Promise<string> {
  * the public URL. Used by the Admin Branding page.
  */
 export async function uploadBrandingImage(file: File, prefix: string): Promise<string> {
-  const ext = (file.name.split(".").pop() || "png").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const converted = await convertToWebP(file);
+  const ext = (converted.name.split(".").pop() || "webp").toLowerCase().replace(/[^a-z0-9]/g, "");
   const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, "-");
   const path = `branding/${safePrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext || "png"}`;
   const { error } = await supabase.storage
     .from("brands-images")
-    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });
   if (error) {
     const msg = (error.message || "").toLowerCase();
     if (msg.includes("row-level security") || msg.includes("unauthorized") || msg.includes("denied") || msg.includes("403")) {
@@ -595,11 +598,12 @@ export function useBulkDeleteCategories() {
 }
 
 export async function uploadCategoryImage(file: File): Promise<string> {
-  const ext = file.name.split(".").pop() || "bin";
+  const converted = await convertToWebP(file);
+  const ext = converted.name.split(".").pop() || "webp";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage
     .from("category-images")
-    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+    .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });
   if (error) throw error;
   return supabase.storage.from("category-images").getPublicUrl(path).data.publicUrl;
 }
