@@ -1,47 +1,48 @@
-## Problem
+## Audit results
 
-After Google sign-in, users land on `https://curemedkw-first.lovable.app/curemed` instead of the production domain. Two causes:
+I searched the codebase for every term you listed:
 
-1. **Origin leak**: `redirectTo` is built from `window.location.origin`, so signing in from a Lovable preview keeps the user on that preview origin even after deployment.
-2. **`auth:next` default**: In `src/pages/Auth.tsx` line 61, `next` defaults to `/account`. If something pre-fills `?next=/curemed` (or another brand path), it gets stored and used as the post-login destination. We will make the default a safer `/` and only honor `next` when it is a same-origin path we trust.
+- `yjvqzvmyritxegugfhkt` — **0 matches**. The old Supabase project ID does not appear anywhere in source.
+- `oauth.lovable.app` — **0 matches**.
+- `/~oauth/initiate` and `/~oauth/callback` — **0 matches**.
+- `lovable.auth.signInWithOAuth` — **0 matches in app code**. The only definition lives in `src/integrations/lovable/index.ts` (an auto-generated wrapper) and is **never imported anywhere**.
 
-## Changes
+Current state of the auth flow:
 
-### 1. `src/pages/Auth.tsx`
+- `src/integrations/supabase/client.ts` reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` from env. Local `.env` already points at `https://lgcuwsjlxkntwzlgjtzp.supabase.co`. The Supabase client only knows about the new project.
+- `src/pages/Auth.tsx` and `src/pages/admin/AdminLogin.tsx` already call `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: getAuthRedirectUrl(), queryParams: { prompt: "select_account" } } })` — direct Supabase OAuth, no Lovable broker.
+- `src/pages/AuthCallback.tsx` already does the PKCE exchange (`exchangeCodeForSession(code)`), then `getSession()`, then navigates to `sessionStorage.getItem("auth:next") || "/"`.
 
-- Add a `getAuthRedirectUrl()` helper at module scope:
-  ```ts
-  const getAuthRedirectUrl = () => {
-    const origin = window.location.origin;
-    if (origin.includes("localhost")) return `${origin}/auth/callback`;
-    if (origin.includes("lovable.app")) return `${origin}/auth/callback`;
-    return "https://curemedkw.com/auth/callback";
-  };
-  ```
-- Change default `next` from `/account` to `/` (line 61).
-- In `signInWithGoogle` (lines 114–136):
-  - Keep `sessionStorage.setItem("auth:next", next || "/")`.
-  - Replace the hardcoded `redirectTo: \`${window.location.origin}/auth/callback\`` with `redirectTo: getAuthRedirectUrl()`.
+So the live redirect to `yjvqzvmyritxegugfhkt.supabase.co/auth/v1/callback` is **not coming from the current source**. It can only come from one of:
 
-### 2. `src/pages/admin/AdminLogin.tsx`
+1. The deployed Dokploy build still using old `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` build args (build-time inlined into the bundle).
+2. The new Supabase project's Google provider being misconfigured (Google Cloud OAuth client still has the old project's `/auth/v1/callback` as its redirect URI), so Google itself bounces to the old URL.
 
-- Add the same `getAuthRedirectUrl()` helper (or import a shared one — see step 4).
-- In `signInWithGoogle`, replace `redirectTo: \`${window.location.origin}/auth/callback\`` with `redirectTo: getAuthRedirectUrl()`. `sessionStorage.setItem("auth:next", "/admin")` stays.
+Both are infra/config, not code. The code is already correct.
 
-### 3. `src/pages/AuthCallback.tsx`
+## Cleanup the plan will perform
 
-Already correct (reads `auth:next`, defaults to `/`, removes the key, navigates with `replace: true`). No change needed.
+Even though it is not the cause of the bug, I will remove the dead Lovable-managed-OAuth scaffolding so future regressions cannot reintroduce it:
 
-### 4. (Optional) Extract shared helper
+1. **Delete** `src/integrations/lovable/index.ts` (unused; it's the only file that calls `lovable.auth.signInWithOAuth` and imports `@lovable.dev/cloud-auth-js`).
+2. **Remove** the `@lovable.dev/cloud-auth-js` dependency from `package.json` (`bun remove @lovable.dev/cloud-auth-js`).
+3. **Verify** with `rg` that none of the forbidden strings remain after the cleanup.
 
-Create `src/lib/authRedirect.ts` exporting `getAuthRedirectUrl()`, and import it from both `Auth.tsx` and `AdminLogin.tsx` instead of duplicating. Keeps future domain changes single-edit.
+No changes to `Auth.tsx`, `AdminLogin.tsx`, `AuthCallback.tsx`, `authRedirect.ts`, or the Supabase client — they already match the spec in your message.
 
-### 5. Reminders for the user (no code action)
+## What you must do outside the code (for the live bug to actually go away)
 
-- The production domain `https://curemedkw.com/auth/callback` must be in Lovable Cloud → Auth → Redirect URLs (along with the `lovable.app` previews).
-- After publishing, test the flow from `https://curemedkw.com/auth`, not from the preview URL — sign-ins started on a preview will still land on that preview by design (because the helper preserves `lovable.app` origins for testing).
+1. In Dokploy, set build args / env:
+   ```
+   VITE_SUPABASE_URL=https://lgcuwsjlxkntwzlgjtzp.supabase.co
+   VITE_SUPABASE_PUBLISHABLE_KEY=<new project anon key>
+   VITE_SUPABASE_PROJECT_ID=lgcuwsjlxkntwzlgjtzp
+   ```
+   Then **rebuild** (Vite inlines these at build time — restarting the container is not enough).
+2. In the **new** Supabase project (`lgcuwsjlxkntwzlgjtzp`):
+   - Authentication → URL Configuration → Site URL: `https://curemedkw.com`
+   - Add redirect URLs: `https://curemedkw.com/auth/callback`, `https://curemedkw.lovable.app/auth/callback`, `http://localhost:*/auth/callback`.
+   - Authentication → Providers → Google: enter the Google OAuth Client ID/Secret and copy the callback URL it shows (it will be `https://lgcuwsjlxkntwzlgjtzp.supabase.co/auth/v1/callback`).
+3. In Google Cloud Console → that OAuth Client → **Authorized redirect URIs**, replace the old `https://yjvqzvmyritxegugfhkt.supabase.co/auth/v1/callback` with the new one above. This is almost certainly what is still sending users to the dead project.
 
-## Notes
-
-- The helper intentionally keeps `lovable.app` origins as-is so preview-based testing keeps working; only "unknown" origins (e.g. a custom domain that isn't `curemedkw.com`) get forced to production. If you'd rather always force production regardless of origin, say so and I'll drop the `lovable.app` branch.
-- The default `next` becoming `/` means email/password sign-in from `/auth` (with no `?next=` param) lands on the home route. If you'd prefer `/account`, tell me and I'll keep `/account` as the default while still sanitizing `auth:next`.
+After approval I will execute step 1–3 of the cleanup section.
