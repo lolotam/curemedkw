@@ -151,7 +151,8 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "hartington",
     categories: ["Health", "Wellness"],
     logo: hartingtonLogo,
-    instagram: "https://www.instagram.com/curemedkw/",
+    instagram: "https://www.instagram.com/hartington/",
+    instagramHandle: "Hartington",
     seo: {
       en: "Hartington Pharmaceutical Kuwait — Trusted pharmaceutical-grade health and wellness products.",
       ar: "هارتنغتون فارماسيوتيكال الكويت — منتجات صحية وعافية بدرجة صيدلانية موثوقة.",
