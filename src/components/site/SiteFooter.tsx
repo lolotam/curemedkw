@@ -98,6 +98,8 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
             <li><Link to="/curemed" className="hover:text-brand">{t("nav.home")}</Link></li>
             <li><Link to="/about" className="hover:text-brand">{t("nav.about")}</Link></li>
             <li><Link to="/contact" className="hover:text-brand">{t("nav.contact")}</Link></li>
+            <li><Link to="/privacy-policy" className="hover:text-brand">{t("nav.privacyPolicy")}</Link></li>
+            <li><Link to="/terms-of-service" className="hover:text-brand">{t("nav.termsOfService")}</Link></li>
           </ul>
         </div>
       </div>
