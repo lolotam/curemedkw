@@ -294,8 +294,8 @@ export const TRANSLATIONS: Dict = {
   // Contact page additions
   "contact.address.title": { en: "Address", ar: "العنوان" },
   "contact.address.body": {
-    en: "Kuwait – Hawally – Tunis St – Gulf Mart Complex, Floor 2, Office 2",
-    ar: "الكويت – حولي – شارع تونس – مجمع جلف مارت، الدور الثاني، مكتب 2",
+    en: "Kuwait – Hawally – Tunis St – Grand Hyper Complex, Floor 2, Office 2",
+    ar: "الكويت – حولي – شارع تونس – مجمع جراند هايبر، الدور الثاني، مكتب 2",
   },
   "contact.phone.title": { en: "Phone", ar: "الهاتف" },
   "contact.email.title": { en: "Email", ar: "البريد الإلكتروني" },
