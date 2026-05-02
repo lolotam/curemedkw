@@ -8,7 +8,8 @@ export type HeroPageKey =
   | "abc"
   | "lafes"
   | "hartington"
-  | "phytophar";
+  | "phytophar"
+  | "hualunhongli";
 
 export const HERO_PAGES: { key: HeroPageKey; label: string; route: string }[] = [
   { key: "curemed", label: "Curemed (Main)", route: "/curemed" },
@@ -19,6 +20,7 @@ export const HERO_PAGES: { key: HeroPageKey; label: string; route: string }[] = 
   { key: "lafes", label: "Lafe's", route: "/lafes" },
   { key: "hartington", label: "Hartington", route: "/hartington" },
   { key: "phytophar", label: "Phytophar", route: "/phytophar" },
+  { key: "hualunhongli", label: "Hualunhongli", route: "/hualunhongli" },
 ];
 
 export interface HeroSlide {
