@@ -275,6 +275,7 @@ function UserMenu() {
   const { user, signOut } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { isAdmin } = useAdminSession();
 
   if (!user) {
     return (
