@@ -302,6 +302,14 @@ function UserMenu() {
         <DropdownMenuItem onClick={() => navigate("/account")}>
           <Package className="h-4 w-4 mr-2" />{t("nav.myOrders")}
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/admin")}>
+              <Shield className="h-4 w-4 mr-2" />{t("nav.admin")}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={async () => { await signOut(); navigate("/"); }}>
           <LogOut className="h-4 w-4 mr-2" />{t("nav.signout")}
