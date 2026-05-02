@@ -1,58 +1,20 @@
+# Move Admin Dashboard Link
 
-# Website Speed Optimization Plan
+Currently the "Admin" link appears in the site footer and is visible to everyone. We'll remove it from the footer and instead show it only inside the logged-in user dropdown menu (the avatar/user icon in the header) — and only when the signed-in user actually has admin privileges.
 
-## 1. Auto-convert images to WebP on upload (biggest impact)
+## Changes
 
-Currently, images are uploaded as-is (PNG, JPG, etc.) to storage. We'll add a client-side conversion step that converts any image to WebP before uploading, reducing file sizes by 25-80%.
+### 1. `src/components/site/SiteFooter.tsx`
+- Remove the `<li><Link to="/admin">{t("nav.admin")}</Link></li>` item from the bottom-right brand links list.
 
-**How it works:**
-- Create a utility function `convertToWebP(file: File, quality?: number): Promise<File>` that uses the browser's Canvas API to re-encode images as WebP
-- Call this function in every upload path before sending to storage:
-  - `uploadProductImage()` in db.ts
-  - `uploadBrandingImage()` in db.ts
-  - `uploadHeroMedia()` in heroSlides.ts (images only, not videos)
-  - Avatar upload in Account.tsx
-- Quality defaults to 0.82 (good balance of size vs quality)
-- Already-WebP files skip conversion
+### 2. `src/components/site/SiteHeader.tsx`
+- The file already imports `useAdminSession` from `@/lib/admin`. In the user dropdown component (around lines 288–310), call `useAdminSession()` to get `isAdmin`.
+- When `isAdmin` is true, add a new `DropdownMenuItem` (with a Shield icon from `lucide-react`) labeled "Admin Dashboard" that navigates to `/admin`. Place it above the sign-out separator, with its own separator above it for visual grouping.
+- Non-admin users see no admin entry — the dropdown stays exactly as it is today (Account, My Orders, Sign out).
 
-**No backend changes needed** — this is pure client-side using `<canvas>.toBlob('image/webp')`.
+## Result
+- Footer no longer exposes an Admin link to public visitors.
+- Admin users get a quick-access "Admin Dashboard" entry directly inside their account dropdown.
+- Regular users see no change in their dropdown.
 
-## 2. Lazy-load images with native `loading="lazy"`
-
-Some `<img>` tags are missing `loading="lazy"`. We'll audit and add it to all below-the-fold images across components (hero slides, product grids, about page, etc.).
-
-## 3. Code splitting with React.lazy
-
-Currently all 20+ pages are eagerly imported in App.tsx. We'll convert admin pages and less-visited pages to `React.lazy()` imports with `<Suspense>`, so the initial bundle only includes the landing/loading page.
-
-Pages to lazy-load: all admin pages, Auth, Account, Cart, Checkout, OrderConfirmation, AboutUs, ContactUs, ResetPassword.
-
-## 4. Supabase Storage image transform URLs (optional, no code change needed)
-
-Supabase Storage supports on-the-fly image transforms via URL params (e.g. `?width=400&quality=75`). We can use this for thumbnails in product cards to serve smaller images. This is a lightweight change in ProductCard and similar components.
-
----
-
-## Technical Details
-
-### WebP conversion utility (`src/lib/imageConvert.ts`)
-```
-convertToWebP(file, quality = 0.82) → Promise<File>
-- Skip if already webp
-- Load into Image → draw on canvas → toBlob('image/webp', quality)
-- Return new File with .webp extension
-```
-
-### Modified upload functions
-Each upload function gets a 1-line addition: `file = await convertToWebP(file);` before the storage upload call.
-
-### Code splitting pattern
-```ts
-const AdminOverview = lazy(() => import("./pages/admin/AdminOverview"));
-// wrapped in <Suspense fallback={<Loading />}>
-```
-
-### Estimated impact
-- WebP conversion: 30-70% smaller images
-- Code splitting: 40-60% smaller initial JS bundle
-- Lazy loading: faster perceived load (fewer network requests upfront)
+No translation keys, routes, or other files need changes (`nav.admin` key already exists and will be reused for the dropdown label).
