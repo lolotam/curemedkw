@@ -348,6 +348,11 @@ TRANSLATIONS["account.tabs.security"] = { en: "Security", ar: "الأمان" };
 TRANSLATIONS["account.save"] = { en: "Save changes", ar: "حفظ التغييرات" };
 TRANSLATIONS["account.uploadAvatar"] = { en: "Upload photo", ar: "رفع صورة" };
 TRANSLATIONS["account.changePassword"] = { en: "Change password", ar: "تغيير كلمة المرور" };
+TRANSLATIONS["account.setPassword"] = { en: "Set a password", ar: "تعيين كلمة مرور" };
+TRANSLATIONS["account.setPasswordHint"] = {
+  en: "You signed in with Google. Set a password to also enable email & password login with the same account.",
+  ar: "لقد سجّلت الدخول عبر Google. عيّن كلمة مرور لتتمكن أيضًا من تسجيل الدخول بالبريد الإلكتروني وكلمة المرور لنفس الحساب.",
+};
 TRANSLATIONS["account.noOrders"] = { en: "You haven't placed any orders yet.", ar: "لم تقم بأي طلب بعد." };
 TRANSLATIONS["account.noNotifications"] = { en: "No notifications yet.", ar: "لا توجد إشعارات." };
 TRANSLATIONS["account.markAllRead"] = { en: "Mark all as read", ar: "تعيين الكل كمقروء" };
