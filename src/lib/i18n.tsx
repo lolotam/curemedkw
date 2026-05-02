@@ -12,6 +12,8 @@ export const TRANSLATIONS: Dict = {
   "nav.products": { en: "Products", ar: "المنتجات" },
   "nav.contact": { en: "Contact", ar: "تواصل معنا" },
   "nav.admin": { en: "Admin", ar: "الإدارة" },
+  "nav.privacyPolicy": { en: "Privacy Policy", ar: "سياسة الخصوصية" },
+  "nav.termsOfService": { en: "Terms of Service", ar: "الشروط والأحكام" },
 
   "common.loading": { en: "Loading…", ar: "جارٍ التحميل…" },
   "common.discover": { en: "Discover", ar: "اكتشف" },

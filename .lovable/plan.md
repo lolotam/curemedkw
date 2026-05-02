@@ -1,20 +1,59 @@
-# Move Admin Dashboard Link
+## 1. Google Sign-in error (`Error 400: redirect_uri_mismatch`)
 
-Currently the "Admin" link appears in the site footer and is visible to everyone. We'll remove it from the footer and instead show it only inside the logged-in user dropdown menu (the avatar/user icon in the header) — and only when the signed-in user actually has admin privileges.
+This is **not a code bug** — it's a configuration mismatch in your Google Cloud OAuth client.
 
-## Changes
+Your app uses Lovable Cloud's managed authentication. When a user clicks "Continue with Google", Supabase Auth redirects them to Google using a fixed callback URL on the Supabase project:
 
-### 1. `src/components/site/SiteFooter.tsx`
-- Remove the `<li><Link to="/admin">{t("nav.admin")}</Link></li>` item from the bottom-right brand links list.
+```
+https://lgcuwsjlxkntwzlgjtzp.supabase.co/auth/v1/callback
+```
 
-### 2. `src/components/site/SiteHeader.tsx`
-- The file already imports `useAdminSession` from `@/lib/admin`. In the user dropdown component (around lines 288–310), call `useAdminSession()` to get `isAdmin`.
-- When `isAdmin` is true, add a new `DropdownMenuItem` (with a Shield icon from `lucide-react`) labeled "Admin Dashboard" that navigates to `/admin`. Place it above the sign-out separator, with its own separator above it for visual grouping.
-- Non-admin users see no admin entry — the dropdown stays exactly as it is today (Account, My Orders, Sign out).
+Looking at your screenshot of Google Cloud Console, your OAuth client only lists:
+- `https://curemedkw.lovable.app/~oauth/callback`
 
-## Result
-- Footer no longer exposes an Admin link to public visitors.
-- Admin users get a quick-access "Admin Dashboard" entry directly inside their account dropdown.
-- Regular users see no change in their dropdown.
+That `~oauth/callback` URL belongs to a different (newer) Lovable OAuth flow. Your project still uses the classic Supabase Google provider (`supabase.auth.signInWithOAuth`), so Google rejects the request because the Supabase callback isn't on the allowlist.
 
-No translation keys, routes, or other files need changes (`nav.admin` key already exists and will be reused for the dropdown label).
+### Fix (no code change needed) — you do this in Google Cloud Console:
+
+In your OAuth 2.0 Client (`curemed`) → **Authorized redirect URIs**, add:
+
+```
+https://lgcuwsjlxkntwzlgjtzp.supabase.co/auth/v1/callback
+```
+
+Keep your existing entries. Save, wait ~1 minute, then retry Google sign-in.
+
+Also confirm in **Authentication settings** of Lovable Cloud that Google provider is enabled and that the **Client ID** and **Client Secret** from this Google OAuth client are pasted in. If they're not, signing in with Google will fail even after the redirect URI is fixed.
+
+### Why this happens only with your custom credentials
+Lovable Cloud ships with managed Google OAuth that "just works". The error appears because you've configured your own Google OAuth client (visible in your screenshot), and its redirect URI list is incomplete.
+
+---
+
+## 2. Add Privacy Policy and Terms of Service pages
+
+### New files
+- `src/pages/PrivacyPolicy.tsx` — wrapped in `SiteLayout`, contains a Curemed-tailored privacy policy (data we collect: name, email, phone, address for orders; cookies; analytics; how to contact us; user rights). Bilingual via `useI18n()` for headings, with body content in EN/AR.
+- `src/pages/TermsOfService.tsx` — wrapped in `SiteLayout`, contains terms (acceptance, products & pricing in KWD, ordering, payment via COD/pay-by-link, delivery in Kuwait, returns, liability, governing law = Kuwait). Bilingual.
+
+### Routing — `src/App.tsx`
+Add lazy imports and two new public routes:
+```
+<Route path="/privacy-policy" element={<PrivacyPolicy />} />
+<Route path="/terms-of-service" element={<TermsOfService />} />
+```
+
+### Footer — `src/components/site/SiteFooter.tsx`
+Inside the existing brand-name column (currently has Home / About / Contact), add two more `<li>` entries linking to `/privacy-policy` and `/terms-of-service`, using new translation keys.
+
+### Translations — `src/lib/i18n.tsx`
+Add keys:
+- `nav.privacyPolicy` → "Privacy Policy" / "سياسة الخصوصية"
+- `nav.termsOfService` → "Terms of Service" / "الشروط والأحكام"
+- Page heading + section keys for each page (or inline EN/AR via `lang`).
+
+---
+
+## What I will NOT change
+- `src/integrations/supabase/client.ts` (auto-generated)
+- The auth flow code itself — it's correct; only the Google Console config is wrong.
