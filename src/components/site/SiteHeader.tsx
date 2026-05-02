@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package, ChevronDown } from "lucide-react";
+import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package, ChevronDown, Shield } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
