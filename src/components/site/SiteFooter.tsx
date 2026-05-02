@@ -18,7 +18,9 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
     ? brandMeta.seo[lang as "en" | "ar"] ?? brandMeta.seo.en
     : t("about.body");
   const instagram = brandMeta?.instagram ?? CUREMED_INSTAGRAM;
-  const instagramHandle = `@${instagram.replace(/\/+$/, "").split("/").pop()}`;
+  const instagramHandle = brandMeta?.instagramHandle
+    ? `@${brandMeta.instagramHandle}`
+    : `@${instagram.replace(/\/+$/, "").split("/").pop()}`;
   return (
     <footer className="border-t border-border/50 bg-muted/30 mt-16">
       <div className="container py-12 grid gap-8 md:grid-cols-4">
