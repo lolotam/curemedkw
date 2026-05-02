@@ -80,7 +80,7 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
           <ul className="space-y-2 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
               <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span>Kuwait – Hawally – Tunis St – Gulf Mart Complex, Floor 2, Office 2</span>
+              <span>Kuwait – Hawally – Tunis St – Grand Hyper Complex, Floor 2, Office 2</span>
             </li>
             <li className="flex items-center gap-2">
               <Phone className="h-3.5 w-3.5" />
