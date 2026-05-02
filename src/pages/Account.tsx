@@ -249,33 +249,17 @@ export default function Account() {
 
           <TabsContent value="security" className="mt-6">
             <Card className="p-6 max-w-md">
-              {(() => {
-                const providers = ((user.app_metadata as any)?.providers as string[]) || [];
-                const hasPassword = providers.includes("email");
-                const isGoogleOnly = !hasPassword && providers.includes("google");
-                return (
-                  <>
-                    <h3 className="font-semibold mb-2">
-                      {hasPassword ? t("account.changePassword") : t("account.setPassword")}
-                    </h3>
-                    {isGoogleOnly && (
-                      <p className="text-sm text-muted-foreground mb-4 p-3 rounded-md bg-muted/50 border border-border">
-                        {t("account.setPasswordHint")}
-                      </p>
-                    )}
-                    <form onSubmit={changePassword} className="space-y-3">
-                      <div>
-                        <Label>{t("auth.newPassword")}</Label>
-                        <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} required minLength={6} />
-                      </div>
-                      <Button type="submit" disabled={pwBusy} className="bg-brand hover:bg-brand/90 text-white">
-                        {pwBusy && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                        {t("auth.updatePassword")}
-                      </Button>
-                    </form>
-                  </>
-                );
-              })()}
+              <h3 className="font-semibold mb-4">{t("account.changePassword")}</h3>
+              <form onSubmit={changePassword} className="space-y-3">
+                <div>
+                  <Label>{t("auth.newPassword")}</Label>
+                  <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} required minLength={6} />
+                </div>
+                <Button type="submit" disabled={pwBusy} className="bg-brand hover:bg-brand/90 text-white">
+                  {pwBusy && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                  {t("auth.updatePassword")}
+                </Button>
+              </form>
             </Card>
           </TabsContent>
         </Tabs>
