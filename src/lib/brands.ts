@@ -23,6 +23,7 @@ export interface BrandMeta {
   categories: string[];
   logo: string;
   instagram: string;
+  instagramHandle?: string;
   seo: { en: string; ar: string };
 }
 
@@ -199,6 +200,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     ],
     logo: hualunhongliLogo,
     instagram: "https://www.instagram.com/curemedkw/",
+    instagramHandle: "Hualunhongli",
     seo: {
       en: "Hualunhongli Kuwait — Self-heating FIR therapy patches, wound dressings and pain-relief plasters.",
       ar: "هوالنهونغلي الكويت — لاصقات علاجية ذاتية التسخين بالأشعة تحت الحمراء، ضمادات جروح ولاصقات لتخفيف الألم.",
