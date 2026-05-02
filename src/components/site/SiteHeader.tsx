@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package, ChevronDown } from "lucide-react";
+import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package, ChevronDown, Shield } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -275,6 +275,7 @@ function UserMenu() {
   const { user, signOut } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const { isAdmin } = useAdminSession();
 
   if (!user) {
     return (
@@ -301,6 +302,14 @@ function UserMenu() {
         <DropdownMenuItem onClick={() => navigate("/account")}>
           <Package className="h-4 w-4 mr-2" />{t("nav.myOrders")}
         </DropdownMenuItem>
+        {isAdmin && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/admin")}>
+              <Shield className="h-4 w-4 mr-2" />{t("nav.admin")}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={async () => { await signOut(); navigate("/"); }}>
           <LogOut className="h-4 w-4 mr-2" />{t("nav.signout")}
