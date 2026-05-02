@@ -6,7 +6,7 @@ WORKDIR /app
 
 # Install dependencies (use lockfile if present)
 COPY package.json package-lock.json* bun.lockb* ./
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npm install --no-audit --no-fund
 
 # Copy sources and build
 COPY . .
