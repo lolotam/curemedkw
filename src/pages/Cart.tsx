@@ -136,6 +136,7 @@ export default function Cart() {
                           src={item.image}
                           alt={name}
                           className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
+                          loading="lazy"
                         />
                       </Link>
                       <div className="flex-1 min-w-0">
