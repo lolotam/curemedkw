@@ -32,7 +32,7 @@ export default function CategoryPage() {
         <div className="grid md:grid-cols-[260px_1fr] gap-8 items-center mb-10">
           {category.imageUrl ? (
             <div className="aspect-square rounded-3xl overflow-hidden border border-border bg-brand-soft">
-              <img src={category.imageUrl} alt={name} className="h-full w-full object-cover" />
+              <img src={category.imageUrl} alt={name} className="h-full w-full object-cover" loading="lazy" />
             </div>
           ) : (
             <div className="aspect-square rounded-3xl bg-brand/10 flex items-center justify-center text-brand text-5xl font-bold">
