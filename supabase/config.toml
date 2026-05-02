@@ -1,1 +1,4 @@
 project_id = "lgcuwsjlxkntwzlgjtzp"
+
+[functions.migrate-storage-copy]
+verify_jwt = false

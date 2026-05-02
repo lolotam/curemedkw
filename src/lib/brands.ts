@@ -129,7 +129,6 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     categories: ["Deodorant", "Body Care"],
     logo: lafesLogo,
     instagram: "https://www.instagram.com/curemedkw/",
-    instagramHandle: "Lafes",
     seo: {
       en: "Lafe's Kuwait — Natural aluminum-free deodorants and clean personal care for the whole family.",
       ar: "لافيز الكويت — مزيلات عرق طبيعية خالية من الألومنيوم وعناية شخصية نقية لجميع أفراد العائلة.",
@@ -152,7 +151,6 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     categories: ["Health", "Wellness"],
     logo: hartingtonLogo,
     instagram: "https://www.instagram.com/curemedkw/",
-    instagramHandle: "Hartington",
     seo: {
       en: "Hartington Pharmaceutical Kuwait — Trusted pharmaceutical-grade health and wellness products.",
       ar: "هارتنغتون فارماسيوتيكال الكويت — منتجات صحية وعافية بدرجة صيدلانية موثوقة.",
@@ -174,7 +172,6 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     categories: ["Supplements", "Wellness"],
     logo: phytopharLogo,
     instagram: "https://www.instagram.com/curemedkw/",
-    instagramHandle: "phtophar",
     seo: {
       en: "Phytophar Kuwait — Plant-based phytotherapy supplements and natural wellness products.",
       ar: "فيتوفار الكويت — مكملات نباتية للعلاج بالأعشاب ومنتجات عافية طبيعية.",

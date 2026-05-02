@@ -1,46 +1,43 @@
-Restyle `/auth`, `/privacy-policy`, and `/terms-of-service` to match the colorful, animated About page using the existing shared helpers in `src/components/site/ColorfulFx.tsx` (`ColorfulHeroBg`, `GlowCard`, `Icon3D`, `Reveal`).
+## Changes
 
-## Shared visual language (from About page)
-- Animated blob gradient hero background (sky → violet → pink) with dotted texture
-- Eyebrow pill + gradient-clipped headline + fade-in animation cascade
-- Gradient divider line below hero
-- `GlowCard` (gradient ring on hover, glass card) + 3D colored `Icon3D` per section
-- `Reveal` for staggered scroll-in
-- Hover scale + glow on CTAs
+### 1. Rewrite `src/pages/AuthCallback.tsx` (PKCE-aware)
 
-## 1. `src/pages/PrivacyPolicy.tsx` — full rewrite
-- Hero: blob bg, eyebrow "Your Rights First" / "حقوقك أولًا", gradient title (sky → violet → pink), subtitle, last-updated date
-- Body: 6 sections rendered in a 2-column grid of `GlowCard`s, each with its own `Icon3D` + variant:
-  - Introduction (sky, ShieldCheck)
-  - Information we collect (violet, Database) — bullet list
-  - How we use information (emerald, Cog) — bullet list
-  - Sharing of information (amber, Share2)
-  - Your rights (indigo, UserCheck) — clickable email
-  - Contact us (rose, Mail) — clickable email + phone
-- Bilingual via `useI18n()` `lang === "ar"` switching, RTL-aware list padding (`pr-6` vs `pl-6`)
+Replace full file with handler that:
+- Reads `code` from `window.location.search`.
+- If `code` exists → `await supabase.auth.exchangeCodeForSession(code)`.
+- Calls `supabase.auth.getSession()`.
+- On session present: `window.history.replaceState({}, document.title, "/auth/callback")`, then navigate to `sessionStorage.getItem("auth:next") || "/"` and remove `auth:next`.
+- On exchange failure → navigate `/auth?error=oauth_callback_failed`.
+- On no session → navigate `/auth?error=oauth_no_session`.
+- Uses a `cancelled` flag to avoid navigation after unmount.
+- Keeps existing spinner + "Signing you in…" UI.
 
-## 2. `src/pages/TermsOfService.tsx` — full rewrite
-- Same hero pattern with gradient (amber → rose → violet), eyebrow "Usage Agreement" / "اتفاقية الاستخدام"
-- 8 `GlowCard` sections in 2-column grid: Acceptance (sky, FileCheck), Products & Pricing (violet, Tag), Orders & Payment (emerald, CreditCard), Delivery (amber, Truck), Returns (rose, RotateCcw), Liability (indigo, ShieldAlert), Governing Law (cyan, Scale), Contact (violet, Mail with email + phone links)
-- Bilingual EN/AR
+### 2. `src/pages/Auth.tsx` — unchanged
 
-## 3. `src/pages/Auth.tsx` — full rewrite
-- Wrap in `SiteLayout` hero with `ColorfulHeroBg` (consistent with site)
-- Eyebrow pill + gradient-clipped title, gradient theme switches by mode:
-  - signin → sky/violet/pink (LogIn icon)
-  - signup → violet/fuchsia/pink (UserPlus icon)
-  - reset → amber/rose/violet (KeyRound icon)
-- Form inside a `GlowCard` (`Reveal` wrapped) with a large `Icon3D` overlapping the top edge
-- Inputs get glassy `bg-background/80 backdrop-blur-sm` styling and label icons (Mail, KeyRound, User, Phone)
-- Submit button uses gradient background matching the mode + hover scale
-- Google button keeps brand colors but with glassy outline + hover scale
-- Mode switcher links use `story-link` underline animation
-- Eye toggle for password preserved; forgot-password link preserved
-- All existing logic preserved verbatim: `signInWithPassword`, `signUp` with `emailRedirectTo` + metadata, `resetPasswordForEmail` with `/reset-password`, `signInWithOAuth("google")`, busy state, redirect on `user`
+Already uses `supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: \`${window.location.origin}/auth/callback\`, queryParams: { prompt: "select_account" } } })`.
 
-## Files touched
-- `src/pages/Auth.tsx` (rewrite)
-- `src/pages/PrivacyPolicy.tsx` (rewrite)
-- `src/pages/TermsOfService.tsx` (rewrite)
+### 3. `src/App.tsx` — unchanged
 
-No new dependencies, no DB changes, no route changes. Reuses existing `ColorfulFx` helpers so visual language stays consistent with About.
+`/auth/callback` route already registered.
+
+### 4. `src/pages/admin/AdminLogin.tsx` — admin cleanup
+
+In `signInWithGoogle`:
+- Add `sessionStorage.setItem("auth:next", "/admin")` before the OAuth call.
+- Change `redirectTo` from `${origin}/admin` to `${origin}/auth/callback`.
+
+### 5. Verify no remaining managed-OAuth references
+
+Grep for `lovable.auth.signInWithOAuth`, `/~oauth/initiate`, `/~oauth/callback` in `src/` and confirm none remain in active call sites.
+
+### 6. Publish
+
+Remind the user to click Publish → Update so the new bundle reaches `curemedkw.com` (production currently still serves the old build).
+
+## Notes for the user (no code action)
+
+- Google Cloud Console authorized redirect URI: `https://lgcuwsjlxkntwzlgjtzp.supabase.co/auth/v1/callback`.
+- Lovable Cloud → Auth → Redirect URLs must include:
+  - `https://curemedkw.com/auth/callback`
+  - `https://www.curemedkw.com/auth/callback`
+  - `https://curemedkw.lovable.app/auth/callback`

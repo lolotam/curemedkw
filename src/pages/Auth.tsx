@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -114,20 +114,21 @@ export default function Auth() {
   const signInWithGoogle = async () => {
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+      // Remember where to land after the OAuth round-trip
+      sessionStorage.setItem("auth:next", next || "/");
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: { prompt: "select_account" },
+        },
       });
-      if (result.error) {
-        toast.error(result.error.message ?? "Google sign-in failed");
+      if (error) {
+        toast.error(error.message ?? "Google sign-in failed");
         setBusy(false);
         return;
       }
-      if (result.redirected) {
-        // Browser is redirecting to Google
-        return;
-      }
-      // Tokens received, session set — navigate to next
-      navigate(next, { replace: true });
+      // Browser is redirecting to Google — nothing else to do
     } catch (err: any) {
       toast.error(err?.message ?? "Google sign-in failed");
       setBusy(false);

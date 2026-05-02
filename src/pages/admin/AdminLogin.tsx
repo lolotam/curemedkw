@@ -60,7 +60,8 @@ export default function AdminLogin() {
   const signInWithGoogle = async () => {
     setBusy(true);
     try {
-      const redirectUrl = `${window.location.origin}/admin`;
+      sessionStorage.setItem("auth:next", "/admin");
+      const redirectUrl = `${window.location.origin}/auth/callback`;
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: redirectUrl },
