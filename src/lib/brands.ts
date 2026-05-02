@@ -42,7 +42,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "flexitol",
     categories: ["Foot Care", "Hand Care", "Lip Care", "Body Care"],
     logo: flexitolLogo,
-    instagram: "https://www.instagram.com/flexitolkw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Flexitol Kuwait — Heel Balm, Hand Balm and intensive moisturizers for very dry skin and diabetic foot care.",
       ar: "فليكسيتول الكويت — بلسم الكعب واليدين ومرطبات مكثفة للبشرة شديدة الجفاف والعناية بقدم مرضى السكري.",
@@ -63,7 +63,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "kapiva",
     categories: ["Juices", "Capsules", "Gummies", "Wellness Foods"],
     logo: kapivaLogo,
-    instagram: "https://www.instagram.com/shilajitkapivakw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Kapiva Kuwait — Ayurvedic juices, capsules and gummies for energy, fitness and natural wellness.",
       ar: "كابيفا الكويت — عصائر وكبسولات وحلوى أيورفيدية للطاقة واللياقة والعافية الطبيعية.",
@@ -84,7 +84,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "nada",
     categories: ["Raspberry", "Melon", "Peppermint", "Honey Lemon"],
     logo: nadaLogo,
-    instagram: "https://www.instagram.com/nudemintkw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "NADA Kuwait — Sugar-free Japanese breath capsules for instant freshness and lasting confidence.",
       ar: "ندى الكويت — كبسولات يابانية خالية من السكر لانتعاش فوري للنفس وثقة تدوم طويلاً.",
@@ -106,7 +106,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "abc",
     categories: ["Body Wash", "Lotion", "Hair Care", "Deodorant"],
     logo: abcLogo,
-    instagram: "https://www.instagram.com/australianbodycarekw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Australian Bodycare Kuwait — Natural Tea Tree Oil body wash, lotion and hair care for the whole family.",
       ar: "أستراليان بودي كير الكويت — غسول الجسم واللوشن والعناية بالشعر بزيت شجرة الشاي الطبيعي لجميع أفراد العائلة.",
@@ -127,7 +127,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "lafes",
     categories: ["Deodorant", "Body Care"],
     logo: lafesLogo,
-    instagram: "https://www.instagram.com/lafeskw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Lafe's Kuwait — Natural aluminum-free deodorants and clean personal care for the whole family.",
       ar: "لافيز الكويت — مزيلات عرق طبيعية خالية من الألومنيوم وعناية شخصية نقية لجميع أفراد العائلة.",
@@ -149,7 +149,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "hartington",
     categories: ["Health", "Wellness"],
     logo: hartingtonLogo,
-    instagram: "https://www.instagram.com/hartingtonkw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Hartington Pharmaceutical Kuwait — Trusted pharmaceutical-grade health and wellness products.",
       ar: "هارتنغتون فارماسيوتيكال الكويت — منتجات صحية وعافية بدرجة صيدلانية موثوقة.",
@@ -170,7 +170,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     themeAttr: "phytophar",
     categories: ["Supplements", "Wellness"],
     logo: phytopharLogo,
-    instagram: "https://www.instagram.com/phytopharkw",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Phytophar Kuwait — Plant-based phytotherapy supplements and natural wellness products.",
       ar: "فيتوفار الكويت — مكملات نباتية للعلاج بالأعشاب ومنتجات عافية طبيعية.",
@@ -198,7 +198,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
       "Wound Dressing",
     ],
     logo: hualunhongliLogo,
-    instagram: "",
+    instagram: "https://www.instagram.com/curemedkw/",
     seo: {
       en: "Hualunhongli Kuwait — Self-heating FIR therapy patches, wound dressings and pain-relief plasters.",
       ar: "هوالنهونغلي الكويت — لاصقات علاجية ذاتية التسخين بالأشعة تحت الحمراء، ضمادات جروح ولاصقات لتخفيف الألم.",
