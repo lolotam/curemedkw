@@ -14,10 +14,32 @@ export default function AuthCallback() {
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
 
+        // Surface OAuth provider errors that arrive in the query string or hash
+        // (e.g. ?error=...&error_description=... from GoTrue / Google)
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const providerError =
+          url.searchParams.get("error_description") ||
+          url.searchParams.get("error") ||
+          hash.get("error_description") ||
+          hash.get("error");
+        if (providerError) {
+          console.error("OAuth provider error:", providerError, {
+            href: window.location.href,
+          });
+          navigate(
+            `/auth?error=${encodeURIComponent(providerError)}`,
+            { replace: true },
+          );
+          return;
+        }
+
         if (code) {
           const { error: exchangeError } =
             await supabase.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
+          if (exchangeError) {
+            console.error("exchangeCodeForSession failed:", exchangeError);
+            throw exchangeError;
+          }
         }
 
         const { data, error } = await supabase.auth.getSession();
