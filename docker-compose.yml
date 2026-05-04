@@ -13,21 +13,10 @@ services:
     ports:
       - "3000:80"
     environment:
-      # Set these in Dokploy -> Environment. They are written into
-      # /usr/share/nginx/html/config.js at container startup so the frontend
-      # talks to the self-hosted Supabase instead of Lovable Cloud.
+      # Set in Dokploy -> Environment. The image's start-nginx.sh writes these
+      # into /usr/share/nginx/html/config.js at container startup.
       RUNTIME_SUPABASE_URL: ${RUNTIME_SUPABASE_URL}
       RUNTIME_SUPABASE_ANON_KEY: ${RUNTIME_SUPABASE_ANON_KEY}
-    # $${VAR} escapes docker-compose interpolation so the literal ${VAR}
-    # reaches the container shell, which expands it against the container env.
-    command: >
-      sh -c 'printf "%s\n" \
-        "window.__APP_CONFIG__ = {" \
-        "  SUPABASE_URL: \"$${RUNTIME_SUPABASE_URL}\"," \
-        "  SUPABASE_ANON_KEY: \"$${RUNTIME_SUPABASE_ANON_KEY}\"" \
-        "};" \
-        > /usr/share/nginx/html/config.js
-        nginx -g "daemon off;"'
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s

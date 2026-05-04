@@ -1,10 +1,49 @@
 ## Goal
 
-Replace the bind-mounted `config.js` with a container-startup `printf` that writes `/usr/share/nginx/html/config.js` from Dokploy env vars. Lovable preview unchanged.
+Move the runtime config.js generation from `docker-compose command:` (which Dokploy ignores) into the Docker image itself via a startup script + Dockerfile `CMD`.
 
 ## Changes
 
-### 1. `docker-compose.yml` — replace `web` service with the user-supplied version
+### 1. New file: `docker/start-nginx.sh`
+
+```sh
+#!/bin/sh
+set -eu
+
+cat > /usr/share/nginx/html/config.js <<EOF
+window.__APP_CONFIG__ = {
+  SUPABASE_URL: "${RUNTIME_SUPABASE_URL:-}",
+  SUPABASE_ANON_KEY: "${RUNTIME_SUPABASE_ANON_KEY:-}"
+};
+EOF
+
+exec nginx -g "daemon off;"
+```
+
+### 2. `Dockerfile` — runtime stage updates
+
+Add after `COPY --from=builder /app/dist ...`:
+
+```dockerfile
+COPY docker/start-nginx.sh /usr/local/bin/start-nginx.sh
+RUN chmod +x /usr/local/bin/start-nginx.sh
+```
+
+Replace the final line:
+
+```dockerfile
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+with:
+
+```dockerfile
+CMD ["/usr/local/bin/start-nginx.sh"]
+```
+
+### 3. `docker-compose.yml` — drop the `command:` override
+
+Final web service:
 
 ```yaml
 services:
@@ -24,14 +63,6 @@ services:
     environment:
       RUNTIME_SUPABASE_URL: ${RUNTIME_SUPABASE_URL}
       RUNTIME_SUPABASE_ANON_KEY: ${RUNTIME_SUPABASE_ANON_KEY}
-    command: >
-      sh -c 'printf "%s\n" \
-        "window.__APP_CONFIG__ = {" \
-        "  SUPABASE_URL: \"$${RUNTIME_SUPABASE_URL}\"," \
-        "  SUPABASE_ANON_KEY: \"$${RUNTIME_SUPABASE_ANON_KEY}\"" \
-        "};" \
-        > /usr/share/nginx/html/config.js
-        nginx -g "daemon off;"'
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s
@@ -40,30 +71,17 @@ services:
       start_period: 10s
 ```
 
-The bind-mount volume is removed entirely. `$${...}` escapes interpolation so the literal `${VAR}` reaches the container shell, which expands it against `RUNTIME_SUPABASE_URL` / `RUNTIME_SUPABASE_ANON_KEY`.
-
-### 2. `.dockerignore` — drop the now-irrelevant `config.js` line and its comment
-
-There is no host-side `config.js` anymore.
-
-### 3. Dokploy → Environment (one-time, no repo change)
-
-```
-RUNTIME_SUPABASE_URL=https://supabase.curemedkw.com
-RUNTIME_SUPABASE_ANON_KEY=<self-hosted anon key>
-```
-
 ## Not changed
 
 - `public/config.js` — empty fallback for Lovable preview.
-- `index.html` — already loads `/config.js` before the bundle.
-- `src/integrations/supabase/clientRuntime.ts` — already prefers `window.__APP_CONFIG__`, falls back to Vite env.
+- `index.html` — already loads `/config.js` first.
+- `src/integrations/supabase/clientRuntime.ts` — already prefers `window.__APP_CONFIG__`.
 - `src/integrations/supabase/client.ts` — Lovable-managed, untouched.
-- `Dockerfile`, `.env` — untouched.
+- `.env`, `.dockerignore`.
 
 ## Verification after deploy
 
-1. `docker exec curemed-web cat /usr/share/nginx/html/config.js` shows the self-hosted URL.
-2. `https://curemedkw.com` console: `[supabase] using URL: https://supabase.curemedkw.com`.
-3. Network tab: `/auth/v1/*` and `/rest/v1/*` go to `supabase.curemedkw.com`.
+1. `docker inspect curemed-web --format '{{json .Config.Cmd}}'` → `["/usr/local/bin/start-nginx.sh"]`
+2. `docker exec curemed-web cat /usr/share/nginx/html/config.js` → contains `https://supabase.curemedkw.com`
+3. Browser console at `https://curemedkw.com` → `[supabase] using URL: https://supabase.curemedkw.com`
 4. Lovable preview console still shows `lgcuwsjlxkntwzlgjtzp.supabase.co`.
