@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 
 export type DescFormat = "text" | "html";
 

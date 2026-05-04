@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { convertToWebP } from "@/lib/imageConvert";
 
 export type HeroPageKey =

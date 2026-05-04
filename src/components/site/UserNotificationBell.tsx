@@ -11,7 +11,7 @@ import {
   useMarkNotificationRead, useMarkAllNotificationsRead,
 } from "@/lib/db";
 import { useI18n } from "@/lib/i18n";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 

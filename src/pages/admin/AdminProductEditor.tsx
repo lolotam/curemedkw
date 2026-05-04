@@ -18,7 +18,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
 import type { ExtractedFields } from "@/lib/aiImport";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";

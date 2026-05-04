@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Upload, CheckCheck, Bell } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { convertToWebP } from "@/lib/imageConvert";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";

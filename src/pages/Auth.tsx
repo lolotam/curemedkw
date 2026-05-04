@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { getAuthRedirectUrl } from "@/lib/authRedirect";
 
 import { useAuth } from "@/lib/auth";
