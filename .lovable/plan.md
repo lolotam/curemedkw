@@ -1,26 +1,76 @@
-## Goal
+# Self-hosted Supabase migration workflow
 
-In `/admin/categories` "Add category" / "Edit category" dialog, the image upload works but the resulting URL is not visible. Add a URL text input next to the Upload button (mirroring the pattern in `/admin/branding` `BrandingField`), so admins can either paste a URL or upload — and after upload, the URL is shown and editable.
+Add a safe, idempotent way to apply SQL migrations to your self-hosted Postgres container `cloud-supabase-hns8fw-supabase-db`. Nothing runs from the browser; nothing is exposed as a frontend route.
 
-## Changes
+## Files to create
 
-**File: `src/pages/admin/AdminCategories.tsx`** — only the image section of `CategoryEditorDialog` (lines ~382–415).
+### 1. `supabase/migrations/.gitkeep`
+Empty file so the folder is tracked in git. All future DB changes go here as timestamped files:
+```
+supabase/migrations/YYYYMMDDHHMMSS_short_description.sql
+```
+Example: `20260504120000_add_category_image_url.sql`
 
-Replace the current image block with the same UX as branding:
+Convention going forward: every time I make a schema change for you, I will also drop a matching SQL file into `supabase/migrations/`.
 
-1. Keep the 32×32 (h-32 w-32) square preview thumbnail on the left with the X remove button.
-2. To the right, render:
-   - A **URL Input** bound to `form.imageUrl` (`onChange` updates `imageUrl` directly). Placeholder: `https://example.com/category.jpg`.
-   - An **Upload button** (icon + label) that triggers a hidden `<input type="file" accept="image/*">`. On upload, call existing `uploadCategoryImage(file)`, set `form.imageUrl` to the returned public URL, and toast success — same behavior as today.
-   - Helper text: "Paste a URL above, or upload an image. 1:1 square recommended (PNG/JPG/WebP)."
-   - When `form.imageUrl` is non-empty, show a small "Currently: <mono URL>" line below (break-all) so the link is visible — matching `AdminBranding`.
+### 2. `supabase/migrations/00000000000000_init_migration_tracker.sql`
+Bootstraps the tracking table. Idempotent — safe to run repeatedly.
 
-3. No changes to `uploadCategoryImage`, `useCreateCategory`, or `useUpdateCategory` — the saving flow is unchanged. The URL is already persisted to the `categories.image_url` column via the existing save path.
+```sql
+CREATE TABLE IF NOT EXISTS public.self_hosted_migrations (
+  filename     text PRIMARY KEY,
+  applied_at   timestamptz NOT NULL DEFAULT now(),
+  checksum     text
+);
+```
 
-No DB migrations, no new dependencies, no other files touched.
+### 3. `scripts/apply-self-hosted-migrations.sh`
+Bash script that:
 
-## Result
+- `set -euo pipefail` and uses `psql -v ON_ERROR_STOP=1 --single-transaction`.
+- Targets container `cloud-supabase-hns8fw-supabase-db` (overridable via `SUPABASE_DB_CONTAINER` env var).
+- Uses `docker exec -i "$CONTAINER" psql -U postgres -d postgres ...`.
+- **Step A — bootstrap:** unconditionally apply `supabase/migrations/00000000000000_init_migration_tracker.sql` (it's `IF NOT EXISTS`).
+- **Step B — loop** over `supabase/migrations/*.sql` sorted lexicographically:
+  1. **Skip the bootstrap file** explicitly:
+     ```bash
+     if [ "$filename" = "00000000000000_init_migration_tracker.sql" ]; then
+       continue
+     fi
+     ```
+     Reason: it's already applied in Step A and must not be tracked like a normal migration.
+  2. Compute `sha256sum` checksum.
+  3. Query `SELECT checksum FROM public.self_hosted_migrations WHERE filename = '<file>'`.
+  4. If already applied with matching checksum → log `[skip] <file>`.
+  5. If applied with different checksum → ABORT with clear error (file edited after being applied).
+  6. If not applied → `cat file | docker exec -i ... psql ... -1` (single transaction, `ON_ERROR_STOP=1`). On success, `INSERT INTO public.self_hosted_migrations (filename, checksum) VALUES (...)`.
+- Final summary: `Applied N, skipped M.`
+- Exits non-zero on any failure so CI/deploy pipelines halt.
 
-- Admins can paste an image URL directly (no upload needed).
-- After uploading, the resulting public Storage URL appears in the input and is visible/copyable.
-- Behavior matches `/admin/branding` brand card logo flow.
+### 4. `scripts/README.md`
+Short doc with the command to run after every deploy:
+
+```bash
+# After each deploy, on the host running the Supabase docker stack:
+bash scripts/apply-self-hosted-migrations.sh
+
+# Override container name if needed:
+SUPABASE_DB_CONTAINER=my-other-db bash scripts/apply-self-hosted-migrations.sh
+```
+
+Notes:
+- Run from the project root.
+- Requires `docker` access on the host and the Supabase DB container running.
+- Migrations applied in filename order — always prefix with a UTC timestamp.
+- Never edit a migration after it has been applied; create a new one instead.
+- Never run this from the browser or an edge function. Host-side only.
+
+## What is NOT changed
+
+- No frontend routes, no React code, no edge functions.
+- No changes to `supabase/config.toml`, `Dockerfile`, `docker-compose.yml`, or nginx.
+- Lovable Cloud is not touched — this workflow is exclusively for your self-hosted Postgres.
+
+## After approval
+
+I'll create the four files above exactly as described. No DB changes executed by me — you run the script on your host.
