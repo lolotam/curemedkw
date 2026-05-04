@@ -1,5 +1,5 @@
 import * as React from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import type { User } from "@supabase/supabase-js";
 
 interface AuthCtx {

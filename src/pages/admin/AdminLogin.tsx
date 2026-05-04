@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { useAdminSession } from "@/lib/admin";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { getAuthRedirectUrl } from "@/lib/authRedirect";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "sonner";
