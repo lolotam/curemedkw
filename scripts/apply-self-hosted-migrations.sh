@@ -5,15 +5,17 @@
 # Apply SQL migrations from supabase/migrations/ to the self-hosted
 # Supabase Postgres container. Idempotent and safe to re-run.
 #
-# Usage (from project root):
+# Usage (from project root, on the host running the Supabase docker stack):
 #   bash scripts/apply-self-hosted-migrations.sh
 #
 # Override the target container if needed:
 #   SUPABASE_DB_CONTAINER=my-other-db bash scripts/apply-self-hosted-migrations.sh
 #
-# Requires:
-#   - docker on PATH
-#   - the Supabase DB container running on this host
+# Other overrides:
+#   SUPABASE_DB_USER (default: postgres)
+#   SUPABASE_DB_NAME (default: postgres)
+#
+# Requires: docker on PATH and the Supabase DB container running.
 #
 
 set -euo pipefail
@@ -25,9 +27,8 @@ DB_NAME="${SUPABASE_DB_NAME:-postgres}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MIGRATIONS_DIR="$PROJECT_ROOT/supabase/migrations"
-BOOTSTRAP_FILE="00000000000000_init_migration_tracker.sql"
 
-PSQL_BASE=(docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME")
+PSQL=(docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME")
 
 log() { printf '%s\n' "$*" >&2; }
 
@@ -48,17 +49,18 @@ if [ ! -d "$MIGRATIONS_DIR" ]; then
   exit 1
 fi
 
-# --- step A: bootstrap tracker table -----------------------------------------
+# --- step A: bootstrap tracker table (inlined; idempotent) -------------------
 
-if [ ! -f "$MIGRATIONS_DIR/$BOOTSTRAP_FILE" ]; then
-  log "ERROR: missing bootstrap file: $MIGRATIONS_DIR/$BOOTSTRAP_FILE"
-  exit 1
-fi
+log "[bootstrap] ensuring public.self_hosted_migrations exists"
+"${PSQL[@]}" --single-transaction <<'SQL'
+CREATE TABLE IF NOT EXISTS public.self_hosted_migrations (
+  filename     text PRIMARY KEY,
+  applied_at   timestamptz NOT NULL DEFAULT now(),
+  checksum     text
+);
+SQL
 
-log "[bootstrap] applying $BOOTSTRAP_FILE (CREATE TABLE IF NOT EXISTS)"
-"${PSQL_BASE[@]}" --single-transaction < "$MIGRATIONS_DIR/$BOOTSTRAP_FILE"
-
-# --- step B: apply remaining migrations in order ------------------------------
+# --- step B: apply remaining migrations in lexicographic order ---------------
 
 applied=0
 skipped=0
@@ -67,22 +69,20 @@ shopt -s nullglob
 files=("$MIGRATIONS_DIR"/*.sql)
 shopt -u nullglob
 
-# sort lexicographically (timestamp prefix => chronological)
-IFS=$'\n' files=($(printf '%s\n' "${files[@]}" | sort))
-unset IFS
+if [ "${#files[@]}" -gt 0 ]; then
+  IFS=$'\n' files=($(printf '%s\n' "${files[@]}" | sort))
+  unset IFS
+fi
+
+sql_escape() { printf %s "$1" | sed "s/'/''/g"; }
 
 for path in "${files[@]}"; do
   filename="$(basename "$path")"
-
-  # bootstrap is applied unconditionally above; never track it
-  if [ "$filename" = "$BOOTSTRAP_FILE" ]; then
-    continue
-  fi
-
   checksum="$(sha256sum "$path" | awk '{print $1}')"
+  esc_filename="$(sql_escape "$filename")"
 
-  existing="$("${PSQL_BASE[@]}" -At -c \
-    "SELECT checksum FROM public.self_hosted_migrations WHERE filename = '$(printf %s "$filename" | sed "s/'/''/g")'")"
+  existing="$("${PSQL[@]}" -At -c \
+    "SELECT checksum FROM public.self_hosted_migrations WHERE filename = '$esc_filename'")"
 
   if [ -n "$existing" ]; then
     if [ "$existing" = "$checksum" ]; then
@@ -93,16 +93,16 @@ for path in "${files[@]}"; do
       log "ERROR: checksum mismatch for $filename."
       log "       Stored:   $existing"
       log "       Current:  $checksum"
-      log "       Migrations must be immutable. Create a new migration file instead of editing this one."
+      log "       Migrations are immutable — create a new migration file instead of editing this one."
       exit 1
     fi
   fi
 
   log "[apply] $filename"
-  "${PSQL_BASE[@]}" --single-transaction < "$path"
+  "${PSQL[@]}" --single-transaction < "$path"
 
-  "${PSQL_BASE[@]}" -c \
-    "INSERT INTO public.self_hosted_migrations (filename, checksum) VALUES ('$(printf %s "$filename" | sed "s/'/''/g")', '$checksum')"
+  "${PSQL[@]}" -c \
+    "INSERT INTO public.self_hosted_migrations (filename, checksum) VALUES ('$esc_filename', '$(sql_escape "$checksum")')"
 
   applied=$((applied + 1))
 done
