@@ -399,18 +399,33 @@ function CategoryEditorDialog({
                 </div>
               )}
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-w-0">
               <p className="text-sm font-medium">Image (1:1 square)</p>
-              <p className="text-xs text-muted-foreground">Square crop recommended. PNG/JPG.</p>
-              <Label className="inline-flex">
-                <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
-                <span className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-background text-sm cursor-pointer hover:bg-muted",
-                  uploading && "opacity-50 pointer-events-none",
-                )}>
-                  <Upload className="h-3.5 w-3.5" /> {uploading ? "Uploading…" : "Upload"}
-                </span>
-              </Label>
+              <div className="flex gap-2">
+                <Input
+                  value={form.imageUrl}
+                  onChange={(e) => update("imageUrl", e.target.value)}
+                  placeholder="https://example.com/category.jpg"
+                  className="flex-1"
+                />
+                <Label className="inline-flex shrink-0">
+                  <input type="file" accept="image/*" onChange={onUpload} className="hidden" />
+                  <span className={cn(
+                    "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-background text-sm cursor-pointer hover:bg-muted",
+                    uploading && "opacity-50 pointer-events-none",
+                  )}>
+                    <Upload className="h-3.5 w-3.5" /> {uploading ? "Uploading…" : "Upload"}
+                  </span>
+                </Label>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Paste a URL above, or upload an image. 1:1 square recommended (PNG/JPG/WebP).
+              </p>
+              {form.imageUrl && (
+                <p className="text-[11px] text-muted-foreground break-all">
+                  Currently: <span className="font-mono">{form.imageUrl}</span>
+                </p>
+              )}
             </div>
           </div>
 

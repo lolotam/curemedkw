@@ -1,87 +1,26 @@
 ## Goal
 
-Move the runtime config.js generation from `docker-compose command:` (which Dokploy ignores) into the Docker image itself via a startup script + Dockerfile `CMD`.
+In `/admin/categories` "Add category" / "Edit category" dialog, the image upload works but the resulting URL is not visible. Add a URL text input next to the Upload button (mirroring the pattern in `/admin/branding` `BrandingField`), so admins can either paste a URL or upload — and after upload, the URL is shown and editable.
 
 ## Changes
 
-### 1. New file: `docker/start-nginx.sh`
+**File: `src/pages/admin/AdminCategories.tsx`** — only the image section of `CategoryEditorDialog` (lines ~382–415).
 
-```sh
-#!/bin/sh
-set -eu
+Replace the current image block with the same UX as branding:
 
-cat > /usr/share/nginx/html/config.js <<EOF
-window.__APP_CONFIG__ = {
-  SUPABASE_URL: "${RUNTIME_SUPABASE_URL:-}",
-  SUPABASE_ANON_KEY: "${RUNTIME_SUPABASE_ANON_KEY:-}"
-};
-EOF
+1. Keep the 32×32 (h-32 w-32) square preview thumbnail on the left with the X remove button.
+2. To the right, render:
+   - A **URL Input** bound to `form.imageUrl` (`onChange` updates `imageUrl` directly). Placeholder: `https://example.com/category.jpg`.
+   - An **Upload button** (icon + label) that triggers a hidden `<input type="file" accept="image/*">`. On upload, call existing `uploadCategoryImage(file)`, set `form.imageUrl` to the returned public URL, and toast success — same behavior as today.
+   - Helper text: "Paste a URL above, or upload an image. 1:1 square recommended (PNG/JPG/WebP)."
+   - When `form.imageUrl` is non-empty, show a small "Currently: <mono URL>" line below (break-all) so the link is visible — matching `AdminBranding`.
 
-exec nginx -g "daemon off;"
-```
+3. No changes to `uploadCategoryImage`, `useCreateCategory`, or `useUpdateCategory` — the saving flow is unchanged. The URL is already persisted to the `categories.image_url` column via the existing save path.
 
-### 2. `Dockerfile` — runtime stage updates
+No DB migrations, no new dependencies, no other files touched.
 
-Add after `COPY --from=builder /app/dist ...`:
+## Result
 
-```dockerfile
-COPY docker/start-nginx.sh /usr/local/bin/start-nginx.sh
-RUN chmod +x /usr/local/bin/start-nginx.sh
-```
-
-Replace the final line:
-
-```dockerfile
-CMD ["nginx", "-g", "daemon off;"]
-```
-
-with:
-
-```dockerfile
-CMD ["/usr/local/bin/start-nginx.sh"]
-```
-
-### 3. `docker-compose.yml` — drop the `command:` override
-
-Final web service:
-
-```yaml
-services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
-        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
-    image: curemed-web:latest
-    container_name: curemed-web
-    restart: unless-stopped
-    ports:
-      - "3000:80"
-    environment:
-      RUNTIME_SUPABASE_URL: ${RUNTIME_SUPABASE_URL}
-      RUNTIME_SUPABASE_ANON_KEY: ${RUNTIME_SUPABASE_ANON_KEY}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-```
-
-## Not changed
-
-- `public/config.js` — empty fallback for Lovable preview.
-- `index.html` — already loads `/config.js` first.
-- `src/integrations/supabase/clientRuntime.ts` — already prefers `window.__APP_CONFIG__`.
-- `src/integrations/supabase/client.ts` — Lovable-managed, untouched.
-- `.env`, `.dockerignore`.
-
-## Verification after deploy
-
-1. `docker inspect curemed-web --format '{{json .Config.Cmd}}'` → `["/usr/local/bin/start-nginx.sh"]`
-2. `docker exec curemed-web cat /usr/share/nginx/html/config.js` → contains `https://supabase.curemedkw.com`
-3. Browser console at `https://curemedkw.com` → `[supabase] using URL: https://supabase.curemedkw.com`
-4. Lovable preview console still shows `lgcuwsjlxkntwzlgjtzp.supabase.co`.
+- Admins can paste an image URL directly (no upload needed).
+- After uploading, the resulting public Storage URL appears in the input and is visible/copyable.
+- Behavior matches `/admin/branding` brand card logo flow.
