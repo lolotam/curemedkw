@@ -1,76 +1,77 @@
-# Google Sign-In Diagnosis
+## Goal
 
-## What I checked
-- `src/pages/Auth.tsx` (lines 115–137): correctly calls `supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: getAuthRedirectUrl(), queryParams: { prompt: 'select_account' } } })`.
-- `src/pages/AuthCallback.tsx`: correctly handles `?code=...` via `exchangeCodeForSession` and falls back to `getSession`.
-- `src/lib/authRedirect.ts`: returns `https://curemedkw.com/auth/callback` in production, `${origin}/auth/callback` for localhost / lovable.app.
-- `src/integrations/supabase/client.ts` + `.env`: pointing to `https://supabase.curemedkw.com` with the new anon key.
-- Route `/auth/callback` is registered in `App.tsx`.
+Make the Dokploy/Docker production build read its Supabase URL + anon key from a runtime-mounted `config.js`, while Lovable preview keeps using Lovable Cloud unchanged.
 
-**Conclusion: the React code is fine.** The failure is in the self-hosted Supabase (GoTrue) configuration created during the recent Dokploy migration — not in the app.
+## Current state (already in place from previous step)
 
-## Most likely root causes (in order)
+- `public/config.js` exists with empty defaults (falls back to Vite env vars).
+- `src/integrations/supabase/clientRuntime.ts` reads `window.__APP_CONFIG__` first, then `VITE_SUPABASE_*`.
+- All 13 app imports use `clientRuntime`. `src/integrations/supabase/client.ts` is untouched (Lovable-managed).
+- `index.html` already loads `/config.js` before `/src/main.tsx`.
 
-1. **GoTrue (Auth) on Dokploy is missing/incorrect Google provider env vars.** After the migration the new self-hosted stack must have:
-   - `GOTRUE_EXTERNAL_GOOGLE_ENABLED=true`
-   - `GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=<your Google client id>`
-   - `GOTRUE_EXTERNAL_GOOGLE_SECRET=<your Google client secret>`
-   - `GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=https://supabase.curemedkw.com/auth/v1/callback`
-2. **`SITE_URL` / `URI_ALLOW_LIST` not updated** on the new GoTrue:
-   - `GOTRUE_SITE_URL=https://curemedkw.com`
-   - `GOTRUE_URI_ALLOW_LIST=https://curemedkw.com/*,https://*.lovable.app/*,http://localhost:5173/*,http://localhost:3000/*`
-   Without this, GoTrue refuses to redirect back to `/auth/callback` and you get `redirect_to mismatch` / `bad_oauth_state`.
-3. **Google Cloud Console authorized redirect URI still points to the old `*.supabase.co` callback.** It must include:
-   - `https://supabase.curemedkw.com/auth/v1/callback`
-4. **API URL / external URL mismatch.** GoTrue must know its public URL:
-   - `API_EXTERNAL_URL=https://supabase.curemedkw.com`
-   - `GOTRUE_API_EXTERNAL_URL=https://supabase.curemedkw.com`
-5. **Kong/proxy not routing `/auth/v1/*` correctly** — common Dokploy pitfall when only the REST route is exposed.
+So nothing in the app code needs to change. The remaining work is purely on the Docker/Dokploy side.
 
-## What I need from you to confirm
-Open Google sign-in once and tell me which of these you see:
-- A. Google account picker never appears (instant error in app) → cause #1 or #5.
-- B. Picker appears, then redirects to a Supabase URL that shows an error JSON (e.g. `{"error":"redirect_to mismatch"}`, `bad_oauth_state`, `provider is not enabled`) → cause #1 or #2.
-- C. Returns to `/auth/callback` then bounces to `/auth?error=oauth_no_session` or `oauth_callback_failed` → cause #2 (cookie/session not set; usually `SITE_URL` mismatch or third-party cookie blocked because callback host differs from app host).
-- D. 404 / 502 from `https://supabase.curemedkw.com/auth/v1/authorize?...` → cause #5 (Kong route missing).
+## Changes
 
-The exact URL in the address bar when it fails (you can redact tokens) will tell me which one immediately.
+### 1. `docker-compose.yml` — add volume mount on the `web` service
 
-## Fix plan (server-side, on Dokploy — no app code changes)
-
-Step 1 — Update Dokploy env vars on the `auth` (GoTrue) service:
-```text
-API_EXTERNAL_URL=https://supabase.curemedkw.com
-GOTRUE_SITE_URL=https://curemedkw.com
-GOTRUE_URI_ALLOW_LIST=https://curemedkw.com/*,https://*.lovable.app/*,http://localhost:5173/*,http://localhost:3000/*
-GOTRUE_EXTERNAL_GOOGLE_ENABLED=true
-GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID=<paste>
-GOTRUE_EXTERNAL_GOOGLE_SECRET=<paste>
-GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI=https://supabase.curemedkw.com/auth/v1/callback
+```yaml
+services:
+  web:
+    # ... existing build / image / ports / healthcheck stay as-is ...
+    volumes:
+      - ./config.js:/usr/share/nginx/html/config.js:ro
 ```
-Then restart the `auth` container.
 
-Step 2 — In Google Cloud Console → Credentials → your OAuth Client → Authorized redirect URIs, add:
-```text
-https://supabase.curemedkw.com/auth/v1/callback
+This overrides the empty `config.js` baked into the image with the host file at container start. Read-only mount so the container can't mutate it.
+
+### 2. Create `config.js` at the Dokploy host repo root (next to `docker-compose.yml`)
+
+This file is NOT committed to the repo (it contains the deployment-specific anon key). It is created once on the Dokploy host:
+
+```js
+window.__APP_CONFIG__ = {
+  SUPABASE_URL: "https://supabase.curemedkw.com",
+  SUPABASE_ANON_KEY: "<self-hosted anon key>"
+};
 ```
-Keep the old one only if you still use the old project; otherwise remove it.
 
-Step 3 — Verify Kong route. Hit this in a browser:
+I will also add `config.js` to `.dockerignore` and `.gitignore` so it can never accidentally be baked into the image or committed.
+
+### 3. Verify `index.html` loads `/config.js` before the bundle
+
+Already done — confirmed `<script src="/config.js"></script>` sits immediately before `<script type="module" src="/src/main.tsx"></script>`. No change needed.
+
+## Explicitly NOT changed
+
+- `src/integrations/supabase/client.ts` — untouched, Lovable-managed.
+- `.env` — untouched. Lovable preview keeps reading `VITE_SUPABASE_URL` = Lovable Cloud project.
+- `Dockerfile` — no change. Build args still pass Lovable Cloud values as a safe fallback if the volume isn't mounted.
+- No app code changes.
+
+## How the two environments resolve at runtime
+
 ```text
-https://supabase.curemedkw.com/auth/v1/health
+Lovable preview (id-preview--*.lovable.app)
+  /config.js  -> repo's public/config.js  (empty SUPABASE_URL)
+  fallback    -> VITE_SUPABASE_URL = Lovable Cloud
+  result      -> Lovable Cloud  ✓
+
+Dokploy production (curemedkw.com)
+  /config.js  -> host-mounted file (self-hosted URL + anon key)
+  result      -> https://supabase.curemedkw.com  ✓
 ```
-You should get `{"name":"GoTrue", ...}`. If you get 404/502, fix the Kong `auth-v1-open` route in your Dokploy stack before anything else.
 
-Step 4 — Smoke test:
-- Open `https://curemedkw.com/auth`, click "Continue with Google".
-- Expected flow: Google picker → `https://supabase.curemedkw.com/auth/v1/callback?code=...` → `https://curemedkw.com/auth/callback?code=...` → home page, signed in.
+## Verification after deploy
 
-## What I will change in code
-**Nothing**, unless after step 1–3 we still see issue C above. In that case I will:
-- Add a small log inside `AuthCallback.tsx` to surface the exact GoTrue error (`error_description` from URL hash), so we can see the real reason instead of a generic `oauth_callback_failed`.
+1. Open `https://curemedkw.com` → DevTools console must show:
+   `[supabase] using URL: https://supabase.curemedkw.com`
+2. Network tab: `/auth/v1/*` and `/rest/v1/*` requests go to `supabase.curemedkw.com`.
+3. Open Lovable preview → console must still show the Lovable Cloud URL (`lgcuwsjlxkntwzlgjtzp.supabase.co`).
 
-## Notes on the warnings in your console
-The two warnings about `Function components cannot be given refs` (`SlideAnimatedText`, `FeaturedGlassCard`) are unrelated to auth. We can fix those separately by wrapping those two components in `React.forwardRef` if you want — say the word and I'll do it in a follow-up.
+## Dokploy host setup checklist (one-time)
 
-Reply with which symptom (A/B/C/D) you observe, or paste the failing URL, and I'll either confirm the server fix or push the small `AuthCallback` logging patch.
+1. On the Dokploy host, in the repo working dir, create `config.js` with the production values shown above.
+2. `chmod 644 config.js`.
+3. Redeploy the stack — Dokploy will recreate the `web` container with the new mount.
+4. If `config.js` is missing on the host the container will fail to start (mount target won't exist) — create it first.

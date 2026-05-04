@@ -12,6 +12,15 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    volumes:
+      # Production-only runtime config. Create ./config.js on the Dokploy host
+      # next to this compose file with:
+      #   window.__APP_CONFIG__ = {
+      #     SUPABASE_URL: "https://supabase.curemedkw.com",
+      #     SUPABASE_ANON_KEY: "<self-hosted anon key>"
+      #   };
+      # Read-only mount overrides the empty /config.js baked into the image.
+      - ./config.js:/usr/share/nginx/html/config.js:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
       interval: 30s
