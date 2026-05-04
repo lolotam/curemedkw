@@ -1,77 +1,69 @@
 ## Goal
 
-Make the Dokploy/Docker production build read its Supabase URL + anon key from a runtime-mounted `config.js`, while Lovable preview keeps using Lovable Cloud unchanged.
-
-## Current state (already in place from previous step)
-
-- `public/config.js` exists with empty defaults (falls back to Vite env vars).
-- `src/integrations/supabase/clientRuntime.ts` reads `window.__APP_CONFIG__` first, then `VITE_SUPABASE_*`.
-- All 13 app imports use `clientRuntime`. `src/integrations/supabase/client.ts` is untouched (Lovable-managed).
-- `index.html` already loads `/config.js` before `/src/main.tsx`.
-
-So nothing in the app code needs to change. The remaining work is purely on the Docker/Dokploy side.
+Replace the bind-mounted `config.js` with a container-startup `printf` that writes `/usr/share/nginx/html/config.js` from Dokploy env vars. Lovable preview unchanged.
 
 ## Changes
 
-### 1. `docker-compose.yml` — add volume mount on the `web` service
+### 1. `docker-compose.yml` — replace `web` service with the user-supplied version
 
 ```yaml
 services:
   web:
-    # ... existing build / image / ports / healthcheck stay as-is ...
-    volumes:
-      - ./config.js:/usr/share/nginx/html/config.js:ro
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+    image: curemed-web:latest
+    container_name: curemed-web
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      RUNTIME_SUPABASE_URL: ${RUNTIME_SUPABASE_URL}
+      RUNTIME_SUPABASE_ANON_KEY: ${RUNTIME_SUPABASE_ANON_KEY}
+    command: >
+      sh -c 'printf "%s\n" \
+        "window.__APP_CONFIG__ = {" \
+        "  SUPABASE_URL: \"$${RUNTIME_SUPABASE_URL}\"," \
+        "  SUPABASE_ANON_KEY: \"$${RUNTIME_SUPABASE_ANON_KEY}\"" \
+        "};" \
+        > /usr/share/nginx/html/config.js
+        nginx -g "daemon off;"'
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 ```
 
-This overrides the empty `config.js` baked into the image with the host file at container start. Read-only mount so the container can't mutate it.
+The bind-mount volume is removed entirely. `$${...}` escapes interpolation so the literal `${VAR}` reaches the container shell, which expands it against `RUNTIME_SUPABASE_URL` / `RUNTIME_SUPABASE_ANON_KEY`.
 
-### 2. Create `config.js` at the Dokploy host repo root (next to `docker-compose.yml`)
+### 2. `.dockerignore` — drop the now-irrelevant `config.js` line and its comment
 
-This file is NOT committed to the repo (it contains the deployment-specific anon key). It is created once on the Dokploy host:
+There is no host-side `config.js` anymore.
 
-```js
-window.__APP_CONFIG__ = {
-  SUPABASE_URL: "https://supabase.curemedkw.com",
-  SUPABASE_ANON_KEY: "<self-hosted anon key>"
-};
+### 3. Dokploy → Environment (one-time, no repo change)
+
+```
+RUNTIME_SUPABASE_URL=https://supabase.curemedkw.com
+RUNTIME_SUPABASE_ANON_KEY=<self-hosted anon key>
 ```
 
-I will also add `config.js` to `.dockerignore` and `.gitignore` so it can never accidentally be baked into the image or committed.
+## Not changed
 
-### 3. Verify `index.html` loads `/config.js` before the bundle
-
-Already done — confirmed `<script src="/config.js"></script>` sits immediately before `<script type="module" src="/src/main.tsx"></script>`. No change needed.
-
-## Explicitly NOT changed
-
-- `src/integrations/supabase/client.ts` — untouched, Lovable-managed.
-- `.env` — untouched. Lovable preview keeps reading `VITE_SUPABASE_URL` = Lovable Cloud project.
-- `Dockerfile` — no change. Build args still pass Lovable Cloud values as a safe fallback if the volume isn't mounted.
-- No app code changes.
-
-## How the two environments resolve at runtime
-
-```text
-Lovable preview (id-preview--*.lovable.app)
-  /config.js  -> repo's public/config.js  (empty SUPABASE_URL)
-  fallback    -> VITE_SUPABASE_URL = Lovable Cloud
-  result      -> Lovable Cloud  ✓
-
-Dokploy production (curemedkw.com)
-  /config.js  -> host-mounted file (self-hosted URL + anon key)
-  result      -> https://supabase.curemedkw.com  ✓
-```
+- `public/config.js` — empty fallback for Lovable preview.
+- `index.html` — already loads `/config.js` before the bundle.
+- `src/integrations/supabase/clientRuntime.ts` — already prefers `window.__APP_CONFIG__`, falls back to Vite env.
+- `src/integrations/supabase/client.ts` — Lovable-managed, untouched.
+- `Dockerfile`, `.env` — untouched.
 
 ## Verification after deploy
 
-1. Open `https://curemedkw.com` → DevTools console must show:
-   `[supabase] using URL: https://supabase.curemedkw.com`
-2. Network tab: `/auth/v1/*` and `/rest/v1/*` requests go to `supabase.curemedkw.com`.
-3. Open Lovable preview → console must still show the Lovable Cloud URL (`lgcuwsjlxkntwzlgjtzp.supabase.co`).
-
-## Dokploy host setup checklist (one-time)
-
-1. On the Dokploy host, in the repo working dir, create `config.js` with the production values shown above.
-2. `chmod 644 config.js`.
-3. Redeploy the stack — Dokploy will recreate the `web` container with the new mount.
-4. If `config.js` is missing on the host the container will fail to start (mount target won't exist) — create it first.
+1. `docker exec curemed-web cat /usr/share/nginx/html/config.js` shows the self-hosted URL.
+2. `https://curemedkw.com` console: `[supabase] using URL: https://supabase.curemedkw.com`.
+3. Network tab: `/auth/v1/*` and `/rest/v1/*` go to `supabase.curemedkw.com`.
+4. Lovable preview console still shows `lgcuwsjlxkntwzlgjtzp.supabase.co`.

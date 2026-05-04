@@ -8,8 +8,6 @@ dist
 .env
 .env.local
 .env.*.local
-# Host-only runtime config for Dokploy production (mounted at runtime)
-config.js
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
