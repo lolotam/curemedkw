@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
+import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
