@@ -70,6 +70,8 @@ export default function AdminBranding() {
 
       <FeaturedGlassOpacityControl />
 
+      <LoaderVideoControl />
+
       <LoaderBarControl />
 
       <div className="pt-4">
