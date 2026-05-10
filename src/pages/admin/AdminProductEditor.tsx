@@ -216,9 +216,10 @@ export default function AdminProductEditor() {
     update("gallery", [oldMain, ...form.gallery.filter((g) => g !== src)]);
   };
 
-  const applyImported = (fields: ExtractedFields, images: string[]) => {
+  const applyImported = (fields: ExtractedFields, images: string[], sourceUrl?: string) => {
     setForm((f) => {
       const next = { ...f };
+      if (sourceUrl && sourceUrl.trim()) next.sourceUrl = sourceUrl.trim();
       if (fields.name) next.name = fields.name;
       if (fields.brand) next.brand = fields.brand;
       if (fields.category) {
