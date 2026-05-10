@@ -399,7 +399,7 @@ export default function AdminProductEditor() {
             {translating ? "Translating…" : "Translate to Arabic"}
           </Button>
         )}
-        <Button type="submit" className="bg-brand hover:bg-brand/90 text-white">Save</Button>
+        <Button type="submit" disabled={!!priceError} className="bg-brand hover:bg-brand/90 text-white">Save</Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
