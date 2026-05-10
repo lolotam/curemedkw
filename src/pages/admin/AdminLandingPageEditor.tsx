@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BRANDS } from "@/lib/brands";
+import curemedBadge from "@/assets/curemed-c-badge.png";
 import { SlideStylePanel } from "@/components/admin/SlideStylePanel";
 import { SlideLivePreview } from "@/components/admin/SlideLivePreview";
 import { HeroIntervalCard } from "@/components/admin/HeroIntervalCard";
