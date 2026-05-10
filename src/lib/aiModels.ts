@@ -1,21 +1,34 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { toast } from "sonner";
+import type { Provider, ModelKind } from "./aiProviders";
 
-// AI model selection is stored server-side in `site_settings` so the same
-// chain is used by every browser, every origin (preview vs production),
-// and most importantly by the edge function itself. localStorage was
-// previously used here but it is per-origin/per-browser, which caused
-// the edge function to fall back to defaults (e.g. openai/gpt-4o-mini)
-// when the live site had no saved selection.
+// Stored in `site_settings.ai_import_models` as:
+//   { chat: Slot[], image: Slot[] }   (each array length 3)
+// Legacy format (flat string[]) is migrated on read into chat slots
+// pinned to the OpenRouter provider.
 
 const SETTINGS_KEY = "ai_import_models";
 
-export const DEFAULT_AI_MODELS: [string, string, string] = [
-  "openai/gpt-4o-mini",
-  "google/gemini-2.0-flash-001",
-  "anthropic/claude-3.5-haiku",
-];
+export interface Slot {
+  provider: Provider;
+  model: string;
+}
+
+export type SlotsByKind = Record<ModelKind, [Slot, Slot, Slot]>;
+
+export const DEFAULT_SLOTS: SlotsByKind = {
+  chat: [
+    { provider: "openrouter", model: "openai/gpt-4o-mini" },
+    { provider: "openrouter", model: "google/gemini-2.0-flash-001" },
+    { provider: "openrouter", model: "anthropic/claude-3.5-haiku" },
+  ],
+  image: [
+    { provider: "google", model: "gemini-2.5-flash-image" },
+    { provider: "openai", model: "gpt-image-1" },
+    { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
+  ],
+};
 
 export const SLOT_LABELS = [
   "Primary AI model",
@@ -23,31 +36,50 @@ export const SLOT_LABELS = [
   "Fallback model #3",
 ] as const;
 
-// Kept for backwards-compatibility with any older imports — no longer used.
-export const AI_MODEL_STORAGE_KEYS = [
-  "ai-import-model",
-  "ai-import-model-2",
-  "ai-import-model-3",
-] as const;
-
 const CHANGE_EVENT = "ai-models-changed";
 
-let cache: [string, string, string] | null = null;
-let inflight: Promise<[string, string, string]> | null = null;
+let cache: SlotsByKind | null = null;
+let inflight: Promise<SlotsByKind> | null = null;
 
-function normalize(value: unknown): [string, string, string] {
-  if (Array.isArray(value)) {
-    const arr = value.map((v) => (typeof v === "string" ? v : "")).filter((v) => v.length > 0);
-    return [
-      arr[0] || DEFAULT_AI_MODELS[0],
-      arr[1] || DEFAULT_AI_MODELS[1],
-      arr[2] || DEFAULT_AI_MODELS[2],
-    ];
-  }
-  return [...DEFAULT_AI_MODELS] as [string, string, string];
+function clone(s: SlotsByKind): SlotsByKind {
+  return {
+    chat: [s.chat[0], s.chat[1], s.chat[2]].map((x) => ({ ...x })) as [Slot, Slot, Slot],
+    image: [s.image[0], s.image[1], s.image[2]].map((x) => ({ ...x })) as [Slot, Slot, Slot],
+  };
 }
 
-async function fetchFromDb(): Promise<[string, string, string]> {
+function normalizeSlot(value: unknown, fallback: Slot): Slot {
+  if (value && typeof value === "object") {
+    const v = value as any;
+    const provider = (["openrouter", "openai", "google"].includes(v.provider) ? v.provider : fallback.provider) as Provider;
+    const model = typeof v.model === "string" && v.model ? v.model : fallback.model;
+    return { provider, model };
+  }
+  return { ...fallback };
+}
+
+function normalize(value: unknown): SlotsByKind {
+  // Legacy: array of strings -> chat slots on openrouter
+  if (Array.isArray(value)) {
+    const chat = [0, 1, 2].map((i) => {
+      const s = typeof value[i] === "string" && value[i] ? (value[i] as string) : DEFAULT_SLOTS.chat[i].model;
+      return { provider: "openrouter" as Provider, model: s };
+    }) as [Slot, Slot, Slot];
+    return { chat, image: clone(DEFAULT_SLOTS).image };
+  }
+  if (value && typeof value === "object") {
+    const v = value as any;
+    const chatArr = Array.isArray(v.chat) ? v.chat : [];
+    const imgArr = Array.isArray(v.image) ? v.image : [];
+    return {
+      chat: [0, 1, 2].map((i) => normalizeSlot(chatArr[i], DEFAULT_SLOTS.chat[i])) as [Slot, Slot, Slot],
+      image: [0, 1, 2].map((i) => normalizeSlot(imgArr[i], DEFAULT_SLOTS.image[i])) as [Slot, Slot, Slot],
+    };
+  }
+  return clone(DEFAULT_SLOTS);
+}
+
+async function fetchFromDb(): Promise<SlotsByKind> {
   if (inflight) return inflight;
   inflight = (async () => {
     const { data, error } = await supabase
@@ -57,7 +89,7 @@ async function fetchFromDb(): Promise<[string, string, string]> {
       .maybeSingle();
     if (error) {
       console.error("[aiModels] load failed:", error.message);
-      return [...DEFAULT_AI_MODELS] as [string, string, string];
+      return clone(DEFAULT_SLOTS);
     }
     return normalize((data as any)?.value);
   })();
@@ -75,29 +107,19 @@ function broadcast() {
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }
 
-/**
- * Synchronous getter — returns cached value or defaults until the DB load
- * completes. Use the `useAiModels` hook in components instead when possible.
- */
-export function getAiModels(): [string, string, string] {
-  return cache ?? ([...DEFAULT_AI_MODELS] as [string, string, string]);
-}
-
 export function useAiModels() {
-  const [models, setModels] = useState<[string, string, string]>(
-    () => cache ?? ([...DEFAULT_AI_MODELS] as [string, string, string]),
-  );
+  const [slots, setSlots] = useState<SlotsByKind>(() => cache ?? clone(DEFAULT_SLOTS));
   const [loading, setLoading] = useState<boolean>(cache === null);
 
   useEffect(() => {
     let active = true;
     fetchFromDb().then((m) => {
       if (!active) return;
-      setModels(m);
+      setSlots(m);
       setLoading(false);
     });
     const refresh = () => {
-      if (cache) setModels(cache);
+      if (cache) setSlots(clone(cache));
     };
     window.addEventListener(CHANGE_EVENT, refresh);
     return () => {
@@ -106,41 +128,44 @@ export function useAiModels() {
     };
   }, []);
 
-  const persist = useCallback(async (next: [string, string, string]) => {
+  const persist = useCallback(async (next: SlotsByKind) => {
     cache = next;
-    setModels(next);
+    setSlots(clone(next));
     broadcast();
     const { error } = await supabase
       .from("site_settings")
       .upsert({ key: SETTINGS_KEY, value: next as unknown as any }, { onConflict: "key" });
     if (error) {
       toast.error(`Failed to save model selection: ${error.message}`);
-      // Re-fetch authoritative state from DB.
       const fresh = await fetchFromDb();
-      setModels(fresh);
+      setSlots(clone(fresh));
       broadcast();
     } else {
       toast.success("AI model selection saved");
     }
   }, []);
 
-  const setModelAt = useCallback(
-    (slot: 0 | 1 | 2, id: string) => {
-      const next = [...(cache ?? models)] as [string, string, string];
-      next[slot] = id;
+  const setSlot = useCallback(
+    (kind: ModelKind, index: 0 | 1 | 2, value: Slot) => {
+      const next = clone(cache ?? slots);
+      next[kind][index] = value;
       void persist(next);
     },
-    [models, persist],
+    [slots, persist],
   );
 
   const resetSlot = useCallback(
-    (slot: 0 | 1 | 2) => setModelAt(slot, DEFAULT_AI_MODELS[slot]),
-    [setModelAt],
+    (kind: ModelKind, index: 0 | 1 | 2) => {
+      const next = clone(cache ?? slots);
+      next[kind][index] = { ...DEFAULT_SLOTS[kind][index] };
+      void persist(next);
+    },
+    [slots, persist],
   );
 
   const resetAll = useCallback(() => {
-    void persist([...DEFAULT_AI_MODELS] as [string, string, string]);
+    void persist(clone(DEFAULT_SLOTS));
   }, [persist]);
 
-  return { models, loading, setModelAt, resetSlot, resetAll };
+  return { slots, loading, setSlot, resetSlot, resetAll };
 }
