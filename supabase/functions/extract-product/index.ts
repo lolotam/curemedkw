@@ -98,21 +98,24 @@ Deno.serve(async (req) => {
     const sourceUrl = String(body?.sourceUrl ?? "").trim();
     if (!markdown) return json({ error: "markdown is required" }, 400);
 
-    const apiKey = Deno.env.get("OPENROUTER_API_KEY");
-    if (!apiKey) return json({ error: "OPENROUTER_API_KEY is not configured" }, 500);
+    const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
+    const googleKey = Deno.env.get("GOOGLE_API_KEY");
 
-    // Authoritative model chain comes from site_settings.ai_import_models.
-    // Client-supplied `model` / `fallbackModels` are accepted only as a last-
-    // resort fallback when the settings row is missing — this guarantees the
-    // /admin/models page is the single source of truth across browsers and
-    // both the Lovable Cloud and self-hosted deployments.
-    const DEFAULT_CHAIN = [
-      "openai/gpt-4o-mini",
-      "google/gemini-2.0-flash-001",
-      "anthropic/claude-3.5-haiku",
+    type Provider = "openrouter" | "openai" | "google";
+    interface Slot { provider: Provider; model: string }
+
+    // Authoritative model chain comes from site_settings.ai_import_models
+    // (managed in /admin/models). Reads both the new shape
+    //   { chat: Slot[], image: Slot[] }
+    // and the legacy flat string[] (treated as openrouter chat slots).
+    const DEFAULT_CHAIN: Slot[] = [
+      { provider: "openrouter", model: "openai/gpt-4o-mini" },
+      { provider: "openrouter", model: "google/gemini-2.0-flash-001" },
+      { provider: "openrouter", model: "anthropic/claude-3.5-haiku" },
     ];
 
-    let dbChain: string[] | null = null;
+    let dbChain: Slot[] | null = null;
     try {
       const { data: settingRow } = await admin
         .from("site_settings")
@@ -121,7 +124,17 @@ Deno.serve(async (req) => {
         .maybeSingle();
       const v = (settingRow as any)?.value;
       if (Array.isArray(v)) {
-        dbChain = v.map((m: unknown) => String(m ?? "").trim()).filter((m: string) => m.length > 0);
+        dbChain = v
+          .map((m: unknown) => String(m ?? "").trim())
+          .filter((m: string) => m.length > 0)
+          .map((m: string) => ({ provider: "openrouter" as Provider, model: m }));
+      } else if (v && typeof v === "object" && Array.isArray((v as any).chat)) {
+        dbChain = ((v as any).chat as any[])
+          .map((s) => ({
+            provider: (["openrouter", "openai", "google"].includes(s?.provider) ? s.provider : "openrouter") as Provider,
+            model: String(s?.model ?? "").trim(),
+          }))
+          .filter((s) => s.model.length > 0);
       }
     } catch (e) {
       console.error("failed to read ai_import_models from site_settings:", e);
@@ -132,98 +145,137 @@ Deno.serve(async (req) => {
       ? body.fallbackModels.map((m: unknown) => String(m ?? "").trim()).filter((m: string) => m.length > 0)
       : [];
 
-    const sourceChain =
+    const sourceChain: Slot[] =
       dbChain && dbChain.length > 0
         ? dbChain
         : clientModel
-          ? [clientModel, ...clientFallback]
+          ? [clientModel, ...clientFallback].map((m) => ({ provider: "openrouter" as Provider, model: m }))
           : DEFAULT_CHAIN;
 
-    // Build dedup'd chain: primary + up to 2 fallbacks
-    const chain: string[] = [];
-    for (const m of sourceChain) {
-      if (m && !chain.includes(m)) chain.push(m);
+    const seen = new Set<string>();
+    const chain: Slot[] = [];
+    for (const s of sourceChain) {
+      const key = `${s.provider}:${s.model}`;
+      if (s.model && !seen.has(key)) {
+        seen.add(key);
+        chain.push(s);
+      }
       if (chain.length >= 3) break;
     }
-    console.log("extract-product chain:", chain.join(" -> "), "(source:", dbChain ? "db" : "client/default", ")");
+    console.log("extract-product chain:", chain.map((s) => `${s.provider}:${s.model}`).join(" -> "));
 
+    const userContent = `Source URL: ${sourceUrl}\n\nPAGE CONTENT (markdown):\n\n${markdown.slice(0, 60000)}`;
 
-    const callOpenRouter = (useModel: string) =>
-      fetch("https://openrouter.ai/api/v1/chat/completions", {
+    async function callOpenRouter(model: string): Promise<{ ok: boolean; status: number; args?: any; text?: string }> {
+      if (!openrouterKey) return { ok: false, status: 500, text: "OPENROUTER_API_KEY missing" };
+      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${openrouterKey}`,
           "Content-Type": "application/json",
           "HTTP-Referer": "https://curemedkw.lovable.app",
           "X-Title": "Curemed Admin",
         },
         body: JSON.stringify({
-          model: useModel,
-          messages: [
-            { role: "system", content: SYSTEM },
-            {
-              role: "user",
-              content: `Source URL: ${sourceUrl}\n\nPAGE CONTENT (markdown):\n\n${markdown.slice(0, 60000)}`,
-            },
-          ],
+          model,
+          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: userContent }],
           tools: [TOOL],
           tool_choice: { type: "function", function: { name: "set_product_fields" } },
           temperature: 0.2,
         }),
       });
-
-    const attempts: Array<{ model: string; status: number; reason: string }> = [];
-
-    for (const useModel of chain) {
-      let r = await callOpenRouter(useModel);
-      // Auto-retry once on 429 with short backoff
-      if (r.status === 429) {
-        await new Promise((res) => setTimeout(res, 1500));
-        r = await callOpenRouter(useModel);
-      }
-
-      if (r.status === 402) {
-        attempts.push({ model: useModel, status: 402, reason: "payment_required" });
-        continue;
-      }
-      if (r.status === 429) {
-        attempts.push({ model: useModel, status: 429, reason: "rate_limited" });
-        continue;
-      }
-      if (!r.ok) {
-        const t = await r.text().catch(() => "");
-        console.error("OpenRouter error", useModel, r.status, t);
-        attempts.push({
-          model: useModel,
-          status: r.status,
-          reason: `provider_error: ${t.slice(0, 200)}`,
-        });
-        continue;
-      }
-
+      if (!r.ok) return { ok: false, status: r.status, text: await r.text().catch(() => "") };
       const payload = await r.json().catch(() => null);
       const choice = payload?.choices?.[0];
       const call = choice?.message?.tool_calls?.[0];
       let args: any = null;
       if (call?.function?.arguments) {
-        try {
-          args = JSON.parse(call.function.arguments);
-        } catch (e) {
-          console.error("Failed to parse tool args", e, call.function.arguments);
-        }
+        try { args = JSON.parse(call.function.arguments); } catch (e) { console.error("parse args", e); }
       }
       if (!args) {
         const raw = choice?.message?.content;
-        if (typeof raw === "string") {
-          try { args = JSON.parse(raw); } catch { /* ignore */ }
-        }
+        if (typeof raw === "string") { try { args = JSON.parse(raw); } catch { /* ignore */ } }
       }
+      return { ok: true, status: 200, args };
+    }
+
+    async function callOpenAI(model: string): Promise<{ ok: boolean; status: number; args?: any; text?: string }> {
+      if (!openaiKey) return { ok: false, status: 500, text: "OPENAI_API_KEY missing" };
+      const r = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: SYSTEM }, { role: "user", content: userContent }],
+          tools: [TOOL],
+          tool_choice: { type: "function", function: { name: "set_product_fields" } },
+          temperature: 0.2,
+        }),
+      });
+      if (!r.ok) return { ok: false, status: r.status, text: await r.text().catch(() => "") };
+      const payload = await r.json().catch(() => null);
+      const choice = payload?.choices?.[0];
+      const call = choice?.message?.tool_calls?.[0];
+      let args: any = null;
+      if (call?.function?.arguments) {
+        try { args = JSON.parse(call.function.arguments); } catch (e) { console.error("parse args", e); }
+      }
+      return { ok: true, status: 200, args };
+    }
+
+    async function callGoogle(model: string): Promise<{ ok: boolean; status: number; args?: any; text?: string }> {
+      if (!googleKey) return { ok: false, status: 500, text: "GOOGLE_API_KEY missing" };
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${googleKey}`;
+      const r = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: SYSTEM }] },
+          contents: [{ role: "user", parts: [{ text: userContent }] }],
+          tools: [{ functionDeclarations: [TOOL.function] }],
+          toolConfig: { functionCallingConfig: { mode: "ANY", allowedFunctionNames: ["set_product_fields"] } },
+          generationConfig: { temperature: 0.2 },
+        }),
+      });
+      if (!r.ok) return { ok: false, status: r.status, text: await r.text().catch(() => "") };
+      const payload = await r.json().catch(() => null);
+      const parts = payload?.candidates?.[0]?.content?.parts ?? [];
+      const fc = parts.find((p: any) => p?.functionCall)?.functionCall;
+      let args: any = fc?.args ?? null;
       if (!args) {
-        attempts.push({ model: useModel, status: 200, reason: "no_structured_output" });
+        const raw = parts.find((p: any) => typeof p?.text === "string")?.text;
+        if (raw) { try { args = JSON.parse(raw); } catch { /* ignore */ } }
+      }
+      return { ok: true, status: 200, args };
+    }
+
+    const dispatch = async (slot: Slot) => {
+      if (slot.provider === "openai") return callOpenAI(slot.model);
+      if (slot.provider === "google") return callGoogle(slot.model);
+      return callOpenRouter(slot.model);
+    };
+
+    const attempts: Array<{ model: string; status: number; reason: string }> = [];
+
+    for (const slot of chain) {
+      const tag = `${slot.provider}:${slot.model}`;
+      let res = await dispatch(slot);
+      if (!res.ok && res.status === 429) {
+        await new Promise((r) => setTimeout(r, 1500));
+        res = await dispatch(slot);
+      }
+      if (!res.ok) {
+        if (res.status === 402) { attempts.push({ model: tag, status: 402, reason: "payment_required" }); continue; }
+        if (res.status === 429) { attempts.push({ model: tag, status: 429, reason: "rate_limited" }); continue; }
+        console.error("provider error", tag, res.status, res.text);
+        attempts.push({ model: tag, status: res.status, reason: `provider_error: ${(res.text ?? "").slice(0, 200)}` });
         continue;
       }
-
-      return json({ fields: args, model: useModel, primaryModel: chain[0], attempts });
+      if (!res.args) {
+        attempts.push({ model: tag, status: 200, reason: "no_structured_output" });
+        continue;
+      }
+      return json({ fields: res.args, model: tag, primaryModel: `${chain[0].provider}:${chain[0].model}`, attempts });
     }
 
     // All models in the chain failed — return 200 with structured error

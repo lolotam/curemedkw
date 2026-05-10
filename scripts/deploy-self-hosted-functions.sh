@@ -7,9 +7,11 @@
 #
 # Production functions deployed by this script:
 #   - scrape-product       (Firecrawl scrape, admin-only, used by AI import)
-#   - extract-product      (LLM field extraction, used by AI import)
+#   - extract-product      (LLM field extraction, dispatches per provider)
 #   - translate-product    (Arabic translation, used by AdminProductEditor)
 #   - openrouter-models    (lists OpenRouter models for admin UI)
+#   - openai-models        (lists OpenAI models for admin UI)
+#   - google-models        (lists Google Gemini models for admin UI)
 #   - upscale-image        (Picsart AI upscale, admin-only, used by product editor)
 #   - migrate-storage-copy (one-shot ops helper, not invoked by the app)
 #
@@ -24,7 +26,8 @@
 #        export SUPABASE_DB_URL="postgres://postgres:<POSTGRES_PASSWORD>@supabase.curemedkw.com:5432/postgres"
 #   3. Function secrets already set on the self-hosted stack:
 #        SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY,
-#        LOVABLE_API_KEY, FIRECRAWL_API_KEY, OPENROUTER_API_KEY, PICSART_API_KEY
+#        LOVABLE_API_KEY, FIRECRAWL_API_KEY, OPENROUTER_API_KEY, PICSART_API_KEY,
+#        OPENAI_API_KEY, GOOGLE_API_KEY
 #
 # Usage from the Dokploy server (typical):
 #   cd /etc/dokploy/applications/curemedkw-curemedkw-fnsxxa/code

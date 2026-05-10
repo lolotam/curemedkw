@@ -10,6 +10,18 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
+function classify(m: any): "chat" | "image" {
+  const arch = m?.architecture ?? {};
+  const outs: string[] = arch.output_modalities ?? arch.output_modality ?? [];
+  const outsArr = Array.isArray(outs) ? outs : [outs];
+  if (outsArr.some((o) => typeof o === "string" && o.toLowerCase().includes("image"))) {
+    return "image";
+  }
+  const modality = String(arch.modality ?? "").toLowerCase();
+  if (modality.includes("->image") || modality.endsWith("image")) return "image";
+  return "chat";
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -29,6 +41,7 @@ Deno.serve(async (req) => {
     const models = (payload?.data ?? []).map((m: any) => ({
       id: m.id,
       name: m.name ?? m.id,
+      kind: classify(m),
       context_length: m.context_length ?? null,
       pricing: m.pricing ?? null,
     }));
