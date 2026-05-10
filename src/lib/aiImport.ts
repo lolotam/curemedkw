@@ -49,7 +49,8 @@ export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
 export async function extractProductFields(args: {
   markdown: string;
   sourceUrl: string;
-  model: string;
+  /** Optional override — server normally resolves models from site_settings. */
+  model?: string;
   fallbackModels?: string[];
 }): Promise<ExtractResult> {
   const { data, error } = await supabase.functions.invoke("extract-product", {
@@ -61,7 +62,7 @@ export async function extractProductFields(args: {
   return {
     fields: d.fields as ExtractedFields,
     usedModel: d.model as string,
-    primaryModel: (d.primaryModel as string) ?? args.model,
+    primaryModel: (d.primaryModel as string) ?? args.model ?? "",
     attempts: (d.attempts as ExtractResult["attempts"]) ?? [],
   };
 }

@@ -31,7 +31,7 @@ interface TranslateOutput {
   ingredients_ar: string[];
 }
 
-async function translateWithAI(input: TranslateInput): Promise<TranslateOutput> {
+async function translateWithAI(input: TranslateInput, model: string): Promise<TranslateOutput> {
   const sys =
     "You translate cosmetic and pharmaceutical product copy from English to natural Modern Standard Arabic suitable for a Kuwaiti consumer audience. Preserve markdown bullet structure. Keep brand names, ingredient INCI names and SKUs in their original Latin form. Be concise — do not invent claims that are not in the source. Always answer by calling the provided tool.";
 
@@ -84,7 +84,7 @@ async function translateWithAI(input: TranslateInput): Promise<TranslateOutput> 
       "X-Title": "Curemed Admin",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: sys },
         {
@@ -172,7 +172,22 @@ Deno.serve(async (req) => {
       };
     }
 
-    const translated = await translateWithAI(source);
+    // Resolve translate model from site_settings (single source of truth).
+    let translateModel = "google/gemini-2.5-flash";
+    try {
+      const { data: settingRow } = await admin
+        .from("site_settings")
+        .select("value")
+        .eq("key", "ai_translate_model")
+        .maybeSingle();
+      const v = (settingRow as any)?.value;
+      if (typeof v === "string" && v.trim().length > 0) translateModel = v.trim();
+    } catch (e) {
+      console.error("failed to read ai_translate_model:", e);
+    }
+    console.log("translate-product model:", translateModel);
+
+    const translated = await translateWithAI(source, translateModel);
 
     if (productId && persist) {
       const { error: upErr } = await admin

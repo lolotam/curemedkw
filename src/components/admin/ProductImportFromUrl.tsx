@@ -10,7 +10,6 @@ import {
   scrapeProductUrl,
   type ExtractedFields,
 } from "@/lib/aiImport";
-import { useAiModels } from "@/lib/aiModels";
 
 export interface ProductImportFromUrlProps {
   onImported: (fields: ExtractedFields, images: string[]) => void;
@@ -18,7 +17,6 @@ export interface ProductImportFromUrlProps {
 
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
   const [url, setUrl] = useState("");
-  const { models: models3 } = useAiModels();
   const [phase, setPhase] = useState<"idle" | "scraping" | "extracting">("idle");
 
   const run = async () => {
@@ -31,19 +29,23 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
       setPhase("scraping");
       const scraped = await scrapeProductUrl(trimmed);
       setPhase("extracting");
+      // Models are now resolved server-side from site_settings.ai_import_models
+      // so the same chain is used regardless of which browser or origin runs
+      // the import. See src/lib/aiModels.ts.
       const result = await extractProductFields({
         markdown: scraped.markdown,
         sourceUrl: scraped.sourceUrl,
-        model: models3[0],
-        fallbackModels: [models3[1], models3[2]],
       });
       onImported(result.fields, scraped.images || []);
-      const usedFallback = result.usedModel && result.usedModel !== models3[0];
+      const usedFallback =
+        result.usedModel && result.primaryModel && result.usedModel !== result.primaryModel;
       toast.success(
         `Imported${scraped.images?.length ? ` with ${scraped.images.length} image(s)` : ""}${usedFallback ? ` using fallback ${result.usedModel}` : ""}. Review and save.`,
       );
       if (usedFallback) {
-        toast.message(`Primary model "${models3[0]}" failed — used "${result.usedModel}" instead.`);
+        toast.message(
+          `Primary model "${result.primaryModel}" failed — used "${result.usedModel}" instead.`,
+        );
       }
     } catch (e: any) {
       toast.error(e?.message || "Import failed");
