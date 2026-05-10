@@ -83,6 +83,7 @@ SUPABASE_ANON_KEY
 LOVABLE_API_KEY
 FIRECRAWL_API_KEY
 OPENROUTER_API_KEY
+PICSART_API_KEY
 ```
 
 Functions deployed and what each needs:
@@ -93,6 +94,7 @@ Functions deployed and what each needs:
 | `extract-product` | yes (admin AI import) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LOVABLE_API_KEY` |
 | `translate-product` | yes (admin product editor) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LOVABLE_API_KEY` |
 | `openrouter-models` | yes (admin) | `OPENROUTER_API_KEY` |
+| `upscale-image` | yes (admin product editor) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PICSART_API_KEY` |
 | `migrate-storage-copy` | ops only | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 
 All functions deploy with `--no-verify-jwt` and perform their own auth

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye, Check, ChevronsUpDown, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
+import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -126,6 +127,7 @@ export default function AdminProductEditor() {
 
   // Image preview + selection state
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [upscaleTarget, setUpscaleTarget] = useState<{ url: string; kind: "main" | "gallery"; index?: number } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
@@ -618,6 +620,16 @@ export default function AdminProductEditor() {
                   >
                     <Download className="h-3.5 w-3.5" />
                   </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 pointer-events-auto"
+                    onClick={() => setUpscaleTarget({ url: form.mainImage, kind: "main" })}
+                    title="Upscale with AI"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
               <div className="space-y-2">
@@ -742,6 +754,16 @@ export default function AdminProductEditor() {
                           size="icon"
                           variant="secondary"
                           className="h-7 w-7 pointer-events-auto"
+                          onClick={() => setUpscaleTarget({ url: src, kind: "gallery", index: i })}
+                          title="Upscale with AI"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          className="h-7 w-7 pointer-events-auto"
                           onClick={() => setAsMain(src)}
                           title="Set as main"
                         >
@@ -832,6 +854,22 @@ export default function AdminProductEditor() {
         open={!!previewSrc}
         onOpenChange={(o) => !o && setPreviewSrc(null)}
         filename={previewSrc === form.mainImage ? `${baseName}-main` : baseName}
+      />
+
+      <ImageUpscaleDialog
+        open={!!upscaleTarget}
+        onOpenChange={(o) => !o && setUpscaleTarget(null)}
+        imageUrl={upscaleTarget?.url ?? ""}
+        onReplace={(newUrl) => {
+          if (!upscaleTarget) return;
+          if (upscaleTarget.kind === "main") {
+            update("mainImage", newUrl);
+          } else if (typeof upscaleTarget.index === "number") {
+            const next = [...form.gallery];
+            next[upscaleTarget.index] = newUrl;
+            update("gallery", next);
+          }
+        }}
       />
     </form>
   );
