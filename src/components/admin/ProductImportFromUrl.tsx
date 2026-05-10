@@ -12,7 +12,7 @@ import {
 } from "@/lib/aiImport";
 
 export interface ProductImportFromUrlProps {
-  onImported: (fields: ExtractedFields, images: string[]) => void;
+  onImported: (fields: ExtractedFields, images: string[], sourceUrl: string) => void;
 }
 
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
