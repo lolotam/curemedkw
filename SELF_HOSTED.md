@@ -174,3 +174,68 @@ pg_dump --data-only --schema=public \
 For storage objects, loop the `migrate-storage-copy` edge function over
 each `(bucket, path, source_url)` triple from the Lovable Cloud
 `storage.objects` table.
+
+---
+
+## H) Self-hosted Edge Functions secrets in Dokploy Supabase stack
+
+The deployed edge functions (`extract-product`, `translate-product`,
+`scrape-product`, `openrouter-models`) read their third-party API keys from
+the **Supabase stack's** environment — not from the frontend `web`
+container. These must be configured in two places on the server.
+
+### 1. Add the secrets to the Supabase stack `.env`
+
+File:
+
+```
+/etc/dokploy/compose/cloud-supabase-hns8fw/code/.env
+```
+
+Required env names:
+
+```
+OPENROUTER_API_KEY=...
+FIRECRAWL_API_KEY=...
+LOVABLE_API_KEY=...
+```
+
+### 2. Pass them into the `functions` service in `docker-compose.yml`
+
+The Supabase stack's `docker-compose.yml` (same directory as the `.env`
+above) must forward these variables into the `functions` service's
+`environment:` block:
+
+```yaml
+services:
+  functions:
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY}
+      LOVABLE_API_KEY: ${LOVABLE_API_KEY}
+```
+
+Without this passthrough the keys exist in `.env` but
+`Deno.env.get("OPENROUTER_API_KEY")` (etc.) inside the functions returns
+`undefined`, and AI / scraping calls will fail at runtime.
+
+After editing either file, redeploy the Supabase stack from Dokploy so the
+`functions` container is recreated with the new env.
+
+### 3. Warning — keep this as recovery documentation
+
+Normal CureMed frontend auto-deploy will **not** overwrite the Supabase
+stack compose file or its `.env`. However, recreating or updating the
+Supabase stack **template** in Dokploy may overwrite
+`/etc/dokploy/compose/cloud-supabase-hns8fw/code/docker-compose.yml` and
+drop these env passthroughs. If AI features suddenly stop working after a
+Supabase stack template update, re-apply both steps above.
+
+### 4. Security
+
+These keys are **server-side only**. Never put them in:
+
+- frontend source code,
+- `RUNTIME_SUPABASE_*` vars on the `web` container,
+- `VITE_*` build args,
+- or anything that ends up in the browser bundle.
