@@ -127,9 +127,33 @@ export default function BrandPage() {
                       })}
                     </div>
                   </div>
+                  <div className="border-t border-border mt-4 pt-3">
+                    <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.discount")}</h4>
+                    <div className="space-y-2">
+                      {[
+                        { v: 0, key: "filter.discount.any" },
+                        { v: 0.01, key: "filter.discount.onSale" },
+                        { v: 10, key: "filter.discount.10" },
+                        { v: 20, key: "filter.discount.20" },
+                        { v: 30, key: "filter.discount.30" },
+                        { v: 50, key: "filter.discount.50" },
+                      ].map((opt) => (
+                        <label key={opt.v} className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-brand">
+                          <input
+                            type="radio"
+                            name="discount-filter"
+                            className="accent-brand"
+                            checked={discountMin === opt.v}
+                            onChange={() => setDiscountMin(opt.v)}
+                          />
+                          <span>{t(opt.key)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                {selectedCats.size > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedCats(new Set())}>
+                {(selectedCats.size > 0 || discountMin > 0) && (
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedCats(new Set()); setDiscountMin(0); }}>
                     {t("filter.clear")}
                   </Button>
                 )}
