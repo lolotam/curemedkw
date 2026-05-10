@@ -1,8 +1,7 @@
 import type { BrandKey } from "./db";
 
 // Brand logos served from the public `brands-images` Supabase storage bucket.
-const BRAND_LOGO_BASE =
-  "https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/brands-images";
+const BRAND_LOGO_BASE = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/brands-images`;
 const flexitolLogo = `${BRAND_LOGO_BASE}/flexitol.png`;
 const kapivaLogo = `${BRAND_LOGO_BASE}/kapiva.png`;
 const nadaLogo = `${BRAND_LOGO_BASE}/NADA.png`;
