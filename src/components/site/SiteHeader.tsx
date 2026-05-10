@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, Moon, Sun, Globe, X, Bell, Mail, User as UserIcon, LogOut, Package, ChevronDown, Shield } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { useTheme } from "@/lib/theme";
@@ -29,6 +29,8 @@ export function SiteHeader() {
   const { theme, toggle } = useTheme();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  const lastScrollY = useRef(0);
   const { isAdmin } = useAdminSession();
   const { data: brandingLogo } = useBrandingLogo();
   const { data: removeBg } = useBrandingLogoRemoveBg();
@@ -41,10 +43,45 @@ export function SiteHeader() {
     brandingLogo?.trim() ||
     defaultLogo;
 
+  useEffect(() => {
+    if (open) setHidden(false);
+  }, [open]);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (open) {
+        setHidden(false);
+      } else if (y < 80) {
+        setHidden(false);
+      } else if (y > lastScrollY.current) {
+        setHidden(true);
+      } else if (y < lastScrollY.current) {
+        setHidden(false);
+      }
+      lastScrollY.current = y;
+    };
+    const onMouseMove = (e: MouseEvent) => {
+      if (e.clientY < 80) setHidden(false);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("mousemove", onMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("mousemove", onMouseMove);
+    };
+  }, [open]);
+
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
+    <header
+      className={cn(
+        "sticky top-0 z-40 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70",
+        "transition-transform duration-300 will-change-transform",
+        hidden && "-translate-y-full",
+      )}
+    >
       <div className="container flex h-24 items-center justify-between gap-4">
         <Link to="/curemed" className="flex items-center gap-2">
           <img
