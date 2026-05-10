@@ -9,7 +9,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 
 interface TranslateInput {
   name?: string;
@@ -75,11 +75,13 @@ async function translateWithAI(input: TranslateInput): Promise<TranslateOutput> 
     ingredients: input.ingredients ?? [],
   };
 
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
+      "HTTP-Referer": "https://curemedkw.lovable.app",
+      "X-Title": "Curemed Admin",
     },
     body: JSON.stringify({
       model: "google/gemini-2.5-flash",
@@ -99,9 +101,9 @@ async function translateWithAI(input: TranslateInput): Promise<TranslateOutput> 
 
   if (!resp.ok) {
     const t = await resp.text();
-    if (resp.status === 429) throw new Error("AI rate limit hit. Try again in a moment.");
-    if (resp.status === 402) throw new Error("AI credits exhausted. Top up Lovable AI usage.");
-    throw new Error(`AI gateway error ${resp.status}: ${t.slice(0, 200)}`);
+    if (resp.status === 429) throw new Error("OpenRouter rate limit hit. Try again in a moment.");
+    if (resp.status === 402) throw new Error("OpenRouter credits exhausted. Top up your OpenRouter account.");
+    throw new Error(`OpenRouter error ${resp.status}: ${t.slice(0, 200)}`);
   }
 
   const data = await resp.json();
