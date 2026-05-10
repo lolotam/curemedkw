@@ -338,6 +338,10 @@ export default function AdminProductEditor() {
       toast.error("Name and SKU are required");
       return;
     }
+    if (priceError) {
+      toast.error(priceError);
+      return;
+    }
     try {
       if (isNew) {
         const created = await createMut.mutateAsync(form);
