@@ -1,26 +1,15 @@
-# Persist scraped product URL into `source_url`
+## Add Show/Hide toggle for the loading page progress bar
 
-## Why
-The product editor already has a `sourceUrl` field (DB column `source_url` exists in both Lovable Cloud and the self-hosted Supabase). Today, after a Firecrawl scrape, the URL is passed to the AI extractor but **never written back into the form**, so saving the product leaves `source_url` empty. The user wants the scraped URL automatically saved so each product remembers where it came from.
+Add a `visible` flag to the loader-bar settings so admins can hide the gradient progress bar on the splash screen from `/admin/branding` without losing existing position/width/duration values.
 
-## Change (frontend only — single flow, both backends benefit)
+### Changes
 
-### 1. `src/components/admin/ProductImportFromUrl.tsx`
-- Extend the `onImported` callback signature from
-  `(fields, images) => void` to
-  `(fields, images, sourceUrl) => void`.
-- Pass `scraped.sourceUrl` (the canonical URL Firecrawl returns) as the third argument when calling `onImported`.
+1. **`src/lib/db.ts`** — Extend `LoaderBarSettings` with `visible: boolean`. Add `visible: true` to `LOADER_BAR_DEFAULTS` so existing installs keep current behavior.
 
-### 2. `src/pages/admin/AdminProductEditor.tsx`
-- Update `applyImported(fields, images)` to `applyImported(fields, images, sourceUrl)`.
-- Inside the `setForm(...)` reducer, set `next.sourceUrl = sourceUrl` whenever a non-empty value is provided. Always overwrite — the URL is the source of truth for this import.
-- Existing Save flow already persists `form.sourceUrl` into `source_url` via the standard `useCreateProduct` / `useUpdateProduct` mutations (see `src/lib/db.ts` mapping). No DB or RLS work needed.
+2. **`src/pages/Loading.tsx`** — Read `cfg.visible`; conditionally render the gradient progress bar block only when `visible !== false` (default-on for backward compatibility with already-saved settings missing the field).
 
-## Out of scope
-- No edge-function change (`extract-product` already receives `sourceUrl`; that path is unchanged).
-- No migration (column exists).
-- No change to the URL-paste field in the editor — admin can still override manually.
+3. **`src/pages/admin/AdminBranding.tsx`** — In `LoaderBarControl`, add a `Switch` row labeled "Show progress bar" at the top of the card. Toggling it updates state and commits via the existing `useUpdateSiteSetting` flow. When hidden, dim/disable the position/width/duration inputs to make it clear they have no effect.
 
-## Files touched
-- `src/components/admin/ProductImportFromUrl.tsx`
-- `src/pages/admin/AdminProductEditor.tsx`
+### Notes
+- Pure presentation change; no migration needed (stored in `site_settings` JSON).
+- Backward compatible: missing `visible` is treated as `true`.
