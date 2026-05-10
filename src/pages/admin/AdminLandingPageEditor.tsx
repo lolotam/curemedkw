@@ -550,8 +550,8 @@ function PageBadge({ pageKey }: { pageKey: HeroPageKey }) {
       <img src={meta.logo} alt={meta.name} className="max-h-full max-w-full object-contain" />
     </div>
   ) : (
-    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-brand to-brand/60 text-white shadow-md flex items-center justify-center font-black text-xl shrink-0">
-      C
+    <div className="h-12 w-12 rounded-xl bg-white shadow-md ring-1 ring-black/5 p-1.5 flex items-center justify-center shrink-0">
+      <img src={curemedBadge} alt="Curemed" className="max-h-full max-w-full object-contain" />
     </div>
   );
 }
