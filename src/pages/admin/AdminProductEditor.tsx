@@ -127,6 +127,7 @@ export default function AdminProductEditor() {
 
   // Image preview + selection state
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [upscaleTarget, setUpscaleTarget] = useState<{ url: string; kind: "main" | "gallery"; index?: number } | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
