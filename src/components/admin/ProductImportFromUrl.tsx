@@ -12,7 +12,7 @@ import {
 } from "@/lib/aiImport";
 
 export interface ProductImportFromUrlProps {
-  onImported: (fields: ExtractedFields, images: string[]) => void;
+  onImported: (fields: ExtractedFields, images: string[], sourceUrl: string) => void;
 }
 
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
@@ -36,7 +36,7 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
         markdown: scraped.markdown,
         sourceUrl: scraped.sourceUrl,
       });
-      onImported(result.fields, scraped.images || []);
+      onImported(result.fields, scraped.images || [], scraped.sourceUrl || trimmed);
       const usedFallback =
         result.usedModel && result.primaryModel && result.usedModel !== result.primaryModel;
       toast.success(
