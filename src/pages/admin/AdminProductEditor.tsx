@@ -855,6 +855,22 @@ export default function AdminProductEditor() {
         onOpenChange={(o) => !o && setPreviewSrc(null)}
         filename={previewSrc === form.mainImage ? `${baseName}-main` : baseName}
       />
+
+      <ImageUpscaleDialog
+        open={!!upscaleTarget}
+        onOpenChange={(o) => !o && setUpscaleTarget(null)}
+        imageUrl={upscaleTarget?.url ?? ""}
+        onReplace={(newUrl) => {
+          if (!upscaleTarget) return;
+          if (upscaleTarget.kind === "main") {
+            update("mainImage", newUrl);
+          } else if (typeof upscaleTarget.index === "number") {
+            const next = [...form.gallery];
+            next[upscaleTarget.index] = newUrl;
+            update("gallery", next);
+          }
+        }}
+      />
     </form>
   );
 }
