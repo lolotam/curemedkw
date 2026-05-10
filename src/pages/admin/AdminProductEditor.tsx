@@ -327,6 +327,11 @@ export default function AdminProductEditor() {
     }
   };
 
+  const priceError =
+    form.originalPrice != null && form.originalPrice > 0 && form.originalPrice <= form.price
+      ? "Original price must be higher than the discounted price."
+      : null;
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) {
