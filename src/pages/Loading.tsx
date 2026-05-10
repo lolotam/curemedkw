@@ -1,15 +1,14 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLoaderBarSettings, LOADER_BAR_DEFAULTS } from "@/lib/db";
-
-const VIDEO_URL =
-  "https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/hero-media//CureMed_logo_loading_animation_202604300936.mp4";
+import { useLoaderBarSettings, LOADER_BAR_DEFAULTS, useLoaderVideoUrl, LOADER_VIDEO_DEFAULT } from "@/lib/db";
 
 export default function Loading() {
   const navigate = useNavigate();
   const { data: settings } = useLoaderBarSettings();
+  const { data: videoUrl } = useLoaderVideoUrl();
   const cfg = settings ?? LOADER_BAR_DEFAULTS;
   const { durationMs, positionX, positionY, widthPx } = cfg;
+  const VIDEO_URL = (videoUrl && videoUrl.trim()) || LOADER_VIDEO_DEFAULT;
 
   useEffect(() => {
     const timer = setTimeout(

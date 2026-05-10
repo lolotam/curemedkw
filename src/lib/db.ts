@@ -1043,6 +1043,32 @@ export function useLoaderBarSettings() {
   return useSiteSetting<LoaderBarSettings>(LOADER_BAR_KEY, LOADER_BAR_DEFAULTS);
 }
 
+// Loading page video URL (splash screen). Stored in site_settings so admin can update.
+export const LOADER_VIDEO_KEY = "loader_video_url";
+export const LOADER_VIDEO_DEFAULT =
+  "https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/hero-media//CureMed_logo_loading_animation_202604300936.mp4";
+export function useLoaderVideoUrl() {
+  return useSiteSetting<string>(LOADER_VIDEO_KEY, LOADER_VIDEO_DEFAULT);
+}
+
+/** Uploads a video to the public `hero-media` bucket under `branding/` and returns the public URL. */
+export async function uploadBrandingVideo(file: File, prefix: string): Promise<string> {
+  const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const safePrefix = prefix.replace(/[^a-zA-Z0-9_-]/g, "-");
+  const path = `branding/${safePrefix}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext || "mp4"}`;
+  const { error } = await supabase.storage
+    .from("hero-media")
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) {
+    const msg = (error.message || "").toLowerCase();
+    if (msg.includes("row-level security") || msg.includes("unauthorized") || msg.includes("denied") || msg.includes("403")) {
+      throw new Error("Upload denied — make sure you are signed in as an admin.");
+    }
+    throw error;
+  }
+  return supabase.storage.from("hero-media").getPublicUrl(path).data.publicUrl;
+}
+
 /* ============================================================
  * Product reviews
  * ============================================================ */

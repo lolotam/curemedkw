@@ -267,3 +267,18 @@ When applying migrations to the self-hosted stack, make sure to also seed
 these two rows (the migration script does this automatically), then
 redeploy `extract-product` and `translate-product` via
 `scripts/deploy-self-hosted-functions.sh`.
+
+### Preloader video
+
+The splash-screen video shown by `/loading` (before redirecting to `/curemed`)
+is also stored in `public.site_settings`:
+
+- `key = 'loader_video_url'` — JSON string with a public video URL
+  (MP4 / WebM / MOV).
+
+Admins can change it from `/admin/branding` → **Preloading page video** card.
+The card supports both pasting a URL and uploading a file; uploads go to
+the public `hero-media` bucket under the `branding/` folder. Each
+environment (Lovable Cloud vs. self-hosted) keeps its own row, so set it
+once per deployment. Leave the field empty to fall back to the built-in
+default video baked into the frontend.
