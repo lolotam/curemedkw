@@ -382,6 +382,26 @@ function LoaderBarControl() {
         </p>
       </div>
 
+      <div className="flex items-center justify-between rounded-md border border-border p-3">
+        <div>
+          <Label className="text-sm font-medium">Show progress bar</Label>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Toggle off to hide the gradient bar on the loading splash.
+          </p>
+        </div>
+        <Switch
+          checked={cfg.visible !== false}
+          onCheckedChange={(v) => {
+            const next = { ...cfg, visible: v };
+            setTouched(true);
+            setCfg(next);
+            commit(next);
+          }}
+          disabled={update.isPending}
+        />
+      </div>
+
+      <fieldset disabled={cfg.visible === false} className={cfg.visible === false ? "opacity-50 space-y-5" : "space-y-5"}>
       <SliderRow
         label="Animation duration"
         valueLabel={`${(cfg.durationMs / 1000).toFixed(1)} s`}
