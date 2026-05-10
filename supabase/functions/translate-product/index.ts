@@ -31,7 +31,7 @@ interface TranslateOutput {
   ingredients_ar: string[];
 }
 
-async function translateWithAI(input: TranslateInput): Promise<TranslateOutput> {
+async function translateWithAI(input: TranslateInput, model: string): Promise<TranslateOutput> {
   const sys =
     "You translate cosmetic and pharmaceutical product copy from English to natural Modern Standard Arabic suitable for a Kuwaiti consumer audience. Preserve markdown bullet structure. Keep brand names, ingredient INCI names and SKUs in their original Latin form. Be concise — do not invent claims that are not in the source. Always answer by calling the provided tool.";
 
