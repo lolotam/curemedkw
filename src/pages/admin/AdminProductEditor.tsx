@@ -754,6 +754,16 @@ export default function AdminProductEditor() {
                           size="icon"
                           variant="secondary"
                           className="h-7 w-7 pointer-events-auto"
+                          onClick={() => setUpscaleTarget({ url: src, kind: "gallery", index: i })}
+                          title="Upscale with AI"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="secondary"
+                          className="h-7 w-7 pointer-events-auto"
                           onClick={() => setAsMain(src)}
                           title="Set as main"
                         >
