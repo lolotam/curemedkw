@@ -147,12 +147,6 @@ Deno.serve(async (req) => {
     }
     console.log("extract-product chain:", chain.join(" -> "), "(source:", dbChain ? "db" : "client/default", ")");
 
-    // Build dedup'd chain: primary + up to 2 fallbacks
-    const chain: string[] = [];
-    for (const m of [model, ...fallbackModels]) {
-      if (m && !chain.includes(m)) chain.push(m);
-      if (chain.length >= 3) break;
-    }
 
     const callOpenRouter = (useModel: string) =>
       fetch("https://openrouter.ai/api/v1/chat/completions", {
