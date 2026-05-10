@@ -1,71 +1,75 @@
-# Show discounted prices + add discount filter + admin price validation
+# Admin: upload / set Preloader Video URL
 
-## Why nothing currently shows as "discounted"
+## Why
 
-- `ProductCard.tsx` already has discount logic (strike-through + red `-XX%` badge) — but it only triggers when `originalPrice > price`.
-- `AdminProductEditor.tsx` has **no input for Original Price** — only `Price (KD)`. So no product in the database has an `originalPrice` set, and every card/page falls back to showing a single price.
-- `ProductDetail.tsx` doesn't render `originalPrice` at all (only `product.price`).
+`src/pages/Loading.tsx` currently hardcodes the splash-screen video to a fixed Supabase storage URL. There is no admin control. Add a card on `/admin/branding` so the admin can either upload a video file or paste a URL, saved to `site_settings` and used live by the Loading page.
 
-So three changes are needed.
+Saves automatically to the active backend (Lovable Cloud in preview, the self-hosted Supabase on `curemedkw.com`) since both use the same `site_settings` table that already exists in both databases.
 
-## 1. Admin editor: add Original Price input with live validation
+## 1. Storage helper — accept video uploads
 
-File: `src/pages/admin/AdminProductEditor.tsx`
+File: `src/lib/db.ts`
 
-- Add a new field next to `Price (KD)`: **Original Price (KD)** bound to `form.originalPrice` (already in the form type / DB column `original_price`).
-- Validation rules (live, while editing — block save, show inline red error, no toast spam):
-  - If `originalPrice` is set and `originalPrice <= price` → error: *"Original price must be higher than the discounted price."*
-  - If user edits `price` to a value `>= originalPrice` (when originalPrice set) → same error on the price field.
-  - Empty / 0 originalPrice = no discount, no error (allowed — means no sale).
-- Disable the Save button while the error is active.
-- Show a small live preview underneath: *"Discount: -23% (was KD 12.99 → KD 9.99)"* when valid.
+Add a new helper next to `uploadBrandingImage`:
 
-## 2. Product detail page: show both prices + % off
+```ts
+export async function uploadBrandingVideo(file: File, prefix: string): Promise<string>
+```
 
-File: `src/pages/ProductDetail.tsx` (lines 101-108 block)
+- Bucket: existing public `hero-media` (already used for splash media).
+- Path: `branding/${safePrefix}-${Date.now()}.${ext}`.
+- Allowed types: `video/mp4`, `video/webm`, `video/quicktime`.
+- Max size: 30 MB (toast on overflow).
+- No WebP conversion — upload raw.
+- Returns public URL via `getPublicUrl`.
 
-When `originalPrice > price` and not `priceHidden`, render:
+## 2. New site_settings key + hook
 
-- Big bold current `price` in red (or `text-destructive`).
-- Strike-through `originalPrice` in muted color next to it.
-- A red pill badge: `-XX% OFF` and an `EN/AR` "You save KD X.XX" line.
-- Falls back to current single-price layout when no discount.
+File: `src/lib/db.ts`
 
-Use the same calc already in `ProductCard`:
-`pct = Math.round((1 - price / originalPrice) * 100)`.
+```ts
+export const LOADER_VIDEO_KEY = "loader_video_url";
+export const LOADER_VIDEO_DEFAULT =
+  "https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/hero-media//CureMed_logo_loading_animation_202604300936.mp4";
+export function useLoaderVideoUrl()  // useSiteSetting<string>(LOADER_VIDEO_KEY, LOADER_VIDEO_DEFAULT)
+```
 
-## 3. Brand page: discount % filter
+No DB migration needed — `site_settings` already exists with admin-only write RLS, and the row is created on first save via the existing `useUpdateSiteSetting` upsert.
 
-File: `src/pages/BrandPage.tsx`
+## 3. Loading page — read from settings
 
-Add a new filter block in the existing left sidebar (under the categories block), labeled **Discount**:
+File: `src/pages/Loading.tsx`
 
-- Checkboxes (single-select via radio-style state, or multi-select OR'd):
-  - Any (default)
-  - 10% or more
-  - 20% or more
-  - 30% or more
-  - 50% or more
-  - On sale (any discount > 0)
-- Apply filter inside the existing `filteredProducts` useMemo:
-  `pct = originalPrice > price ? (1 - price/originalPrice)*100 : 0` and keep products where `pct >= threshold`.
-- "Clear" button already there clears categories — extend it to also clear the discount filter.
+Replace the hardcoded `VIDEO_URL` with `const { data: videoUrl } = useLoaderVideoUrl();` and render `<video src={videoUrl ?? LOADER_VIDEO_DEFAULT} …/>`.
 
-Add i18n keys: `filter.discount`, `filter.discount.any`, `filter.discount.10`, `filter.discount.20`, `filter.discount.30`, `filter.discount.50`, `filter.discount.onSale`, `discount.save`, `discount.off` (EN + AR) in `src/lib/i18n.tsx`.
+## 4. New admin card on /admin/branding
 
-## 4. ProductCard
+File: `src/pages/admin/AdminBranding.tsx`
 
-Already shows discount correctly — no change needed. Once admins set `originalPrice` on a product, the card will automatically render the strike-through, current price, and `-XX%` badge.
+Add a new `<LoaderVideoControl />` block placed right above `<LoaderBarControl />` (logical grouping — both are about the splash page). Card contents:
+
+- Title: **Preloading page video**
+- Description: *"Shown on the splash/loading screen before the home page. Upload an MP4/WebM (≤ 30 MB) or paste a URL. Saves immediately to the live database."*
+- URL `Input` + **Upload** button (triggers hidden `<input type="file" accept="video/*">`).
+- Live preview: `<video controls muted className="h-40 rounded-lg bg-black" />` of the current saved URL.
+- Save / Reset-to-default buttons (mirrors existing BrandingField UX).
+- Validation: URL must start with `https://` or `/`; show inline amber warning if not.
+
+Implement as a self-contained component in the same file (similar to `LoaderBarControl`) — no need to generalize `BrandingField` for video, since transparency-check / probing logic doesn't apply.
+
+## 5. Self-hosted parity note
+
+No code or schema work — `site_settings` already exists on the self-hosted Supabase stack. First save from `/admin/branding` on `curemedkw.com` writes the row directly to that database. Add one short paragraph to `SELF_HOSTED.md` under the existing `site_settings` section listing the new key `loader_video_url` for documentation.
 
 ## Out of scope
 
-- No DB migration (column `original_price` already exists, nullable numeric).
-- No edge-function or backend change.
-- No change to checkout/cart math (they already use `product.price` which is the discounted price).
+- No new bucket (reuse `hero-media`, already public).
+- No edge function / no migration.
+- No change to the loader progress-bar settings.
 
 ## Files touched
 
-- `src/pages/admin/AdminProductEditor.tsx` — add input + validation + disable save
-- `src/pages/ProductDetail.tsx` — render dual price + badge
-- `src/pages/BrandPage.tsx` — add discount filter UI + filter logic
-- `src/lib/i18n.tsx` — new translation keys (EN + AR)
+- `src/lib/db.ts` — `uploadBrandingVideo`, `LOADER_VIDEO_KEY`, `useLoaderVideoUrl`
+- `src/pages/Loading.tsx` — read URL from settings
+- `src/pages/admin/AdminBranding.tsx` — new `LoaderVideoControl` card
+- `SELF_HOSTED.md` — document the new key
