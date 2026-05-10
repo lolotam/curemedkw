@@ -1,79 +1,71 @@
-# Why GPT-4o-mini was used and where the last scrape ran
+# Show discounted prices + add discount filter + admin price validation
 
-## 1. Findings — read this first
+## Why nothing currently shows as "discounted"
 
-### A. Why OpenRouter logged `gpt-4o-mini` even though `/admin/models` shows Nemotron + Gemma + gpt-oss-120b
+- `ProductCard.tsx` already has discount logic (strike-through + red `-XX%` badge) — but it only triggers when `originalPrice > price`.
+- `AdminProductEditor.tsx` has **no input for Original Price** — only `Price (KD)`. So no product in the database has an `originalPrice` set, and every card/page falls back to showing a single price.
+- `ProductDetail.tsx` doesn't render `originalPrice` at all (only `product.price`).
 
-The 3 model slots on `/admin/models` are stored in **browser `localStorage`** (`src/lib/aiModels.ts`, keys `ai-import-model`, `ai-import-model-2`, `ai-import-model-3`).
+So three changes are needed.
 
-`localStorage` is **per-origin and per-browser**. That means:
+## 1. Admin editor: add Original Price input with live validation
 
-- Settings saved on `id-preview--…lovable.app` are **NOT visible** on `curemedkw.com`.
-- Settings saved in one browser/profile are not visible in another.
-- A private/incognito window starts empty.
+File: `src/pages/admin/AdminProductEditor.tsx`
 
-When the slots are empty, `getAiModels()` falls back to `DEFAULT_AI_MODELS`:
-```
-["openai/gpt-4o-mini", "google/gemini-2.0-flash-001", "anthropic/claude-3.5-haiku"]
-```
-The frontend (`ProductImportFromUrl.tsx`) sends those values to `extract-product`, which forwards them as-is to OpenRouter. The edge function is behaving correctly — it is the **client** that sent `openai/gpt-4o-mini` because the live origin had no saved selection.
+- Add a new field next to `Price (KD)`: **Original Price (KD)** bound to `form.originalPrice` (already in the form type / DB column `original_price`).
+- Validation rules (live, while editing — block save, show inline red error, no toast spam):
+  - If `originalPrice` is set and `originalPrice <= price` → error: *"Original price must be higher than the discounted price."*
+  - If user edits `price` to a value `>= originalPrice` (when originalPrice set) → same error on the price field.
+  - Empty / 0 originalPrice = no discount, no error (allowed — means no sale).
+- Disable the Save button while the error is active.
+- Show a small live preview underneath: *"Discount: -23% (was KD 12.99 → KD 9.99)"* when valid.
 
-So nothing in the edge function ignores the dashboard. The dashboard choices simply didn't reach the edge function on that call.
+## 2. Product detail page: show both prices + % off
 
-### B. Where the last scrape was stored, and which functions ran
+File: `src/pages/ProductDetail.tsx` (lines 101-108 block)
 
-- **Lovable Cloud edge function logs** for `scrape-product`, `extract-product`, `translate-product` for the last day are **empty** (see context).
-- **Lovable Cloud `products` table**: newest row is `2026-04-29` (over a week ago). No new product was inserted on Lovable Cloud today.
-- The OpenRouter dashboard screenshot shows a real call at **May 10, 03:16 PM** with App = "Curemed Admin" (the `X-Title` header set inside our edge functions).
+When `originalPrice > price` and not `priceHidden`, render:
 
-Conclusion: the recent scrape ran on the **self-hosted Supabase stack** (Dokploy / `supabase.curemedkw.com`), not on Lovable Cloud. The functions invoked were `scrape-product` (Firecrawl) → `extract-product` (OpenRouter). `translate-product` may or may not have followed depending on the admin UI flow.
+- Big bold current `price` in red (or `text-destructive`).
+- Strike-through `originalPrice` in muted color next to it.
+- A red pill badge: `-XX% OFF` and an `EN/AR` "You save KD X.XX" line.
+- Falls back to current single-price layout when no discount.
 
-This is consistent with `clientRuntime.ts` + `/config.js`: when the live site is served with a `config.js` pointing to the self-hosted Supabase URL, every `supabase.functions.invoke(...)` call goes to the self-hosted functions container, and rows are written to the self-hosted DB — completely separate from Lovable Cloud's DB.
+Use the same calc already in `ProductCard`:
+`pct = Math.round((1 - price / originalPrice) * 100)`.
 
-## 2. Proposed fix — make model selection authoritative server-side
+## 3. Brand page: discount % filter
 
-The cleanest fix is to stop relying on per-browser `localStorage` for something that affects server billing and behavior. Store the 3 model IDs in the database, read them in the edge function as the source of truth, and use the dashboard UI to write them.
+File: `src/pages/BrandPage.tsx`
 
-### Steps
+Add a new filter block in the existing left sidebar (under the categories block), labeled **Discount**:
 
-1. **DB**: add a tiny key/value settings table (or reuse one if it already exists) on **both** Lovable Cloud and the self-hosted stack:
-   ```
-   create table public.app_settings (
-     key text primary key,
-     value jsonb not null,
-     updated_at timestamptz not null default now()
-   );
-   ```
-   - RLS: `select` allowed to everyone authenticated (or anon, since model IDs are not secret); `insert/update` only for `has_role(auth.uid(), 'admin')`.
-   - Seed row: `('ai_import_models', '["openai/gpt-4o-mini","google/gemini-2.0-flash-001","anthropic/claude-3.5-haiku"]')`.
+- Checkboxes (single-select via radio-style state, or multi-select OR'd):
+  - Any (default)
+  - 10% or more
+  - 20% or more
+  - 30% or more
+  - 50% or more
+  - On sale (any discount > 0)
+- Apply filter inside the existing `filteredProducts` useMemo:
+  `pct = originalPrice > price ? (1 - price/originalPrice)*100 : 0` and keep products where `pct >= threshold`.
+- "Clear" button already there clears categories — extend it to also clear the discount filter.
 
-2. **`/admin/models` page**: load + save the 3 slots from `app_settings` instead of `localStorage`. Keep a small in-memory cache so the UI is snappy. Show a "Saved" toast on success.
+Add i18n keys: `filter.discount`, `filter.discount.any`, `filter.discount.10`, `filter.discount.20`, `filter.discount.30`, `filter.discount.50`, `filter.discount.onSale`, `discount.save`, `discount.off` (EN + AR) in `src/lib/i18n.tsx`.
 
-3. **`extract-product` edge function**: at the top of the handler, fetch `app_settings.ai_import_models` with the service-role client and use that as the chain. Ignore any model fields coming from the request body (or only honor them when an explicit `override: true` flag is passed by the admin UI for one-off testing).
+## 4. ProductCard
 
-4. **`translate-product` edge function**: today the model is hardcoded to `google/gemini-2.5-flash`. Either (a) leave it, or (b) add a separate `app_settings.ai_translate_model` row and read it the same way. Recommend (b) so translation is also configurable from the dashboard.
+Already shows discount correctly — no change needed. Once admins set `originalPrice` on a product, the card will automatically render the strike-through, current price, and `-XX%` badge.
 
-5. **`ProductImportFromUrl.tsx`**: stop sending `model` / `fallbackModels` from the client. The edge function now decides. Keep `useAiModels` only as a *display* hook that reads from DB so the admin still sees the active models in the import card.
+## Out of scope
 
-6. **Self-hosted parity**: the migration applied to Lovable Cloud must also be applied to the self-hosted Supabase via `scripts/apply-self-hosted-migrations.sh`, and `extract-product` / `translate-product` redeployed on the self-hosted side via `scripts/deploy-self-hosted-functions.sh`. Document this in `SELF_HOSTED.md`.
+- No DB migration (column `original_price` already exists, nullable numeric).
+- No edge-function or backend change.
+- No change to checkout/cart math (they already use `product.price` which is the discounted price).
 
-### Result
-- One source of truth for which models are used, regardless of browser, device, or origin.
-- The self-hosted site and the Lovable preview each have their own row, so you can run different model chains per environment if you want.
-- No more "I set Nemotron but OpenRouter billed GPT-4o-mini".
+## Files touched
 
-## 3. Quick answer to "which side stored the last scrape"
-
-The latest scrape on May 10 was **stored on the self-hosted Dokploy Supabase database** and used the **self-hosted `scrape-product` + `extract-product` edge functions**. The Lovable Cloud DB and Lovable Cloud functions were not involved in that call.
-
-## 4. Files that will change (for reference)
-
-- `supabase/migrations/<new>.sql` — create `app_settings` + RLS + seed.
-- `src/lib/aiModels.ts` — replace localStorage with Supabase read/write.
-- `src/pages/admin/AdminModels.tsx` — wire to async load/save.
-- `src/components/admin/ProductImportFromUrl.tsx` — stop sending model fields.
-- `supabase/functions/extract-product/index.ts` — read chain from `app_settings`.
-- `supabase/functions/translate-product/index.ts` — optionally read translate model from `app_settings`.
-- `SELF_HOSTED.md` — note the migration + redeploy step.
-
-Approve this and I'll implement it.
+- `src/pages/admin/AdminProductEditor.tsx` — add input + validation + disable save
+- `src/pages/ProductDetail.tsx` — render dual price + badge
+- `src/pages/BrandPage.tsx` — add discount filter UI + filter logic
+- `src/lib/i18n.tsx` — new translation keys (EN + AR)
