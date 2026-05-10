@@ -1,10 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/clientRuntime";
+import { toast } from "sonner";
 
-export const AI_MODEL_STORAGE_KEYS = [
-  "ai-import-model",
-  "ai-import-model-2",
-  "ai-import-model-3",
-] as const;
+// AI model selection is stored server-side in `site_settings` so the same
+// chain is used by every browser, every origin (preview vs production),
+// and most importantly by the edge function itself. localStorage was
+// previously used here but it is per-origin/per-browser, which caused
+// the edge function to fall back to defaults (e.g. openai/gpt-4o-mini)
+// when the live site had no saved selection.
+
+const SETTINGS_KEY = "ai_import_models";
 
 export const DEFAULT_AI_MODELS: [string, string, string] = [
   "openai/gpt-4o-mini",
@@ -18,15 +23,51 @@ export const SLOT_LABELS = [
   "Fallback model #3",
 ] as const;
 
+// Kept for backwards-compatibility with any older imports — no longer used.
+export const AI_MODEL_STORAGE_KEYS = [
+  "ai-import-model",
+  "ai-import-model-2",
+  "ai-import-model-3",
+] as const;
+
 const CHANGE_EVENT = "ai-models-changed";
 
-export function getAiModels(): [string, string, string] {
-  if (typeof window === "undefined") return [...DEFAULT_AI_MODELS] as [string, string, string];
-  return [
-    localStorage.getItem(AI_MODEL_STORAGE_KEYS[0]) || DEFAULT_AI_MODELS[0],
-    localStorage.getItem(AI_MODEL_STORAGE_KEYS[1]) || DEFAULT_AI_MODELS[1],
-    localStorage.getItem(AI_MODEL_STORAGE_KEYS[2]) || DEFAULT_AI_MODELS[2],
-  ];
+let cache: [string, string, string] | null = null;
+let inflight: Promise<[string, string, string]> | null = null;
+
+function normalize(value: unknown): [string, string, string] {
+  if (Array.isArray(value)) {
+    const arr = value.map((v) => (typeof v === "string" ? v : "")).filter((v) => v.length > 0);
+    return [
+      arr[0] || DEFAULT_AI_MODELS[0],
+      arr[1] || DEFAULT_AI_MODELS[1],
+      arr[2] || DEFAULT_AI_MODELS[2],
+    ];
+  }
+  return [...DEFAULT_AI_MODELS] as [string, string, string];
+}
+
+async function fetchFromDb(): Promise<[string, string, string]> {
+  if (inflight) return inflight;
+  inflight = (async () => {
+    const { data, error } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", SETTINGS_KEY)
+      .maybeSingle();
+    if (error) {
+      console.error("[aiModels] load failed:", error.message);
+      return [...DEFAULT_AI_MODELS] as [string, string, string];
+    }
+    return normalize((data as any)?.value);
+  })();
+  try {
+    const result = await inflight;
+    cache = result;
+    return result;
+  } finally {
+    inflight = null;
+  }
 }
 
 function broadcast() {
@@ -34,36 +75,72 @@ function broadcast() {
   window.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 }
 
+/**
+ * Synchronous getter — returns cached value or defaults until the DB load
+ * completes. Use the `useAiModels` hook in components instead when possible.
+ */
+export function getAiModels(): [string, string, string] {
+  return cache ?? ([...DEFAULT_AI_MODELS] as [string, string, string]);
+}
+
 export function useAiModels() {
-  const [models, setModels] = useState<[string, string, string]>(() => getAiModels());
+  const [models, setModels] = useState<[string, string, string]>(
+    () => cache ?? ([...DEFAULT_AI_MODELS] as [string, string, string]),
+  );
+  const [loading, setLoading] = useState<boolean>(cache === null);
 
   useEffect(() => {
-    const refresh = () => setModels(getAiModels());
+    let active = true;
+    fetchFromDb().then((m) => {
+      if (!active) return;
+      setModels(m);
+      setLoading(false);
+    });
+    const refresh = () => {
+      if (cache) setModels(cache);
+    };
     window.addEventListener(CHANGE_EVENT, refresh);
-    window.addEventListener("storage", refresh);
     return () => {
+      active = false;
       window.removeEventListener(CHANGE_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  const setModelAt = (slot: 0 | 1 | 2, id: string) => {
-    localStorage.setItem(AI_MODEL_STORAGE_KEYS[slot], id);
-    setModels((prev) => {
-      const next = [...prev] as [string, string, string];
+  const persist = useCallback(async (next: [string, string, string]) => {
+    cache = next;
+    setModels(next);
+    broadcast();
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: SETTINGS_KEY, value: next as unknown as any }, { onConflict: "key" });
+    if (error) {
+      toast.error(`Failed to save model selection: ${error.message}`);
+      // Re-fetch authoritative state from DB.
+      const fresh = await fetchFromDb();
+      setModels(fresh);
+      broadcast();
+    } else {
+      toast.success("AI model selection saved");
+    }
+  }, []);
+
+  const setModelAt = useCallback(
+    (slot: 0 | 1 | 2, id: string) => {
+      const next = [...(cache ?? models)] as [string, string, string];
       next[slot] = id;
-      return next;
-    });
-    broadcast();
-  };
+      void persist(next);
+    },
+    [models, persist],
+  );
 
-  const resetSlot = (slot: 0 | 1 | 2) => setModelAt(slot, DEFAULT_AI_MODELS[slot]);
+  const resetSlot = useCallback(
+    (slot: 0 | 1 | 2) => setModelAt(slot, DEFAULT_AI_MODELS[slot]),
+    [setModelAt],
+  );
 
-  const resetAll = () => {
-    AI_MODEL_STORAGE_KEYS.forEach((k, i) => localStorage.setItem(k, DEFAULT_AI_MODELS[i]));
-    setModels([...DEFAULT_AI_MODELS] as [string, string, string]);
-    broadcast();
-  };
+  const resetAll = useCallback(() => {
+    void persist([...DEFAULT_AI_MODELS] as [string, string, string]);
+  }, [persist]);
 
-  return { models, setModelAt, resetSlot, resetAll };
+  return { models, loading, setModelAt, resetSlot, resetAll };
 }
