@@ -172,7 +172,22 @@ Deno.serve(async (req) => {
       };
     }
 
-    const translated = await translateWithAI(source);
+    // Resolve translate model from site_settings (single source of truth).
+    let translateModel = "google/gemini-2.5-flash";
+    try {
+      const { data: settingRow } = await admin
+        .from("site_settings")
+        .select("value")
+        .eq("key", "ai_translate_model")
+        .maybeSingle();
+      const v = (settingRow as any)?.value;
+      if (typeof v === "string" && v.trim().length > 0) translateModel = v.trim();
+    } catch (e) {
+      console.error("failed to read ai_translate_model:", e);
+    }
+    console.log("translate-product model:", translateModel);
+
+    const translated = await translateWithAI(source, translateModel);
 
     if (productId && persist) {
       const { error: upErr } = await admin
