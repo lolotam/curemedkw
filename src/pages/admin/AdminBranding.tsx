@@ -599,3 +599,154 @@ function FeaturedGlassOpacityControl() {
   );
 }
 
+
+function LoaderVideoControl() {
+  const { data: saved, isLoading } = useLoaderVideoUrl();
+  const update = useUpdateSiteSetting();
+  const [draft, setDraft] = React.useState("");
+  const [touched, setTouched] = React.useState(false);
+  const [uploading, setUploading] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    if (!touched) setDraft(saved ?? "");
+  }, [saved, touched]);
+
+  const trimmed = draft.trim();
+  const dirty = (saved ?? "") !== draft;
+  const looksValid = !trimmed || /^https?:\/\//i.test(trimmed) || trimmed.startsWith("/");
+  const previewUrl = (saved && saved.trim()) || LOADER_VIDEO_DEFAULT;
+
+  const handleSave = async () => {
+    try {
+      await update.mutateAsync({ key: LOADER_VIDEO_KEY, value: trimmed });
+      setTouched(false);
+      toast.success("Preloader video updated");
+    } catch (e: any) {
+      toast.error("Save failed", { description: e?.message ?? "Unknown error" });
+    }
+  };
+
+  const handleReset = async () => {
+    if (!confirm("Reset preloader video to the default?")) return;
+    try {
+      await update.mutateAsync({ key: LOADER_VIDEO_KEY, value: "" });
+      setDraft("");
+      setTouched(false);
+      toast.success("Preloader video reset to default");
+    } catch (e: any) {
+      toast.error("Reset failed", { description: e?.message ?? "Unknown error" });
+    }
+  };
+
+  const handleFilePicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      toast.error("Invalid file", { description: "Please pick a video (MP4, WebM, MOV)." });
+      return;
+    }
+    const MAX = 30 * 1024 * 1024;
+    if (file.size > MAX) {
+      toast.error("File too large", { description: "Maximum size is 30 MB." });
+      return;
+    }
+    setUploading(true);
+    try {
+      const url = await uploadBrandingVideo(file, "loader-video");
+      await update.mutateAsync({ key: LOADER_VIDEO_KEY, value: url });
+      setDraft(url);
+      setTouched(false);
+      toast.success("Preloader video uploaded and saved");
+    } catch (err: any) {
+      toast.error("Upload failed", { description: err?.message ?? "Unknown error" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Card className="p-5 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Preloading page video</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Shown on the splash/loading screen before the home page. Upload an MP4/WebM (max 30 MB)
+          or paste a video URL. Saves immediately to the live database.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Video URL</Label>
+        <div className="flex gap-2">
+          <Input
+            value={draft}
+            onChange={(e) => { setDraft(e.target.value); setTouched(true); }}
+            placeholder="https://example.com/loader.mp4"
+            disabled={isLoading || uploading}
+            className="flex-1"
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="video/mp4,video/webm,video/quicktime"
+            className="hidden"
+            onChange={handleFilePicked}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading || update.isPending}
+            className="gap-1 shrink-0"
+          >
+            {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            Upload
+          </Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Paste a URL above, or upload a file (MP4 / WebM / MOV, max 30 MB). Uploads are saved automatically.
+        </p>
+        {!looksValid && (
+          <p className="text-[11px] text-amber-600 inline-flex items-center gap-1">
+            <AlertTriangle className="h-3 w-3" />
+            URL should start with https:// or / (for files in the public folder).
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs">Live preview</Label>
+        <video
+          key={previewUrl}
+          src={previewUrl}
+          controls
+          muted
+          playsInline
+          className="h-44 w-full rounded-lg bg-black object-contain"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2 items-center">
+        <Button
+          type="button"
+          onClick={handleSave}
+          disabled={!dirty || !looksValid || update.isPending || uploading}
+          className="gap-1"
+        >
+          {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Save URL
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleReset}
+          disabled={update.isPending || uploading}
+        >
+          <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Reset to default
+        </Button>
+      </div>
+    </Card>
+  );
+}
