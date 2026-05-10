@@ -239,3 +239,31 @@ These keys are **server-side only**. Never put them in:
 - `RUNTIME_SUPABASE_*` vars on the `web` container,
 - `VITE_*` build args,
 - or anything that ends up in the browser bundle.
+
+## I) AI model selection (single source of truth)
+
+The 3-model OpenRouter fallback chain used by `extract-product` and the
+single model used by `translate-product` are stored in the database table
+`public.site_settings`:
+
+- `key = 'ai_import_models'` — JSON array of 3 OpenRouter model IDs (used by
+  `extract-product`, primary first then 2 fallbacks).
+- `key = 'ai_translate_model'` — JSON string with one OpenRouter model ID
+  (used by `translate-product`).
+
+The `/admin/models` page in the dashboard reads and writes these rows. The
+edge functions also read them at request time and ignore any model fields
+sent from the client. This means:
+
+- Changing a model on `/admin/models` immediately affects every browser,
+  every device, and both the Lovable Cloud and self-hosted deployments
+  (each environment has its own `site_settings` row, since the Supabase
+  databases are independent).
+- The previous `localStorage`-based selection is gone. If OpenRouter shows
+  an unexpected model being billed, check `site_settings` on the
+  environment that actually ran the call — not the browser localStorage.
+
+When applying migrations to the self-hosted stack, make sure to also seed
+these two rows (the migration script does this automatically), then
+redeploy `extract-product` and `translate-product` via
+`scripts/deploy-self-hosted-functions.sh`.
