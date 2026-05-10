@@ -96,15 +96,56 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const markdown = String(body?.markdown ?? "").trim();
     const sourceUrl = String(body?.sourceUrl ?? "").trim();
-    const model = String(body?.model ?? "openai/gpt-4o-mini").trim();
-    const fallbackModelsRaw = Array.isArray(body?.fallbackModels) ? body.fallbackModels : [];
-    const fallbackModels = fallbackModelsRaw
-      .map((m: unknown) => String(m ?? "").trim())
-      .filter((m: string) => m.length > 0);
     if (!markdown) return json({ error: "markdown is required" }, 400);
 
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!apiKey) return json({ error: "OPENROUTER_API_KEY is not configured" }, 500);
+
+    // Authoritative model chain comes from site_settings.ai_import_models.
+    // Client-supplied `model` / `fallbackModels` are accepted only as a last-
+    // resort fallback when the settings row is missing — this guarantees the
+    // /admin/models page is the single source of truth across browsers and
+    // both the Lovable Cloud and self-hosted deployments.
+    const DEFAULT_CHAIN = [
+      "openai/gpt-4o-mini",
+      "google/gemini-2.0-flash-001",
+      "anthropic/claude-3.5-haiku",
+    ];
+
+    let dbChain: string[] | null = null;
+    try {
+      const { data: settingRow } = await admin
+        .from("site_settings")
+        .select("value")
+        .eq("key", "ai_import_models")
+        .maybeSingle();
+      const v = (settingRow as any)?.value;
+      if (Array.isArray(v)) {
+        dbChain = v.map((m: unknown) => String(m ?? "").trim()).filter((m: string) => m.length > 0);
+      }
+    } catch (e) {
+      console.error("failed to read ai_import_models from site_settings:", e);
+    }
+
+    const clientModel = String(body?.model ?? "").trim();
+    const clientFallback = Array.isArray(body?.fallbackModels)
+      ? body.fallbackModels.map((m: unknown) => String(m ?? "").trim()).filter((m: string) => m.length > 0)
+      : [];
+
+    const sourceChain =
+      dbChain && dbChain.length > 0
+        ? dbChain
+        : clientModel
+          ? [clientModel, ...clientFallback]
+          : DEFAULT_CHAIN;
+
+    // Build dedup'd chain: primary + up to 2 fallbacks
+    const chain: string[] = [];
+    for (const m of sourceChain) {
+      if (m && !chain.includes(m)) chain.push(m);
+      if (chain.length >= 3) break;
+    }
+    console.log("extract-product chain:", chain.join(" -> "), "(source:", dbChain ? "db" : "client/default", ")");
 
     // Build dedup'd chain: primary + up to 2 fallbacks
     const chain: string[] = [];
