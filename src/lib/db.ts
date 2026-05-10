@@ -1027,6 +1027,7 @@ export function useFeaturedGlassOpacity() {
 
 // Loading page gradient progress bar settings.
 export interface LoaderBarSettings {
+  visible: boolean;     // show or hide the gradient bar
   durationMs: number;   // total time bar takes to fill
   positionX: number;    // 0-100 % of viewport width
   positionY: number;    // 0-100 % of viewport height
@@ -1034,6 +1035,7 @@ export interface LoaderBarSettings {
 }
 export const LOADER_BAR_KEY = "loader_bar";
 export const LOADER_BAR_DEFAULTS: LoaderBarSettings = {
+  visible: true,
   durationMs: 3200,
   positionX: 50,
   positionY: 50,
