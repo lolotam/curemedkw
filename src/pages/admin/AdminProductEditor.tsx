@@ -620,6 +620,16 @@ export default function AdminProductEditor() {
                   >
                     <Download className="h-3.5 w-3.5" />
                   </Button>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="secondary"
+                    className="h-7 w-7 pointer-events-auto"
+                    onClick={() => setUpscaleTarget({ url: form.mainImage, kind: "main" })}
+                    title="Upscale with AI"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
               <div className="space-y-2">
