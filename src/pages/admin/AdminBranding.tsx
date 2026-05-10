@@ -16,7 +16,10 @@ import {
   FEATURED_GLASS_OPACITY_KEY,
   LOADER_BAR_KEY,
   LOADER_BAR_DEFAULTS,
+  LOADER_VIDEO_KEY,
+  LOADER_VIDEO_DEFAULT,
   useLoaderBarSettings,
+  useLoaderVideoUrl,
   useBrandingFavicon,
   useBrandingLogo,
   useBrandingLogoRemoveBg,
@@ -25,6 +28,7 @@ import {
   useFeaturedGlassOpacity,
   useUpdateSiteSetting,
   uploadBrandingImage,
+  uploadBrandingVideo,
 } from "@/lib/db";
 import { BRAND_LIST } from "@/lib/brands";
 
