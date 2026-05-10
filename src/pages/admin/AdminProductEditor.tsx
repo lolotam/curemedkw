@@ -532,7 +532,37 @@ export default function AdminProductEditor() {
                 </div>
               </Field>
               <Field label="Price (KD)">
-                <Input type="number" step="0.01" min={0} value={form.price} onChange={(e) => update("price", parseFloat(e.target.value) || 0)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={form.price}
+                  onChange={(e) => update("price", parseFloat(e.target.value) || 0)}
+                  className={priceError ? "border-destructive focus-visible:ring-destructive" : undefined}
+                />
+              </Field>
+              <Field label="Original price (KD) — optional, for sale display">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={form.originalPrice ?? ""}
+                  placeholder="Leave empty if no discount"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    update("originalPrice", v === "" ? null : (parseFloat(v) || 0));
+                  }}
+                  className={priceError ? "border-destructive focus-visible:ring-destructive" : undefined}
+                />
+                {priceError ? (
+                  <p className="text-[11px] text-destructive mt-1">{priceError}</p>
+                ) : form.originalPrice && form.originalPrice > form.price && form.price > 0 ? (
+                  <p className="text-[11px] text-emerald-600 mt-1">
+                    Discount: -{Math.round((1 - form.price / form.originalPrice) * 100)}% (was KD {form.originalPrice.toFixed(2)} → KD {form.price.toFixed(2)})
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground mt-1">Must be higher than price to show as discounted.</p>
+                )}
               </Field>
               <Field label="Short description" full>
                 <Textarea rows={2} value={form.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} />
