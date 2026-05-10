@@ -27,6 +27,7 @@ export default function BrandPage() {
   const { data: brandProducts = [] } = useProductsByBrand(brandKey);
   const { data: categories = [] } = useCategories();
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [discountMin, setDiscountMin] = useState<number>(0); // 0 = any, otherwise min %
 
   // Build category list with counts. Show ALL active categories (including
   // those with 0 products in this brand) so users can see the full taxonomy.
@@ -45,13 +46,21 @@ export default function BrandPage() {
       .map((c) => ({ ...c, count: counts.get(c.id) || 0 }));
   }, [categories, brandProducts]);
 
+  const discountPct = (p: typeof brandProducts[number]) =>
+    p.originalPrice && p.originalPrice > p.price && p.price > 0
+      ? (1 - p.price / p.originalPrice) * 100
+      : 0;
+
   const filteredProducts = useMemo(() => {
-    if (selectedCats.size === 0) return brandProducts;
     return brandProducts.filter((p) => {
-      const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
-      return ids.some((cid) => selectedCats.has(cid));
+      if (selectedCats.size > 0) {
+        const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+        if (!ids.some((cid) => selectedCats.has(cid))) return false;
+      }
+      if (discountMin > 0 && discountPct(p) < discountMin) return false;
+      return true;
     });
-  }, [brandProducts, selectedCats]);
+  }, [brandProducts, selectedCats, discountMin]);
 
   const toggleCat = (id: string) => {
     setSelectedCats((prev) => {
