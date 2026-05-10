@@ -27,6 +27,7 @@ export default function BrandPage() {
   const { data: brandProducts = [] } = useProductsByBrand(brandKey);
   const { data: categories = [] } = useCategories();
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [discountMin, setDiscountMin] = useState<number>(0); // 0 = any, otherwise min %
 
   // Build category list with counts. Show ALL active categories (including
   // those with 0 products in this brand) so users can see the full taxonomy.
@@ -45,13 +46,21 @@ export default function BrandPage() {
       .map((c) => ({ ...c, count: counts.get(c.id) || 0 }));
   }, [categories, brandProducts]);
 
+  const discountPct = (p: typeof brandProducts[number]) =>
+    p.originalPrice && p.originalPrice > p.price && p.price > 0
+      ? (1 - p.price / p.originalPrice) * 100
+      : 0;
+
   const filteredProducts = useMemo(() => {
-    if (selectedCats.size === 0) return brandProducts;
     return brandProducts.filter((p) => {
-      const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
-      return ids.some((cid) => selectedCats.has(cid));
+      if (selectedCats.size > 0) {
+        const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+        if (!ids.some((cid) => selectedCats.has(cid))) return false;
+      }
+      if (discountMin > 0 && discountPct(p) < discountMin) return false;
+      return true;
     });
-  }, [brandProducts, selectedCats]);
+  }, [brandProducts, selectedCats, discountMin]);
 
   const toggleCat = (id: string) => {
     setSelectedCats((prev) => {
@@ -118,9 +127,33 @@ export default function BrandPage() {
                       })}
                     </div>
                   </div>
+                  <div className="border-t border-border mt-4 pt-3">
+                    <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.discount")}</h4>
+                    <div className="space-y-2">
+                      {[
+                        { v: 0, key: "filter.discount.any" },
+                        { v: 0.01, key: "filter.discount.onSale" },
+                        { v: 10, key: "filter.discount.10" },
+                        { v: 20, key: "filter.discount.20" },
+                        { v: 30, key: "filter.discount.30" },
+                        { v: 50, key: "filter.discount.50" },
+                      ].map((opt) => (
+                        <label key={opt.v} className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-brand">
+                          <input
+                            type="radio"
+                            name="discount-filter"
+                            className="accent-brand"
+                            checked={discountMin === opt.v}
+                            onChange={() => setDiscountMin(opt.v)}
+                          />
+                          <span>{t(opt.key)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                {selectedCats.size > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedCats(new Set())}>
+                {(selectedCats.size > 0 || discountMin > 0) && (
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedCats(new Set()); setDiscountMin(0); }}>
                     {t("filter.clear")}
                   </Button>
                 )}

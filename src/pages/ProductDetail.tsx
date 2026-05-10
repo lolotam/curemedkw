@@ -98,14 +98,32 @@ export default function ProductDetail() {
                 {stockBadge.label}
               </span>
             </div>
-          ) : (
-            <div className="mt-6 flex items-baseline gap-4">
-              <span className="text-4xl font-bold">KD {product.price.toFixed(2)}</span>
-              <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>
-                {stockBadge.label}
-              </span>
-            </div>
-          )}
+          ) : (() => {
+            const hasDiscount = !!product.originalPrice && product.originalPrice > product.price && product.price > 0;
+            const pct = hasDiscount ? Math.round((1 - product.price / (product.originalPrice as number)) * 100) : 0;
+            const save = hasDiscount ? ((product.originalPrice as number) - product.price) : 0;
+            return (
+              <div className="mt-6 space-y-2">
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  {hasDiscount ? (
+                    <>
+                      <span className="text-4xl font-bold text-red-600">KD {product.price.toFixed(2)}</span>
+                      <span className="text-xl line-through text-muted-foreground">KD {(product.originalPrice as number).toFixed(2)}</span>
+                      <span className="inline-flex items-center rounded-full bg-red-600 text-white px-2.5 py-1 text-xs font-bold">-{pct}% {t("discount.off")}</span>
+                    </>
+                  ) : (
+                    <span className="text-4xl font-bold">KD {product.price.toFixed(2)}</span>
+                  )}
+                  <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>
+                    {stockBadge.label}
+                  </span>
+                </div>
+                {hasDiscount && (
+                  <p className="text-sm font-medium text-red-600">{t("discount.save")} KD {save.toFixed(2)}</p>
+                )}
+              </div>
+            );
+          })()}
           {!priceHidden && product.stockStatus !== "out_of_stock" && (
             <div className="mt-6">
               <AddToCartButton product={product} size="lg" fullWidth />

@@ -327,10 +327,19 @@ export default function AdminProductEditor() {
     }
   };
 
+  const priceError =
+    form.originalPrice != null && form.originalPrice > 0 && form.originalPrice <= form.price
+      ? "Original price must be higher than the discounted price."
+      : null;
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim() || !form.sku.trim()) {
       toast.error("Name and SKU are required");
+      return;
+    }
+    if (priceError) {
+      toast.error(priceError);
       return;
     }
     try {
@@ -390,7 +399,7 @@ export default function AdminProductEditor() {
             {translating ? "Translating…" : "Translate to Arabic"}
           </Button>
         )}
-        <Button type="submit" className="bg-brand hover:bg-brand/90 text-white">Save</Button>
+        <Button type="submit" disabled={!!priceError} className="bg-brand hover:bg-brand/90 text-white">Save</Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -532,7 +541,37 @@ export default function AdminProductEditor() {
                 </div>
               </Field>
               <Field label="Price (KD)">
-                <Input type="number" step="0.01" min={0} value={form.price} onChange={(e) => update("price", parseFloat(e.target.value) || 0)} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={form.price}
+                  onChange={(e) => update("price", parseFloat(e.target.value) || 0)}
+                  className={priceError ? "border-destructive focus-visible:ring-destructive" : undefined}
+                />
+              </Field>
+              <Field label="Original price (KD) — optional, for sale display">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  value={form.originalPrice ?? ""}
+                  placeholder="Leave empty if no discount"
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    update("originalPrice", v === "" ? null : (parseFloat(v) || 0));
+                  }}
+                  className={priceError ? "border-destructive focus-visible:ring-destructive" : undefined}
+                />
+                {priceError ? (
+                  <p className="text-[11px] text-destructive mt-1">{priceError}</p>
+                ) : form.originalPrice && form.originalPrice > form.price && form.price > 0 ? (
+                  <p className="text-[11px] text-emerald-600 mt-1">
+                    Discount: -{Math.round((1 - form.price / form.originalPrice) * 100)}% (was KD {form.originalPrice.toFixed(2)} → KD {form.price.toFixed(2)})
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground mt-1">Must be higher than price to show as discounted.</p>
+                )}
               </Field>
               <Field label="Short description" full>
                 <Textarea rows={2} value={form.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} />
