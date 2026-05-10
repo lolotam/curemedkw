@@ -84,7 +84,7 @@ async function translateWithAI(input: TranslateInput, model: string): Promise<Tr
       "X-Title": "Curemed Admin",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model,
       messages: [
         { role: "system", content: sys },
         {
