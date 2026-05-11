@@ -62,7 +62,15 @@ export default function AdminProducts() {
   return (
     <div className="p-8">
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-        <div><h1 className="text-3xl font-bold">Products</h1><p className="text-muted-foreground mt-1">Manage products across all four brands</p></div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold">Products</h1>
+            <span className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-full bg-brand/10 text-brand text-sm font-semibold tabular-nums">
+              {allProducts.length}
+            </span>
+          </div>
+          <p className="text-muted-foreground mt-1">Manage products across all four brands</p>
+        </div>
         <Button asChild className="bg-brand hover:bg-brand/90 text-white gap-2"><Link to="/admin/products/new"><Plus className="h-4 w-4" /> Add product</Link></Button>
       </div>
       <Card className="p-4 mb-4">
