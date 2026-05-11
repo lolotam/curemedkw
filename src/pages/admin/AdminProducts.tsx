@@ -268,6 +268,17 @@ function InlinePriceCell({
   );
 }
 
+function CountBadge({ count, active }: { count: number; active: boolean }) {
+  return (
+    <span className={cn(
+      "ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded-full text-[10px] font-semibold tabular-nums",
+      active ? "bg-white/25 text-white" : "bg-foreground/10 text-foreground/70",
+    )}>
+      {count}
+    </span>
+  );
+}
+
 function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} className={cn("px-3 py-1.5 rounded-full text-xs font-medium transition-colors", active ? "bg-brand text-white" : "bg-muted hover:bg-muted/70")}>{children}</button>;
 }
