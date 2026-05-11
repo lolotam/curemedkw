@@ -127,10 +127,15 @@ export default function CuremedHome() {
                 arrow: "text-violet-600",
               },
             ].map(({ icon: Icon, key, grad, ring, blob, title, arrow }, i) => (
-              <div
+              <a
                 key={key}
+                href="#hero"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById("hero")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
                 className={cn(
-                  "group relative animate-fade-in-up",
+                  "group relative animate-fade-in-up block",
                   i === 0 && "animation-delay-100",
                   i === 1 && "animation-delay-200",
                   i === 2 && "animation-delay-300",
