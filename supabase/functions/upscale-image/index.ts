@@ -129,7 +129,9 @@ Deno.serve(async (req) => {
       url: pub.publicUrl,
       originalUrl: imageUrl,
       mode,
-      factor,
+      factor: effectiveFactor,
+      requestedFactor: factor,
+      clamped: effectiveFactor !== factor,
       format,
     });
   } catch (e) {
