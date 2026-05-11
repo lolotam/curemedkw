@@ -612,6 +612,17 @@ export async function uploadCategoryImage(file: File): Promise<string> {
   return supabase.storage.from("category-images").getPublicUrl(path).data.publicUrl;
 }
 
+export async function uploadCategoryBanner(file: File): Promise<string> {
+  const converted = await convertToWebP(file);
+  const ext = converted.name.split(".").pop() || "webp";
+  const path = `banners/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("category-images")
+    .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });
+  if (error) throw error;
+  return supabase.storage.from("category-images").getPublicUrl(path).data.publicUrl;
+}
+
 export const slugify = (s: string) =>
   s.toLowerCase().trim()
     .replace(/[^a-z0-9\s-]/g, "")
