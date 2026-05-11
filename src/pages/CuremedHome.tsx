@@ -9,6 +9,7 @@ import { FAQ } from "@/components/site/FAQ";
 import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
+import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, type Product } from "@/lib/db";
