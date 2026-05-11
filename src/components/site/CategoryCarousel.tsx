@@ -98,7 +98,7 @@ export function CategoryCarousel() {
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
         }}
       >
-        <div className="cat-marquee flex w-max group-hover:[animation-play-state:paused] py-2">
+        <div className={cn("cat-marquee flex w-max group-hover:[animation-play-state:paused] py-2", !categoriesAutoscroll && "[animation-play-state:paused]")}>
           {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
