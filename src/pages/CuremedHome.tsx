@@ -215,7 +215,7 @@ export default function CuremedHome() {
                     <ArrowRight className="h-4 w-4 rtl:rotate-180" />
                   </div>
                 </Card>
-              </div>
+              </a>
             ))}
           </div>
         </div>
