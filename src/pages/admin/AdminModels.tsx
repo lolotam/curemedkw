@@ -113,6 +113,7 @@ export default function AdminModels() {
                 }
               />
             ))}
+            {kind === "image" && <UpscalePromptCard />}
           </TabsContent>
         ))}
       </Tabs>
