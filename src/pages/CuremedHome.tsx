@@ -47,7 +47,7 @@ export default function CuremedHome() {
           </div>
         </div>
         <div
-          className="group relative overflow-hidden"
+          className="group relative"
           style={{
             maskImage:
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
@@ -55,7 +55,7 @@ export default function CuremedHome() {
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className={cn("marquee flex w-max group-hover:[animation-play-state:paused]", !brandsAutoscroll && "[animation-play-state:paused]")}>
+          <AutoScrollMarquee autoScroll={brandsAutoscroll} speed={50}>
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
               <BrandTile
                 key={`${b.key}-${idx}`}
@@ -63,7 +63,7 @@ export default function CuremedHome() {
                 isClone={idx >= BRAND_LIST.length}
               />
             ))}
-          </div>
+          </AutoScrollMarquee>
         </div>
       </section>
 
