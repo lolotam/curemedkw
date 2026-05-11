@@ -447,6 +447,51 @@ function CategoryEditorDialog({
             </div>
           </div>
 
+          {/* Hero banner (19:6) */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Hero banner (19:6)</p>
+            <div className="relative w-full aspect-[19/6] rounded-xl overflow-hidden border border-border bg-muted">
+              {form.bannerUrl ? (
+                <>
+                  <img src={form.bannerUrl} alt="" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => update("bannerUrl", "")}
+                    className="absolute top-2 right-2 bg-destructive text-destructive-foreground rounded-full p-1"
+                    aria-label="Remove banner"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              ) : (
+                <div className="h-full w-full flex items-center justify-center text-muted-foreground gap-2">
+                  <ImagePlus className="h-5 w-5" />
+                  <span className="text-xs">No banner — shown on /categories/{form.slug || "your-slug"}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                value={form.bannerUrl}
+                onChange={(e) => update("bannerUrl", e.target.value)}
+                placeholder="https://example.com/banner.jpg"
+                className="flex-1"
+              />
+              <Label className="inline-flex shrink-0">
+                <input type="file" accept="image/*" onChange={onUploadBanner} className="hidden" />
+                <span className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border bg-background text-sm cursor-pointer hover:bg-muted",
+                  uploadingBanner && "opacity-50 pointer-events-none",
+                )}>
+                  <Upload className="h-3.5 w-3.5" /> {uploadingBanner ? "Uploading…" : "Upload"}
+                </span>
+              </Label>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Recommended: 1900×600 px (19:6 aspect ratio). Paste a URL or upload an image.
+            </p>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Name (English) *</Label>
