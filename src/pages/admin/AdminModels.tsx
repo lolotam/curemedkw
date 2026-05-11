@@ -374,3 +374,51 @@ function Meta({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function UpscalePromptCard() {
+  const { prompt, loading, save, reset } = useUpscalePrompt();
+  const [draft, setDraft] = useState(prompt);
+  useEffect(() => { setDraft(prompt); }, [prompt]);
+  const dirty = draft.trim() !== prompt.trim();
+  const isDefault = prompt.trim() === DEFAULT_UPSCALE_PROMPT.trim();
+  return (
+    <Card className="p-5">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted text-muted-foreground border border-border shrink-0">
+          <Sparkles className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="font-semibold text-sm">AI Upscaling Prompt</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Used when admins choose the AI engine in the image upscaler. Keep it focused on preserving product details.
+              </p>
+            </div>
+            {!isDefault && (
+              <button
+                type="button"
+                onClick={reset}
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset to default
+              </button>
+            )}
+          </div>
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={loading}
+            rows={6}
+            className="font-mono text-xs"
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => save(draft)} disabled={!dirty || loading}>
+              Save prompt
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
