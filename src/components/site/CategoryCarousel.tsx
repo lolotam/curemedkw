@@ -118,7 +118,7 @@ export function CategoryCarousel() {
                   )}
                 />
                 <Link
-                  to={`/category/${c.slug}`}
+                  to={`/categories/${c.slug}`}
                   tabIndex={isClone ? -1 : undefined}
                   className={cn(
                     "relative block h-full overflow-hidden rounded-3xl border border-border bg-card/80 p-4 backdrop-blur-sm transition-all duration-500 group-hover/card:-translate-y-2 group-hover/card:shadow-2xl",
