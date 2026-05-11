@@ -13,14 +13,14 @@ import {
 } from "@/components/ui/select";
 import {
   useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory,
-  useBulkDeleteCategories, uploadCategoryImage, useProducts, slugify,
+  useBulkDeleteCategories, uploadCategoryImage, uploadCategoryBanner, useProducts, slugify,
   type Category, type CategoryInput,
 } from "@/lib/db";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const BLANK: CategoryInput = {
-  slug: "", nameEn: "", nameAr: "", imageUrl: "", sortOrder: 0, isActive: true,
+  slug: "", nameEn: "", nameAr: "", imageUrl: "", bannerUrl: "", sortOrder: 0, isActive: true,
   parentId: null, visiblePages: ["curemed"],
 };
 
