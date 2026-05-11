@@ -11,7 +11,10 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, type Product } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, type Product } from "@/lib/db";
+
+type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
+const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
 import { useCart } from "@/lib/cart";
 import { toast } from "sonner";
 import { getBrandLogo } from "@/lib/placeholder";
