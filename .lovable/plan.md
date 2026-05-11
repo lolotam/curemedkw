@@ -1,90 +1,50 @@
-# Restructure `/admin/models`
+# AI Upscaler with Editable Prompt
 
-## Goal
+Extend the existing upscaler dialog so the admin can choose between **PICSART** (current) and **AI image model** (new). The AI option reuses the three image slots already configured in `/admin/models` (Primary → Fallback #2 → Fallback #3) with automatic fallback. The system prompt sent to the AI is editable from the admin dashboard.
 
-Replace the flat 3-slot list with two tabs, each containing the same 3-slot Primary / Fallback #2 / Fallback #3 structure. Each slot is a card with a **Provider** dropdown (OpenRouter / OpenAI / Google) and a **Model** dropdown filtered to that tab's category (chat or image).
+## 1. Admin: editable upscaling prompt
 
-## Tabs & layout
+- New row in `site_settings` with key `ai_upscale_prompt`, holding the prompt template.
+- Default prompt:
+  > "Upscale this product image to a higher resolution. Preserve every product detail exactly: shape, colors, packaging text, logos, branding, materials, lighting and background. Do NOT add, remove, restyle or reinterpret anything. Output a clean, sharp, photorealistic version of the same image at a larger size."
+- Add a card in `src/pages/admin/AdminModels.tsx` (under the Image Models tab) titled **"AI Upscaling Prompt"** with a `<Textarea>` + Save / Reset to default buttons. Persisted via the same `site_settings` upsert pattern already used by `aiModels.ts`.
 
-```
-[ Chat Models ] [ Image Models ]
+## 2. Upscale dialog UI (`src/components/admin/ImageUpscaleDialog.tsx`)
 
-  Primary AI model
-    Provider: [OpenRouter ▼]   Model: [openai/gpt-4o-mini ▼]
-  Fallback model #2
-    Provider: [OpenAI ▼]       Model: [gpt-4o ▼]
-  Fallback model #3
-    Provider: [Google ▼]       Model: [gemini-2.5-flash ▼]
-```
+- Add a top-level **Engine** selector (RadioGroup): `PICSART` | `AI model`.
+- When **PICSART** is selected → show existing controls (mode, factor, format) — unchanged behavior.
+- When **AI model** is selected → hide PICSART controls and show:
+  - Read-only summary of the 3 image slots in priority order (from `useAiModels().slots.image`), with a link to `/admin/models` to edit.
+  - Optional "Extra instructions" textarea appended to the saved prompt (per-image override, not persisted).
+- Generate button calls the appropriate edge function based on engine.
 
-Both tabs share the same shape — only the model list differs.
+## 3. New edge function: `upscale-image-ai`
 
-## Providers & model sources
+`supabase/functions/upscale-image-ai/index.ts`:
+- Auth + admin check (same pattern as `upscale-image`).
+- Inputs: `imageUrl`, `extraInstructions?`.
+- Loads `ai_upscale_prompt` and `ai_import_models.image` slots from `site_settings`.
+- Fetches source image → base64.
+- Iterates slots in order, returning on first success. Provider dispatch:
+  - **google** (e.g. `gemini-2.5-flash-image`): call `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` with `inlineData` part for the source image + text prompt; extract returned `inlineData` image.
+  - **openai** (e.g. `gpt-image-1`): call `https://api.openai.com/v1/images/edits` (multipart) with image + prompt + `size=auto`.
+  - **openrouter** (e.g. `google/gemini-2.5-flash-image`): call `/api/v1/chat/completions` with multimodal message containing the image and prompt; read base64 image from response.
+- On any failure (network, 4xx/5xx, no image returned, content blocked), log and try next slot. If all 3 fail, return 502 with collected errors.
+- Upload the returned PNG to the `product-images` bucket under `upscaled-ai/{uuid}.png` and return `{ url, provider, model }` — same response shape as `upscale-image` so the dialog's "Use this image" flow keeps working.
 
-Three separate edge functions back the dropdowns; each is called only when its provider is selected and the response is cached client-side.
+## 4. Frontend wiring
 
-| Provider | Function | Endpoint |
-|---|---|---|
-| OpenRouter | existing `openrouter-models` | `https://openrouter.ai/api/v1/models` |
-| OpenAI | new `openai-models` | `https://api.openai.com/v1/models` |
-| Google | new `google-models` | `https://generativelanguage.googleapis.com/v1beta/models` |
+- `ImageUpscaleDialog` calls `supabase.functions.invoke("upscale-image-ai", { body: { imageUrl, extraInstructions } })` when engine = AI.
+- Show which provider/model produced the result in the result panel (small caption).
+- Toast errors clearly when all fallbacks fail (e.g. "All AI models failed: …").
 
-Each function classifies every model as `chat` or `image` so the UI can filter:
+## 5. Deploy
 
-- **OpenRouter**: image if `architecture.output_modalities` includes `image` (or `modality` contains `image`), else chat.
-- **OpenAI**: image if id starts with `dall-e`, `gpt-image`; chat if id starts with `gpt-`, `o1`, `o3`, `o4`, `chatgpt-`. Others are skipped.
-- **Google**: image if `supportedGenerationMethods` includes `predict` or name contains `image`/`imagen`; chat if it includes `generateContent`.
+Deploy the new `upscale-image-ai` edge function. No new secrets required (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` already configured).
 
-Required new secrets (the user picked direct APIs):
-- `OPENAI_API_KEY`
-- `GOOGLE_API_KEY` (Generative Language API key)
+## Technical notes
 
-`OPENROUTER_API_KEY` already exists.
-
-## Storage
-
-Replace the flat array in `site_settings.ai_import_models` with a structured object, keeping a back-compat read path:
-
-```json
-{
-  "chat":  [{"provider":"openrouter","model":"openai/gpt-4o-mini"},
-            {"provider":"openai","model":"gpt-4o"},
-            {"provider":"google","model":"gemini-2.5-flash"}],
-  "image": [{"provider":"google","model":"gemini-2.5-flash-image"},
-            {"provider":"openai","model":"gpt-image-1"},
-            {"provider":"openrouter","model":"google/gemini-2.5-flash-image"}]
-}
-```
-
-Loader: if the saved value is an array (old format), treat as `chat` slots all using OpenRouter. Image defaults applied if missing.
-
-## Edge function consumers
-
-- `extract-product` keeps reading `site_settings.ai_import_models`. Its loader is updated to pull the `chat` array when the new object format is present (and still accept the legacy array). Routing by provider:
-  - `openrouter` → existing OpenRouter call.
-  - `openai` → call `https://api.openai.com/v1/chat/completions` with `OPENAI_API_KEY`.
-  - `google` → call Gemini `generateContent` with `GOOGLE_API_KEY` and adapt the tool-call payload.
-- Picsart upscale is unrelated and stays as-is.
-- No existing AI image generation feature uses these models yet, so the **image** chain is stored only — the dropdowns + persistence ship now and the next image-generation feature will read this same setting (documented in code comments).
-
-## Files
-
-New
-- `supabase/functions/openai-models/index.ts`
-- `supabase/functions/google-models/index.ts`
-- `src/lib/aiProviders.ts` — types (`Provider`, `ProviderModel`, `Slot`), per-provider hooks (`useProviderModels(provider)`), filtering helpers (`isChat`, `isImage`).
-
-Edited
-- `src/lib/aiModels.ts` — switch persisted shape to `{chat: Slot[], image: Slot[]}`, keep legacy-array migration on read, expose `useAiModels()` returning both arrays + setters `setSlot(category, index, {provider, model})`.
-- `src/pages/admin/AdminModels.tsx` — Tabs (`chat` / `image`), reusable `<SlotCard>` with two combobox popovers (provider, then model filtered to tab category). Shows context length / pricing meta only when available (OpenRouter only).
-- `supabase/functions/extract-product/index.ts` — read new shape, dispatch by provider.
-- `scripts/deploy-self-hosted-functions.sh`, `SELF_HOSTED.md` — register `openai-models`, `google-models`, document the two new secrets.
-
-## Defaults
-
-- Chat: `openrouter:openai/gpt-4o-mini`, `openrouter:google/gemini-2.0-flash-001`, `openrouter:anthropic/claude-3.5-haiku` (matches today).
-- Image: `google:gemini-2.5-flash-image`, `openai:gpt-image-1`, `openrouter:google/gemini-2.5-flash-image`.
-
-## Open dependency
-
-Before implementing the edge-function dispatch I will request the two new secrets (`OPENAI_API_KEY`, `GOOGLE_API_KEY`) via the secrets tool. The UI/storage portion can ship without them; the dropdowns just won't populate for those providers until the keys are added.
+- Reuse `SlotsByKind`/`useAiModels` for slot config — no schema change to `ai_import_models`.
+- The prompt is a single string stored at `site_settings.ai_upscale_prompt.value` (text). Falls back to the hard-coded default if missing.
+- AI image models do not change pixel dimensions deterministically the way PICSART does — so the "factor" control is intentionally hidden for the AI engine. A note in the dialog explains this.
+- File names follow project convention; no design-token changes; new card uses existing shadcn primitives.
