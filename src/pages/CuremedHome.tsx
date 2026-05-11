@@ -24,6 +24,11 @@ export default function CuremedHome() {
   const { t, lang } = useI18n();
   const { data: featuredAll = [] } = useFeaturedProducts();
   const featured = featuredAll.slice(0, 8);
+  const { data: autoscroll = AUTOSCROLL_DEFAULT } = useSiteSetting<HomeCarouselAutoscroll>(
+    "home_carousel_autoscroll",
+    AUTOSCROLL_DEFAULT,
+  );
+  const brandsAutoscroll = autoscroll.brands !== false;
 
   return (
     <SiteLayout brand="curemed">
