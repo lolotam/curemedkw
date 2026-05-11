@@ -180,7 +180,7 @@ export function CategoryCarousel() {
               </div>
             );
           })}
-        </div>
+        </AutoScrollMarquee>
       </div>
     </section>
   );
