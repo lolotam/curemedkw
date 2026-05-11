@@ -247,6 +247,9 @@ All colors MUST be HSL.
   .border-brand { border-color: hsl(var(--brand-primary)); }
   .ring-brand { --tw-ring-color: hsl(var(--brand-primary)); }
 
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
   .marquee {
     animation: marquee 40s linear infinite;
   }
