@@ -324,6 +324,7 @@ function CategoryEditorDialog({
         nameEn: editingCategory.nameEn,
         nameAr: editingCategory.nameAr,
         imageUrl: editingCategory.imageUrl,
+        bannerUrl: editingCategory.bannerUrl ?? "",
         sortOrder: editingCategory.sortOrder,
         isActive: editingCategory.isActive,
         parentId: editingCategory.parentId,
