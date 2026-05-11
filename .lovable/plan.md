@@ -1,50 +1,37 @@
-# AI Upscaler with Editable Prompt
+# Add carousel auto-scroll toggles to /admin/landing
 
-Extend the existing upscaler dialog so the admin can choose between **PICSART** (current) and **AI image model** (new). The AI option reuses the three image slots already configured in `/admin/models` (Primary → Fallback #2 → Fallback #3) with automatic fallback. The system prompt sent to the AI is editable from the admin dashboard.
+Add a small settings card at the top of the **Landing Pages** admin (`/admin/landing` → `AdminLandingPages.tsx`) with two switches:
 
-## 1. Admin: editable upscaling prompt
+1. **Brands cards carousel auto-scroll** (home page brands marquee)
+2. **Category cards carousel auto-scroll** (home page categories marquee)
 
-- New row in `site_settings` with key `ai_upscale_prompt`, holding the prompt template.
-- Default prompt:
-  > "Upscale this product image to a higher resolution. Preserve every product detail exactly: shape, colors, packaging text, logos, branding, materials, lighting and background. Do NOT add, remove, restyle or reinterpret anything. Output a clean, sharp, photorealistic version of the same image at a larger size."
-- Add a card in `src/pages/admin/AdminModels.tsx` (under the Image Models tab) titled **"AI Upscaling Prompt"** with a `<Textarea>` + Save / Reset to default buttons. Persisted via the same `site_settings` upsert pattern already used by `aiModels.ts`.
+When ON → marquee animates as today. When OFF → animation paused, user can still scroll horizontally manually.
 
-## 2. Upscale dialog UI (`src/components/admin/ImageUpscaleDialog.tsx`)
+## Storage
 
-- Add a top-level **Engine** selector (RadioGroup): `PICSART` | `AI model`.
-- When **PICSART** is selected → show existing controls (mode, factor, format) — unchanged behavior.
-- When **AI model** is selected → hide PICSART controls and show:
-  - Read-only summary of the 3 image slots in priority order (from `useAiModels().slots.image`), with a link to `/admin/models` to edit.
-  - Optional "Extra instructions" textarea appended to the saved prompt (per-image override, not persisted).
-- Generate button calls the appropriate edge function based on engine.
+Use existing `site_settings` table via `useSiteSetting` / `useUpdateSiteSetting` hooks (already in `src/lib/db.ts`).
 
-## 3. New edge function: `upscale-image-ai`
+- Key: `home_carousel_autoscroll`
+- Value: `{ brands: boolean; categories: boolean }`
+- Defaults: both `true`.
 
-`supabase/functions/upscale-image-ai/index.ts`:
-- Auth + admin check (same pattern as `upscale-image`).
-- Inputs: `imageUrl`, `extraInstructions?`.
-- Loads `ai_upscale_prompt` and `ai_import_models.image` slots from `site_settings`.
-- Fetches source image → base64.
-- Iterates slots in order, returning on first success. Provider dispatch:
-  - **google** (e.g. `gemini-2.5-flash-image`): call `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent` with `inlineData` part for the source image + text prompt; extract returned `inlineData` image.
-  - **openai** (e.g. `gpt-image-1`): call `https://api.openai.com/v1/images/edits` (multipart) with image + prompt + `size=auto`.
-  - **openrouter** (e.g. `google/gemini-2.5-flash-image`): call `/api/v1/chat/completions` with multimodal message containing the image and prompt; read base64 image from response.
-- On any failure (network, 4xx/5xx, no image returned, content blocked), log and try next slot. If all 3 fail, return 502 with collected errors.
-- Upload the returned PNG to the `product-images` bucket under `upscaled-ai/{uuid}.png` and return `{ url, provider, model }` — same response shape as `upscale-image` so the dialog's "Use this image" flow keeps working.
+## Files to change
 
-## 4. Frontend wiring
+**1. `src/pages/admin/AdminLandingPages.tsx`**
+- Add a card above the grid with two `<Switch>` rows (label + description).
+- Read/write via `useSiteSetting("home_carousel_autoscroll", { brands: true, categories: true })` + `useUpdateSiteSetting()`.
+- Toast on save.
 
-- `ImageUpscaleDialog` calls `supabase.functions.invoke("upscale-image-ai", { body: { imageUrl, extraInstructions } })` when engine = AI.
-- Show which provider/model produced the result in the result panel (small caption).
-- Toast errors clearly when all fallbacks fail (e.g. "All AI models failed: …").
+**2. `src/pages/CuremedHome.tsx`** (brands marquee at line ~47 and ~225)
+- Read the same setting.
+- Conditionally add `[animation-play-state:paused]` class to the `.marquee` divs when `brands === false`.
 
-## 5. Deploy
+**3. `src/components/site/CategoryCarousel.tsx`**
+- Read the same setting.
+- Conditionally add `[animation-play-state:paused]` to the `.cat-marquee` div when `categories === false`.
 
-Deploy the new `upscale-image-ai` edge function. No new secrets required (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` already configured).
+This keeps the manual horizontal scroll/hover behavior intact and only halts the CSS keyframe animation. No DB migration needed (key/value row in existing `site_settings`).
 
-## Technical notes
-
-- Reuse `SlotsByKind`/`useAiModels` for slot config — no schema change to `ai_import_models`.
-- The prompt is a single string stored at `site_settings.ai_upscale_prompt.value` (text). Falls back to the hard-coded default if missing.
-- AI image models do not change pixel dimensions deterministically the way PICSART does — so the "factor" control is intentionally hidden for the AI engine. A note in the dialog explains this.
-- File names follow project convention; no design-token changes; new card uses existing shadcn primitives.
+## Out of scope
+- `AutoCarousel.tsx` (used elsewhere, not on home brands/categories sections).
+- Per-brand landing pages.
