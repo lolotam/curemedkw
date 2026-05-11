@@ -11,7 +11,10 @@ import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
-import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, type Product } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, type Product } from "@/lib/db";
+
+type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
+const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
 import { useCart } from "@/lib/cart";
 import { toast } from "sonner";
 import { getBrandLogo } from "@/lib/placeholder";
@@ -21,6 +24,11 @@ export default function CuremedHome() {
   const { t, lang } = useI18n();
   const { data: featuredAll = [] } = useFeaturedProducts();
   const featured = featuredAll.slice(0, 8);
+  const { data: autoscroll = AUTOSCROLL_DEFAULT } = useSiteSetting<HomeCarouselAutoscroll>(
+    "home_carousel_autoscroll",
+    AUTOSCROLL_DEFAULT,
+  );
+  const brandsAutoscroll = autoscroll.brands !== false;
 
   return (
     <SiteLayout brand="curemed">
@@ -44,7 +52,7 @@ export default function CuremedHome() {
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
+          <div className={cn("marquee flex w-max group-hover:[animation-play-state:paused]", !brandsAutoscroll && "[animation-play-state:paused]")}>
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
               <BrandTile
                 key={`${b.key}-${idx}`}

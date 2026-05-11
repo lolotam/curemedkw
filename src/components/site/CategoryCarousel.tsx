@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
-import { useCategories, useProducts } from "@/lib/db";
+import { useCategories, useProducts, useSiteSetting } from "@/lib/db";
 import { cn } from "@/lib/utils";
+
+type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
+const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
 
 /** Pillar-tinted palette cycled across category tiles (matches the
  *  "What we do" pillars section on the home page). */
@@ -45,6 +48,11 @@ export function CategoryCarousel() {
   const { t, lang } = useI18n();
   const { data: categories = [] } = useCategories();
   const { data: products = [] } = useProducts();
+  const { data: autoscroll = AUTOSCROLL_DEFAULT } = useSiteSetting<HomeCarouselAutoscroll>(
+    "home_carousel_autoscroll",
+    AUTOSCROLL_DEFAULT,
+  );
+  const categoriesAutoscroll = autoscroll.categories !== false;
 
   // Show every active category — both parents and subcategories.
   const active = useMemo(
@@ -90,7 +98,7 @@ export function CategoryCarousel() {
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
         }}
       >
-        <div className="cat-marquee flex w-max group-hover:[animation-play-state:paused] py-2">
+        <div className={cn("cat-marquee flex w-max group-hover:[animation-play-state:paused] py-2", !categoriesAutoscroll && "[animation-play-state:paused]")}>
           {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
