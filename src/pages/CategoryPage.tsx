@@ -18,6 +18,25 @@ export default function CategoryPage() {
 
   return (
     <SiteLayout brand="curemed">
+      {category.bannerUrl ? (
+        <div className="relative w-full overflow-hidden">
+          <div className="aspect-[19/6] w-full">
+            <img
+              src={category.bannerUrl}
+              alt={name}
+              className="h-full w-full object-cover"
+              loading="eager"
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0">
+            <div className="container py-4 md:py-6">
+              <h1 className="text-white text-2xl md:text-4xl font-bold drop-shadow-lg">{name}</h1>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="bg-brand-soft border-b border-border/40">
         <div className="container py-3 text-sm text-muted-foreground">
           <Link to="/curemed" className="inline-flex items-center gap-1 hover:text-brand">
