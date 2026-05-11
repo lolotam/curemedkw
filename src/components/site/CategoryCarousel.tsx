@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useCategories, useProducts, useSiteSetting } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
 const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
@@ -90,7 +91,7 @@ export function CategoryCarousel() {
       </div>
 
       <div
-        className="group relative overflow-hidden"
+        className="group relative"
         style={{
           maskImage:
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
@@ -98,7 +99,7 @@ export function CategoryCarousel() {
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
         }}
       >
-        <div className={cn("cat-marquee flex w-max group-hover:[animation-play-state:paused] py-2", !categoriesAutoscroll && "[animation-play-state:paused]")}>
+        <AutoScrollMarquee autoScroll={categoriesAutoscroll} speed={55} innerClassName="py-2">
           {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
@@ -179,7 +180,7 @@ export function CategoryCarousel() {
               </div>
             );
           })}
-        </div>
+        </AutoScrollMarquee>
       </div>
     </section>
   );

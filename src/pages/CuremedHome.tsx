@@ -9,6 +9,7 @@ import { FAQ } from "@/components/site/FAQ";
 import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
+import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, type Product } from "@/lib/db";
@@ -46,7 +47,7 @@ export default function CuremedHome() {
           </div>
         </div>
         <div
-          className="group relative overflow-hidden"
+          className="group relative"
           style={{
             maskImage:
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
@@ -54,7 +55,7 @@ export default function CuremedHome() {
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className={cn("marquee flex w-max group-hover:[animation-play-state:paused]", !brandsAutoscroll && "[animation-play-state:paused]")}>
+          <AutoScrollMarquee autoScroll={brandsAutoscroll} speed={50}>
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
               <BrandTile
                 key={`${b.key}-${idx}`}
@@ -62,7 +63,7 @@ export default function CuremedHome() {
                 isClone={idx >= BRAND_LIST.length}
               />
             ))}
-          </div>
+          </AutoScrollMarquee>
         </div>
       </section>
 
