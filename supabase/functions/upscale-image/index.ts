@@ -57,11 +57,32 @@ Deno.serve(async (req) => {
     // Fetch source image
     const srcResp = await fetch(imageUrl);
     if (!srcResp.ok) return json({ error: `Failed to fetch source image (${srcResp.status})` }, 400);
-    const srcBlob = await srcResp.blob();
+    const srcBuf = new Uint8Array(await srcResp.arrayBuffer());
+    const srcType = srcResp.headers.get("content-type") || "image/jpeg";
+    const srcBlob = new Blob([srcBuf], { type: srcType });
+
+    // Read intrinsic image dimensions from header bytes (PNG / JPEG / WebP / GIF)
+    const dims = readImageSize(srcBuf);
+    let effectiveFactor = factor;
+    if (dims) {
+      const MAX_PIXELS = 23_000_000; // Picsart hard cap (~23MP output)
+      const inputPixels = dims.w * dims.h;
+      const candidates = [...allowed].filter((f) => f <= factor).sort((a, b) => b - a);
+      const fit = candidates.find((f) => inputPixels * f * f <= MAX_PIXELS);
+      if (!fit) {
+        return json(
+          {
+            error: `Image is too large to upscale (${dims.w}×${dims.h}). Picsart caps output at 23MP. Try a smaller source image.`,
+          },
+          400,
+        );
+      }
+      effectiveFactor = fit;
+    }
 
     // Build multipart form for Picsart
     const fd = new FormData();
-    fd.append("upscale_factor", String(factor));
+    fd.append("upscale_factor", String(effectiveFactor));
     fd.append("format", format);
     if (mode === "ultra") fd.append("mode", "sync");
     fd.append("image", srcBlob, "source");
