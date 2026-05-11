@@ -52,7 +52,7 @@ export default function CuremedHome() {
               "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
           }}
         >
-          <div className="marquee flex w-max group-hover:[animation-play-state:paused]">
+          <div className={cn("marquee flex w-max group-hover:[animation-play-state:paused]", !brandsAutoscroll && "[animation-play-state:paused]")}>
             {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
               <BrandTile
                 key={`${b.key}-${idx}`}
