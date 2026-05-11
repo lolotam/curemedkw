@@ -309,6 +309,7 @@ function CategoryEditorDialog({
   const open = isNew || !!editingCategory;
   const [form, setForm] = useState<CategoryInput>(BLANK);
   const [uploading, setUploading] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [slugTouched, setSlugTouched] = useState(false);
   const [saving, setSaving] = useState(false);
 
