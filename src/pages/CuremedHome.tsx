@@ -32,7 +32,9 @@ export default function CuremedHome() {
 
   return (
     <SiteLayout brand="curemed">
-      <HeroSlider pageKey="curemed" />
+      <div id="hero">
+        <HeroSlider pageKey="curemed" />
+      </div>
 
       <CategoryCarousel />
 
