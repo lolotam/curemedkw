@@ -469,6 +469,7 @@ export interface Category {
   nameEn: string;
   nameAr: string;
   imageUrl: string;
+  bannerUrl: string;
   sortOrder: number;
   isActive: boolean;
   parentId: string | null;
@@ -479,7 +480,8 @@ export interface Category {
 
 type CategoryRow = {
   id: string; slug: string; name_en: string; name_ar: string;
-  image_url: string; sort_order: number; is_active: boolean;
+  image_url: string; banner_url: string;
+  sort_order: number; is_active: boolean;
   created_at: string; updated_at: string;
   parent_id: string | null;
   visible_pages: string[];
@@ -491,6 +493,7 @@ const rowToCategory = (r: CategoryRow): Category => ({
   nameEn: r.name_en,
   nameAr: r.name_ar,
   imageUrl: r.image_url,
+  bannerUrl: r.banner_url ?? "",
   sortOrder: r.sort_order,
   isActive: r.is_active,
   parentId: r.parent_id ?? null,
@@ -507,6 +510,7 @@ const categoryToRow = (c: Partial<CategoryInput>): Partial<CategoryRow> => {
   if (c.nameEn !== undefined) out.name_en = c.nameEn;
   if (c.nameAr !== undefined) out.name_ar = c.nameAr;
   if (c.imageUrl !== undefined) out.image_url = c.imageUrl;
+  if (c.bannerUrl !== undefined) out.banner_url = c.bannerUrl;
   if (c.sortOrder !== undefined) out.sort_order = c.sortOrder;
   if (c.isActive !== undefined) out.is_active = c.isActive;
   if (c.parentId !== undefined) out.parent_id = c.parentId;
@@ -601,6 +605,17 @@ export async function uploadCategoryImage(file: File): Promise<string> {
   const converted = await convertToWebP(file);
   const ext = converted.name.split(".").pop() || "webp";
   const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("category-images")
+    .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });
+  if (error) throw error;
+  return supabase.storage.from("category-images").getPublicUrl(path).data.publicUrl;
+}
+
+export async function uploadCategoryBanner(file: File): Promise<string> {
+  const converted = await convertToWebP(file);
+  const ext = converted.name.split(".").pop() || "webp";
+  const path = `banners/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage
     .from("category-images")
     .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });

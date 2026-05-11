@@ -82,6 +82,7 @@ export type Database = {
       }
       categories: {
         Row: {
+          banner_url: string
           created_at: string
           id: string
           image_url: string
@@ -95,6 +96,7 @@ export type Database = {
           visible_pages: string[]
         }
         Insert: {
+          banner_url?: string
           created_at?: string
           id?: string
           image_url?: string
@@ -108,6 +110,7 @@ export type Database = {
           visible_pages?: string[]
         }
         Update: {
+          banner_url?: string
           created_at?: string
           id?: string
           image_url?: string

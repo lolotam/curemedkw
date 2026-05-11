@@ -107,6 +107,7 @@ const App = () => {
                   <Route path="notifications" element={<AdminNotificationTemplates />} />
                   <Route path="branding" element={<AdminBranding />} />
                 </Route>
+                <Route path="/categories/:slug" element={<CategoryPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/:brand/product/:id" element={<ProductDetail />} />
                 <Route path="/:brand" element={<BrandPage />} />
