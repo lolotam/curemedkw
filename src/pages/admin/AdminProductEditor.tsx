@@ -319,7 +319,7 @@ export default function AdminProductEditor() {
     const slug = slugify(name);
     try {
       const created = await createCategoryMut.mutateAsync({
-        slug, nameEn: name, nameAr, imageUrl: "", sortOrder: 0, isActive: true,
+        slug, nameEn: name, nameAr, imageUrl: "", bannerUrl: "", sortOrder: 0, isActive: true,
         parentId: null, visiblePages: ["curemed"],
       });
       setCategoryIds([...form.categoryIds, created.id]);
