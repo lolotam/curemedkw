@@ -15,6 +15,60 @@ const json = (body: unknown, status = 200) =>
 const STANDARD_FACTORS = new Set([2, 4, 6, 8]);
 const ULTRA_FACTORS = new Set([2, 4, 6, 8, 16]);
 
+function readImageSize(b: Uint8Array): { w: number; h: number } | null {
+  // PNG: 8-byte sig, then IHDR at offset 16 (width), 20 (height), big-endian
+  if (b.length >= 24 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    return { w: dv.getUint32(16), h: dv.getUint32(20) };
+  }
+  // GIF: 'GIF87a'/'GIF89a', width/height at 6/8 little-endian
+  if (b.length >= 10 && b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    return { w: dv.getUint16(6, true), h: dv.getUint16(8, true) };
+  }
+  // WebP: 'RIFF'....'WEBP'
+  if (b.length >= 30 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) {
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    const fourcc = String.fromCharCode(b[12], b[13], b[14], b[15]);
+    if (fourcc === "VP8 ") {
+      const w = dv.getUint16(26, true) & 0x3fff;
+      const h = dv.getUint16(28, true) & 0x3fff;
+      return { w, h };
+    }
+    if (fourcc === "VP8L") {
+      const b0 = b[21], b1 = b[22], b2 = b[23], b3 = b[24];
+      const w = 1 + (((b1 & 0x3f) << 8) | b0);
+      const h = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
+      return { w, h };
+    }
+    if (fourcc === "VP8X") {
+      const w = 1 + (b[24] | (b[25] << 8) | (b[26] << 16));
+      const h = 1 + (b[27] | (b[28] << 8) | (b[29] << 16));
+      return { w, h };
+    }
+  }
+  // JPEG: scan SOF markers
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2;
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    while (i < b.length) {
+      if (b[i] !== 0xff) return null;
+      while (i < b.length && b[i] === 0xff) i++;
+      const marker = b[i++];
+      if (marker === 0xd8 || marker === 0xd9) return null;
+      const segLen = dv.getUint16(i, false);
+      const sof = (marker >= 0xc0 && marker <= 0xcf) && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc;
+      if (sof) {
+        const h = dv.getUint16(i + 3, false);
+        const w = dv.getUint16(i + 5, false);
+        return { w, h };
+      }
+      i += segLen;
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
