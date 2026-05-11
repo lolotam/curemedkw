@@ -78,8 +78,19 @@ export default function AdminProducts() {
           <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, SKU, category…" className="pl-9" /></div>
           <div className="flex flex-wrap gap-1.5">
-            <Chip active={brandFilter === "all"} onClick={() => setBrand("all")}>All brands</Chip>
-            {BRAND_LIST.map((b) => <Chip key={b.key} active={brandFilter === b.key} onClick={() => setBrand(b.key)}>{b.name}</Chip>)}
+            <Chip active={brandFilter === "all"} onClick={() => setBrand("all")}>
+              All brands
+              <CountBadge active={brandFilter === "all"} count={allProducts.length} />
+            </Chip>
+            {BRAND_LIST.map((b) => {
+              const count = allProducts.filter((p) => p.brand === b.key).length;
+              return (
+                <Chip key={b.key} active={brandFilter === b.key} onClick={() => setBrand(b.key)}>
+                  {b.name}
+                  <CountBadge active={brandFilter === b.key} count={count} />
+                </Chip>
+              );
+            })}
           </div>
           {selected.size > 0 && (
             <Button variant="destructive" size="sm" onClick={bulkRemove} className="gap-1.5">
@@ -254,6 +265,17 @@ function InlinePriceCell({
       />
       {(busy || saving) && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}
     </div>
+  );
+}
+
+function CountBadge({ count, active }: { count: number; active: boolean }) {
+  return (
+    <span className={cn(
+      "ml-1.5 inline-flex items-center justify-center min-w-[1.25rem] h-4 px-1 rounded-full text-[10px] font-semibold tabular-nums",
+      active ? "bg-white/25 text-white" : "bg-foreground/10 text-foreground/70",
+    )}>
+      {count}
+    </span>
   );
 }
 
