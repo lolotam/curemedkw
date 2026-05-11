@@ -372,6 +372,22 @@ function CategoryEditorDialog({
     }
   };
 
+  const onUploadBanner = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBanner(true);
+    try {
+      const url = await uploadCategoryBanner(file);
+      update("bannerUrl", url);
+      toast.success("Banner uploaded");
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setUploadingBanner(false);
+      e.target.value = "";
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg !grid-cols-1 grid-rows-[auto_1fr_auto] max-h-[90vh] p-0 gap-0 overflow-hidden">
