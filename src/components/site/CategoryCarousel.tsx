@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
-import { useCategories, useProducts } from "@/lib/db";
+import { useCategories, useProducts, useSiteSetting } from "@/lib/db";
 import { cn } from "@/lib/utils";
+
+type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
+const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
 
 /** Pillar-tinted palette cycled across category tiles (matches the
  *  "What we do" pillars section on the home page). */
