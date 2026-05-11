@@ -48,6 +48,11 @@ export function CategoryCarousel() {
   const { t, lang } = useI18n();
   const { data: categories = [] } = useCategories();
   const { data: products = [] } = useProducts();
+  const { data: autoscroll = AUTOSCROLL_DEFAULT } = useSiteSetting<HomeCarouselAutoscroll>(
+    "home_carousel_autoscroll",
+    AUTOSCROLL_DEFAULT,
+  );
+  const categoriesAutoscroll = autoscroll.categories !== false;
 
   // Show every active category — both parents and subcategories.
   const active = useMemo(
