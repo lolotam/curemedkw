@@ -1,37 +1,64 @@
-# Add carousel auto-scroll toggles to /admin/landing
+# Dedicated category pages with editable banner
 
-Add a small settings card at the top of the **Landing Pages** admin (`/admin/landing` → `AdminLandingPages.tsx`) with two switches:
+Each category will have its own URL (`/categories/:slug`) and a small **19:6 hero banner** that admins can set from the category edit form — either by uploading a file (stored in Lovable Cloud storage) or by pasting an external URL.
 
-1. **Brands cards carousel auto-scroll** (home page brands marquee)
-2. **Category cards carousel auto-scroll** (home page categories marquee)
+## 1. Database
 
-When ON → marquee animates as today. When OFF → animation paused, user can still scroll horizontally manually.
+Add one column to `categories`:
 
-## Storage
+- `banner_url TEXT NOT NULL DEFAULT ''`
 
-Use existing `site_settings` table via `useSiteSetting` / `useUpdateSiteSetting` hooks (already in `src/lib/db.ts`).
+(Migration only; existing categories keep working — empty banner just hides the hero.)
 
-- Key: `home_carousel_autoscroll`
-- Value: `{ brands: boolean; categories: boolean }`
-- Defaults: both `true`.
+## 2. Storage
 
-## Files to change
+Reuse the existing public `category-images` bucket. New uploads from the banner picker go under a `banners/` prefix to keep them tidy. No new bucket / RLS needed.
 
-**1. `src/pages/admin/AdminLandingPages.tsx`**
-- Add a card above the grid with two `<Switch>` rows (label + description).
-- Read/write via `useSiteSetting("home_carousel_autoscroll", { brands: true, categories: true })` + `useUpdateSiteSetting()`.
-- Toast on save.
+## 3. Routing
 
-**2. `src/pages/CuremedHome.tsx`** (brands marquee at line ~47 and ~225)
-- Read the same setting.
-- Conditionally add `[animation-play-state:paused]` class to the `.marquee` divs when `brands === false`.
+In `src/App.tsx`:
 
-**3. `src/components/site/CategoryCarousel.tsx`**
-- Read the same setting.
-- Conditionally add `[animation-play-state:paused]` to the `.cat-marquee` div when `categories === false`.
+- Add `<Route path="/categories/:slug" element={<CategoryPage />} />`
+- Keep the old `/category/:slug` route as an alias (so existing links don't break).
 
-This keeps the manual horizontal scroll/hover behavior intact and only halts the CSS keyframe animation. No DB migration needed (key/value row in existing `site_settings`).
+Update internal links to use the new path:
+
+- `src/components/site/CategoryCarousel.tsx` → `to={"/categories/" + c.slug}`
+- Any other `/category/${slug}` references found in the codebase.
+
+## 4. Data layer (`src/lib/db.ts`)
+
+- Add `bannerUrl: string` to the `Category` interface.
+- Map `banner_url` ↔ `bannerUrl` in `rowToCategory` / `categoryToRow`.
+- Add `uploadCategoryBanner(file)` helper that uploads to `category-images/banners/<uuid>.<ext>` and returns the public URL (mirrors the existing `uploadCategoryImage`).
+
+## 5. Admin form (`src/pages/admin/AdminCategories.tsx`)
+
+In the category edit dialog, add a **Hero banner (19:6)** section under the existing image field:
+
+- 19:6 aspect-ratio preview box (empty placeholder when none).
+- "Upload banner" button → calls `uploadCategoryBanner`.
+- "Or paste image URL" text input bound to `bannerUrl`.
+- Clear button to remove the banner.
+- Helper text: "Recommended: 1900×600 (19:6 aspect ratio)".
+
+Defaults `bannerUrl: ""` in the new-category form state.
+
+## 6. Public category page (`src/pages/CategoryPage.tsx`)
+
+Above the existing breadcrumb / grid, render the banner when `category.bannerUrl` is set:
+
+```text
++----------------------------------------------------+
+|  [ banner image — aspect-[19/6], object-cover ]    |
+|  category title overlay (gradient at bottom)       |
++----------------------------------------------------+
+```
+
+If no banner is set, fall back to the current header (no visual regression).
 
 ## Out of scope
-- `AutoCarousel.tsx` (used elsewhere, not on home brands/categories sections).
-- Per-brand landing pages.
+
+- Per-category SEO meta / JSON-LD (can come later).
+- Admin bulk banner editor.
+- Replacing the existing square thumbnail (`imageUrl`) — that stays for the carousel tiles.
