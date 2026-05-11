@@ -45,7 +45,6 @@ import {
 } from "@/lib/aiModels";
 import { useUpscalePrompt, DEFAULT_UPSCALE_PROMPT } from "@/lib/upscalePrompt";
 import { Textarea } from "@/components/ui/textarea";
-import { useEffect as useEffectReact } from "react";
 
 function formatPricePerM(value?: string | number) {
   if (value === undefined || value === null || value === "") return "—";
