@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useCategories, useProducts, useSiteSetting } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
 const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
