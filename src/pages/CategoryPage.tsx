@@ -59,32 +59,9 @@ export default function CategoryPage() {
         </div>
       </div>
 
-      <section className="container py-10 md:py-14">
-        <div className="grid md:grid-cols-[260px_1fr] gap-8 items-center mb-10">
-          {category.imageUrl ? (
-            <div className="aspect-square rounded-3xl overflow-hidden border border-border bg-brand-soft">
-              <img src={category.imageUrl} alt={name} className="h-full w-full object-cover" loading="lazy" />
-            </div>
-          ) : (
-            <div className="aspect-square rounded-3xl bg-brand/10 flex items-center justify-center text-brand text-5xl font-bold">
-              {name.charAt(0)}
-            </div>
-          )}
-          <div>
-            <p className="text-xs uppercase tracking-wider font-semibold text-brand">{t("categories.title")}</p>
-            <h1 className="mt-2 text-4xl md:text-5xl font-bold">{name}</h1>
-            {category.nameAr && lang === "en" && (
-              <p className="mt-2 text-lg text-muted-foreground" dir="rtl">{category.nameAr}</p>
-            )}
-            <p className="mt-4 text-sm text-muted-foreground">
-              {products.length}{" "}
-              {products.length === 1
-                ? t("category.productSingular")
-                : t("category.productPlural")}
-            </p>
-          </div>
-        </div>
+      {subcategories.length > 0 && <SubcategoryCarousel categories={subcategories} />}
 
+      <section className="container py-10 md:py-14">
         {products.length === 0 ? (
           <p className="text-center text-muted-foreground py-16">{t("category.noProducts")}</p>
         ) : (
