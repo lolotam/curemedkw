@@ -486,6 +486,7 @@ type CategoryRow = {
   created_at: string; updated_at: string;
   parent_id: string | null;
   visible_pages: string[];
+  show_in_carousel: boolean;
 };
 
 const rowToCategory = (r: CategoryRow): Category => ({
@@ -499,6 +500,7 @@ const rowToCategory = (r: CategoryRow): Category => ({
   isActive: r.is_active,
   parentId: r.parent_id ?? null,
   visiblePages: r.visible_pages ?? [],
+  showInCarousel: r.show_in_carousel ?? true,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
@@ -516,6 +518,7 @@ const categoryToRow = (c: Partial<CategoryInput>): Partial<CategoryRow> => {
   if (c.isActive !== undefined) out.is_active = c.isActive;
   if (c.parentId !== undefined) out.parent_id = c.parentId;
   if (c.visiblePages !== undefined) out.visible_pages = c.visiblePages;
+  if (c.showInCarousel !== undefined) out.show_in_carousel = c.showInCarousel;
   return out;
 };
 
