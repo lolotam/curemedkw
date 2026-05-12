@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const BLANK: CategoryInput = {
   slug: "", nameEn: "", nameAr: "", imageUrl: "", bannerUrl: "", sortOrder: 0, isActive: true,
-  parentId: null, visiblePages: ["curemed"],
+  parentId: null, visiblePages: ["curemed"], showInCarousel: true,
 };
 
 const TOP_LEVEL_VALUE = "__top__";
@@ -350,6 +350,7 @@ function CategoryEditorDialog({
         isActive: editingCategory.isActive,
         parentId: editingCategory.parentId,
         visiblePages: editingCategory.visiblePages ?? [],
+        showInCarousel: editingCategory.showInCarousel ?? true,
       });
       setSlugTouched(true);
     }
@@ -558,10 +559,22 @@ function CategoryEditorDialog({
               <Input type="number" value={form.sortOrder}
                 onChange={(e) => update("sortOrder", parseInt(e.target.value) || 0)} />
             </div>
-            <div className="space-y-1.5 flex items-center gap-2 pt-6">
-              <Checkbox id="active" checked={form.isActive}
-                onCheckedChange={(v) => update("isActive", !!v)} />
-              <Label htmlFor="active" className="text-sm cursor-pointer">Active</Label>
+            <div className="space-y-1.5 flex items-center gap-4 pt-6 col-span-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Checkbox id="active" checked={form.isActive}
+                  onCheckedChange={(v) => update("isActive", !!v)} />
+                <Label htmlFor="active" className="text-sm cursor-pointer">Active</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch id="show-in-carousel" checked={form.showInCarousel}
+                  onCheckedChange={(v) => update("showInCarousel", v)} />
+                <Label htmlFor="show-in-carousel" className="text-sm cursor-pointer">
+                  Show in main carousel
+                  <span className="block text-[11px] text-muted-foreground font-normal">
+                    Appears on the home and brand pages carousel
+                  </span>
+                </Label>
+              </div>
             </div>
           </div>
         </div>

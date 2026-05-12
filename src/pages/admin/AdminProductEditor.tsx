@@ -320,7 +320,7 @@ export default function AdminProductEditor() {
     try {
       const created = await createCategoryMut.mutateAsync({
         slug, nameEn: name, nameAr, imageUrl: "", bannerUrl: "", sortOrder: 0, isActive: true,
-        parentId: null, visiblePages: ["curemed"],
+        parentId: null, visiblePages: ["curemed"], showInCarousel: true,
       });
       setCategoryIds([...form.categoryIds, created.id]);
       setCatSearch("");

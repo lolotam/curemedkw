@@ -57,7 +57,7 @@ export function CategoryCarousel() {
 
   // Show every active category — both parents and subcategories.
   const active = useMemo(
-    () => categories.filter((c) => c.isActive),
+    () => categories.filter((c) => c.isActive && c.showInCarousel !== false),
     [categories],
   );
 
