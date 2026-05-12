@@ -222,6 +222,7 @@ export default function AdminCategories() {
                   className={cn(
                     "border-t border-border hover:bg-muted/30",
                     depth === 1 && "bg-muted/20",
+                    !c.isActive && "opacity-60",
                   )}
                 >
                   <td className="px-4 py-3"><Checkbox checked={selected.has(c.id)} onCheckedChange={() => toggleOne(c.id)} /></td>
