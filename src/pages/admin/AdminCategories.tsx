@@ -211,6 +211,7 @@ export default function AdminCategories() {
                 <th className="text-left px-4 py-3">Slug</th>
                 <th className="text-left px-4 py-3">Order</th>
                 <th className="text-left px-4 py-3">Products</th>
+                <th className="text-left px-4 py-3">Active</th>
                 <th className="text-right px-4 py-3">Actions</th>
               </tr>
             </thead>
