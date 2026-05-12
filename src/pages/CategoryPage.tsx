@@ -1,8 +1,10 @@
+import { useMemo } from "react";
 import { useParams, Navigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
-import { useCategoryBySlug, useProductsByCategory } from "@/lib/db";
+import { SubcategoryCarousel } from "@/components/site/SubcategoryCarousel";
+import { useCategories, useCategoryBySlug, useProductsByCategory } from "@/lib/db";
 import { useI18n } from "@/lib/i18n";
 
 export default function CategoryPage() {
@@ -10,6 +12,16 @@ export default function CategoryPage() {
   const { t, lang } = useI18n();
   const { data: category, isLoading } = useCategoryBySlug(slug);
   const { data: products = [] } = useProductsByCategory(category?.id);
+  const { data: allCategories = [] } = useCategories();
+
+  const subcategories = useMemo(
+    () =>
+      allCategories
+        .filter((c) => c.parentId === category?.id && c.isActive !== false)
+        .slice()
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn)),
+    [allCategories, category?.id],
+  );
 
   if (isLoading) return null;
   if (!category) return <Navigate to="/curemed" replace />;
