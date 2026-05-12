@@ -56,6 +56,9 @@ export default function CategoryPage() {
           </Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{name}</span>
+          <span className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-semibold text-white">
+            {products.length}
+          </span>
         </div>
       </div>
 
