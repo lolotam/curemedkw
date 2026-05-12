@@ -350,6 +350,7 @@ function CategoryEditorDialog({
         isActive: editingCategory.isActive,
         parentId: editingCategory.parentId,
         visiblePages: editingCategory.visiblePages ?? [],
+        showInCarousel: editingCategory.showInCarousel ?? true,
       });
       setSlugTouched(true);
     }
