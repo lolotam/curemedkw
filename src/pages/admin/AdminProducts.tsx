@@ -12,6 +12,13 @@ import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
+type SortKey = "name" | "brand" | "category" | "price" | "originalPrice" | "stock" | "featured";
+type SortDir = "asc" | "desc";
+type FeaturedFilter = "all" | "yes" | "no";
+type StockFilter = "all" | "in_stock" | "low_stock" | "out_of_stock";
+
+const STOCK_ORDER: Record<string, number> = { in_stock: 0, low_stock: 1, out_of_stock: 2 };
+
 export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [q, setQ] = useState("");
@@ -22,16 +29,91 @@ export default function AdminProducts() {
   const updateProduct = useUpdateProduct();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const brandFilter = searchParams.get("brand") || "all";
+
+  const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
+  const [priceMin, setPriceMin] = useState<string>("");
+  const [priceMax, setPriceMax] = useState<string>("");
+  const [featuredFilter, setFeaturedFilter] = useState<FeaturedFilter>("all");
+  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
+
+  // Products narrowed by brand only — used to compute category counts
+  const brandScoped = useMemo(
+    () => (brandFilter === "all" ? allProducts : allProducts.filter((p) => p.brand === brandFilter)),
+    [allProducts, brandFilter],
+  );
+
+  const categoryCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const p of brandScoped) {
+      const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+      for (const id of ids) m.set(id, (m.get(id) || 0) + 1);
+    }
+    return m;
+  }, [brandScoped]);
+
   const list = useMemo(() => {
-    let items = allProducts;
-    if (brandFilter !== "all") items = items.filter((p) => p.brand === brandFilter);
+    let items = brandScoped;
     const query = q.trim().toLowerCase();
     if (query) items = items.filter((p) => p.name.toLowerCase().includes(query) || p.sku.toLowerCase().includes(query) || p.category.toLowerCase().includes(query));
-    return [...items].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
-  }, [q, brandFilter, allProducts]);
+    if (catFilter.size > 0) {
+      items = items.filter((p) => {
+        const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+        return ids.some((id) => catFilter.has(id));
+      });
+    }
+    const minN = priceMin.trim() === "" ? null : Number(priceMin);
+    const maxN = priceMax.trim() === "" ? null : Number(priceMax);
+    if (minN !== null && !Number.isNaN(minN)) items = items.filter((p) => p.price >= minN);
+    if (maxN !== null && !Number.isNaN(maxN)) items = items.filter((p) => p.price <= maxN);
+    if (featuredFilter !== "all") items = items.filter((p) => (featuredFilter === "yes" ? p.featured : !p.featured));
+    if (stockFilter !== "all") items = items.filter((p) => p.stockStatus === stockFilter);
+
+    const sorted = [...items];
+    if (!sort) {
+      sorted.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    } else {
+      const dir = sort.dir === "asc" ? 1 : -1;
+      const catName = (p: Product) => {
+        const ids = p.categoryIds.length ? p.categoryIds : (p.categoryId ? [p.categoryId] : []);
+        const c = ids.length ? categories.find((x) => x.id === ids[0]) : null;
+        return (c?.nameEn || p.category || "").toLowerCase();
+      };
+      const brandName = (p: Product) => (BRANDS[p.brand]?.name || p.brand).toLowerCase();
+      sorted.sort((a, b) => {
+        let av: any, bv: any;
+        switch (sort.key) {
+          case "name": av = a.name.toLowerCase(); bv = b.name.toLowerCase(); break;
+          case "brand": av = brandName(a); bv = brandName(b); break;
+          case "category": av = catName(a); bv = catName(b); break;
+          case "price": av = a.price; bv = b.price; break;
+          case "originalPrice":
+            // Nulls last regardless of direction
+            if (a.originalPrice == null && b.originalPrice == null) return 0;
+            if (a.originalPrice == null) return 1;
+            if (b.originalPrice == null) return -1;
+            av = a.originalPrice; bv = b.originalPrice; break;
+          case "stock": av = STOCK_ORDER[a.stockStatus] ?? 99; bv = STOCK_ORDER[b.stockStatus] ?? 99; break;
+          case "featured": av = a.featured ? 1 : 0; bv = b.featured ? 1 : 0; break;
+        }
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }
+    return sorted;
+  }, [brandScoped, q, catFilter, priceMin, priceMax, featuredFilter, stockFilter, sort, categories]);
 
   const remove = (id: string, name: string) => { if (confirm(`Delete "${name}"?`)) { del.mutate(id, { onSuccess: () => toast.success("Product deleted") }); } };
   const setBrand = (b: string) => { const next = new URLSearchParams(searchParams); if (b === "all") next.delete("brand"); else next.set("brand", b); setSearchParams(next); };
+
+  const cycleSort = (key: SortKey) => {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, dir: "asc" };
+      if (prev.dir === "asc") return { key, dir: "desc" };
+      return null;
+    });
+  };
 
   const allChecked = list.length > 0 && list.every((p) => selected.has(p.id));
   const toggleAll = () => {
@@ -59,6 +141,23 @@ export default function AdminProducts() {
     });
   };
 
+  const hasExtraFilters =
+    catFilter.size > 0 ||
+    priceMin.trim() !== "" ||
+    priceMax.trim() !== "" ||
+    featuredFilter !== "all" ||
+    stockFilter !== "all";
+
+  const clearAllFilters = () => {
+    setCatFilter(new Set());
+    setPriceMin("");
+    setPriceMax("");
+    setFeaturedFilter("all");
+    setStockFilter("all");
+  };
+
+  const selectedCatNames = categories.filter((c) => catFilter.has(c.id)).map((c) => c.nameEn);
+
   return (
     <div className="p-8">
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
@@ -73,7 +172,7 @@ export default function AdminProducts() {
         </div>
         <Button asChild className="bg-brand hover:bg-brand/90 text-white gap-2"><Link to="/admin/products/new"><Plus className="h-4 w-4" /> Add product</Link></Button>
       </div>
-      <Card className="p-4 mb-4">
+      <Card className="p-4 mb-4 space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, SKU, category…" className="pl-9" /></div>
@@ -98,6 +197,74 @@ export default function AdminProducts() {
             </Button>
           )}
         </div>
+
+        <div className="flex flex-wrap gap-2 items-center pt-1 border-t">
+          <CategoryFilterPopover
+            categories={categories}
+            counts={categoryCounts}
+            selected={catFilter}
+            onChange={setCatFilter}
+          />
+          <PriceFilterPopover
+            min={priceMin}
+            max={priceMax}
+            onChange={(mn, mx) => { setPriceMin(mn); setPriceMax(mx); }}
+          />
+          <Segmented
+            label="Featured"
+            value={featuredFilter}
+            options={[
+              { v: "all", label: "All" },
+              { v: "yes", label: "Featured" },
+              { v: "no", label: "Not featured" },
+            ]}
+            onChange={(v) => setFeaturedFilter(v as FeaturedFilter)}
+          />
+          <Segmented
+            label="Stock"
+            value={stockFilter}
+            options={[
+              { v: "all", label: "All" },
+              { v: "in_stock", label: "In stock" },
+              { v: "low_stock", label: "Low" },
+              { v: "out_of_stock", label: "Out" },
+            ]}
+            onChange={(v) => setStockFilter(v as StockFilter)}
+          />
+          {hasExtraFilters && (
+            <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={clearAllFilters}>
+              <X className="h-3.5 w-3.5" /> Clear filters
+            </Button>
+          )}
+        </div>
+
+        {hasExtraFilters && (
+          <div className="flex flex-wrap gap-1.5 items-center">
+            {selectedCatNames.map((n, i) => {
+              const id = Array.from(catFilter)[i];
+              return (
+                <ActiveChip key={id} onRemove={() => setCatFilter((prev) => { const n = new Set(prev); n.delete(id); return n; })}>
+                  Category: {n}
+                </ActiveChip>
+              );
+            })}
+            {(priceMin.trim() !== "" || priceMax.trim() !== "") && (
+              <ActiveChip onRemove={() => { setPriceMin(""); setPriceMax(""); }}>
+                Price: {priceMin || "0"}–{priceMax || "∞"} KD
+              </ActiveChip>
+            )}
+            {featuredFilter !== "all" && (
+              <ActiveChip onRemove={() => setFeaturedFilter("all")}>
+                {featuredFilter === "yes" ? "Featured" : "Not featured"}
+              </ActiveChip>
+            )}
+            {stockFilter !== "all" && (
+              <ActiveChip onRemove={() => setStockFilter("all")}>
+                Stock: {stockFilter === "in_stock" ? "In stock" : stockFilter === "low_stock" ? "Low" : "Out"}
+              </ActiveChip>
+            )}
+          </div>
+        )}
       </Card>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -105,11 +272,13 @@ export default function AdminProducts() {
             <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground"><tr>
               <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
               <th className="px-4 py-3 w-12 text-left">#</th>
-              <th className="text-left px-4 py-3">Product</th><th className="text-left px-4 py-3">Brand</th>
-              <th className="text-left px-4 py-3">Category</th>
-              <th className="text-left px-4 py-3">Price</th>
-              <th className="text-left px-4 py-3">Original price</th>
-              <th className="text-left px-4 py-3">Stock</th><th className="text-left px-4 py-3">Featured</th>
+              <SortTH label="Product" sortKey="name" sort={sort} onClick={cycleSort} />
+              <SortTH label="Brand" sortKey="brand" sort={sort} onClick={cycleSort} />
+              <SortTH label="Category" sortKey="category" sort={sort} onClick={cycleSort} />
+              <SortTH label="Price" sortKey="price" sort={sort} onClick={cycleSort} />
+              <SortTH label="Original price" sortKey="originalPrice" sort={sort} onClick={cycleSort} />
+              <SortTH label="Stock" sortKey="stock" sort={sort} onClick={cycleSort} />
+              <SortTH label="Featured" sortKey="featured" sort={sort} onClick={cycleSort} />
               <th className="text-right px-4 py-3">Actions</th></tr></thead>
             <tbody>
               {list.map((p, i) => (
@@ -165,6 +334,162 @@ export default function AdminProducts() {
     </div>
   );
 }
+
+function SortTH({ label, sortKey, sort, onClick }: { label: string; sortKey: SortKey; sort: { key: SortKey; dir: SortDir } | null; onClick: (k: SortKey) => void }) {
+  const active = sort?.key === sortKey;
+  const Icon = !active ? ArrowUpDown : sort!.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className="text-left px-4 py-3">
+      <button
+        type="button"
+        onClick={() => onClick(sortKey)}
+        className={cn(
+          "inline-flex items-center gap-1 uppercase tracking-wider text-xs font-medium hover:text-foreground transition-colors",
+          active ? "text-foreground" : "text-muted-foreground",
+        )}
+      >
+        {label}
+        <Icon className={cn("h-3 w-3", !active && "opacity-50")} />
+      </button>
+    </th>
+  );
+}
+
+function Segmented({ label, value, options, onChange }: { label: string; value: string; options: { v: string; label: string }[]; onChange: (v: string) => void }) {
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">{label}:</span>
+      <div className="inline-flex rounded-md border border-input overflow-hidden">
+        {options.map((o) => (
+          <button
+            key={o.v}
+            type="button"
+            onClick={() => onChange(o.v)}
+            className={cn(
+              "px-2.5 h-8 text-xs font-medium transition-colors",
+              value === o.v ? "bg-brand text-white" : "bg-background hover:bg-muted/60",
+            )}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActiveChip({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-brand/10 text-brand text-xs font-medium">
+      {children}
+      <button type="button" onClick={onRemove} className="hover:bg-brand/20 rounded-full p-0.5" title="Remove">
+        <X className="h-3 w-3" />
+      </button>
+    </span>
+  );
+}
+
+function PriceFilterPopover({ min, max, onChange }: { min: string; max: string; onChange: (mn: string, mx: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [mn, setMn] = useState(min);
+  const [mx, setMx] = useState(max);
+  useEffect(() => { if (open) { setMn(min); setMx(max); } }, [open, min, max]);
+  const active = min.trim() !== "" || max.trim() !== "";
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-input text-xs font-medium hover:bg-muted/60 transition-colors",
+            active ? "bg-brand/10 text-brand border-brand/30" : "bg-background",
+          )}
+        >
+          Price{active ? `: ${min || "0"}–${max || "∞"}` : ""}
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-3" align="start">
+        <p className="text-xs font-medium mb-2">Price range (KD)</p>
+        <div className="flex items-center gap-2">
+          <Input type="number" placeholder="Min" value={mn} onChange={(e) => setMn(e.target.value)} className="h-8 text-sm" />
+          <span className="text-muted-foreground">–</span>
+          <Input type="number" placeholder="Max" value={mx} onChange={(e) => setMx(e.target.value)} className="h-8 text-sm" />
+        </div>
+        <div className="flex justify-between gap-2 mt-3">
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => { setMn(""); setMx(""); onChange("", ""); setOpen(false); }}>Clear</Button>
+          <Button size="sm" className="h-7" onClick={() => { onChange(mn, mx); setOpen(false); }}>Apply</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function CategoryFilterPopover({ categories, counts, selected, onChange }: { categories: Category[]; counts: Map<string, number>; selected: Set<string>; onChange: (s: Set<string>) => void }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [draft, setDraft] = useState<Set<string>>(selected);
+  useEffect(() => { if (open) setDraft(selected); }, [open, selected]);
+  const visible = useMemo(() => {
+    const list = categories.filter((c) => c.isActive !== false);
+    const q = search.trim().toLowerCase();
+    const filtered = q ? list.filter((c) => c.nameEn.toLowerCase().includes(q) || c.nameAr.toLowerCase().includes(q)) : list;
+    return filtered.slice().sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn));
+  }, [categories, search]);
+  const toggle = (id: string) => setDraft((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const apply = () => { onChange(new Set(draft)); setOpen(false); };
+  const active = selected.size > 0;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md border border-input text-xs font-medium hover:bg-muted/60 transition-colors",
+            active ? "bg-brand/10 text-brand border-brand/30" : "bg-background",
+          )}
+        >
+          Category{active ? ` (${selected.size})` : ""}
+          <ChevronDown className="h-3.5 w-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <div className="p-2 border-b">
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search categories…" className="h-8 text-sm" autoFocus />
+        </div>
+        <div className="max-h-64 overflow-y-auto py-1">
+          {visible.length === 0 && <p className="px-3 py-4 text-sm text-muted-foreground text-center">No categories</p>}
+          {visible.map((c) => {
+            const checked = draft.has(c.id);
+            const count = counts.get(c.id) || 0;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggle(c.id)}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-muted/60 text-left"
+              >
+                <span className={cn(
+                  "h-4 w-4 rounded border flex items-center justify-center shrink-0",
+                  checked ? "bg-primary border-primary text-primary-foreground" : "border-input",
+                )}>
+                  {checked && <Check className="h-3 w-3" />}
+                </span>
+                <span className="truncate flex-1">{c.nameEn}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center justify-between gap-2 p-2 border-t">
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => setDraft(new Set())}>Clear</Button>
+          <Button size="sm" className="h-7" onClick={apply}>Apply</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 
 function InlinePriceCell({
   value,
