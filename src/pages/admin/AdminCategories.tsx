@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -210,6 +211,7 @@ export default function AdminCategories() {
                 <th className="text-left px-4 py-3">Slug</th>
                 <th className="text-left px-4 py-3">Order</th>
                 <th className="text-left px-4 py-3">Products</th>
+                <th className="text-left px-4 py-3">Active</th>
                 <th className="text-right px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -220,6 +222,7 @@ export default function AdminCategories() {
                   className={cn(
                     "border-t border-border hover:bg-muted/30",
                     depth === 1 && "bg-muted/20",
+                    !c.isActive && "opacity-60",
                   )}
                 >
                   <td className="px-4 py-3"><Checkbox checked={selected.has(c.id)} onCheckedChange={() => toggleOne(c.id)} /></td>
@@ -243,6 +246,23 @@ export default function AdminCategories() {
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{c.slug}</td>
                   <td className="px-4 py-3">{c.sortOrder}</td>
                   <td className="px-4 py-3 text-muted-foreground">{productCounts.get(c.id) || 0}</td>
+                  <td className="px-4 py-3">
+                    <div className="inline-flex items-center gap-2">
+                      <Switch
+                        checked={c.isActive}
+                        onCheckedChange={(v) =>
+                          updateMut.mutate(
+                            { id: c.id, patch: { isActive: v } },
+                            {
+                              onSuccess: () => toast.success(v ? "Category activated" : "Category deactivated"),
+                              onError: (e: any) => toast.error(e.message),
+                            },
+                          )
+                        }
+                      />
+                      <span className="text-xs text-muted-foreground">{c.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
                       {depth === 0 && (
@@ -264,7 +284,7 @@ export default function AdminCategories() {
                 </tr>
               ))}
               {rows.length === 0 && (
-                <tr><td colSpan={9} className="text-center py-12 text-muted-foreground">No categories yet.</td></tr>
+                <tr><td colSpan={10} className="text-center py-12 text-muted-foreground">No categories yet.</td></tr>
               )}
             </tbody>
           </table>
