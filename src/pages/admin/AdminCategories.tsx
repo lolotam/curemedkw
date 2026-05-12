@@ -246,6 +246,23 @@ export default function AdminCategories() {
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs">{c.slug}</td>
                   <td className="px-4 py-3">{c.sortOrder}</td>
                   <td className="px-4 py-3 text-muted-foreground">{productCounts.get(c.id) || 0}</td>
+                  <td className="px-4 py-3">
+                    <div className="inline-flex items-center gap-2">
+                      <Switch
+                        checked={c.isActive}
+                        onCheckedChange={(v) =>
+                          updateMut.mutate(
+                            { id: c.id, patch: { isActive: v } },
+                            {
+                              onSuccess: () => toast.success(v ? "Category activated" : "Category deactivated"),
+                              onError: (e: any) => toast.error(e.message),
+                            },
+                          )
+                        }
+                      />
+                      <span className="text-xs text-muted-foreground">{c.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
                       {depth === 0 && (
