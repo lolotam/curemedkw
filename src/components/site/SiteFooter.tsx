@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { Mail, Phone, MapPin } from "lucide-react";
 import defaultLogo from "@/assets/curemed-logo.png";
-import { useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
+import { useBrandingLogo, useBrandingLogoRemoveBg, useBrandingBrandLogo } from "@/lib/db";
 
 const CUREMED_INSTAGRAM = "https://www.instagram.com/curemedkw/";
 
@@ -12,7 +12,10 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
   const brandMeta = Object.values(BRANDS).find((b) => b.themeAttr === brand);
   const { data: brandingLogo } = useBrandingLogo();
   const { data: removeBg } = useBrandingLogoRemoveBg();
-  const logo = brandMeta?.logo ?? (brandingLogo?.trim() || defaultLogo);
+  const { data: brandHeaderLogo } = useBrandingBrandLogo(brandMeta?.key ?? null);
+  const logo = brandMeta
+    ? (brandHeaderLogo?.trim() || brandMeta.logo)
+    : (brandingLogo?.trim() || defaultLogo);
   const brandName = brandMeta?.name ?? "Curemed";
   const seoText = brandMeta
     ? brandMeta.seo[lang as "en" | "ar"] ?? brandMeta.seo.en
