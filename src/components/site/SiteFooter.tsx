@@ -12,7 +12,10 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
   const brandMeta = Object.values(BRANDS).find((b) => b.themeAttr === brand);
   const { data: brandingLogo } = useBrandingLogo();
   const { data: removeBg } = useBrandingLogoRemoveBg();
-  const logo = brandMeta?.logo ?? (brandingLogo?.trim() || defaultLogo);
+  const { data: brandHeaderLogo } = useBrandingBrandLogo(brandMeta?.key ?? null);
+  const logo = brandMeta
+    ? (brandHeaderLogo?.trim() || brandMeta.logo)
+    : (brandingLogo?.trim() || defaultLogo);
   const brandName = brandMeta?.name ?? "Curemed";
   const seoText = brandMeta
     ? brandMeta.seo[lang as "en" | "ar"] ?? brandMeta.seo.en
