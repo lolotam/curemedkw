@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 
 const BLANK: CategoryInput = {
   slug: "", nameEn: "", nameAr: "", imageUrl: "", bannerUrl: "", sortOrder: 0, isActive: true,
-  parentId: null, visiblePages: ["curemed"],
+  parentId: null, visiblePages: ["curemed"], showInCarousel: true,
 };
 
 const TOP_LEVEL_VALUE = "__top__";
