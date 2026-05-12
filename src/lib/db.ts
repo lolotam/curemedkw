@@ -474,6 +474,7 @@ export interface Category {
   isActive: boolean;
   parentId: string | null;
   visiblePages: string[];
+  showInCarousel: boolean;
   createdAt: string;
   updatedAt: string;
 }
