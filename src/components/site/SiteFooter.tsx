@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { Mail, Phone, MapPin } from "lucide-react";
 import defaultLogo from "@/assets/curemed-logo.png";
-import { useBrandingLogo, useBrandingLogoRemoveBg } from "@/lib/db";
+import { useBrandingLogo, useBrandingLogoRemoveBg, useBrandingBrandLogo } from "@/lib/db";
 
 const CUREMED_INSTAGRAM = "https://www.instagram.com/curemedkw/";
 
