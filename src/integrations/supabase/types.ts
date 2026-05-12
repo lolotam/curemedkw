@@ -90,6 +90,7 @@ export type Database = {
           name_ar: string
           name_en: string
           parent_id: string | null
+          show_in_carousel: boolean
           slug: string
           sort_order: number
           updated_at: string
@@ -104,6 +105,7 @@ export type Database = {
           name_ar?: string
           name_en: string
           parent_id?: string | null
+          show_in_carousel?: boolean
           slug: string
           sort_order?: number
           updated_at?: string
@@ -118,6 +120,7 @@ export type Database = {
           name_ar?: string
           name_en?: string
           parent_id?: string | null
+          show_in_carousel?: boolean
           slug?: string
           sort_order?: number
           updated_at?: string
