@@ -18,6 +18,8 @@ import {
   LOADER_BAR_DEFAULTS,
   LOADER_VIDEO_KEY,
   LOADER_VIDEO_DEFAULT,
+  IMAGE_COMPRESSION_ENABLED_KEY,
+  IMAGE_COMPRESSION_QUALITY_KEY,
   useLoaderBarSettings,
   useLoaderVideoUrl,
   useBrandingFavicon,
@@ -26,6 +28,8 @@ import {
   useBrandingBrandLogo,
   useBrandingBrandCardLogo,
   useFeaturedGlassOpacity,
+  useImageCompressionEnabled,
+  useImageCompressionQuality,
   useUpdateSiteSetting,
   uploadBrandingImage,
   uploadBrandingVideo,
@@ -73,6 +77,8 @@ export default function AdminBranding() {
       <LoaderVideoControl />
 
       <LoaderBarControl />
+
+      <ImageCompressionControl />
 
       <div className="pt-4">
         <h2 className="text-xl font-bold">Per-brand page logos</h2>
