@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useBrandingFavicon } from "@/lib/db";
+import { useBrandingFavicon, useImageCompressionEnabled, useImageCompressionQuality } from "@/lib/db";
+import { setImageCompressionConfig } from "@/lib/imageConvert";
 
 const DEFAULT_FAVICON = "/favicon.png";
 
