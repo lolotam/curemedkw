@@ -58,6 +58,11 @@ const PageFallback = () => (
 
 const queryClient = new QueryClient();
 
+function LegacyCategoryRedirect() {
+  const { slug } = useParams();
+  return <Navigate to={`/category/${slug ?? ""}`} replace />;
+}
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
