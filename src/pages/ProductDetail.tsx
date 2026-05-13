@@ -51,6 +51,35 @@ export default function ProductDetail() {
 
   return (
     <SiteLayout brand={meta.themeAttr}>
+      <Seo
+        title={`${name} — ${meta.name} | Curemed Kuwait`}
+        description={(shortDesc || longDesc || `${name} by ${meta.name}, available at Curemed Kuwait.`).toString().replace(/\s+/g, " ").slice(0, 160)}
+        path={`/${meta.slug}/product/${product.id}`}
+        image={product.mainImage}
+        ogType="product"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name,
+          image: images,
+          description: (shortDesc || longDesc || "").toString().slice(0, 500),
+          brand: { "@type": "Brand", name: meta.name },
+          ...(priceHidden
+            ? {}
+            : {
+                offers: {
+                  "@type": "Offer",
+                  price: product.price,
+                  priceCurrency: "KWD",
+                  availability:
+                    product.stockStatus === "out_of_stock"
+                      ? "https://schema.org/OutOfStock"
+                      : "https://schema.org/InStock",
+                  url: `https://curemedkw.lovable.app/${meta.slug}/product/${product.id}`,
+                },
+              }),
+        }}
+      />
       <div className="bg-brand-soft border-b border-border/40">
         <div className="container py-3 text-sm text-muted-foreground flex items-center gap-2">
           <Link to={`/${meta.slug}`} className="inline-flex items-center gap-1 hover:text-brand"><ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {meta.name}</Link>
