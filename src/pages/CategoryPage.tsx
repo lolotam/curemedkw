@@ -37,7 +37,7 @@ export default function CategoryPage() {
         path={`/categories/${category.slug}`}
       />
       {category.bannerUrl ? (
-        <div className="relative w-full overflow-hidden">
+        <div className="relative w-full overflow-hidden hidden md:block">
           <div className="aspect-[19/6] w-full">
             <img
               src={category.bannerUrl}
