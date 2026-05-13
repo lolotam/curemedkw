@@ -5,25 +5,43 @@
 
 const WEBP_MIME = "image/webp";
 
+interface CompressionConfig {
+  enabled: boolean;
+  quality: number; // 1-100
+}
+
+// Module-level config, kept in sync from React via setImageCompressionConfig.
+let _config: CompressionConfig = { enabled: true, quality: 99 };
+
+export function setImageCompressionConfig(next: Partial<CompressionConfig>) {
+  _config = { ..._config, ...next };
+}
+
+export function getImageCompressionConfig(): CompressionConfig {
+  return _config;
+}
+
 /**
  * Convert an image File to WebP format.
+ * - Skips when compression is disabled in admin settings.
  * - Skips files that are already WebP.
- * - Skips non-image files (videos, PDFs, etc.).
+ * - Skips non-image files (videos, PDFs, etc.) and SVGs.
  * - Falls back to the original file if conversion fails.
  *
  * @param file  The source image file
- * @param quality  WebP quality 0-1 (default 0.82)
+ * @param quality  Optional WebP quality 0-1 override; otherwise reads admin setting (1-100).
  */
-export async function convertToWebP(file: File, quality = 0.82): Promise<File> {
-  // Skip non-image or already-webp
+export async function convertToWebP(file: File, quality?: number): Promise<File> {
+  if (!_config.enabled) return file;
+
   if (!file.type.startsWith("image/") || file.type === WEBP_MIME) {
     return file;
   }
-
-  // Skip SVGs — they're already efficient vectors
   if (file.type === "image/svg+xml") {
     return file;
   }
+
+  const q = typeof quality === "number" ? quality : _config.quality / 100;
 
   try {
     const bitmap = await createImageBitmap(file);
@@ -32,13 +50,11 @@ export async function convertToWebP(file: File, quality = 0.82): Promise<File> {
     if (!ctx) return file;
 
     ctx.drawImage(bitmap, 0, 0);
-    const blob = await canvas.convertToBlob({ type: WEBP_MIME, quality });
+    const blob = await canvas.convertToBlob({ type: WEBP_MIME, quality: q });
 
-    // Build a new filename with .webp extension
     const baseName = file.name.replace(/\.[^.]+$/, "");
     return new File([blob], `${baseName}.webp`, { type: WEBP_MIME });
   } catch {
-    // If anything fails (e.g. OffscreenCanvas not supported), return original
     console.warn("[imageConvert] WebP conversion failed, using original file");
     return file;
   }
