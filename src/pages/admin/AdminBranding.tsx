@@ -74,8 +74,6 @@ export default function AdminBranding() {
 
       <LoaderBarControl />
 
-      <ImageCompressionControl />
-
       <div className="pt-4">
         <h2 className="text-xl font-bold">Per-brand page logos</h2>
         <p className="text-sm text-muted-foreground mt-1">
