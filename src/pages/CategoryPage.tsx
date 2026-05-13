@@ -31,6 +31,11 @@ export default function CategoryPage() {
 
   return (
     <SiteLayout brand="curemed">
+      <Seo
+        title={`${name} — Curemed Kuwait`}
+        description={`Browse ${products.length} ${name} products at Curemed Kuwait. Trusted pharmaceutical and medical supplies delivered across Kuwait.`.slice(0, 160)}
+        path={`/categories/${category.slug}`}
+      />
       {category.bannerUrl ? (
         <div className="relative w-full overflow-hidden">
           <div className="aspect-[19/6] w-full">
