@@ -14,6 +14,7 @@ import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { BRANDS, slugToBrand } from "@/lib/brands";
+import { Seo } from "@/components/site/Seo";
 import { useI18n } from "@/lib/i18n";
 import { useProductsByBrand, useCategories } from "@/lib/db";
 import type { HeroPageKey } from "@/lib/heroSlides";
