@@ -12,6 +12,7 @@ import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
+import { Seo } from "@/components/site/Seo";
 import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, type Product } from "@/lib/db";
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
