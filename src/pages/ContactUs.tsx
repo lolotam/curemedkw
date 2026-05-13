@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { Seo } from "@/components/site/Seo";
 import { ContactSection } from "@/components/site/ContactSection";
 import {
   MapPin,
