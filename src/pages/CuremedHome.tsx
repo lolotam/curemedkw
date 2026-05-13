@@ -34,6 +34,27 @@ export default function CuremedHome() {
 
   return (
     <SiteLayout brand="curemed">
+      <Seo
+        title="Curemed — Pharmaceuticals & Medical Supplies in Kuwait"
+        description="Shop trusted pharmaceutical and medical supplies in Kuwait. Featured brands include Flexitol, Kapiva, Nada, Australian Bodycare, La Fe's, Hartington and Phytophar."
+        path="/curemed"
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Curemed",
+            url: "https://curemedkw.lovable.app/",
+            logo: "https://curemedkw.lovable.app/favicon.png",
+            areaServed: "KW",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Curemed",
+            url: "https://curemedkw.lovable.app/",
+          },
+        ]}
+      />
       <div id="hero">
         <HeroSlider pageKey="curemed" />
       </div>
