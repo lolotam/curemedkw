@@ -1,0 +1,29 @@
+# Curemed
+
+> Kuwait-based pharmaceuticals and medical supplies company offering trusted brands across skin, body, wellness, and home health care.
+
+Curemed distributes pharmaceutical and medical-supply brands to consumers and pharmacies across Kuwait. The storefront lets visitors browse by brand or category, view product details, and contact the team for orders and inquiries.
+
+## Pages
+
+- [Home](/curemed): Featured products, brand carousel, categories.
+- [About](/about): Company background and mission.
+- [Contact](/contact): Phone, email, address, and contact form.
+- [Privacy Policy](/privacy-policy): How customer data is handled.
+- [Terms of Service](/terms-of-service): Storefront terms.
+
+## Brands
+
+- [Flexitol](/flexitol): Foot and skin care.
+- [Kapiva](/kapiva): Ayurvedic wellness.
+- [Nada](/nada): Personal care.
+- [Australian Bodycare](/australian-bodycare): Tea-tree based skincare.
+- [La Fe's](/lafes): Personal care.
+- [Hartington](/hartington): Wellness supplements.
+- [Phytophar](/phytophar): Herbal supplements.
+- [Hualunhongli](/hualunhongli): Health products.
+
+## Optional
+
+- [Cart](/cart)
+- [Account](/account)

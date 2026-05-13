@@ -14,6 +14,7 @@ import { Newsletter } from "@/components/site/Newsletter";
 import { HeroSlider } from "@/components/site/HeroSlider";
 import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { BRANDS, slugToBrand } from "@/lib/brands";
+import { Seo } from "@/components/site/Seo";
 import { useI18n } from "@/lib/i18n";
 import { useProductsByBrand, useCategories } from "@/lib/db";
 import type { HeroPageKey } from "@/lib/heroSlides";
@@ -72,6 +73,18 @@ export default function BrandPage() {
 
   return (
     <SiteLayout brand={meta.themeAttr}>
+      <Seo
+        title={`${meta.name} — Curemed Kuwait`}
+        description={`${meta.name} products available at Curemed in Kuwait. ${meta.tagline?.en ?? "Shop the full range online."}`.slice(0, 160)}
+        path={`/${meta.slug}`}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Brand",
+          name: meta.name,
+          url: `https://curemedkw.lovable.app/${meta.slug}`,
+          logo: meta.logo,
+        }}
+      />
       <HeroSlider pageKey={brandKey as HeroPageKey} />
 
       <CategoryCarousel />

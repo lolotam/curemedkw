@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { Seo } from "@/components/site/Seo";
 import {
   ShieldCheck,
   Handshake,
@@ -153,6 +154,11 @@ export default function AboutUs() {
 
   return (
     <SiteLayout brand="curemed">
+      <Seo
+        title="About Curemed — Pharmaceuticals & Medical Supplies in Kuwait"
+        description="Learn about Curemed: a Kuwait-based pharmaceuticals and medical supplies company partnering with leading global brands across skin, body and wellness."
+        path="/about"
+      />
       {/* ===================== HERO ===================== */}
       <section className="relative overflow-hidden py-24 md:py-32">
         {/* animated gradient background */}

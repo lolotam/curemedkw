@@ -12,6 +12,7 @@ import { CategoryCarousel } from "@/components/site/CategoryCarousel";
 import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
+import { Seo } from "@/components/site/Seo";
 import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, type Product } from "@/lib/db";
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
@@ -33,6 +34,27 @@ export default function CuremedHome() {
 
   return (
     <SiteLayout brand="curemed">
+      <Seo
+        title="Curemed — Pharmaceuticals & Medical Supplies in Kuwait"
+        description="Shop trusted pharmaceutical and medical supplies in Kuwait. Featured brands include Flexitol, Kapiva, Nada, Australian Bodycare, La Fe's, Hartington and Phytophar."
+        path="/curemed"
+        jsonLd={[
+          {
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Curemed",
+            url: "https://curemedkw.lovable.app/",
+            logo: "https://curemedkw.lovable.app/favicon.png",
+            areaServed: "KW",
+          },
+          {
+            "@context": "https://schema.org",
+            "@type": "WebSite",
+            name: "Curemed",
+            url: "https://curemedkw.lovable.app/",
+          },
+        ]}
+      />
       <div id="hero">
         <HeroSlider pageKey="curemed" />
       </div>
