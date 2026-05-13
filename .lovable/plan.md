@@ -1,50 +1,34 @@
-## Add legacy URL redirects + noindex 404
+## Problem
 
-A SPA can't return real HTTP 301s without server config (Lovable hosting serves `index.html` for any unknown path), so I'll do **client-side 301-equivalent redirects** with React Router's `<Navigate replace>` — Googlebot follows them and consolidates signals. The remaining cleanup is a real `noindex` on the 404 page.
+When an admin clicks **Admin** in the user dropdown, they briefly see an "Authorization" / "Not authorized" dialog before landing on the dashboard. Root cause is in `src/lib/admin.ts`:
 
-### 1. Add legacy route redirects in `src/App.tsx`
+- `useAdminSession()` sets `loading = false` as soon as `getSession()` resolves.
+- The `isAdmin` role lookup against `user_roles` is a **separate async call** that finishes a moment later.
+- During that gap, `AdminLayout` sees `loading=false`, `user=set`, `isAdmin=false` → it renders the red **"Not authorized"** card. When the role query resolves, `isAdmin` flips to `true` and the real dashboard appears. That's the flicker the user is seeing.
 
-Map old WordPress paths to current routes. Note current routes are `/about` and `/contact` (not `/about-us`/`/contact-us`), and the home is `/curemed`.
+The dropdown logic itself is already correct: `SiteHeader.tsx` renders the **Admin** menu item only when `isAdmin === true` from the same hook. We just need that flag to be trustworthy on first paint.
 
-| Legacy path | Redirect to |
-|---|---|
-| `/about-us` and `/about-us/` | `/about` |
-| `/contact-us` and `/contact-us/` | `/contact` |
-| `/home` | `/curemed` |
-| `/products` and `/products/` | `/curemed` |
-| `/product-category/:slug` and `/product-category/:slug/` | `/category/:slug` |
-| `/product/:slug` and `/product/:slug/` | `/curemed` (no old-slug → UUID lookup table available; sending to home is the safest default) |
+## Fix
 
-Implementation: add a small `Redirect` helper (or inline `<Navigate to="..." replace />` elements) plus a `LegacyCategoryRedirect` / `LegacyProductRedirect` wrapper that reads `useParams()` and forwards the slug. Place these `<Route>` entries **above** the `*` catch-all.
+### 1. `src/lib/admin.ts` — make `loading` cover the role check too
+- Add an internal `roleLoading` state.
+- `loading` returned by the hook becomes `sessionLoading || (user && roleLoading)`.
+- Set `roleLoading = true` whenever a user is detected (initial session + auth state changes) and flip it to `false` only after the `user_roles` query resolves (or immediately when there is no user).
+- Keep the existing "subscribe first, then getSession" order to avoid races.
 
-Trailing-slash variants are handled by adding a duplicate `<Route>` for each (React Router 6 treats `/about-us` and `/about-us/` as distinct).
+### 2. `src/components/admin/AdminLayout.tsx` — no behavior change needed
+Once `loading` correctly waits for the role check, the existing branches work as intended:
+- `loading` → spinner
+- `!user` → redirect to `/admin/login`
+- `user && !isAdmin` → "Not authorized" (only real non-admins now)
+- otherwise → dashboard
 
-### 2. Make `NotFound` non-indexable in `src/pages/NotFound.tsx`
+### 3. `src/components/site/SiteHeader.tsx` — confirm-only
+Already gated by `{isAdmin && …}` in `UserMenu`. With the fix above, `isAdmin` is only `true` after the `user_roles` row is confirmed, so non-admins never see the menu item. No code change required.
 
-Add a `<Helmet>` block (project already uses `react-helmet-async` via `Seo.tsx`) that emits:
+## Out of scope
+- No DB / RLS / auth-provider changes.
+- No changes to `AdminLogin`, routing, or the dropdown markup.
 
-```html
-<title>404 — Page not found | Curemed</title>
-<meta name="robots" content="noindex, follow" />
-```
-
-Reusing the existing `<Seo />` component is cleanest — it already wraps `<Helmet>`. Add an optional `noindex` prop to `Seo.tsx` if it doesn't have one, then use it from `NotFound`.
-
-### 3. No changes to
-
-- `public/robots.txt` (already correct)
-- `public/sitemap.xml` (legacy paths shouldn't be in the sitemap; redirect targets already are)
-- `index.html` (sitewide head untouched)
-- Backend / DB
-
-### Manual GSC step (you do this, not the code)
-
-In Search Console → Sitemaps: remove the stale `sitemap_index.xml` and submit `https://curemedkw.com/sitemap.xml`. Nothing to change in code for that.
-
-### Verification
-
-After the edits I'll spot-check:
-1. `App.tsx` compiles and the new routes appear above `*`.
-2. The `NotFound` page renders with `<meta name="robots" content="noindex, follow">` in `document.head`.
-
-Approve and I'll ship the redirects + noindex.
+## Files touched
+- `src/lib/admin.ts` (small refactor of the hook)

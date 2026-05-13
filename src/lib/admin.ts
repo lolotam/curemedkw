@@ -15,7 +15,8 @@ export interface AdminSession {
 export function useAdminSession(): AdminSession {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [sessionLoading, setSessionLoading] = useState(true);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -27,7 +28,9 @@ export function useAdminSession(): AdminSession {
         .eq("user_id", uid)
         .eq("role", "admin")
         .maybeSingle();
-      if (active) setIsAdmin(!!data);
+      if (!active) return;
+      setIsAdmin(!!data);
+      setRoleLoading(false);
     };
 
     // Subscribe FIRST, then fetch the initial session (avoids race conditions)
@@ -35,20 +38,26 @@ export function useAdminSession(): AdminSession {
       const u = session?.user ?? null;
       setUser(u);
       if (u) {
+        setRoleLoading(true);
         // Defer the role lookup so the auth listener can return synchronously
         setTimeout(() => { void checkRole(u.id); }, 0);
       } else {
         setIsAdmin(false);
+        setRoleLoading(false);
       }
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null;
-      if (active) {
-        setUser(u);
-        setLoading(false);
+      if (!active) return;
+      setUser(u);
+      setSessionLoading(false);
+      if (u) {
+        setRoleLoading(true);
+        void checkRole(u.id);
+      } else {
+        setRoleLoading(false);
       }
-      if (u) void checkRole(u.id);
     });
 
     return () => {
@@ -57,6 +66,7 @@ export function useAdminSession(): AdminSession {
     };
   }, []);
 
+  const loading = sessionLoading || (!!user && roleLoading);
   return { user, isAdmin, loading };
 }
 
