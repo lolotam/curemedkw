@@ -112,6 +112,19 @@ export default function ContactUs() {
 
   return (
     <SiteLayout brand="curemed">
+      <Seo
+        title="Contact Curemed — Pharmacies & Customer Support in Kuwait"
+        description="Get in touch with Curemed in Kuwait. Reach our team by phone, email or message for orders, partnerships and product enquiries."
+        path="/contact"
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "LocalBusiness",
+          name: "Curemed",
+          url: "https://curemedkw.lovable.app/contact",
+          areaServed: "KW",
+          address: { "@type": "PostalAddress", addressCountry: "KW" },
+        }}
+      />
       {/* ===================== HERO ===================== */}
       <section className="relative overflow-hidden py-24 md:py-32">
         <div aria-hidden className="absolute inset-0 -z-10">
