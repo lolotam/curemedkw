@@ -1,45 +1,50 @@
-## Fix Lighthouse mobile "image elements do not have explicit width and height" finding
+## Add legacy URL redirects + noindex 404
 
-Lighthouse flags `<img>` elements that ship without explicit `width`/`height` attributes — the browser can't reserve space, causing **CLS (Cumulative Layout Shift)** on mobile. Every image in the app currently relies only on CSS sizing (`h-full w-full`, `h-12 w-auto`, etc.), so all of them get flagged.
+A SPA can't return real HTTP 301s without server config (Lovable hosting serves `index.html` for any unknown path), so I'll do **client-side 301-equivalent redirects** with React Router's `<Navigate replace>` — Googlebot follows them and consolidates signals. The remaining cleanup is a real `noindex` on the 404 page.
 
-The fix is to add explicit `width` and `height` attributes that match the **intrinsic aspect ratio** of each image. The CSS already controls displayed size; the attributes only tell the browser the ratio so it can reserve the box before the image loads.
+### 1. Add legacy route redirects in `src/App.tsx`
 
-### Files to update (frontend only)
+Map old WordPress paths to current routes. Note current routes are `/about` and `/contact` (not `/about-us`/`/contact-us`), and the home is `/curemed`.
 
-User-visible `<img>` tags that need explicit `width`/`height`:
+| Legacy path | Redirect to |
+|---|---|
+| `/about-us` and `/about-us/` | `/about` |
+| `/contact-us` and `/contact-us/` | `/contact` |
+| `/home` | `/curemed` |
+| `/products` and `/products/` | `/curemed` |
+| `/product-category/:slug` and `/product-category/:slug/` | `/category/:slug` |
+| `/product/:slug` and `/product/:slug/` | `/curemed` (no old-slug → UUID lookup table available; sending to home is the safest default) |
 
-| File | Image | Aspect |
-|---|---|---|
-| `src/components/site/ProductCard.tsx` | product thumb (square container) | 800×800 |
-| `src/components/site/SubcategoryCarousel.tsx` | subcategory tile (square) | 800×800 |
-| `src/components/site/SlidePreview.tsx` | hero slide (full-bleed) | 1920×800 |
-| `src/components/site/SiteHeader.tsx` | brand logo | 240×96 (h-20 ≈ 80px, ~3:1 logo box) |
-| `src/components/site/SiteFooter.tsx` | brand logo | 240×96 |
-| `src/pages/CuremedHome.tsx` | brand tile (`useImageTile`) | 200×120 |
-| `src/pages/CuremedHome.tsx` | brand inline logo | 160×48 |
-| `src/pages/CuremedHome.tsx` | featured product card image | 800×800 |
-| `src/pages/CategoryPage.tsx` | category banner | 1900×600 (matches `aspect-[19/6]`) |
-| `src/pages/ProductDetail.tsx` | main product image + thumbs | 800×800 each |
-| `src/pages/Cart.tsx` | cart line item | 200×200 |
-| `src/pages/Checkout.tsx` | order summary thumb | 112×112 |
-| `src/pages/OrderConfirmation.tsx` | order line item | 96×96 |
-| `src/pages/Account.tsx` | avatar | 128×128 |
+Implementation: add a small `Redirect` helper (or inline `<Navigate to="..." replace />` elements) plus a `LegacyCategoryRedirect` / `LegacyProductRedirect` wrapper that reads `useParams()` and forwards the slug. Place these `<Route>` entries **above** the `*` catch-all.
 
-Skip: `src/pages/Index.tsx` (placeholder), all `src/pages/admin/*` (not user-facing, not Lighthouse-scored), `src/components/admin/ImageUpscaleDialog.tsx`, `src/components/site/LiveOrdersToast.tsx` (toast, transient).
+Trailing-slash variants are handled by adding a duplicate `<Route>` for each (React Router 6 treats `/about-us` and `/about-us/` as distinct).
 
-### Approach
+### 2. Make `NotFound` non-indexable in `src/pages/NotFound.tsx`
 
-For each `<img>`:
-1. Add `width={N}` and `height={N}` attributes matching the aspect ratio used by the surrounding container.
-2. Leave the existing Tailwind classes alone — `object-cover` / `object-contain` continue to govern display.
-3. Where the image is purely decorative (e.g. checkout/order list thumbnails with `alt=""`), keep `alt=""` but still add dimensions.
+Add a `<Helmet>` block (project already uses `react-helmet-async` via `Seo.tsx`) that emits:
 
-No changes to backend, sitemap, robots, or `index.html`.
+```html
+<title>404 — Page not found | Curemed</title>
+<meta name="robots" content="noindex, follow" />
+```
+
+Reusing the existing `<Seo />` component is cleanest — it already wraps `<Helmet>`. Add an optional `noindex` prop to `Seo.tsx` if it doesn't have one, then use it from `NotFound`.
+
+### 3. No changes to
+
+- `public/robots.txt` (already correct)
+- `public/sitemap.xml` (legacy paths shouldn't be in the sitemap; redirect targets already are)
+- `index.html` (sitewide head untouched)
+- Backend / DB
+
+### Manual GSC step (you do this, not the code)
+
+In Search Console → Sitemaps: remove the stale `sitemap_index.xml` and submit `https://curemedkw.com/sitemap.xml`. Nothing to change in code for that.
 
 ### Verification
 
-After edits, mark the SEO finding fixed via `seo_chat--update_findings` so the next Lighthouse rescan re-evaluates. (Cannot run Lighthouse from the sandbox; the user republishes and re-runs the scan from the SEO tab.)
+After the edits I'll spot-check:
+1. `App.tsx` compiles and the new routes appear above `*`.
+2. The `NotFound` page renders with `<meta name="robots" content="noindex, follow">` in `document.head`.
 
-### Note on Google Search Console
-
-Already verified — `sc-domain:curemedkw.com` shows `permissionLevel: siteOwner` for your connected account. No OAuth or verification work needed; nothing to change in the project for that.
+Approve and I'll ship the redirects + noindex.
