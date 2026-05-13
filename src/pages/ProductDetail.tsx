@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ArrowLeft, Star, Check, MessageCircle, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { Seo } from "@/components/site/Seo";
 import { ProductCard } from "@/components/site/ProductCard";
 import { useProduct, useProductsByBrand, usePriceVisibility } from "@/lib/db";
 import { BRANDS, slugToBrand } from "@/lib/brands";
