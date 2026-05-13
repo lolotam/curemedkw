@@ -1,16 +1,9 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Image as ImageIcon, Sparkles, Home, ListFilter, MoveHorizontal } from "lucide-react";
+import { ArrowRight, Image as ImageIcon, Sparkles, Home, ListFilter } from "lucide-react";
 import { HERO_PAGES, type HeroPageKey } from "@/lib/heroSlides";
 import { BRANDS } from "@/lib/brands";
-import {
-  type BrandKey,
-  useSiteSetting,
-  useUpdateSiteSetting,
-} from "@/lib/db";
+import { type BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
 import curemedBadge from "@/assets/curemed-c-badge.png";
 
 export type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
@@ -21,59 +14,8 @@ export const DEFAULT_HOME_CAROUSEL_AUTOSCROLL: HomeCarouselAutoscroll = {
 };
 
 export default function AdminLandingPages() {
-  const { data: autoscroll = DEFAULT_HOME_CAROUSEL_AUTOSCROLL } =
-    useSiteSetting<HomeCarouselAutoscroll>(
-      HOME_CAROUSEL_AUTOSCROLL_KEY,
-      DEFAULT_HOME_CAROUSEL_AUTOSCROLL,
-    );
-  const update = useUpdateSiteSetting();
-
-  const setKey = (key: keyof HomeCarouselAutoscroll, value: boolean) => {
-    const next = { ...DEFAULT_HOME_CAROUSEL_AUTOSCROLL, ...autoscroll, [key]: value };
-    update.mutate(
-      { key: HOME_CAROUSEL_AUTOSCROLL_KEY, value: next },
-      {
-        onSuccess: () => toast.success("Saved"),
-        onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
-      },
-    );
-  };
-
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
-      <div className="mb-4 rounded-xl border border-border bg-card p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <MoveHorizontal className="h-4 w-4 text-brand" />
-          <h2 className="font-semibold text-sm">Home page carousels — auto-scroll</h2>
-        </div>
-        <p className="text-xs text-muted-foreground mb-4">
-          Turn off to pause the auto-scrolling animation. Visitors can still scroll the cards manually.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-            <div>
-              <Label className="cursor-pointer">Brands cards carousel</Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Home page brand tiles marquee</p>
-            </div>
-            <Switch
-              checked={!!autoscroll.brands}
-              onCheckedChange={(v) => setKey("brands", v)}
-              disabled={update.isPending}
-            />
-          </label>
-          <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5">
-            <div>
-              <Label className="cursor-pointer">Category cards carousel</Label>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Home page categories marquee</p>
-            </div>
-            <Switch
-              checked={!!autoscroll.categories}
-              onCheckedChange={(v) => setKey("categories", v)}
-              disabled={update.isPending}
-            />
-          </label>
-        </div>
-      </div>
 
       <div className="mb-4 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-foreground/80 flex items-center gap-2">
