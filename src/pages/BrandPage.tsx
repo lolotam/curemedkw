@@ -73,6 +73,18 @@ export default function BrandPage() {
 
   return (
     <SiteLayout brand={meta.themeAttr}>
+      <Seo
+        title={`${meta.name} — Curemed Kuwait`}
+        description={`${meta.name} products available at Curemed in Kuwait. ${meta.tagline?.en ?? "Shop the full range online."}`.slice(0, 160)}
+        path={`/${meta.slug}`}
+        jsonLd={{
+          "@context": "https://schema.org",
+          "@type": "Brand",
+          name: meta.name,
+          url: `https://curemedkw.lovable.app/${meta.slug}`,
+          logo: meta.logo,
+        }}
+      />
       <HeroSlider pageKey={brandKey as HeroPageKey} />
 
       <CategoryCarousel />
