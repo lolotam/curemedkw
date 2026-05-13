@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useParams, Navigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
+import { Seo } from "@/components/site/Seo";
 import { ProductCard } from "@/components/site/ProductCard";
 import { SubcategoryCarousel } from "@/components/site/SubcategoryCarousel";
 import { useCategories, useCategoryBySlug, useProductsByCategory } from "@/lib/db";
