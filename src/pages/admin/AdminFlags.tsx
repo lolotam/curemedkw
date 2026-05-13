@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   usePriceVisibility,
   useUpdatePriceVisibility,
+  useSiteSetting,
+  useUpdateSiteSetting,
   type PriceVisibility,
 } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import type { BrandKey } from "@/lib/db";
+import {
+  HOME_CAROUSEL_AUTOSCROLL_KEY,
+  DEFAULT_HOME_CAROUSEL_AUTOSCROLL,
+  type HomeCarouselAutoscroll,
+} from "./AdminLandingPages";
+import { ImageCompressionCard } from "@/components/admin/ImageCompressionCard";
 
 export default function AdminFlags() {
   const { data, isLoading } = usePriceVisibility();
@@ -52,8 +61,8 @@ export default function AdminFlags() {
         <div>
           <h1 className="text-2xl font-bold">Site flags</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Hide product prices from customers. When hidden, a "Contact us" button replaces the
-            price across the storefront.
+            Site-wide toggles: home page carousel auto-scroll, image compression on upload,
+            and price visibility.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -76,6 +85,12 @@ export default function AdminFlags() {
           </Button>
         </div>
       </header>
+
+      <HomeCarouselAutoscrollCard />
+
+      <div className="mb-6">
+        <ImageCompressionCard />
+      </div>
 
       <Card className="p-5 mb-6 border-brand/30 bg-brand-soft/40">
         <FlagRow
@@ -121,6 +136,62 @@ export default function AdminFlags() {
         })}
       </div>
     </div>
+  );
+}
+
+function HomeCarouselAutoscrollCard() {
+  const { data: autoscroll = DEFAULT_HOME_CAROUSEL_AUTOSCROLL } =
+    useSiteSetting<HomeCarouselAutoscroll>(
+      HOME_CAROUSEL_AUTOSCROLL_KEY,
+      DEFAULT_HOME_CAROUSEL_AUTOSCROLL,
+    );
+  const update = useUpdateSiteSetting();
+
+  const setKey = (key: keyof HomeCarouselAutoscroll, value: boolean) => {
+    const next = { ...DEFAULT_HOME_CAROUSEL_AUTOSCROLL, ...autoscroll, [key]: value };
+    update.mutate(
+      { key: HOME_CAROUSEL_AUTOSCROLL_KEY, value: next },
+      {
+        onSuccess: () => toast.success("Saved"),
+        onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+      },
+    );
+  };
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <MoveHorizontal className="h-4 w-4 text-brand" />
+        <h2 className="font-semibold text-sm">Home page carousels — auto-scroll</h2>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        Turn off to pause the auto-scrolling animation. Visitors can still scroll the cards manually.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+          <div>
+            <Label className="cursor-pointer">Brands cards carousel</Label>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Home page brand tiles marquee</p>
+          </div>
+          <Switch
+            checked={!!autoscroll.brands}
+            onCheckedChange={(v) => setKey("brands", v)}
+            disabled={update.isPending}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+          <div>
+            <Label className="cursor-pointer">Category cards carousel</Label>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Home page categories marquee</p>
+          </div>
+          <Switch
+            checked={!!autoscroll.categories}
+            onCheckedChange={(v) => setKey("categories", v)}
+            disabled={update.isPending}
+          />
+        </label>
+      </div>
+    </Card>
   );
 }
 
