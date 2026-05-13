@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useBrandingFavicon } from "@/lib/db";
+import { useBrandingFavicon, useImageCompressionEnabled, useImageCompressionQuality } from "@/lib/db";
+import { setImageCompressionConfig } from "@/lib/imageConvert";
 
 const DEFAULT_FAVICON = "/favicon.png";
 
@@ -9,7 +10,16 @@ const DEFAULT_FAVICON = "/favicon.png";
  */
 export function BrandingHead() {
   const { data: faviconUrl } = useBrandingFavicon();
+  const { data: compEnabled } = useImageCompressionEnabled();
+  const { data: compQuality } = useImageCompressionQuality();
   const url = faviconUrl?.trim() || DEFAULT_FAVICON;
+
+  useEffect(() => {
+    setImageCompressionConfig({
+      enabled: compEnabled ?? true,
+      quality: typeof compQuality === "number" ? compQuality : 99,
+    });
+  }, [compEnabled, compQuality]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;

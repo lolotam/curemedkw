@@ -1,16 +1,38 @@
 ## Goal
+Let admins control image WebP conversion from `/admin/branding`: an enable/disable toggle and a quality % slider (default 99%).
 
-On brand pages (e.g. `/kapiva`, `/flexitol`, …), make the **footer logo** use the same uploaded image as the **header logo** configured in `/admin/branding` → "Per-brand page logos" → Header logo. Today the footer falls back to the hardcoded bundled brand logo even when an admin has uploaded a custom one.
+## Settings (stored in `site_settings`)
+- `image_compression_enabled` — boolean, default `true`
+- `image_compression_quality` — number 1–100, default `99`
 
-## Change
+## Changes
 
-**File:** `src/components/site/SiteFooter.tsx`
+### 1. `src/lib/imageConvert.ts`
+- Make `convertToWebP(file, quality?)` read defaults from a module-level cache when `quality` is not passed.
+- Add `setImageCompressionConfig({ enabled, quality })` and `getImageCompressionConfig()` so React code can sync settings into the cache after fetch.
+- If `enabled === false`, return the original file untouched (skip conversion entirely).
+- Quality stored as 1–100, divided by 100 internally for the canvas API.
 
-- Resolve `brandMeta` as today (by `themeAttr`).
-- Add `const { data: brandHeaderLogo } = useBrandingBrandLogo(brandMeta?.key ?? null);` (already exported from `src/lib/db.ts`, reads `site_settings` key `branding_brand_logo_<brand>`).
-- Logo resolution order:
-  1. If on a brand page (`brandMeta` exists): `brandHeaderLogo?.trim() || brandMeta.logo`
-  2. Otherwise (Curemed footer): existing behavior — `brandingLogo?.trim() || defaultLogo` with the remove-bg class.
-- Keep the existing remove-bg class only for the Curemed (non-brand) case, matching `SiteHeader` behavior.
+### 2. `src/lib/db.ts`
+- Add constants + hooks:
+  - `IMAGE_COMPRESSION_ENABLED_KEY`, `IMAGE_COMPRESSION_QUALITY_KEY`
+  - `useImageCompressionEnabled()` → boolean (default `true`)
+  - `useImageCompressionQuality()` → number (default `99`)
+- Existing `useUpdateSiteSetting` is reused for writes.
 
-No DB changes, no admin UI changes, no changes to `BrandPage` or any other file. The admin already uploads to the same `branding_brand_logo_<brand>` setting that the header reads — we're just making the footer read from it too.
+### 3. `src/components/site/BrandingHead.tsx` (or a tiny new sync component mounted in `App.tsx`)
+- Subscribe to both settings via the hooks above and call `setImageCompressionConfig(...)` on change so every uploader (hero, products, branding, account avatar) picks up the latest values without prop-drilling.
+
+### 4. `src/pages/admin/AdminBranding.tsx`
+- New "Image compression" card with:
+  - Switch: "Convert uploaded images to WebP" (bound to `image_compression_enabled`)
+  - Slider + number input: "Quality" 1–100, default 99 (disabled when toggle off)
+  - Helper text explaining lower % = smaller file but lower quality; 100% = near-lossless.
+- Save uses `useUpdateSiteSetting` and shows a toast.
+
+### 5. Call sites already in code
+No changes needed at call sites in `heroSlides.ts`, `db.ts`, `Account.tsx` — they all call `convertToWebP(file)` with no quality arg, which will now read from the synced config.
+
+## Notes
+- No DB migration required; `site_settings` already supports arbitrary JSON keys.
+- Default quality bumped from 0.82 → 0.99 effectively for any project that hasn't customized the value.

@@ -1037,6 +1037,18 @@ export function useBrandingBrandCardLogo(brand: BrandKey | null | undefined) {
   return useSiteSetting<string>(brand ? BRANDING_BRAND_CARD_LOGO_KEY(brand) : "branding_brand_card_logo_none", "");
 }
 
+// Image compression (WebP) settings — admin-controlled.
+export const IMAGE_COMPRESSION_ENABLED_KEY = "image_compression_enabled";
+export const IMAGE_COMPRESSION_QUALITY_KEY = "image_compression_quality";
+
+export function useImageCompressionEnabled() {
+  return useSiteSetting<boolean>(IMAGE_COMPRESSION_ENABLED_KEY, true);
+}
+
+export function useImageCompressionQuality() {
+  return useSiteSetting<number>(IMAGE_COMPRESSION_QUALITY_KEY, 99);
+}
+
 // Featured product card glass-strip background opacity (0-100). Default 70.
 export const FEATURED_GLASS_OPACITY_KEY = "featured_glass_opacity";
 
