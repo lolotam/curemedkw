@@ -112,6 +112,8 @@ export function SubcategoryCarousel({ categories }: { categories: Category[] }) 
                         <img
                           src={c.imageUrl}
                           alt={c.nameEn}
+                          width={800}
+                          height={800}
                           loading="lazy"
                           className="h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-105"
                         />

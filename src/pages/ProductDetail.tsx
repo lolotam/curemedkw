@@ -98,13 +98,13 @@ export default function ProductDetail() {
       <section className="container py-10 md:py-16 grid lg:grid-cols-2 gap-10 lg:gap-16">
         <div>
           <div className="aspect-square rounded-3xl overflow-hidden bg-brand-soft border border-border">
-            <img src={images[activeImg]} alt={name} className="h-full w-full object-cover" loading="lazy" />
+            <img src={images[activeImg]} alt={name} width={800} height={800} className="h-full w-full object-cover" loading="lazy" />
           </div>
           {images.length > 1 && (
             <div className="mt-4 grid grid-cols-4 gap-3">
               {images.map((src, i) => (
                 <button key={i} onClick={() => setActiveImg(i)} className={cn("aspect-square rounded-xl overflow-hidden border-2 transition-all bg-brand-soft", activeImg === i ? "border-brand" : "border-border hover:border-brand/40")}>
-                   <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+                   <img src={src} alt="" width={200} height={200} className="h-full w-full object-cover" loading="lazy" />
                 </button>
               ))}
             </div>

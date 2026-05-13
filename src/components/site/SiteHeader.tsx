@@ -87,6 +87,8 @@ export function SiteHeader() {
           <img
             src={logoSrc}
             alt="Curemed"
+            width={240}
+            height={96}
             className={cn("h-20 w-auto brand-logo-img", removeBg && "brand-logo-img--remove-white")}
           />
         </Link>

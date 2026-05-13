@@ -37,7 +37,7 @@ export default function OrderConfirmation() {
                 {order.items?.map((i) => (
                   <li key={i.id} className="flex gap-3 py-3 text-sm">
                     {i.productImageSnapshot && (
-                      <img src={i.productImageSnapshot} alt="" className="h-12 w-12 rounded-lg object-cover bg-brand-soft" loading="lazy" />
+                      <img src={i.productImageSnapshot} alt="" width={96} height={96} className="h-12 w-12 rounded-lg object-cover bg-brand-soft" loading="lazy" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium line-clamp-1">{i.productNameSnapshot}</p>
