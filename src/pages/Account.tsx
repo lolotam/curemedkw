@@ -126,7 +126,7 @@ export default function Account() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             {profile?.avatarUrl ? (
-              <img src={profile.avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover bg-muted" />
+              <img src={profile.avatarUrl} alt="" width={128} height={128} className="h-16 w-16 rounded-full object-cover bg-muted" />
             ) : (
               <div className="h-16 w-16 rounded-full bg-brand/10 text-brand inline-flex items-center justify-center font-bold text-xl">
                 {(profile?.fullName || user.email || "?").charAt(0).toUpperCase()}

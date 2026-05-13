@@ -42,6 +42,8 @@ export default function CategoryPage() {
             <img
               src={category.bannerUrl}
               alt={name}
+              width={1900}
+              height={600}
               className="h-full w-full object-cover"
               loading="eager"
             />

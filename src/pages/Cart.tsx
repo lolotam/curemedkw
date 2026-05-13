@@ -135,6 +135,8 @@ export default function Cart() {
                         <img
                           src={item.image}
                           alt={name}
+                          width={200}
+                          height={200}
                           className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
                           loading="lazy"
                         />

@@ -31,6 +31,8 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
           <img
             src={logo}
             alt={brandName}
+            width={240}
+            height={96}
             className={`h-12 w-auto object-contain brand-logo-img ${!brandMeta && removeBg ? "brand-logo-img--remove-white" : ""}`}
             loading="lazy"
           />

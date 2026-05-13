@@ -70,6 +70,8 @@ export function SlidePreview({
           <img
             src={s.media_url}
             alt={title || "Hero slide"}
+            width={1920}
+            height={800}
             className="absolute inset-0 w-full h-full object-cover"
             loading="lazy"
           />

@@ -29,6 +29,8 @@ export function ProductCard({ product, compact = false }: { product: Product; co
         <img
           src={product.mainImage}
           alt={name}
+          width={800}
+          height={800}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
         />

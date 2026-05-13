@@ -305,6 +305,8 @@ function BrandTile({ brand: b, isClone }: { brand: BrandMeta; isClone: boolean }
             <img
               src={src}
               alt={b.name}
+              width={200}
+              height={120}
               className="max-h-full max-w-full w-auto h-auto object-contain"
               loading="lazy"
             />
@@ -313,6 +315,8 @@ function BrandTile({ brand: b, isClone }: { brand: BrandMeta; isClone: boolean }
           <img
             src={src}
             alt={b.name}
+            width={160}
+            height={48}
             className="h-12 w-auto drop-shadow object-contain"
             loading="lazy"
           />
@@ -369,6 +373,8 @@ function FeaturedGlassCard({
       <img
         src={product.mainImage}
         alt={name}
+        width={800}
+        height={800}
         loading="lazy"
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
       />
