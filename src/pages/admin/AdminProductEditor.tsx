@@ -23,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
+import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -128,6 +129,7 @@ export default function AdminProductEditor() {
   // Image preview + selection state
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [upscaleTarget, setUpscaleTarget] = useState<{ url: string; kind: "main" | "gallery"; index?: number } | null>(null);
+  const [bulkUpscaleOpen, setBulkUpscaleOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
