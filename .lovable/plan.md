@@ -1,34 +1,48 @@
-## Problem
+## Goal
+Add **Anthropic** as a fourth AI provider in `/admin/models` (Chat tab), listing all available Claude models, selectable as Primary / Fallback #2 / Fallback #3, plus a "Test connection" button per slot.
 
-When an admin clicks **Admin** in the user dropdown, they briefly see an "Authorization" / "Not authorized" dialog before landing on the dashboard. Root cause is in `src/lib/admin.ts`:
+## Steps
 
-- `useAdminSession()` sets `loading = false` as soon as `getSession()` resolves.
-- The `isAdmin` role lookup against `user_roles` is a **separate async call** that finishes a moment later.
-- During that gap, `AdminLayout` sees `loading=false`, `user=set`, `isAdmin=false` → it renders the red **"Not authorized"** card. When the role query resolves, `isAdmin` flips to `true` and the real dashboard appears. That's the flicker the user is seeing.
+### 1. Add `ANTHROPIC_API_KEY` secret
+Prompt the user to add their Anthropic API key (from console.anthropic.com → API Keys). Stored as a backend secret used only by edge functions.
 
-The dropdown logic itself is already correct: `SiteHeader.tsx` renders the **Admin** menu item only when `isAdmin === true` from the same hook. We just need that flag to be trustworthy on first paint.
+### 2. New edge function: `anthropic-models`
+- `GET https://api.anthropic.com/v1/models` with headers `x-api-key` + `anthropic-version: 2023-06-01`.
+- Return `{ models: [{ id, name, kind: "chat", context_length: null, pricing: null }] }`.
+- All Anthropic models are chat-only (no image generation), so kind is always `"chat"`.
 
-## Fix
+### 3. New edge function: `ai-test-connection`
+- Body: `{ provider, model }` (admin-only).
+- Performs a tiny "ping" call to the chosen provider's chat endpoint and returns `{ ok, latency_ms, error? }`.
+- Anthropic ping: `POST /v1/messages` with `max_tokens: 1`, message `"ping"`.
+- OpenAI / Google / OpenRouter pings reuse the existing endpoint patterns.
 
-### 1. `src/lib/admin.ts` — make `loading` cover the role check too
-- Add an internal `roleLoading` state.
-- `loading` returned by the hook becomes `sessionLoading || (user && roleLoading)`.
-- Set `roleLoading = true` whenever a user is detected (initial session + auth state changes) and flip it to `false` only after the `user_roles` query resolves (or immediately when there is no user).
-- Keep the existing "subscribe first, then getSession" order to avoid races.
+### 4. Frontend: extend provider list
+File: `src/lib/aiProviders.ts`
+- `Provider = "openrouter" | "openai" | "google" | "anthropic"`
+- Add `PROVIDER_LABELS.anthropic = "Anthropic"`, append to `PROVIDERS`, map `FN_BY_PROVIDER.anthropic = "anthropic-models"`.
 
-### 2. `src/components/admin/AdminLayout.tsx` — no behavior change needed
-Once `loading` correctly waits for the role check, the existing branches work as intended:
-- `loading` → spinner
-- `!user` → redirect to `/admin/login`
-- `user && !isAdmin` → "Not authorized" (only real non-admins now)
-- otherwise → dashboard
+File: `src/lib/aiModels.ts`
+- Add `"anthropic"` to the provider whitelist in `normalizeSlot`.
+- Defaults unchanged.
 
-### 3. `src/components/site/SiteHeader.tsx` — confirm-only
-Already gated by `{isAdmin && …}` in `UserMenu`. With the fix above, `isAdmin` is only `true` after the `user_roles` row is confirmed, so non-admins never see the menu item. No code change required.
+### 5. Frontend: Test button
+In `src/pages/admin/AdminModels.tsx`, inside `SlotCard`, add a small **"Test connection"** button next to the Reset link. On click it invokes `ai-test-connection` with the current `{provider, model}` and shows a toast with success/latency or the error.
+
+### 6. Backend dispatch for chat (extract-product)
+File: `supabase/functions/extract-product/index.ts`
+- Add `"anthropic"` to provider validation list.
+- Add `callAnthropic(model)` that calls `POST https://api.anthropic.com/v1/messages` with the existing tool / function-calling schema converted to Anthropic's `tools` format, and parse the `tool_use` block back into `{ args }`.
+- Wire it into the `dispatch` switch.
+
+### 7. Image tab unchanged
+Anthropic does not produce images; it will only appear in the Chat tab's model list (the existing filter `m.kind === kind` naturally hides it from the Image tab).
+
+## Technical notes
+- Anthropic API: `POST /v1/messages`, headers `x-api-key`, `anthropic-version: 2023-06-01`, `content-type: application/json`. Tool use uses `tools: [{name, description, input_schema}]` and responds with a `tool_use` content block containing `input`.
+- The models list endpoint requires the same headers and returns `{ data: [{ id, display_name, created_at }] }`.
+- Test connection is admin-gated using the existing `user_roles` check pattern (same as `upscale-image-ai`).
 
 ## Out of scope
-- No DB / RLS / auth-provider changes.
-- No changes to `AdminLogin`, routing, or the dropdown markup.
-
-## Files touched
-- `src/lib/admin.ts` (small refactor of the hook)
+- No changes to image-generation flow.
+- No changes to `translate-product` (OpenRouter-only by design).
