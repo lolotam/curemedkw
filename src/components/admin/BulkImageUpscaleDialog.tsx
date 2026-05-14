@@ -53,7 +53,7 @@ async function runPool<T>(items: T[], limit: number, worker: (item: T, i: number
   await Promise.all(runners);
 }
 
-export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, baseName = "image", onReplaceMany }: Props) {
+export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, baseName = "image", storageContext, onReplaceMany }: Props) {
   const { slots } = useAiModels();
 
   // Configuration
