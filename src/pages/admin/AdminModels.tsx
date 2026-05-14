@@ -382,7 +382,7 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TestConnectionButton({ slot }: { slot: Slot }) {
+function TestConnectionButton({ slot, kind }: { slot: Slot; kind: ModelKind }) {
   const [loading, setLoading] = useState(false);
   const disabled = loading || !slot.model;
   const onClick = async () => {
@@ -393,7 +393,7 @@ function TestConnectionButton({ slot }: { slot: Slot }) {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("ai-test-connection", {
-        body: { provider: slot.provider, model: slot.model },
+        body: { provider: slot.provider, model: slot.model, kind },
       });
       if (error) {
         toast.error(`Test failed: ${error.message}`);
