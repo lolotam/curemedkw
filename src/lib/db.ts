@@ -1093,8 +1093,10 @@ export function useLoaderBarSettings() {
 
 // Loading page video URL (splash screen). Stored in site_settings so admin can update.
 export const LOADER_VIDEO_KEY = "loader_video_url";
-export const LOADER_VIDEO_DEFAULT =
-  "https://yjvqzvmyritxegugfhkt.supabase.co/storage/v1/object/public/hero-media//CureMed_logo_loading_animation_202604300936.mp4";
+// No hardcoded backend URL fallback — the active value comes from site_settings.loader_video_url
+// (set in Admin → Branding → Preloading page video). Empty string means the frontend uses its
+// built-in default animation.
+export const LOADER_VIDEO_DEFAULT = "";
 export function useLoaderVideoUrl() {
   return useSiteSetting<string>(LOADER_VIDEO_KEY, LOADER_VIDEO_DEFAULT);
 }
