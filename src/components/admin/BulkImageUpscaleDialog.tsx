@@ -33,6 +33,7 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   imageUrls: string[];
   baseName?: string;
+  storageContext?: { brand?: string; productSlug?: string };
   /** Replace many original URLs at once. urlMap: oldUrl -> newUrl. */
   onReplaceMany: (urlMap: Record<string, string>) => void;
 }
