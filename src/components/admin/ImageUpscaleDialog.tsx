@@ -20,12 +20,13 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   imageUrl: string;
   onReplace: (newUrl: string) => void;
+  storageContext?: { brand?: string; productSlug?: string };
 }
 
 const STANDARD_FACTORS = [2, 4, 6, 8] as const;
 const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
 
-export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onReplace }: Props) {
+export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onReplace, storageContext }: Props) {
   const [engine, setEngine] = useState<Engine>("picsart");
   const [mode, setMode] = useState<Mode>("standard");
   const [factor, setFactor] = useState<number>(2);
