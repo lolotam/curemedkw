@@ -425,10 +425,25 @@ export function useProductsByCategory(categoryId: string | undefined) {
  * Image uploads (product-images bucket)
  * ============================================================ */
 
-export async function uploadProductImage(file: File): Promise<string> {
+function sanitizeSegment(s: string | undefined | null): string {
+  const v = (s || "").toString().toLowerCase().trim().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  return v.slice(0, 64) || "_unsorted";
+}
+
+export type ProductImageContext = {
+  brand?: string;
+  productSlug?: string;
+  /** Subfolder. Defaults to "original" for direct uploads. */
+  subfolder?: "original" | "upscaled" | "upscaled-ai";
+};
+
+export async function uploadProductImage(file: File, ctx?: ProductImageContext): Promise<string> {
   const converted = await convertToWebP(file);
   const ext = converted.name.split(".").pop() || "webp";
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+  const brand = sanitizeSegment(ctx?.brand);
+  const slug = sanitizeSegment(ctx?.productSlug);
+  const sub = ctx?.subfolder || "original";
+  const path = `${brand}/${slug}/${sub}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const { error } = await supabase.storage
     .from("product-images")
     .upload(path, converted, { cacheControl: "3600", upsert: false, contentType: converted.type });
