@@ -20,12 +20,13 @@ interface Props {
   onOpenChange: (v: boolean) => void;
   imageUrl: string;
   onReplace: (newUrl: string) => void;
+  storageContext?: { brand?: string; productSlug?: string };
 }
 
 const STANDARD_FACTORS = [2, 4, 6, 8] as const;
 const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
 
-export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onReplace }: Props) {
+export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onReplace, storageContext }: Props) {
   const [engine, setEngine] = useState<Engine>("picsart");
   const [mode, setMode] = useState<Mode>("standard");
   const [factor, setFactor] = useState<number>(2);
@@ -51,7 +52,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
     try {
       if (engine === "picsart") {
         const { data, error } = await supabase.functions.invoke("upscale-image", {
-          body: { imageUrl, mode, factor, format },
+          body: { imageUrl, mode, factor, format, brand: storageContext?.brand, productSlug: storageContext?.productSlug },
         });
         if (error) throw error;
         if (!data?.url) throw new Error("No result URL");
@@ -60,7 +61,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
         toast.success("Upscaled successfully");
       } else {
         const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
-          body: { imageUrl, extraInstructions: extraInstructions.trim() || undefined },
+          body: { imageUrl, extraInstructions: extraInstructions.trim() || undefined, brand: storageContext?.brand, productSlug: storageContext?.productSlug },
         });
         if (error) throw error;
         if (!data?.url) {

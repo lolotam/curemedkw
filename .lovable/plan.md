@@ -1,48 +1,78 @@
-# Batch upscale with before/after compare slider
+# Organize storage as `{brand}/{product-slug}/...`
 
-Extend the upscale workflow on the product editor so the admin can upscale **multiple selected images at once**, compare each one with a draggable before/after slider, then download or replace selectively.
+Today every image lands flat in the `product-images` bucket — uploads at the root, upscales under `upscaled/` or `upscaled-ai/`. We'll restructure so each product owns a folder under its brand.
 
-## UX flow
+## Target layout (bucket: `product-images`)
 
-1. In `AdminProductEditor`, add a "Bulk upscale" button to the gallery toolbar (next to existing per-image upscale).
-2. Clicking opens a new full-screen dialog `BulkImageUpscaleDialog` with:
-   - **Step 1 — Select**: thumbnail grid of all product images (main + gallery) with checkboxes. "Select all" / "Clear" controls.
-   - **Engine + settings panel**: same engine choice (PICSART vs AI) and options as the existing single dialog. Single setting applied to the whole batch.
-   - **Run** button → triggers parallel upscale (max 3 concurrent) calling the same `upscale-image` / `upscale-image-ai` edge functions per image. Per-image status: pending → loading → done/failed (with error tooltip).
-3. **Step 2 — Compare**: once any image finishes, a results grid shows pairs. Each card has:
-   - A **before/after slider** (draggable vertical handle over a stacked `<img>` pair) so the admin drags left/right to reveal the upscaled version.
-   - A row checkbox (selected by default for successful items).
-   - Buttons: **Preview fullscreen** (opens an enlarged version of the same slider), **Download** (single).
-4. **Footer actions**:
-   - **Download selected (zip)** — uses existing `downloadImagesAsZip`.
-   - **Replace selected** — swaps each selected original URL with its upscaled URL inside `form.mainImage` / `form.gallery` and closes.
-   - **Replace all (successful)** — same but ignores selection.
-   - **Cancel** — discards results.
+```text
+product-images/
+├── flexitol/
+│   ├── heel-balm-200ml/
+│   │   ├── original/1731000000-ab12.webp
+│   │   ├── original/1731000050-cd34.webp
+│   │   └── upscaled/8e3f-...-2025-05-14.png
+│   └── foot-cream-100ml/
+│       └── original/...
+├── neutrogena/
+│   └── ...
+└── _unsorted/        ← fallback when brand or slug isn't known yet
+    └── ...
+```
 
-## Files
+- **`original/`** — direct uploads (replaces today's flat root).
+- **`upscaled/`** — Picsart results (replaces `upscaled/` at the root).
+- **`upscaled-ai/`** — AI image-model results (replaces `upscaled-ai/` at the root).
 
-**New:**
-- `src/components/admin/BulkImageUpscaleDialog.tsx` — orchestrates batch state, calls edge functions, renders selection + results grid + footer actions.
-- `src/components/admin/BeforeAfterSlider.tsx` — reusable draggable slider (stacked images, draggable handle, keyboard arrow support, `aspect-square` container, `object-contain`). Used in both grid cards and fullscreen preview.
+## Changes
 
-**Edited:**
-- `src/pages/admin/AdminProductEditor.tsx` — add "Bulk upscale" button to gallery toolbar, wire dialog open state, implement `replaceMany(urlMap: Record<string,string>)` to update `mainImage` and `gallery` in one `setForm` call.
+### Frontend
 
-## Technical notes
+**`src/lib/db.ts`**
+- Change `uploadProductImage(file)` → `uploadProductImage(file, ctx?: { brand?: BrandKey; productSlug?: string; subfolder?: "original" | "upscaled" })`.
+  - Build path: `{brand ?? "_unsorted"}/{productSlug ?? "_unsorted"}/{subfolder ?? "original"}/{ts}-{rand}.{ext}`.
+  - Default `subfolder = "original"`.
 
-- No new edge functions or DB changes. Reuses `upscale-image` and `upscale-image-ai`.
-- Concurrency: simple promise pool (limit 3) to avoid hammering APIs.
-- Each item state shape: `{ src, status: 'pending'|'loading'|'done'|'error', resultUrl?, meta?, error? }`.
-- Selection state separate from status — only `done` items are selectable.
-- Slider implementation: pointer events on a handle, percentage state 0–100, `clip-path: inset(0 X% 0 0)` on the top image. Works on touch + mouse. RTL-safe via `dir="ltr"` wrapper.
-- Replace logic (in editor): build a `Map<oldUrl, newUrl>`; remap `mainImage` and `gallery` preserving order and duplicates.
-- Use existing `ImagePreviewDialog` only as inspiration; the fullscreen compare uses the same `BeforeAfterSlider` enlarged.
-- All styling via semantic tokens (`bg-background`, `border-border`, `bg-muted`, `text-muted-foreground`, `text-brand`). No hardcoded colors.
-- Toasts for batch summary: `"Upscaled 7/8 images — 1 failed"`.
-- Reuse `useAiModels` + `PROVIDER_LABELS` for the AI engine fallback display.
+**`src/pages/admin/AdminProductEditor.tsx`**
+- Compute `productSlug = slugify(form.name) || form.sku || "_unsorted"`.
+- Pass `{ brand: form.brand, productSlug }` to every `uploadProductImage(...)` call (main upload + gallery upload + import-from-URL persisted images).
+- Pass the same context to both upscale dialogs.
+
+**`src/components/admin/ImageUpscaleDialog.tsx`** and **`src/components/admin/BulkImageUpscaleDialog.tsx`**
+- Accept new optional `storageContext?: { brand?: string; productSlug?: string }` prop.
+- Forward it in the body of `supabase.functions.invoke("upscale-image" | "upscale-image-ai", { body: { ..., brand, productSlug } })`.
+
+**`src/components/admin/ProductImportFromUrl.tsx`** (and `src/lib/aiImport.ts` if it persists images)
+- Same `{ brand, productSlug }` plumbing where it calls `uploadProductImage` or invokes scrape/extract that store images.
+
+### Edge functions
+
+**`supabase/functions/upscale-image/index.ts`** and **`supabase/functions/upscale-image-ai/index.ts`**
+- Read optional `brand`, `productSlug` from request body. Sanitize each (lowercase, `[a-z0-9-]`, max 64 chars). Default to `_unsorted` if missing.
+- Build path:
+  - Picsart: `{brand}/{slug}/upscaled/{uuid}.{ext}`
+  - AI: `{brand}/{slug}/upscaled-ai/{uuid}.{ext}`
+
+### Storage / RLS
+
+- No bucket changes (`product-images` already exists and is public).
+- No RLS changes — existing admin policies work for any object key.
+- No DB schema changes.
+
+## Existing images
+
+- Existing flat objects stay where they are; `products.main_image` / `products.gallery` URLs keep working.
+- A one-shot migration script (out of scope unless asked) could move legacy keys into `_unsorted/` or attempt brand/slug inference. For now just leave them.
+
+## Edge cases
+
+- **New product (no name yet)**: slug falls back to `_unsorted`. Files reorganize automatically once the user gives the product a name and uploads more.
+- **Renamed product**: previously uploaded files keep their old folder name (URLs are immutable); only new uploads/upscales land in the new folder. Acceptable trade-off.
+- **Slug collisions across brands**: scoped under brand folder, so collisions are isolated.
 
 ## Out of scope
 
-- Persisting upscales as separate stored assets (current flow keeps the returned URL — same as today).
-- Per-image different engines/factors in one batch (single setting applies to all).
-- Side-by-side (non-slider) comparison view — slider is the only compare mode.
+- Backfilling existing files into the new structure.
+- Renaming/moving objects when a product's name changes.
+- Per-folder cleanup when a product is deleted.
+
+Confirm and I'll implement, or tell me if you also want a one-shot backfill of existing files into `{brand}/{slug}/original/`.

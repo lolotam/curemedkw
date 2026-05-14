@@ -160,6 +160,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const imageUrl = String(body?.imageUrl ?? "").trim();
     const extraInstructions = String(body?.extraInstructions ?? "").trim();
+    const sanitize = (s: unknown) => {
+      const v = String(s ?? "").toLowerCase().trim().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+      return v.slice(0, 64) || "_unsorted";
+    };
+    const brandSeg = sanitize(body?.brand);
+    const slugSeg = sanitize(body?.productSlug);
     if (!/^https?:\/\//i.test(imageUrl)) return json({ error: "Provide a valid http(s) imageUrl" }, 400);
 
     // Load prompt + image slot chain from site_settings
@@ -230,7 +236,7 @@ Deno.serve(async (req) => {
 
     const ct = success.result.contentType || "image/png";
     const ext = ct.includes("jpeg") ? "jpg" : ct.includes("webp") ? "webp" : "png";
-    const path = `upscaled-ai/${crypto.randomUUID()}.${ext}`;
+    const path = `${brandSeg}/${slugSeg}/upscaled-ai/${crypto.randomUUID()}.${ext}`;
     const { error: upErr } = await admin.storage
       .from("product-images")
       .upload(path, success.result.bytes!, { contentType: ct, upsert: false });
