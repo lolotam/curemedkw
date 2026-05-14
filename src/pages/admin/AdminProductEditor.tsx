@@ -874,6 +874,7 @@ export default function AdminProductEditor() {
         open={!!upscaleTarget}
         onOpenChange={(o) => !o && setUpscaleTarget(null)}
         imageUrl={upscaleTarget?.url ?? ""}
+        storageContext={storageCtx}
         onReplace={(newUrl) => {
           if (!upscaleTarget) return;
           if (upscaleTarget.kind === "main") {
@@ -891,6 +892,7 @@ export default function AdminProductEditor() {
         onOpenChange={setBulkUpscaleOpen}
         imageUrls={[form.mainImage, ...form.gallery]}
         baseName={baseName}
+        storageContext={storageCtx}
         onReplaceMany={(urlMap) => {
           const remap = (u: string) => urlMap[u] ?? u;
           setForm((prev) => ({
