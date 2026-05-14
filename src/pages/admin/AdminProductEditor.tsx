@@ -153,10 +153,21 @@ export default function AdminProductEditor() {
     }
     if (existing) {
       const { id: _i, createdAt: _c, updatedAt: _u, ...rest } = existing;
-      setForm(rest);
+      // If a draft exists for this product, keep the draft (unsaved changes).
+      // Otherwise hydrate with the saved server copy.
+      if (!loadDraft(draftKey)) {
+        setForm(rest);
+      }
       setHydrated(true);
     }
-  }, [existing, isLoading, isNew, navigate, hydrated]);
+  }, [existing, isLoading, isNew, navigate, hydrated, draftKey]);
+
+  // Autosave the in-progress form to localStorage so scraped/edited data
+  // survives navigation and page reload until the product is saved.
+  useEffect(() => {
+    if (!isNew && !hydrated) return;
+    saveDraft(draftKey, form);
+  }, [form, draftKey, isNew, hydrated]);
 
   const update = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
