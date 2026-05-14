@@ -382,6 +382,45 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TestConnectionButton({ slot }: { slot: Slot }) {
+  const [loading, setLoading] = useState(false);
+  const disabled = loading || !slot.model;
+  const onClick = async () => {
+    if (!slot.model) {
+      toast.error("Pick a model first");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-test-connection", {
+        body: { provider: slot.provider, model: slot.model },
+      });
+      if (error) {
+        toast.error(`Test failed: ${error.message}`);
+      } else if ((data as any)?.ok) {
+        toast.success(`Connection OK (${(data as any).latency_ms}ms)`);
+      } else {
+        toast.error(`Test failed: ${(data as any)?.error ?? "unknown error"}`);
+      }
+    } catch (e) {
+      toast.error(`Test failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 disabled:opacity-50"
+    >
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+      Test connection
+    </button>
+  );
+}
+
 function UpscalePromptCard() {
   const { prompt, loading, save, reset } = useUpscalePrompt();
   const [draft, setDraft] = useState(prompt);
