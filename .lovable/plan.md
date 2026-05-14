@@ -1,71 +1,105 @@
-# Persistent background jobs for upscale & scrape
-
-## Problem
-Today, `ImageUpscaleDialog`, `BulkImageUpscaleDialog`, and `ProductImportFromUrl` keep all job state (config, items, results, timers) inside React component state. The moment the dialog closes, the user navigates to another route, or the component re‑mounts, the state is wiped. The visible "process" appears to stop because the UI that was driving it is gone — even though some server work may still finish, the client never collects the result.
-
-Switching browser tabs additionally freezes our `requestAnimationFrame` timers, so the elapsed counter looks stuck even when the request is still in flight.
-
 ## Goal
-Once a user clicks **Generate** / **Scrape & fill**:
-- The job keeps running even if the dialog is closed, the route changes, or the tab is in the background.
-- When the user reopens the dialog (or comes back to the page), they see the live progress and any results that already finished.
-- Results stay visible until the user explicitly **saves** (Use this image / Replace selected) or **dismisses** them.
-- Only a hard browser refresh can lose in‑flight requests (browsers kill fetches on reload — unavoidable). Completed results survive a refresh too via `localStorage`.
 
-## Design
+Switch the frontend (Lovable preview, lovable.app, Dokploy) to talk **only** to self-hosted Supabase at `https://supabase.curemedkw.com`. Keep all server-side secrets (service role, JWT secret, API provider keys, SMTP) **out** of the frontend repo.
 
-Introduce a tiny module‑level **job store** (singleton, plain TS — no extra deps) per job family. Components become thin subscribers; the store owns the fetch and the state.
+## Verification (already done)
 
-```text
-src/lib/jobs/
-  jobStore.ts        // generic createJobStore<TState>() with subscribe/get/set + localStorage persist
-  upscaleJobs.ts     // single-image upscale jobs, keyed by imageUrl
-  bulkUpscaleJobs.ts // bulk jobs, keyed by a stable jobId (productId or hash of urls)
-  scrapeJobs.ts      // product-URL scrape+extract jobs, keyed by URL
+- `/config.js` is loaded before `/src/main.tsx` in `index.html` ✓
+- No app file still imports the old `src/integrations/supabase/client.ts` ✓
+- No hardcoded `functions/v1` URLs anywhere ✓
+- `clientRuntime.ts` reads `window.__APP_CONFIG__` first, falls back to `VITE_SUPABASE_*` ✓
+- **One stale URL found**: `src/lib/db.ts:1097` hardcodes the Lovable Cloud storage URL as the default loader video. Will be fixed in this change.
+
+## Frontend secrets — only 2 public values
+
+```
+VITE_SUPABASE_URL=https://supabase.curemedkw.com
+VITE_SUPABASE_PUBLISHABLE_KEY=<self-hosted anon JWT>
 ```
 
-### Store contract (per family)
-- `start(key, config)` → idempotent. If a job with that key is already `running`, return the existing one. Otherwise create it, persist to `localStorage`, and kick off the async work via `supabase.functions.invoke`.
-- `get(key)` → current snapshot.
-- `subscribe(key, cb)` → React hook `useJob(key)` wraps this with `useSyncExternalStore`.
-- `dismiss(key)` → remove from store + storage (called after Save / explicit clear).
-- Persisted shape per job: `{ status: 'running' | 'done' | 'error' | 'partial', config, items[], resultUrl?, meta?, error?, startedAt, finishedAt? }`.
+That's it. The anon key is a public JWT; safety depends entirely on RLS, which is already in place.
 
-Promises live in‑memory only (not persisted). On a hard reload, any `running` job whose promise is gone is marked `error: 'Interrupted by reload'` so the UI can show it clearly.
+**Nothing else** belongs in this repo. The following stay on the self-hosted Supabase stack only (per `SELF_HOSTED.md` § C, H):
+`SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `POSTGRES_PASSWORD`, `SECRET_KEY_BASE`, `VAULT_ENC_KEY`, `PICSART_API_KEY`, `OPENROUTER_API_KEY`, `FIRECRAWL_API_KEY`, `LOVABLE_API_KEY`, `GOOGLE_CLIENT_SECRET`, all `SMTP_*`.
 
-### Component changes
+## Approach: env-driven runtime config (no committed credentials)
 
-1. **`ImageUpscaleDialog.tsx`**
-   - Replace local `loading / resultUrl / startedAt / elapsedMs` with `useUpscaleJob(imageUrl)`.
-   - `handleGenerate` becomes `upscaleJobs.start(imageUrl, {...config})`.
-   - On dialog close, do **not** clear the job — only clear local UI selection. Reopening the same image shows live status/result.
-   - `LiveTimerBadge` reads `startedAt` from the store and uses `Date.now() - startedAt` recomputed on a 1s `setInterval` (works while tab is hidden — fires when tab returns; also re-render on `visibilitychange`).
+Per your preference, do **not** hardcode the URL/key into `public/config.js`. Instead, generate it from env vars at runtime/build:
 
-2. **`BulkImageUpscaleDialog.tsx`**
-   - Generate a stable `jobId` from `storageContext.productSlug` (or hash of `imageUrls`) when the dialog opens.
-   - `useBulkUpscaleJob(jobId)` returns the persisted `items[]` + overall status. The `runPool(..., 3)` loop lives inside the store, not the component.
-   - Closing the dialog mid‑run leaves the pool running; reopening shows current `items[]` with correct statuses, timers, and finished thumbnails.
-   - "Replace selected" calls `onReplaceMany` then `bulkUpscaleJobs.dismiss(jobId)`.
+### 1. `public/config.js` — placeholder template (committed)
 
-3. **`ProductImportFromUrl.tsx`**
-   - `useScrapeJob(url)` drives the `phase` indicator (`scraping | extracting | done | error`).
-   - Calling `run()` invokes `scrapeJobs.start(url)`. On unmount the request keeps going; on remount the same URL shows the existing in‑flight phase or, if finished, immediately calls `onImported(...)` once.
+```js
+// Replaced at runtime by docker/start-nginx.sh, or at dev/build time by Vite env vars.
+// Empty values cause clientRuntime.ts to fall back to VITE_SUPABASE_*.
+window.__APP_CONFIG__ = window.__APP_CONFIG__ || {
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
+};
+```
 
-### Background‑tab fix for timers
-- Drop `requestAnimationFrame`; use `setInterval(1000)` plus a `visibilitychange` listener that forces an immediate re‑render. This makes elapsed time always correct when the user returns, and our `now - startedAt` math stays accurate while hidden.
+(Same as today — no change.)
 
-### Optional small UX touch (in scope, low cost)
-- A subtle "Background jobs" pill in the admin header (only when ≥1 job is `running`) that opens the relevant dialog. Implemented as a tiny `useActiveJobs()` hook reading all three stores. If you'd rather skip this, the persistence still works — you'd just reopen the dialog manually.
+### 2. Dokploy `web` container — already correct
 
-## Out of scope
-- No edge function changes.
-- No new database tables (jobs persist in `localStorage`; they are per‑browser, per‑user, which matches today's UX).
-- No queue/worker infrastructure — the store is purely client‑side coordination.
+`docker/start-nginx.sh` already rewrites `/usr/share/nginx/html/config.js` from `RUNTIME_SUPABASE_URL` / `RUNTIME_SUPABASE_ANON_KEY` on every start. You set those two values in Dokploy → frontend service env. No code change needed.
 
-## Files touched
-- **new**: `src/lib/jobs/jobStore.ts`, `src/lib/jobs/upscaleJobs.ts`, `src/lib/jobs/bulkUpscaleJobs.ts`, `src/lib/jobs/scrapeJobs.ts`
-- **edited**: `src/components/admin/ImageUpscaleDialog.tsx`, `src/components/admin/BulkImageUpscaleDialog.tsx`, `src/components/admin/ProductImportFromUrl.tsx`
-- **edited (only if you want the header pill)**: `src/components/admin/AdminLayout.tsx`
+### 3. Lovable preview + published lovable.app — env vars only
 
-## Caveat to be transparent about
-A **full page reload** (Ctrl+R, closing the browser) will still cancel any in‑flight `fetch`/`functions.invoke` — that's a browser‑level guarantee we can't override from the client. Already‑finished results survive the reload via `localStorage`. If you need true reload‑proof jobs, that requires a server‑side job table + polling, which is a separate, larger change I can plan next if you want.
+Lovable's preview/build environment can't run a shell script to rewrite `config.js`, so for **those two environments** the fallback path is what runs: `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` baked into the bundle at build time.
+
+Lovable currently injects its own values for those two from Lovable Cloud. To override them, set them in **Lovable → Project Settings → Build Secrets** (workspace-level env vars available at build time):
+
+- `VITE_SUPABASE_URL` = `https://supabase.curemedkw.com`
+- `VITE_SUPABASE_PUBLISHABLE_KEY` = your self-hosted anon JWT
+
+Once set, Vite picks them up on the next build. The committed code stays clean — switching back to Lovable Cloud is just removing those two build secrets.
+
+> Note: I cannot set Build Secrets for you — that's a workspace-admin action. After you add them, the next preview rebuild will use self-hosted.
+
+### 4. Optional `.env.example` update
+
+Update the example file so future devs know which two vars matter:
+
+```
+VITE_SUPABASE_URL=https://supabase.curemedkw.com
+VITE_SUPABASE_PUBLISHABLE_KEY=<self-hosted anon key>
+# Optional Dokploy-only runtime overrides:
+# RUNTIME_SUPABASE_URL=https://supabase.curemedkw.com
+# RUNTIME_SUPABASE_ANON_KEY=<self-hosted anon key>
+```
+
+## Code change in this repo
+
+Just one small fix:
+
+**`src/lib/db.ts:1097`** — replace the hardcoded `yjvqzvmyritxegugfhkt.supabase.co` loader-video URL with either an empty string fallback or a relative `/loading.mp4` path, so nothing in the bundle still points at the old project. The active value comes from `site_settings.loader_video_url` anyway.
+
+No other source files need editing. No new files. No type changes.
+
+## Server-side prerequisites (you / ops, not me)
+
+Before flipping the switch, confirm on `https://supabase.curemedkw.com`:
+
+1. **Migrations applied** — `bash scripts/apply-self-hosted-migrations.sh`
+2. **Edge functions deployed** with their secrets (`SELF_HOSTED.md` §C, §H)
+3. **Storage buckets exist & public**: `hero-media`, `product-images`, `category-images`, `buket-images`, `brands-images`, `favicone`, `avatars`
+4. **Kong CORS** allows: `https://curemedkw.com`, `https://curemedkw.lovable.app`, **and** the preview origin `https://id-preview--572b9c01-61fc-4795-bd86-b97ac69f8cac.lovable.app`
+5. **Auth → Redirect URLs** include all three origins above
+6. **Data copied** from Lovable Cloud (one-time `pg_dump --data-only`, plus the `migrate-storage-copy` loop for files), otherwise the site is empty
+7. **Google OAuth client** configured against `https://supabase.curemedkw.com/auth/v1/callback`
+
+If any of these are missing, the switch will surface as: empty pages, CORS errors in the console, or "Invalid login credentials" on sign-in.
+
+## Caveats
+
+- All current sessions become invalid on the switch (different JWT issuer). Everyone signs in again.
+- `src/integrations/supabase/types.ts` stays as-is; it's accurate as long as `supabase/migrations/` is the source of truth for both backends.
+- Reverting = remove the two Build Secrets in Lovable, and on Dokploy clear the `RUNTIME_*` env vars + restart.
+
+## Implementation steps when you approve
+
+1. Edit `src/lib/db.ts` line 1097 — remove the Lovable Cloud storage URL fallback.
+2. Update `.env.example` to document the two required vars.
+3. Tell you to set the two Build Secrets in Lovable and the two `RUNTIME_*` vars in Dokploy.
+
+That's the whole change in the codebase.
