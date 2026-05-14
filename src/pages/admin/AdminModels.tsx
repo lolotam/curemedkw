@@ -172,7 +172,7 @@ function SlotCard({
               )}
             </div>
             <div className="flex items-center gap-3">
-              <TestConnectionButton slot={slot} />
+              <TestConnectionButton slot={slot} kind={kind} />
               {!isDefault && (
                 <button
                   type="button"
