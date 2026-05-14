@@ -23,7 +23,12 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
   { provider: "google", model: "gemini-3.1-flash-image-preview" },
 ];
 
-const PROVIDER_TIMEOUT_MS = 120_000;
+// Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
+// Keep per-provider attempts short so we can try fallbacks AND still return
+// a real response (with CORS headers) before the proxy kills the connection.
+const PROVIDER_TIMEOUT_MS = 35_000;
+// Hard overall budget for the whole function (leave headroom under 100s).
+const TOTAL_BUDGET_MS = 85_000;
 
 async function fetchWithTimeout(
   input: string,
@@ -68,7 +73,7 @@ interface AiResult {
   error?: string;
 }
 
-async function callGoogle(model: string, prompt: string, imgB64: string, imgMime: string, key: string): Promise<AiResult> {
+async function callGoogle(model: string, prompt: string, imgB64: string, imgMime: string, key: string, timeoutMs: number): Promise<AiResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`;
   const resp = await fetchWithTimeout(url, {
     method: "POST",
@@ -83,7 +88,7 @@ async function callGoogle(model: string, prompt: string, imgB64: string, imgMime
       }],
       generationConfig: { responseModalities: ["IMAGE"] },
     }),
-  }, PROVIDER_TIMEOUT_MS, `google:${model}`);
+  }, timeoutMs, `google:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
     return { ok: false, error: `google ${resp.status}: ${t.slice(0, 300)}` };
@@ -99,7 +104,7 @@ async function callGoogle(model: string, prompt: string, imgB64: string, imgMime
   return { ok: false, error: "google: no image in response" };
 }
 
-async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: string): Promise<AiResult> {
+async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: string, timeoutMs: number): Promise<AiResult> {
   const fd = new FormData();
   fd.append("model", model);
   fd.append("prompt", prompt);
@@ -109,7 +114,7 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: str
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: fd,
-  }, PROVIDER_TIMEOUT_MS, `openai:${model}`);
+  }, timeoutMs, `openai:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
     return { ok: false, error: `openai ${resp.status}: ${t.slice(0, 300)}` };
@@ -120,7 +125,7 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: str
   return { ok: true, bytes: base64ToBytes(b64), contentType: "image/png" };
 }
 
-async function callOpenRouter(model: string, prompt: string, imgDataUrl: string, key: string): Promise<AiResult> {
+async function callOpenRouter(model: string, prompt: string, imgDataUrl: string, key: string, timeoutMs: number): Promise<AiResult> {
   const resp = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -138,7 +143,7 @@ async function callOpenRouter(model: string, prompt: string, imgDataUrl: string,
         ],
       }],
     }),
-  }, PROVIDER_TIMEOUT_MS, `openrouter:${model}`);
+  }, timeoutMs, `openrouter:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
     return { ok: false, error: `openrouter ${resp.status}: ${t.slice(0, 300)}` };
@@ -227,19 +232,26 @@ Deno.serve(async (req) => {
 
     const errors: string[] = [];
     let success: { result: AiResult; slot: Slot } | null = null;
+    const startedAt = Date.now();
 
     for (const slot of chain) {
+      const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+      if (remaining < 5_000) {
+        errors.push(`skipped ${slot.provider}:${slot.model} -> out of time budget`);
+        break;
+      }
+      const slotTimeout = Math.min(PROVIDER_TIMEOUT_MS, remaining - 2_000);
       let res: AiResult;
       try {
         if (slot.provider === "google") {
           if (!googleKey) { errors.push(`${slot.provider}:${slot.model} -> GOOGLE_API_KEY missing`); continue; }
-          res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey);
+          res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey, slotTimeout);
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
-          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey);
+          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey, slotTimeout);
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
-          res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey);
+          res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);
         }
       } catch (e) {
         res = { ok: false, error: e instanceof Error ? e.message : String(e) };
