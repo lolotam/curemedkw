@@ -474,6 +474,18 @@ export default function AdminProductEditor() {
         <Button type="submit" disabled={!!priceError} className="bg-brand hover:bg-brand/90 text-white">Save</Button>
       </div>
 
+      {draftRestored && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-brand/40 bg-brand/5 px-4 py-2.5">
+          <p className="text-sm">
+            <span className="font-medium text-brand">Draft restored</span>
+            <span className="text-muted-foreground"> — your unsaved changes were recovered. Save to keep them, or discard to start fresh.</span>
+          </p>
+          <Button type="button" variant="ghost" size="sm" onClick={discardDraft} className="h-8 text-xs">
+            Discard draft
+          </Button>
+        </div>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           <ProductImportFromUrl onImported={applyImported} />
