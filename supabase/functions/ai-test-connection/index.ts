@@ -12,49 +12,94 @@ const json = (body: unknown, status = 200) =>
   });
 
 type Provider = "openrouter" | "openai" | "google" | "anthropic";
+type Kind = "chat" | "image";
 
-async function pingOpenRouter(model: string, key: string) {
-  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+// Some upstream providers (e.g. Azure-hosted GPT-5.x via OpenRouter) require
+// max output tokens >= 16. Use a safe minimum for all chat ping requests.
+const PING_MAX_TOKENS = 16;
+
+async function pingOpenRouterChat(model: string, key: string) {
+  return fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+    body: JSON.stringify({
+      model,
+      max_tokens: PING_MAX_TOKENS,
+      messages: [{ role: "user", content: "ping" }],
+    }),
   });
-  return r;
 }
 
-async function pingOpenAI(model: string, key: string) {
-  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+async function pingOpenAIChat(model: string, key: string) {
+  return fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_completion_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+    body: JSON.stringify({
+      model,
+      max_completion_tokens: PING_MAX_TOKENS,
+      messages: [{ role: "user", content: "ping" }],
+    }),
   });
-  return r;
 }
 
-async function pingGoogle(model: string, key: string) {
+async function pingGoogleChat(model: string, key: string) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`;
-  const r = await fetch(url, {
+  return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: "ping" }] }],
-      generationConfig: { maxOutputTokens: 1 },
+      generationConfig: { maxOutputTokens: PING_MAX_TOKENS },
     }),
   });
-  return r;
 }
 
-async function pingAnthropic(model: string, key: string) {
-  const r = await fetch("https://api.anthropic.com/v1/messages", {
+async function pingAnthropicChat(model: string, key: string) {
+  return fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": key,
       "anthropic-version": "2023-06-01",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: "user", content: "ping" }] }),
+    body: JSON.stringify({
+      model,
+      max_tokens: PING_MAX_TOKENS,
+      messages: [{ role: "user", content: "ping" }],
+    }),
   });
-  return r;
+}
+
+// For image models we don't actually generate an image (that would cost money
+// and be slow). Instead we verify the API key is valid AND the model id exists
+// by retrieving its metadata.
+async function pingOpenAIImage(model: string, key: string) {
+  return fetch(`https://api.openai.com/v1/models/${encodeURIComponent(model)}`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+}
+
+async function pingGoogleImage(model: string, key: string) {
+  return fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}?key=${key}`,
+  );
+}
+
+async function pingOpenRouterImage(model: string, key: string) {
+  // OpenRouter doesn't expose a per-model GET, so list and check membership.
+  const r = await fetch("https://openrouter.ai/api/v1/models", {
+    headers: { Authorization: `Bearer ${key}` },
+  });
+  if (!r.ok) return r;
+  const payload = await r.json().catch(() => ({}));
+  const found = (payload?.data ?? []).some((m: any) => m?.id === model);
+  if (!found) {
+    return new Response(
+      JSON.stringify({ error: { message: `Model "${model}" not found on OpenRouter` } }),
+      { status: 404 },
+    );
+  }
+  return new Response("{}", { status: 200 });
 }
 
 Deno.serve(async (req) => {
@@ -75,6 +120,7 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const provider = String(body?.provider ?? "") as Provider;
     const model = String(body?.model ?? "").trim();
+    const kind = (body?.kind === "image" ? "image" : "chat") as Kind;
     if (!model) return json({ error: "Model is required" }, 400);
 
     const keyName: Record<Provider, string> = {
@@ -86,14 +132,25 @@ Deno.serve(async (req) => {
     const key = Deno.env.get(keyName[provider]);
     if (!key) return json({ ok: false, error: `${keyName[provider]} is not configured` }, 200);
 
+    if (kind === "image" && provider === "anthropic") {
+      return json({ ok: false, error: "Anthropic does not provide image models" }, 200);
+    }
+
     const t0 = Date.now();
     let r: Response;
     try {
-      if (provider === "openrouter") r = await pingOpenRouter(model, key);
-      else if (provider === "openai") r = await pingOpenAI(model, key);
-      else if (provider === "google") r = await pingGoogle(model, key);
-      else if (provider === "anthropic") r = await pingAnthropic(model, key);
-      else return json({ ok: false, error: `Unknown provider: ${provider}` }, 200);
+      if (kind === "image") {
+        if (provider === "openai") r = await pingOpenAIImage(model, key);
+        else if (provider === "google") r = await pingGoogleImage(model, key);
+        else if (provider === "openrouter") r = await pingOpenRouterImage(model, key);
+        else return json({ ok: false, error: `Unknown provider: ${provider}` }, 200);
+      } else {
+        if (provider === "openrouter") r = await pingOpenRouterChat(model, key);
+        else if (provider === "openai") r = await pingOpenAIChat(model, key);
+        else if (provider === "google") r = await pingGoogleChat(model, key);
+        else if (provider === "anthropic") r = await pingAnthropicChat(model, key);
+        else return json({ ok: false, error: `Unknown provider: ${provider}` }, 200);
+      }
     } catch (e) {
       return json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 200);
     }
@@ -103,7 +160,7 @@ Deno.serve(async (req) => {
       return json({ ok: false, latency_ms, status: r.status, error: t.slice(0, 400) }, 200);
     }
     await r.text();
-    return json({ ok: true, latency_ms, provider, model }, 200);
+    return json({ ok: true, latency_ms, provider, model, kind }, 200);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
