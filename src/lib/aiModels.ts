@@ -24,9 +24,9 @@ export const DEFAULT_SLOTS: SlotsByKind = {
     { provider: "openrouter", model: "anthropic/claude-3.5-haiku" },
   ],
   image: [
-    { provider: "google", model: "gemini-2.5-flash-image" },
     { provider: "openai", model: "gpt-image-1" },
-    { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
+    { provider: "openrouter", model: "google/gemini-3-pro-image-preview" },
+    { provider: "google", model: "gemini-3.1-flash-image-preview" },
   ],
 };
 

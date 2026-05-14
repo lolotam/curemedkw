@@ -18,9 +18,9 @@ const DEFAULT_PROMPT =
   "Upscale this product image to a higher resolution. Preserve every product detail exactly: shape, colors, packaging text, logos, branding, materials, lighting and background. Do NOT add, remove, restyle or reinterpret anything. Output a clean, sharp, photorealistic version of the same image at a larger size.";
 
 const DEFAULT_IMAGE_CHAIN: Slot[] = [
-  { provider: "google", model: "gemini-2.5-flash-image" },
   { provider: "openai", model: "gpt-image-1" },
-  { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
+  { provider: "openrouter", model: "google/gemini-3-pro-image-preview" },
+  { provider: "google", model: "gemini-3.1-flash-image-preview" },
 ];
 
 const PROVIDER_TIMEOUT_MS = 120_000;
