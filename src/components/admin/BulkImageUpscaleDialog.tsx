@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -6,62 +6,41 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Cpu, Download, Maximize2, AlertCircle, CheckCircle2, Timer } from "lucide-react";
+import { Loader2, Sparkles, Cpu, Download, Maximize2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useAiModels } from "@/lib/aiModels";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 import BeforeAfterSlider from "./BeforeAfterSlider";
+import {
+  startBulkUpscale,
+  dismissBulkUpscale,
+  useBulkUpscaleJob,
+  bulkUpscaleJobIdFor,
+  type BulkItem,
+  type BulkItemStatus,
+} from "@/lib/jobs/bulkUpscaleJobs";
+import { useTick } from "@/lib/jobs/jobStore";
+import type { UpscaleEngine } from "@/lib/jobs/upscaleJobs";
 
 type Mode = "standard" | "ultra";
-type Engine = "picsart" | "ai";
-type ItemStatus = "pending" | "loading" | "done" | "error";
-
-type Item = {
-  src: string;
-  status: ItemStatus;
-  resultUrl?: string;
-  meta?: string;
-  error?: string;
-  startedAt?: number;
-  elapsedMs?: number;
-};
 
 function formatMs(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
 }
 
-function TimerBadge({ startedAt, elapsedMs, status }: { startedAt?: number; elapsedMs?: number; status: ItemStatus }) {
-  const [now, setNow] = useState(() => Date.now());
-  const rafRef = useRef<number>(0);
-  const lastTickRef = useRef<number>(0);
-
+function TimerBadge({ startedAt, elapsedMs, status }: { startedAt?: number; elapsedMs?: number; status: BulkItemStatus }) {
+  useTick(1000);
   const active = status === "loading" && startedAt != null;
   const frozen = status === "done" || status === "error";
-
-  useEffect(() => {
-    if (!active) return;
-    const tick = (ts: number) => {
-      if (ts - lastTickRef.current >= 1000) {
-        lastTickRef.current = ts;
-        setNow(ts);
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [active]);
-
   if (!startedAt) return null;
-
-  const ms = frozen && elapsedMs != null ? elapsedMs : active ? now - startedAt : 0;
-  if (ms <= 0) return null;
+  const ms = frozen && elapsedMs != null ? elapsedMs : active ? Date.now() - startedAt : 0;
+  if (ms <= 0 && !active) return null;
 
   return (
     <span
@@ -92,24 +71,12 @@ interface Props {
 
 const STANDARD_FACTORS = [2, 4, 6, 8] as const;
 const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
-const CONCURRENCY = 3;
-
-async function runPool<T>(items: T[], limit: number, worker: (item: T, i: number) => Promise<void>) {
-  let i = 0;
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (i < items.length) {
-      const idx = i++;
-      await worker(items[idx], idx);
-    }
-  });
-  await Promise.all(runners);
-}
 
 export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, baseName = "image", storageContext, onReplaceMany }: Props) {
   const { slots } = useAiModels();
 
   // Configuration
-  const [engine, setEngine] = useState<Engine>("picsart");
+  const [engine, setEngine] = useState<UpscaleEngine>("picsart");
   const [mode, setMode] = useState<Mode>("standard");
   const [factor, setFactor] = useState<number>(2);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
@@ -117,9 +84,6 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
 
   // Selection (input phase)
   const [selectedSrcs, setSelectedSrcs] = useState<Set<string>>(new Set());
-  // Items being / already processed
-  const [items, setItems] = useState<Item[]>([]);
-  const [processing, setProcessing] = useState(false);
   // Per-item replace selection (output phase)
   const [replaceSelected, setReplaceSelected] = useState<Set<string>>(new Set());
   // Fullscreen compare
@@ -128,20 +92,45 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
   const factors = mode === "ultra" ? ULTRA_FACTORS : STANDARD_FACTORS;
   const uniqueUrls = useMemo(() => Array.from(new Set(imageUrls.filter((u) => u && !u.startsWith("data:")))), [imageUrls]);
 
-  // Reset on open
+  const jobId = useMemo(() => bulkUpscaleJobIdFor(uniqueUrls, storageContext?.productSlug), [uniqueUrls, storageContext?.productSlug]);
+  const job = useBulkUpscaleJob(jobId);
+  const items: BulkItem[] = job?.items ?? [];
+  const processing = job?.status === "running";
+
+  // Initialize selection when opening fresh (no existing job)
   useEffect(() => {
-    if (open) {
+    if (open && !job) {
       setSelectedSrcs(new Set(uniqueUrls));
-      setItems([]);
       setReplaceSelected(new Set());
       setPreviewIdx(null);
     }
-  }, [open, uniqueUrls]);
+  }, [open, uniqueUrls, job]);
+
+  // Auto-select newly finished items for replacement
+  useEffect(() => {
+    if (!items.length) return;
+    setReplaceSelected((prev) => {
+      const next = new Set(prev);
+      items.forEach((it) => {
+        if (it.status === "done" && !next.has(it.src)) next.add(it.src);
+      });
+      return next;
+    });
+  }, [items]);
+
+  // Toast on completion
+  const finished = job && job.status === "done" && job.finishedAt;
+  useEffect(() => {
+    if (!finished) return;
+    const ok = items.filter((i) => i.status === "done").length;
+    const fail = items.filter((i) => i.status === "error").length;
+    if (ok && !fail) toast.success(`Upscaled ${ok} image(s)`);
+    else if (ok && fail) toast.warning(`Upscaled ${ok} — ${fail} failed`);
+    else if (fail) toast.error(`All ${fail} upscale(s) failed`);
+  }, [finished]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allSelected = uniqueUrls.length > 0 && selectedSrcs.size === uniqueUrls.length;
-  const toggleSelectAll = () => {
-    setSelectedSrcs(allSelected ? new Set() : new Set(uniqueUrls));
-  };
+  const toggleSelectAll = () => setSelectedSrcs(allSelected ? new Set() : new Set(uniqueUrls));
   const toggleSrc = (src: string) => {
     setSelectedSrcs((prev) => {
       const next = new Set(prev);
@@ -151,79 +140,29 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
     });
   };
 
-  const upscaleOne = async (src: string): Promise<{ url: string; meta: string }> => {
-    if (engine === "picsart") {
-      const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { imageUrl: src, mode, factor, format, brand: storageContext?.brand, productSlug: storageContext?.productSlug },
-      });
-      if (error) throw error;
-      if (!data?.url) throw new Error("No result URL");
-      return { url: data.url, meta: `PICSART · ${mode} · ${factor}× · ${format}` };
-    } else {
-      const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
-        body: { imageUrl: src, extraInstructions: extraInstructions.trim() || undefined, brand: storageContext?.brand, productSlug: storageContext?.productSlug },
-      });
-      if (error) throw error;
-      if (!data?.url) {
-        const details = Array.isArray((data as any)?.details) ? (data as any).details.join(" | ") : "";
-        throw new Error(details || "No result URL");
-      }
-      return {
-        url: data.url,
-        meta: `${PROVIDER_LABELS[data.provider as keyof typeof PROVIDER_LABELS] ?? data.provider} · ${data.model}`,
-      };
-    }
-  };
-
-  const handleRun = async () => {
+  const handleRun = () => {
     const list = Array.from(selectedSrcs);
     if (!list.length) {
       toast.info("Select at least one image");
       return;
     }
-    setProcessing(true);
-    const initial: Item[] = list.map((src) => ({ src, status: "pending" as ItemStatus }));
-    setItems(initial);
-    setReplaceSelected(new Set());
-
-    const update = useCallback((src: string, patch: Partial<Item>) => {
-      setItems((prev) => prev.map((it) => (it.src === src ? { ...it, ...patch } : it)));
-    }, []);
-
-    const itemMapRef = useRef<Map<string, Item>>(new Map());
-    const syncUpdate = (src: string, patch: Partial<Item>) => {
-      const cur = itemMapRef.current.get(src);
-      if (cur) itemMapRef.current.set(src, { ...cur, ...patch });
-      update(src, patch);
-    };
-
-    let okCount = 0;
-    let failCount = 0;
-    await runPool(list, CONCURRENCY, async (src) => {
-      const startedAt = Date.now();
-      syncUpdate(src, { status: "loading", startedAt });
-      try {
-        const { url, meta } = await upscaleOne(src);
-        const elapsedMs = Date.now() - startedAt;
-        const item = { status: "done" as ItemStatus, resultUrl: url, meta, elapsedMs };
-        itemMapRef.current.set(src, { ...itemMapRef.current.get(src)!, ...item });
-        update(src, item);
-        setReplaceSelected((prev) => new Set(prev).add(src));
-        okCount++;
-      } catch (e: any) {
-        const msg = e?.context?.error || e?.message || "Failed";
-        const elapsedMs = Date.now() - startedAt;
-        const item = { status: "error" as ItemStatus, error: String(msg), elapsedMs };
-        itemMapRef.current.set(src, { ...itemMapRef.current.get(src)!, ...item });
-        update(src, item);
-        failCount++;
-      }
+    void startBulkUpscale(jobId, list, {
+      engine,
+      mode,
+      factor,
+      format,
+      extraInstructions: extraInstructions.trim() || undefined,
+      brand: storageContext?.brand,
+      productSlug: storageContext?.productSlug,
     });
+    setReplaceSelected(new Set());
+  };
 
-    setProcessing(false);
-    if (okCount && !failCount) toast.success(`Upscaled ${okCount} image(s)`);
-    else if (okCount && failCount) toast.warning(`Upscaled ${okCount} — ${failCount} failed`);
-    else toast.error(`All ${failCount} upscale(s) failed`);
+  const handleStartOver = () => {
+    dismissBulkUpscale(jobId);
+    setSelectedSrcs(new Set(uniqueUrls));
+    setReplaceSelected(new Set());
+    setPreviewIdx(null);
   };
 
   const doneItems = items.filter((it) => it.status === "done" && it.resultUrl);
@@ -235,7 +174,6 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
       return next;
     });
   };
-  const replaceAllSelected = allSelected; // checkbox in results header
   const allDoneSelected = doneItems.length > 0 && replaceSelected.size === doneItems.length;
   const toggleReplaceAll = () => {
     setReplaceSelected(allDoneSelected ? new Set() : new Set(doneItems.map((it) => it.src)));
@@ -266,10 +204,12 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
     targets.forEach((it) => { map[it.src] = it.resultUrl!; });
     onReplaceMany(map);
     toast.success(`Replaced ${targets.length} image(s) — remember to save the product`);
+    dismissBulkUpscale(jobId);
     onOpenChange(false);
   };
 
   const previewItem = previewIdx != null ? doneItems[previewIdx] : null;
+  const showSelection = items.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -279,12 +219,12 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
             <Sparkles className="h-4 w-4 text-brand" /> Bulk upscale images
           </DialogTitle>
           <DialogDescription>
-            Select images, choose an engine, then compare each result with a draggable before/after slider.
+            Select images, choose an engine, then compare each result with a draggable before/after slider. Jobs continue running if you close this dialog or switch tabs.
           </DialogDescription>
         </DialogHeader>
 
         {/* Selection grid */}
-        {items.length === 0 && (
+        {showSelection && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium">Images ({uniqueUrls.length})</p>
@@ -323,13 +263,13 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
         )}
 
         {/* Engine + settings */}
-        {items.length === 0 && (
+        {showSelection && (
           <div className="space-y-4 pt-2">
             <div className="space-y-2">
               <Label className="text-sm font-medium">Engine</Label>
               <RadioGroup
                 value={engine}
-                onValueChange={(v) => setEngine(v as Engine)}
+                onValueChange={(v) => setEngine(v as UpscaleEngine)}
                 className="grid grid-cols-1 sm:grid-cols-2 gap-2"
               >
                 <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40">
@@ -435,7 +375,7 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
             )}
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
               <Button onClick={handleRun} disabled={selectedSrcs.size === 0}>
                 <Sparkles className="h-4 w-4 mr-1.5" /> Upscale {selectedSrcs.size} image{selectedSrcs.size === 1 ? "" : "s"}
               </Button>
@@ -444,7 +384,7 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
         )}
 
         {/* Results grid */}
-        {items.length > 0 && (
+        {!showSelection && (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-3 text-sm">
@@ -461,6 +401,9 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
                     {allDoneSelected ? "Clear" : "Select all"}
                   </Button>
                 )}
+                <Button type="button" variant="ghost" size="sm" onClick={handleStartOver} className="h-8 text-xs" disabled={processing}>
+                  Start over
+                </Button>
               </div>
             </div>
 
@@ -559,13 +502,13 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-border">
-              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={processing}>
-                Cancel
+              <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Close
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={processing || replaceSelected.size === 0}
+                disabled={replaceSelected.size === 0}
                 onClick={downloadSelectedResults}
                 className="gap-1.5"
               >
@@ -574,7 +517,7 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
               <Button
                 variant="outline"
                 size="sm"
-                disabled={processing || doneItems.length === 0}
+                disabled={doneItems.length === 0}
                 onClick={downloadAllResults}
                 className="gap-1.5"
               >
@@ -583,14 +526,14 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
               <Button
                 variant="secondary"
                 size="sm"
-                disabled={processing || replaceSelected.size === 0}
+                disabled={replaceSelected.size === 0}
                 onClick={() => replaceMap("selected")}
               >
                 Replace selected ({replaceSelected.size})
               </Button>
               <Button
                 size="sm"
-                disabled={processing || doneItems.length === 0}
+                disabled={doneItems.length === 0}
                 onClick={() => replaceMap("all")}
               >
                 Replace all ({doneItems.length})
