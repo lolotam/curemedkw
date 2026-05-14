@@ -102,14 +102,14 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
   const upscaleOne = async (src: string): Promise<{ url: string; meta: string }> => {
     if (engine === "picsart") {
       const { data, error } = await supabase.functions.invoke("upscale-image", {
-        body: { imageUrl: src, mode, factor, format },
+        body: { imageUrl: src, mode, factor, format, brand: storageContext?.brand, productSlug: storageContext?.productSlug },
       });
       if (error) throw error;
       if (!data?.url) throw new Error("No result URL");
       return { url: data.url, meta: `PICSART · ${mode} · ${factor}× · ${format}` };
     } else {
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
-        body: { imageUrl: src, extraInstructions: extraInstructions.trim() || undefined },
+        body: { imageUrl: src, extraInstructions: extraInstructions.trim() || undefined, brand: storageContext?.brand, productSlug: storageContext?.productSlug },
       });
       if (error) throw error;
       if (!data?.url) {
