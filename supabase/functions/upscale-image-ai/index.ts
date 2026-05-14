@@ -236,7 +236,7 @@ Deno.serve(async (req) => {
 
     const ct = success.result.contentType || "image/png";
     const ext = ct.includes("jpeg") ? "jpg" : ct.includes("webp") ? "webp" : "png";
-    const path = `upscaled-ai/${crypto.randomUUID()}.${ext}`;
+    const path = `${brandSeg}/${slugSeg}/upscaled-ai/${crypto.randomUUID()}.${ext}`;
     const { error: upErr } = await admin.storage
       .from("product-images")
       .upload(path, success.result.bytes!, { contentType: ct, upsert: false });
