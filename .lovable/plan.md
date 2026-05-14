@@ -1,48 +1,48 @@
-## Goal
-Add **Anthropic** as a fourth AI provider in `/admin/models` (Chat tab), listing all available Claude models, selectable as Primary / Fallback #2 / Fallback #3, plus a "Test connection" button per slot.
+# Batch upscale with before/after compare slider
 
-## Steps
+Extend the upscale workflow on the product editor so the admin can upscale **multiple selected images at once**, compare each one with a draggable before/after slider, then download or replace selectively.
 
-### 1. Add `ANTHROPIC_API_KEY` secret
-Prompt the user to add their Anthropic API key (from console.anthropic.com → API Keys). Stored as a backend secret used only by edge functions.
+## UX flow
 
-### 2. New edge function: `anthropic-models`
-- `GET https://api.anthropic.com/v1/models` with headers `x-api-key` + `anthropic-version: 2023-06-01`.
-- Return `{ models: [{ id, name, kind: "chat", context_length: null, pricing: null }] }`.
-- All Anthropic models are chat-only (no image generation), so kind is always `"chat"`.
+1. In `AdminProductEditor`, add a "Bulk upscale" button to the gallery toolbar (next to existing per-image upscale).
+2. Clicking opens a new full-screen dialog `BulkImageUpscaleDialog` with:
+   - **Step 1 — Select**: thumbnail grid of all product images (main + gallery) with checkboxes. "Select all" / "Clear" controls.
+   - **Engine + settings panel**: same engine choice (PICSART vs AI) and options as the existing single dialog. Single setting applied to the whole batch.
+   - **Run** button → triggers parallel upscale (max 3 concurrent) calling the same `upscale-image` / `upscale-image-ai` edge functions per image. Per-image status: pending → loading → done/failed (with error tooltip).
+3. **Step 2 — Compare**: once any image finishes, a results grid shows pairs. Each card has:
+   - A **before/after slider** (draggable vertical handle over a stacked `<img>` pair) so the admin drags left/right to reveal the upscaled version.
+   - A row checkbox (selected by default for successful items).
+   - Buttons: **Preview fullscreen** (opens an enlarged version of the same slider), **Download** (single).
+4. **Footer actions**:
+   - **Download selected (zip)** — uses existing `downloadImagesAsZip`.
+   - **Replace selected** — swaps each selected original URL with its upscaled URL inside `form.mainImage` / `form.gallery` and closes.
+   - **Replace all (successful)** — same but ignores selection.
+   - **Cancel** — discards results.
 
-### 3. New edge function: `ai-test-connection`
-- Body: `{ provider, model }` (admin-only).
-- Performs a tiny "ping" call to the chosen provider's chat endpoint and returns `{ ok, latency_ms, error? }`.
-- Anthropic ping: `POST /v1/messages` with `max_tokens: 1`, message `"ping"`.
-- OpenAI / Google / OpenRouter pings reuse the existing endpoint patterns.
+## Files
 
-### 4. Frontend: extend provider list
-File: `src/lib/aiProviders.ts`
-- `Provider = "openrouter" | "openai" | "google" | "anthropic"`
-- Add `PROVIDER_LABELS.anthropic = "Anthropic"`, append to `PROVIDERS`, map `FN_BY_PROVIDER.anthropic = "anthropic-models"`.
+**New:**
+- `src/components/admin/BulkImageUpscaleDialog.tsx` — orchestrates batch state, calls edge functions, renders selection + results grid + footer actions.
+- `src/components/admin/BeforeAfterSlider.tsx` — reusable draggable slider (stacked images, draggable handle, keyboard arrow support, `aspect-square` container, `object-contain`). Used in both grid cards and fullscreen preview.
 
-File: `src/lib/aiModels.ts`
-- Add `"anthropic"` to the provider whitelist in `normalizeSlot`.
-- Defaults unchanged.
-
-### 5. Frontend: Test button
-In `src/pages/admin/AdminModels.tsx`, inside `SlotCard`, add a small **"Test connection"** button next to the Reset link. On click it invokes `ai-test-connection` with the current `{provider, model}` and shows a toast with success/latency or the error.
-
-### 6. Backend dispatch for chat (extract-product)
-File: `supabase/functions/extract-product/index.ts`
-- Add `"anthropic"` to provider validation list.
-- Add `callAnthropic(model)` that calls `POST https://api.anthropic.com/v1/messages` with the existing tool / function-calling schema converted to Anthropic's `tools` format, and parse the `tool_use` block back into `{ args }`.
-- Wire it into the `dispatch` switch.
-
-### 7. Image tab unchanged
-Anthropic does not produce images; it will only appear in the Chat tab's model list (the existing filter `m.kind === kind` naturally hides it from the Image tab).
+**Edited:**
+- `src/pages/admin/AdminProductEditor.tsx` — add "Bulk upscale" button to gallery toolbar, wire dialog open state, implement `replaceMany(urlMap: Record<string,string>)` to update `mainImage` and `gallery` in one `setForm` call.
 
 ## Technical notes
-- Anthropic API: `POST /v1/messages`, headers `x-api-key`, `anthropic-version: 2023-06-01`, `content-type: application/json`. Tool use uses `tools: [{name, description, input_schema}]` and responds with a `tool_use` content block containing `input`.
-- The models list endpoint requires the same headers and returns `{ data: [{ id, display_name, created_at }] }`.
-- Test connection is admin-gated using the existing `user_roles` check pattern (same as `upscale-image-ai`).
+
+- No new edge functions or DB changes. Reuses `upscale-image` and `upscale-image-ai`.
+- Concurrency: simple promise pool (limit 3) to avoid hammering APIs.
+- Each item state shape: `{ src, status: 'pending'|'loading'|'done'|'error', resultUrl?, meta?, error? }`.
+- Selection state separate from status — only `done` items are selectable.
+- Slider implementation: pointer events on a handle, percentage state 0–100, `clip-path: inset(0 X% 0 0)` on the top image. Works on touch + mouse. RTL-safe via `dir="ltr"` wrapper.
+- Replace logic (in editor): build a `Map<oldUrl, newUrl>`; remap `mainImage` and `gallery` preserving order and duplicates.
+- Use existing `ImagePreviewDialog` only as inspiration; the fullscreen compare uses the same `BeforeAfterSlider` enlarged.
+- All styling via semantic tokens (`bg-background`, `border-border`, `bg-muted`, `text-muted-foreground`, `text-brand`). No hardcoded colors.
+- Toasts for batch summary: `"Upscaled 7/8 images — 1 failed"`.
+- Reuse `useAiModels` + `PROVIDER_LABELS` for the AI engine fallback display.
 
 ## Out of scope
-- No changes to image-generation flow.
-- No changes to `translate-product` (OpenRouter-only by design).
+
+- Persisting upscales as separate stored assets (current flow keeps the returned URL — same as today).
+- Per-image different engines/factors in one batch (single setting applies to all).
+- Side-by-side (non-slider) comparison view — slider is the only compare mode.
