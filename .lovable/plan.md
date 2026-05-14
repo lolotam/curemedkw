@@ -1,105 +1,100 @@
-## Goal
+## Diagnosis
 
-Switch the frontend (Lovable preview, lovable.app, Dokploy) to talk **only** to self-hosted Supabase at `https://supabase.curemedkw.com`. Keep all server-side secrets (service role, JWT secret, API provider keys, SMTP) **out** of the frontend repo.
+Both errors come from edge functions running on `https://supabase.curemedkw.com` (self-hosted), not from the frontend. The frontend, REST/PostgREST and Auth are working fine — only the two AI-heavy functions fail.
 
-## Verification (already done)
+### What I verified
 
-- `/config.js` is loaded before `/src/main.tsx` in `index.html` ✓
-- No app file still imports the old `src/integrations/supabase/client.ts` ✓
-- No hardcoded `functions/v1` URLs anywhere ✓
-- `clientRuntime.ts` reads `window.__APP_CONFIG__` first, falls back to `VITE_SUPABASE_*` ✓
-- **One stale URL found**: `src/lib/db.ts:1097` hardcodes the Lovable Cloud storage URL as the default loader video. Will be fixed in this change.
+1. **CORS / preflight is OK on self-hosted** — `OPTIONS /functions/v1/scrape-product` and `OPTIONS /functions/v1/upscale-image-ai` both return `200` with `access-control-allow-origin: *`. So the issue is not CORS misconfiguration.
+2. **Functions ARE deployed on self-hosted** — they respond with their own JSON error bodies (`{"error":"Missing Authorization header"}`, `{"error":"Unauthorized"}`), which is code from `scrape-product/index.ts` and `upscale-image-ai/index.ts` running on Kong/edge-runtime at `supabase.curemedkw.com`.
+3. **Auth model in those functions** — both call `admin.auth.getUser(token)` against `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` from env. Then they require an `admin` row in `user_roles`. The browser request DOES include a valid user Bearer token issued by self-hosted GoTrue, so this check should pass for the logged-in admin user.
 
-## Frontend secrets — only 2 public values
+### Why each error happens
 
-```
-VITE_SUPABASE_URL=https://supabase.curemedkw.com
-VITE_SUPABASE_PUBLISHABLE_KEY=<self-hosted anon JWT>
-```
+**A. `scrape-product` → "Edge Function returned a non-2xx status code"**
+The browser actually receives an HTTP response (4xx/5xx) — that's what supabase-js wraps as "non-2xx". Most likely causes on self-hosted, in order of likelihood:
 
-That's it. The anon key is a public JWT; safety depends entirely on RLS, which is already in place.
+1. `FIRECRAWL_API_KEY` is **not set** in the self-hosted edge runtime env → function returns 500 / 400.
+2. `SUPABASE_SERVICE_ROLE_KEY` on self-hosted edge runtime doesn't match the JWT secret used by GoTrue → `admin.auth.getUser(token)` fails → 401 even for a valid user.
+3. The user row isn't in `public.user_roles` with `role='admin'` on the self-hosted DB (data wasn't migrated for this user) → 403.
 
-**Nothing else** belongs in this repo. The following stay on the self-hosted Supabase stack only (per `SELF_HOSTED.md` § C, H):
-`SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `POSTGRES_PASSWORD`, `SECRET_KEY_BASE`, `VAULT_ENC_KEY`, `PICSART_API_KEY`, `OPENROUTER_API_KEY`, `FIRECRAWL_API_KEY`, `LOVABLE_API_KEY`, `GOOGLE_CLIENT_SECRET`, all `SMTP_*`.
+**B. `upscale-image-ai` → "Failed to fetch"** (no HTTP status at all)
+"Failed to fetch" with no status means the browser never saw a response — preflight is fine, so it's almost certainly **the function exceeding the upstream timeout**:
 
-## Approach: env-driven runtime config (no committed credentials)
+- Cloudflare in front of `supabase.curemedkw.com` has a hard ~100s timeout.
+- This function downloads the image, calls OpenAI/Gemini/OpenRouter (each up to 120s — see `PROVIDER_TIMEOUT_MS = 120_000`), uploads to storage, and returns. Easily >100s on first model.
+- When Cloudflare times out, it drops the connection without CORS headers → browser reports `TypeError: Failed to fetch`.
+- A secondary cause would be one of `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY` missing on self-hosted, but that would return 500, not "Failed to fetch".
 
-Per your preference, do **not** hardcode the URL/key into `public/config.js`. Instead, generate it from env vars at runtime/build:
+### What this is NOT
 
-### 1. `public/config.js` — placeholder template (committed)
+- Not a Lovable-vs-self-hosted client config issue. `public/config.js` correctly points at `https://supabase.curemedkw.com` and the user's session is authenticated against it.
+- Not a CORS bug in the function source.
 
-```js
-// Replaced at runtime by docker/start-nginx.sh, or at dev/build time by Vite env vars.
-// Empty values cause clientRuntime.ts to fall back to VITE_SUPABASE_*.
-window.__APP_CONFIG__ = window.__APP_CONFIG__ || {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: "",
-};
-```
+---
 
-(Same as today — no change.)
+## Plan to fix
 
-### 2. Dokploy `web` container — already correct
+### Step 1 — Confirm secrets on the self-hosted stack (you, on the server)
 
-`docker/start-nginx.sh` already rewrites `/usr/share/nginx/html/config.js` from `RUNTIME_SUPABASE_URL` / `RUNTIME_SUPABASE_ANON_KEY` on every start. You set those two values in Dokploy → frontend service env. No code change needed.
-
-### 3. Lovable preview + published lovable.app — env vars only
-
-Lovable's preview/build environment can't run a shell script to rewrite `config.js`, so for **those two environments** the fallback path is what runs: `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY` baked into the bundle at build time.
-
-Lovable currently injects its own values for those two from Lovable Cloud. To override them, set them in **Lovable → Project Settings → Build Secrets** (workspace-level env vars available at build time):
-
-- `VITE_SUPABASE_URL` = `https://supabase.curemedkw.com`
-- `VITE_SUPABASE_PUBLISHABLE_KEY` = your self-hosted anon JWT
-
-Once set, Vite picks them up on the next build. The committed code stays clean — switching back to Lovable Cloud is just removing those two build secrets.
-
-> Note: I cannot set Build Secrets for you — that's a workspace-admin action. After you add them, the next preview rebuild will use self-hosted.
-
-### 4. Optional `.env.example` update
-
-Update the example file so future devs know which two vars matter:
+On the Dokploy/self-hosted Supabase host, check the edge-runtime container env actually has:
 
 ```
-VITE_SUPABASE_URL=https://supabase.curemedkw.com
-VITE_SUPABASE_PUBLISHABLE_KEY=<self-hosted anon key>
-# Optional Dokploy-only runtime overrides:
-# RUNTIME_SUPABASE_URL=https://supabase.curemedkw.com
-# RUNTIME_SUPABASE_ANON_KEY=<self-hosted anon key>
+SUPABASE_URL=https://supabase.curemedkw.com
+SUPABASE_SERVICE_ROLE_KEY=<self-hosted service role>
+SUPABASE_ANON_KEY=<self-hosted anon>
+FIRECRAWL_API_KEY=...
+OPENAI_API_KEY=...
+GOOGLE_API_KEY=...
+OPENROUTER_API_KEY=...
+PICSART_API_KEY=...   (used by upscale-image)
 ```
 
-## Code change in this repo
+The Lovable Cloud "secrets" panel listed in this prompt is **not** what these functions read at runtime — they read the self-hosted edge-runtime env. After updating, restart the `functions` / `edge-runtime` container so values reload.
 
-Just one small fix:
+### Step 2 — Confirm the admin row exists on self-hosted
 
-**`src/lib/db.ts:1097`** — replace the hardcoded `yjvqzvmyritxegugfhkt.supabase.co` loader-video URL with either an empty string fallback or a relative `/loading.mp4` path, so nothing in the bundle still points at the old project. The active value comes from `site_settings.loader_video_url` anyway.
+Run on the self-hosted DB (SQL editor of self-hosted Studio):
 
-No other source files need editing. No new files. No type changes.
+```sql
+select role from public.user_roles
+where user_id = 'b1c2de5a-1134-4b3a-8691-9ff7b73b1221';
+```
 
-## Server-side prerequisites (you / ops, not me)
+If empty, insert `('b1c2de5a-1134-4b3a-8691-9ff7b73b1221','admin')`.
 
-Before flipping the switch, confirm on `https://supabase.curemedkw.com`:
+### Step 3 — Reproduce `scrape-product` with detailed status
 
-1. **Migrations applied** — `bash scripts/apply-self-hosted-migrations.sh`
-2. **Edge functions deployed** with their secrets (`SELF_HOSTED.md` §C, §H)
-3. **Storage buckets exist & public**: `hero-media`, `product-images`, `category-images`, `buket-images`, `brands-images`, `favicone`, `avatars`
-4. **Kong CORS** allows: `https://curemedkw.com`, `https://curemedkw.lovable.app`, **and** the preview origin `https://id-preview--572b9c01-61fc-4795-bd86-b97ac69f8cac.lovable.app`
-5. **Auth → Redirect URLs** include all three origins above
-6. **Data copied** from Lovable Cloud (one-time `pg_dump --data-only`, plus the `migrate-storage-copy` loop for files), otherwise the site is empty
-7. **Google OAuth client** configured against `https://supabase.curemedkw.com/auth/v1/callback`
+After Steps 1–2, retry Add Product → Scrape. If it still fails, capture the response body from DevTools Network tab. The function returns structured JSON like `{ error: "FIRECRAWL_API_KEY not configured" }` or `{ error: "Admin only" }` — that pinpoints the remaining cause exactly.
 
-If any of these are missing, the switch will surface as: empty pages, CORS errors in the console, or "Invalid login credentials" on sign-in.
+### Step 4 — Fix `upscale-image-ai` timeout (code change in next build mode)
 
-## Caveats
+Two options, in order of preference:
 
-- All current sessions become invalid on the switch (different JWT issuer). Everyone signs in again.
-- `src/integrations/supabase/types.ts` stays as-is; it's accurate as long as `supabase/migrations/` is the source of truth for both backends.
-- Reverting = remove the two Build Secrets in Lovable, and on Dokploy clear the `RUNTIME_*` env vars + restart.
+1. **Lower per-provider timeout and run providers in parallel race**, so the function returns within ~60s. Change `PROVIDER_TIMEOUT_MS` from `120_000` to `45_000`, and use `Promise.any` over the chain instead of sequential fallback.
+2. **Convert to background job** — insert a row in a new `image_jobs` table, call `EdgeRuntime.waitUntil(processJob(...))`, return `{ job_id }` immediately. Frontend polls `image_jobs` until `status='complete'`. This is the robust fix; it removes any edge timeout from the user path.
 
-## Implementation steps when you approve
+I recommend option 1 first (small change, no DB migration, often enough), and only do option 2 if it still times out.
 
-1. Edit `src/lib/db.ts` line 1097 — remove the Lovable Cloud storage URL fallback.
-2. Update `.env.example` to document the two required vars.
-3. Tell you to set the two Build Secrets in Lovable and the two `RUNTIME_*` vars in Dokploy.
+### Step 5 — Optional: verify with a direct curl using a real user token
 
-That's the whole change in the codebase.
+Once Steps 1–2 are done, paste the user's Bearer token from DevTools and run:
+
+```bash
+curl -i -X POST https://supabase.curemedkw.com/functions/v1/scrape-product \
+  -H "Authorization: Bearer <USER_JWT>" \
+  -H "apikey: <ANON>" \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://pharmazone.com/products/..."}'
+```
+
+A successful path returns `200` with `{ images: [...] }`. Any other status comes back with a JSON `error` field that tells us exactly which check failed.
+
+---
+
+## Notes / non-goals
+
+- We will keep all client config pointing at self-hosted (`public/config.js` stays as-is).
+- No Lovable Cloud secret changes are needed — these functions only read self-hosted env vars now.
+- No frontend behavior changes for scrape; only `upscale-image-ai/index.ts` may be edited (Step 4 option 1) when you switch out of plan mode.
+
+Tell me which step you want me to start with after you've confirmed Steps 1–2 on the server (or if you want me to just go ahead and apply Step 4 option 1 now).
