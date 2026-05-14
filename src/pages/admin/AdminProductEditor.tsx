@@ -402,12 +402,15 @@ export default function AdminProductEditor() {
       if (isNew) {
         const created = await createMut.mutateAsync(form);
         toast.success("Product created");
+        clearDraft("new");
+        clearDraft(created.id);
         // Auto-translate new product in background
         translate(created.id, { silent: true });
         navigate(`/admin/products/${created.id}`);
       } else if (id) {
         await updateMut.mutateAsync({ id, patch: form });
         toast.success("Product updated");
+        clearDraft(id);
         // Auto-translate after edit, only if Arabic name still missing
         if (!form.nameAr || !form.nameAr.trim()) {
           translate(id, { silent: true });
@@ -424,9 +427,22 @@ export default function AdminProductEditor() {
       try {
         await deleteMut.mutateAsync(id);
         toast.success("Deleted");
+        clearDraft(id);
         navigate("/admin/products");
       } catch (err: any) { toast.error(err.message); }
     }
+  };
+
+  const discardDraft = () => {
+    clearDraft(draftKey);
+    setDraftRestored(false);
+    if (isNew) {
+      setForm(BLANK());
+    } else if (existing) {
+      const { id: _i, createdAt: _c, updatedAt: _u, ...rest } = existing;
+      setForm(rest);
+    }
+    toast.success("Draft discarded");
   };
 
   return (
