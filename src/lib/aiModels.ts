@@ -51,7 +51,7 @@ function clone(s: SlotsByKind): SlotsByKind {
 function normalizeSlot(value: unknown, fallback: Slot): Slot {
   if (value && typeof value === "object") {
     const v = value as any;
-    const provider = (["openrouter", "openai", "google"].includes(v.provider) ? v.provider : fallback.provider) as Provider;
+    const provider = (["openrouter", "openai", "google", "anthropic"].includes(v.provider) ? v.provider : fallback.provider) as Provider;
     const model = typeof v.model === "string" && v.model ? v.model : fallback.model;
     return { provider, model };
   }
