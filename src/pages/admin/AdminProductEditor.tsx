@@ -55,10 +55,43 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   ingredientsAr: [],
 });
 
+const DRAFT_KEY = (id: string) => `lov:product-draft:${id}`;
+
+type FormState = ReturnType<typeof BLANK>;
+
+function loadDraft(id: string): FormState | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as FormState;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveDraft(id: string, form: FormState) {
+  try {
+    localStorage.setItem(DRAFT_KEY(id), JSON.stringify(form));
+  } catch {
+    // quota / SSR
+  }
+}
+
+function clearDraft(id: string) {
+  try {
+    localStorage.removeItem(DRAFT_KEY(id));
+  } catch {
+    // ignore
+  }
+}
+
 export default function AdminProductEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = !id || id === "new";
+  const draftKey = isNew ? "new" : (id as string);
 
   const { data: existing, isLoading } = useProduct(isNew ? undefined : id);
   const createMut = useCreateProduct();
@@ -67,9 +100,14 @@ export default function AdminProductEditor() {
   const qc = useQueryClient();
   const { data: categories = [] } = useCategories();
   const createCategoryMut = useCreateCategory();
-  const [form, setForm] = useState(() => BLANK());
+  const [form, setForm] = useState<FormState>(() => {
+    // Restore unsaved draft (e.g. scraped data) if present.
+    const draft = loadDraft(isNew ? "new" : (id as string));
+    return draft ?? BLANK();
+  });
   const [hydrated, setHydrated] = useState(isNew);
   const [translating, setTranslating] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(() => !!loadDraft(isNew ? "new" : (id as string)));
 
   const translate = async (productId: string, opts: { silent?: boolean; overwrite?: boolean } = {}) => {
     setTranslating(true);
@@ -115,10 +153,21 @@ export default function AdminProductEditor() {
     }
     if (existing) {
       const { id: _i, createdAt: _c, updatedAt: _u, ...rest } = existing;
-      setForm(rest);
+      // If a draft exists for this product, keep the draft (unsaved changes).
+      // Otherwise hydrate with the saved server copy.
+      if (!loadDraft(draftKey)) {
+        setForm(rest);
+      }
       setHydrated(true);
     }
-  }, [existing, isLoading, isNew, navigate, hydrated]);
+  }, [existing, isLoading, isNew, navigate, hydrated, draftKey]);
+
+  // Autosave the in-progress form to localStorage so scraped/edited data
+  // survives navigation and page reload until the product is saved.
+  useEffect(() => {
+    if (!isNew && !hydrated) return;
+    saveDraft(draftKey, form);
+  }, [form, draftKey, isNew, hydrated]);
 
   const update = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -353,12 +402,15 @@ export default function AdminProductEditor() {
       if (isNew) {
         const created = await createMut.mutateAsync(form);
         toast.success("Product created");
+        clearDraft("new");
+        clearDraft(created.id);
         // Auto-translate new product in background
         translate(created.id, { silent: true });
         navigate(`/admin/products/${created.id}`);
       } else if (id) {
         await updateMut.mutateAsync({ id, patch: form });
         toast.success("Product updated");
+        clearDraft(id);
         // Auto-translate after edit, only if Arabic name still missing
         if (!form.nameAr || !form.nameAr.trim()) {
           translate(id, { silent: true });
@@ -375,9 +427,22 @@ export default function AdminProductEditor() {
       try {
         await deleteMut.mutateAsync(id);
         toast.success("Deleted");
+        clearDraft(id);
         navigate("/admin/products");
       } catch (err: any) { toast.error(err.message); }
     }
+  };
+
+  const discardDraft = () => {
+    clearDraft(draftKey);
+    setDraftRestored(false);
+    if (isNew) {
+      setForm(BLANK());
+    } else if (existing) {
+      const { id: _i, createdAt: _c, updatedAt: _u, ...rest } = existing;
+      setForm(rest);
+    }
+    toast.success("Draft discarded");
   };
 
   return (
@@ -408,6 +473,18 @@ export default function AdminProductEditor() {
         )}
         <Button type="submit" disabled={!!priceError} className="bg-brand hover:bg-brand/90 text-white">Save</Button>
       </div>
+
+      {draftRestored && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-brand/40 bg-brand/5 px-4 py-2.5">
+          <p className="text-sm">
+            <span className="font-medium text-brand">Draft restored</span>
+            <span className="text-muted-foreground"> — your unsaved changes were recovered. Save to keep them, or discard to start fresh.</span>
+          </p>
+          <Button type="button" variant="ghost" size="sm" onClick={discardDraft} className="h-8 text-xs">
+            Discard draft
+          </Button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
