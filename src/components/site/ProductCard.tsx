@@ -25,15 +25,32 @@ export function ProductCard({ product, compact = false }: { product: Product; co
       data-brand={brand.themeAttr}
       className="group relative block rounded-2xl border border-border bg-card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg"
     >
-      <div className="aspect-square bg-brand-soft overflow-hidden">
-        <img
-          src={product.mainImage}
-          alt={name}
-          width={800}
-          height={800}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-        />
+      <div className="relative aspect-square bg-brand-soft overflow-hidden">
+        {(() => {
+          const secondImage = product.gallery?.find((u) => u && u !== product.mainImage);
+          return (
+            <>
+              <img
+                src={product.mainImage}
+                alt={name}
+                width={800}
+                height={800}
+                className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${secondImage ? "group-hover:opacity-0" : ""}`}
+                loading="lazy"
+              />
+              {secondImage && (
+                <img
+                  src={secondImage}
+                  alt={name}
+                  width={800}
+                  height={800}
+                  className="absolute inset-0 h-full w-full object-cover opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:scale-105"
+                  loading="lazy"
+                />
+              )}
+            </>
+          );
+        })()}
         {product.featured && (
           <span className="absolute top-3 left-3 rtl:left-auto rtl:right-3 inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-1 text-[10px] font-semibold text-white">
             <Star className="h-3 w-3 fill-current" /> {t("common.featured")}
