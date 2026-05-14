@@ -101,8 +101,9 @@ Deno.serve(async (req) => {
     const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     const googleKey = Deno.env.get("GOOGLE_API_KEY");
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
 
-    type Provider = "openrouter" | "openai" | "google";
+    type Provider = "openrouter" | "openai" | "google" | "anthropic";
     interface Slot { provider: Provider; model: string }
 
     // Authoritative model chain comes from site_settings.ai_import_models
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
       } else if (v && typeof v === "object" && Array.isArray((v as any).chat)) {
         dbChain = ((v as any).chat as any[])
           .map((s) => ({
-            provider: (["openrouter", "openai", "google"].includes(s?.provider) ? s.provider : "openrouter") as Provider,
+            provider: (["openrouter", "openai", "google", "anthropic"].includes(s?.provider) ? s.provider : "openrouter") as Provider,
             model: String(s?.model ?? "").trim(),
           }))
           .filter((s) => s.model.length > 0);
@@ -249,9 +250,41 @@ Deno.serve(async (req) => {
       return { ok: true, status: 200, args };
     }
 
+    async function callAnthropic(model: string): Promise<{ ok: boolean; status: number; args?: any; text?: string }> {
+      if (!anthropicKey) return { ok: false, status: 500, text: "ANTHROPIC_API_KEY missing" };
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": anthropicKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          system: SYSTEM,
+          messages: [{ role: "user", content: userContent }],
+          tools: [{
+            name: TOOL.function.name,
+            description: TOOL.function.description,
+            input_schema: TOOL.function.parameters,
+          }],
+          tool_choice: { type: "tool", name: TOOL.function.name },
+          temperature: 0.2,
+        }),
+      });
+      if (!r.ok) return { ok: false, status: r.status, text: await r.text().catch(() => "") };
+      const payload = await r.json().catch(() => null);
+      const blocks = payload?.content ?? [];
+      const tu = blocks.find((b: any) => b?.type === "tool_use");
+      const args = tu?.input ?? null;
+      return { ok: true, status: 200, args };
+    }
+
     const dispatch = async (slot: Slot) => {
       if (slot.provider === "openai") return callOpenAI(slot.model);
       if (slot.provider === "google") return callGoogle(slot.model);
+      if (slot.provider === "anthropic") return callAnthropic(slot.model);
       return callOpenRouter(slot.model);
     };
 
