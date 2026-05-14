@@ -55,10 +55,43 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" |
   ingredientsAr: [],
 });
 
+const DRAFT_KEY = (id: string) => `lov:product-draft:${id}`;
+
+type FormState = ReturnType<typeof BLANK>;
+
+function loadDraft(id: string): FormState | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY(id));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") return parsed as FormState;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function saveDraft(id: string, form: FormState) {
+  try {
+    localStorage.setItem(DRAFT_KEY(id), JSON.stringify(form));
+  } catch {
+    // quota / SSR
+  }
+}
+
+function clearDraft(id: string) {
+  try {
+    localStorage.removeItem(DRAFT_KEY(id));
+  } catch {
+    // ignore
+  }
+}
+
 export default function AdminProductEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = !id || id === "new";
+  const draftKey = isNew ? "new" : (id as string);
 
   const { data: existing, isLoading } = useProduct(isNew ? undefined : id);
   const createMut = useCreateProduct();
@@ -67,9 +100,14 @@ export default function AdminProductEditor() {
   const qc = useQueryClient();
   const { data: categories = [] } = useCategories();
   const createCategoryMut = useCreateCategory();
-  const [form, setForm] = useState(() => BLANK());
+  const [form, setForm] = useState<FormState>(() => {
+    // Restore unsaved draft (e.g. scraped data) if present.
+    const draft = loadDraft(isNew ? "new" : (id as string));
+    return draft ?? BLANK();
+  });
   const [hydrated, setHydrated] = useState(isNew);
   const [translating, setTranslating] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(() => !!loadDraft(isNew ? "new" : (id as string)));
 
   const translate = async (productId: string, opts: { silent?: boolean; overwrite?: boolean } = {}) => {
     setTranslating(true);
