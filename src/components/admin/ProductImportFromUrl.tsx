@@ -1,15 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles, Loader2, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import {
-  extractProductFields,
-  scrapeProductUrl,
-  type ExtractedFields,
-} from "@/lib/aiImport";
+import type { ExtractedFields } from "@/lib/aiImport";
+import { startScrape, dismissScrape, useScrapeJob } from "@/lib/jobs/scrapeJobs";
 
 export interface ProductImportFromUrlProps {
   onImported: (fields: ExtractedFields, images: string[], sourceUrl: string) => void;
@@ -17,44 +14,48 @@ export interface ProductImportFromUrlProps {
 
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
   const [url, setUrl] = useState("");
-  const [phase, setPhase] = useState<"idle" | "scraping" | "extracting">("idle");
+  const [activeUrl, setActiveUrl] = useState<string | null>(null);
+  const job = useScrapeJob(activeUrl);
+  const handledKeyRef = useRef<string | null>(null);
 
-  const run = async () => {
+  // When job completes, deliver result exactly once per (url, finishedAt) pair
+  useEffect(() => {
+    if (!job || !activeUrl) return;
+    if (job.status === "done" && job.extracted && job.scraped) {
+      const key = `${activeUrl}:${job.finishedAt}`;
+      if (handledKeyRef.current === key) return;
+      handledKeyRef.current = key;
+      const { fields, usedModel, primaryModel } = job.extracted;
+      onImported(fields, job.scraped.images || [], job.scraped.sourceUrl || activeUrl);
+      const usedFallback = usedModel && primaryModel && usedModel !== primaryModel;
+      toast.success(
+        `Imported${job.scraped.images?.length ? ` with ${job.scraped.images.length} image(s)` : ""}${usedFallback ? ` using fallback ${usedModel}` : ""}. Review and save.`,
+      );
+      if (usedFallback) {
+        toast.message(`Primary model "${primaryModel}" failed — used "${usedModel}" instead.`);
+      }
+      dismissScrape(activeUrl);
+      setActiveUrl(null);
+    } else if (job.status === "error") {
+      const key = `${activeUrl}:${job.finishedAt}`;
+      if (handledKeyRef.current === key) return;
+      handledKeyRef.current = key;
+      toast.error(job.error || "Import failed");
+    }
+  }, [job?.status, job?.finishedAt, activeUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const run = () => {
     const trimmed = url.trim();
     if (!/^https?:\/\//i.test(trimmed)) {
       toast.error("Enter a valid http(s) product URL");
       return;
     }
-    try {
-      setPhase("scraping");
-      const scraped = await scrapeProductUrl(trimmed);
-      setPhase("extracting");
-      // Models are now resolved server-side from site_settings.ai_import_models
-      // so the same chain is used regardless of which browser or origin runs
-      // the import. See src/lib/aiModels.ts.
-      const result = await extractProductFields({
-        markdown: scraped.markdown,
-        sourceUrl: scraped.sourceUrl,
-      });
-      onImported(result.fields, scraped.images || [], scraped.sourceUrl || trimmed);
-      const usedFallback =
-        result.usedModel && result.primaryModel && result.usedModel !== result.primaryModel;
-      toast.success(
-        `Imported${scraped.images?.length ? ` with ${scraped.images.length} image(s)` : ""}${usedFallback ? ` using fallback ${result.usedModel}` : ""}. Review and save.`,
-      );
-      if (usedFallback) {
-        toast.message(
-          `Primary model "${result.primaryModel}" failed — used "${result.usedModel}" instead.`,
-        );
-      }
-    } catch (e: any) {
-      toast.error(e?.message || "Import failed");
-    } finally {
-      setPhase("idle");
-    }
+    setActiveUrl(trimmed);
+    void startScrape(trimmed);
   };
 
-  const busy = phase !== "idle";
+  const phase = job?.status ?? "idle";
+  const busy = phase === "scraping" || phase === "extracting";
 
   return (
     <Card className="p-6 space-y-4 border-brand/40 bg-gradient-to-br from-brand/5 to-transparent">
@@ -65,6 +66,7 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
       <p className="text-xs text-muted-foreground -mt-2">
         Paste a product page URL. Firecrawl scrapes it and an AI model fills in every field below.
         If the primary model is rate-limited or fails, the 2nd then 3rd model is tried automatically.
+        Jobs continue running if you switch tabs or navigate away.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
