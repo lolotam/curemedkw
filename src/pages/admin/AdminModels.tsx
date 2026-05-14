@@ -9,7 +9,11 @@ import {
   Cpu,
   MessageSquare,
   Image as ImageIcon,
+  Zap,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -167,15 +171,18 @@ function SlotCard({
                 <Badge variant="default" className="text-[10px]">Primary</Badge>
               )}
             </div>
-            {!isDefault && (
-              <button
-                type="button"
-                onClick={onReset}
-                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
-              >
-                <RotateCcw className="h-3 w-3" /> Reset to default
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              <TestConnectionButton slot={slot} />
+              {!isDefault && (
+                <button
+                  type="button"
+                  onClick={onReset}
+                  className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                >
+                  <RotateCcw className="h-3 w-3" /> Reset to default
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-3">
@@ -372,6 +379,45 @@ function Meta({ label, value }: { label: string; value: string }) {
       <div className="text-[9px] uppercase tracking-wider text-muted-foreground">{label}</div>
       <div className="text-xs font-medium tabular-nums truncate">{value}</div>
     </div>
+  );
+}
+
+function TestConnectionButton({ slot }: { slot: Slot }) {
+  const [loading, setLoading] = useState(false);
+  const disabled = loading || !slot.model;
+  const onClick = async () => {
+    if (!slot.model) {
+      toast.error("Pick a model first");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-test-connection", {
+        body: { provider: slot.provider, model: slot.model },
+      });
+      if (error) {
+        toast.error(`Test failed: ${error.message}`);
+      } else if ((data as any)?.ok) {
+        toast.success(`Connection OK (${(data as any).latency_ms}ms)`);
+      } else {
+        toast.error(`Test failed: ${(data as any)?.error ?? "unknown error"}`);
+      }
+    } catch (e) {
+      toast.error(`Test failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 disabled:opacity-50"
+    >
+      {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+      Test connection
+    </button>
   );
 }
 
