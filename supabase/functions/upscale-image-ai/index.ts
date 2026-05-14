@@ -23,6 +23,28 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
   { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
 ];
 
+const PROVIDER_TIMEOUT_MS = 120_000;
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+  label: string,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error(`${label} timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let bin = "";
   const chunk = 0x8000;
@@ -48,7 +70,7 @@ interface AiResult {
 
 async function callGoogle(model: string, prompt: string, imgB64: string, imgMime: string, key: string): Promise<AiResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${key}`;
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -61,7 +83,7 @@ async function callGoogle(model: string, prompt: string, imgB64: string, imgMime
       }],
       generationConfig: { responseModalities: ["IMAGE"] },
     }),
-  });
+  }, PROVIDER_TIMEOUT_MS, `google:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
     return { ok: false, error: `google ${resp.status}: ${t.slice(0, 300)}` };
@@ -83,11 +105,11 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: str
   fd.append("prompt", prompt);
   fd.append("image", srcBlob, "source.png");
   fd.append("size", "auto");
-  const resp = await fetch("https://api.openai.com/v1/images/edits", {
+  const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: fd,
-  });
+  }, PROVIDER_TIMEOUT_MS, `openai:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
     return { ok: false, error: `openai ${resp.status}: ${t.slice(0, 300)}` };
@@ -99,7 +121,7 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: str
 }
 
 async function callOpenRouter(model: string, prompt: string, imgDataUrl: string, key: string): Promise<AiResult> {
-  const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const resp = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${key}`,
@@ -116,7 +138,7 @@ async function callOpenRouter(model: string, prompt: string, imgDataUrl: string,
         ],
       }],
     }),
-  });
+  }, PROVIDER_TIMEOUT_MS, `openrouter:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
     return { ok: false, error: `openrouter ${resp.status}: ${t.slice(0, 300)}` };
@@ -241,10 +263,11 @@ Deno.serve(async (req) => {
       .from("product-images")
       .upload(path, success.result.bytes!, { contentType: ct, upsert: false });
     if (upErr) return json({ error: `Upload failed: ${upErr.message}` }, 500);
-    const { data: pub } = admin.storage.from("product-images").getPublicUrl(path);
+    const publicBaseUrl = Deno.env.get("SUPABASE_PUBLIC_URL") || supabaseUrl;
+    const publicUrl = `${publicBaseUrl}/storage/v1/object/public/product-images/${path}`;
 
     return json({
-      url: pub.publicUrl,
+      url: publicUrl,
       originalUrl: imageUrl,
       provider: success.slot.provider,
       model: success.slot.model,
