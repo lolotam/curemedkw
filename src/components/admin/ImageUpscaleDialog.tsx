@@ -1,16 +1,17 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Cpu } from "lucide-react";
+import { Loader2, Sparkles, Cpu, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useAiModels } from "@/lib/aiModels";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 type Mode = "standard" | "ultra";
 type Engine = "picsart" | "ai";
@@ -26,6 +27,47 @@ interface Props {
 const STANDARD_FACTORS = [2, 4, 6, 8] as const;
 const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
 
+function formatMs(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
+}
+
+function LiveTimerBadge({ startedAt, stopped }: { startedAt: number | null; stopped: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+  const rafRef = useRef<number>(0);
+  const lastTickRef = useRef<number>(0);
+
+  const active = startedAt != null && !stopped;
+
+  useEffect(() => {
+    if (!active) return;
+    const tick = (ts: number) => {
+      if (ts - lastTickRef.current >= 1000) {
+        lastTickRef.current = ts;
+        setNow(ts);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [active]);
+
+  if (!startedAt) return null;
+  const ms = stopped ? 0 : now - startedAt;
+  if (!stopped && ms <= 0) return null;
+
+  if (stopped) return null;
+
+  return (
+    <span className="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-mono font-medium text-white backdrop-blur-sm animate-pulse">
+      <Loader2 className="h-3 w-3 animate-spin" />
+      {formatMs(now - startedAt)}
+    </span>
+  );
+}
+
 export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onReplace, storageContext }: Props) {
   const [engine, setEngine] = useState<Engine>("picsart");
   const [mode, setMode] = useState<Mode>("standard");
@@ -35,6 +77,8 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
   const [loading, setLoading] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [resultMeta, setResultMeta] = useState<string | null>(null);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
 
   const { slots } = useAiModels();
   const factors = mode === "ultra" ? ULTRA_FACTORS : STANDARD_FACTORS;
@@ -42,6 +86,8 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
   const reset = () => {
     setResultUrl(null);
     setResultMeta(null);
+    setStartedAt(null);
+    setElapsedMs(null);
   };
 
   const handleGenerate = async () => {
@@ -49,6 +95,9 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
     setLoading(true);
     setResultUrl(null);
     setResultMeta(null);
+    setElapsedMs(null);
+    const t0 = Date.now();
+    setStartedAt(t0);
     try {
       if (engine === "picsart") {
         const { data, error } = await supabase.functions.invoke("upscale-image", {
@@ -56,6 +105,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
         });
         if (error) throw error;
         if (!data?.url) throw new Error("No result URL");
+        setElapsedMs(Date.now() - t0);
         setResultUrl(data.url);
         setResultMeta(`PICSART · ${mode} · ${factor}× · ${format}`);
         toast.success("Upscaled successfully");
@@ -68,12 +118,14 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
           const details = Array.isArray((data as any)?.details) ? (data as any).details.join(" | ") : "";
           throw new Error(details || "No result URL");
         }
+        setElapsedMs(Date.now() - t0);
         setResultUrl(data.url);
         setResultMeta(`${PROVIDER_LABELS[data.provider as keyof typeof PROVIDER_LABELS] ?? data.provider} · ${data.model}`);
         toast.success("AI upscale complete");
       }
     } catch (e: any) {
       const msg = e?.context?.error || e?.message || "Upscale failed";
+      setElapsedMs(Date.now() - t0);
       toast.error(String(msg));
     } finally {
       setLoading(false);
@@ -109,17 +161,31 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
           </div>
           <div className="space-y-2">
             <p className="text-sm font-medium">Result</p>
-            <div className="aspect-square rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center">
+            <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center">
               {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <>
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  <LiveTimerBadge startedAt={startedAt} stopped={false} />
+                </>
               ) : resultUrl ? (
-                <img src={resultUrl} alt="Upscaled" className="h-full w-full object-contain" />
+                <>
+                  <img src={resultUrl} alt="Upscaled" className="h-full w-full object-contain" />
+                  {elapsedMs != null && (
+                    <span className="absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full bg-emerald-600/80 px-2 py-0.5 text-[11px] font-mono font-medium text-white backdrop-blur-sm">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {formatMs(elapsedMs)}
+                    </span>
+                  )}
+                </>
               ) : (
                 <span className="text-xs text-muted-foreground">No result yet</span>
               )}
             </div>
             {resultMeta && (
-              <p className="text-[11px] text-muted-foreground truncate">{resultMeta}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {resultMeta}
+                {elapsedMs != null && <span className="ml-1 font-mono text-muted-foreground/70">· {formatMs(elapsedMs)}</span>}
+              </p>
             )}
           </div>
         </div>

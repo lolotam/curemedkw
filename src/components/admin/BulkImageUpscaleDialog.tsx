@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Cpu, Download, Maximize2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, Cpu, Download, Maximize2, AlertCircle, CheckCircle2, Timer } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useAiModels } from "@/lib/aiModels";
@@ -26,7 +26,59 @@ type Item = {
   resultUrl?: string;
   meta?: string;
   error?: string;
+  startedAt?: number;
+  elapsedMs?: number;
 };
+
+function formatMs(ms: number): string {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
+}
+
+function TimerBadge({ startedAt, elapsedMs, status }: { startedAt?: number; elapsedMs?: number; status: ItemStatus }) {
+  const [now, setNow] = useState(() => Date.now());
+  const rafRef = useRef<number>(0);
+  const lastTickRef = useRef<number>(0);
+
+  const active = status === "loading" && startedAt != null;
+  const frozen = status === "done" || status === "error";
+
+  useEffect(() => {
+    if (!active) return;
+    const tick = (ts: number) => {
+      if (ts - lastTickRef.current >= 1000) {
+        lastTickRef.current = ts;
+        setNow(ts);
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [active]);
+
+  if (!startedAt) return null;
+
+  const ms = frozen && elapsedMs != null ? elapsedMs : active ? now - startedAt : 0;
+  if (ms <= 0) return null;
+
+  return (
+    <span
+      className={cn(
+        "absolute top-2 right-2 z-10 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-mono font-medium backdrop-blur-sm",
+        active && "bg-black/60 text-white animate-pulse",
+        status === "done" && "bg-emerald-600/80 text-white",
+        status === "error" && "bg-destructive/80 text-white",
+      )}
+    >
+      {active && <Loader2 className="h-3 w-3 animate-spin" />}
+      {status === "done" && <CheckCircle2 className="h-3 w-3" />}
+      {status === "error" && <AlertCircle className="h-3 w-3" />}
+      {formatMs(ms)}
+    </span>
+  );
+}
 
 interface Props {
   open: boolean;
@@ -134,22 +186,36 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
     setItems(initial);
     setReplaceSelected(new Set());
 
-    const update = (src: string, patch: Partial<Item>) => {
+    const update = useCallback((src: string, patch: Partial<Item>) => {
       setItems((prev) => prev.map((it) => (it.src === src ? { ...it, ...patch } : it)));
+    }, []);
+
+    const itemMapRef = useRef<Map<string, Item>>(new Map());
+    const syncUpdate = (src: string, patch: Partial<Item>) => {
+      const cur = itemMapRef.current.get(src);
+      if (cur) itemMapRef.current.set(src, { ...cur, ...patch });
+      update(src, patch);
     };
 
     let okCount = 0;
     let failCount = 0;
     await runPool(list, CONCURRENCY, async (src) => {
-      update(src, { status: "loading" });
+      const startedAt = Date.now();
+      syncUpdate(src, { status: "loading", startedAt });
       try {
         const { url, meta } = await upscaleOne(src);
-        update(src, { status: "done", resultUrl: url, meta });
+        const elapsedMs = Date.now() - startedAt;
+        const item = { status: "done" as ItemStatus, resultUrl: url, meta, elapsedMs };
+        itemMapRef.current.set(src, { ...itemMapRef.current.get(src)!, ...item });
+        update(src, item);
         setReplaceSelected((prev) => new Set(prev).add(src));
         okCount++;
       } catch (e: any) {
         const msg = e?.context?.error || e?.message || "Failed";
-        update(src, { status: "error", error: String(msg) });
+        const elapsedMs = Date.now() - startedAt;
+        const item = { status: "error" as ItemStatus, error: String(msg), elapsedMs };
+        itemMapRef.current.set(src, { ...itemMapRef.current.get(src)!, ...item });
+        update(src, item);
         failCount++;
       }
     });
@@ -410,10 +476,14 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
                     )}
                   >
                     {it.status === "done" && it.resultUrl ? (
-                      <BeforeAfterSlider beforeSrc={it.src} afterSrc={it.resultUrl} />
+                      <div className="relative">
+                        <BeforeAfterSlider beforeSrc={it.src} afterSrc={it.resultUrl} />
+                        <TimerBadge startedAt={it.startedAt} elapsedMs={it.elapsedMs} status={it.status} />
+                      </div>
                     ) : (
                       <div className="relative aspect-square bg-muted">
                         <img src={it.src} alt="" className="absolute inset-0 h-full w-full object-contain opacity-60" />
+                        <TimerBadge startedAt={it.startedAt} elapsedMs={it.elapsedMs} status={it.status} />
                         <div className="absolute inset-0 grid place-items-center">
                           {it.status === "loading" || it.status === "pending" ? (
                             <div className="flex flex-col items-center gap-2 rounded-md bg-background/80 px-3 py-2 backdrop-blur-sm">
@@ -445,6 +515,14 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
                           <span className="inline-flex items-center gap-1 text-muted-foreground">
                             <CheckCircle2 className="h-3 w-3 text-brand" />
                             <span className="truncate max-w-[150px]">{it.meta}</span>
+                            {it.elapsedMs != null && (
+                              <span className="text-muted-foreground/70 font-mono">{formatMs(it.elapsedMs)}</span>
+                            )}
+                          </span>
+                        ) : it.status === "error" && it.elapsedMs != null ? (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <AlertCircle className="h-3 w-3 text-destructive" />
+                            <span className="font-mono">{formatMs(it.elapsedMs)}</span>
                           </span>
                         ) : (
                           <span className="text-muted-foreground">Select</span>
