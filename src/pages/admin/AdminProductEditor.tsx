@@ -133,6 +133,8 @@ export default function AdminProductEditor() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
+  const productSlug = slugify(form.name) || (form.sku ? slugify(form.sku) : "") || "";
+  const storageCtx = { brand: form.brand, productSlug };
 
   const toggleSelected = (idx: number) => {
     setSelected((prev) => {
@@ -169,7 +171,7 @@ export default function AdminProductEditor() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     try {
-      const urls = await Promise.all(files.map(uploadProductImage));
+      const urls = await Promise.all(files.map((f) => uploadProductImage(f, storageCtx)));
       const mainIsPlaceholder = !form.mainImage || form.mainImage.startsWith("data:");
       if (mainIsPlaceholder) {
         const [first, ...rest] = urls;
@@ -195,7 +197,7 @@ export default function AdminProductEditor() {
   const uploadGallery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     try {
-      const urls = await Promise.all(files.map(uploadProductImage));
+      const urls = await Promise.all(files.map((f) => uploadProductImage(f, storageCtx)));
       update("gallery", [...form.gallery, ...urls]);
       toast.success(`${urls.length} image(s) added`);
     } catch (err: any) { toast.error(err.message); }
