@@ -23,6 +23,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
+import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -128,6 +129,7 @@ export default function AdminProductEditor() {
   // Image preview + selection state
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [upscaleTarget, setUpscaleTarget] = useState<{ url: string; kind: "main" | "gallery"; index?: number } | null>(null);
+  const [bulkUpscaleOpen, setBulkUpscaleOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
@@ -689,6 +691,16 @@ export default function AdminProductEditor() {
                   >
                     <Download className="h-3.5 w-3.5" /> Download all
                   </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={form.gallery.length === 0 && (!form.mainImage || form.mainImage.startsWith("data:"))}
+                    onClick={() => setBulkUpscaleOpen(true)}
+                    className="gap-1.5"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> Bulk upscale
+                  </Button>
                   <input type="file" ref={fileGallery} accept="image/*" multiple onChange={uploadGallery} className="hidden" />
                   <Button type="button" variant="outline" size="sm" onClick={() => fileGallery.current?.click()} className="gap-1.5">
                     <Plus className="h-3.5 w-3.5" /> Add images
@@ -869,6 +881,21 @@ export default function AdminProductEditor() {
             next[upscaleTarget.index] = newUrl;
             update("gallery", next);
           }
+        }}
+      />
+
+      <BulkImageUpscaleDialog
+        open={bulkUpscaleOpen}
+        onOpenChange={setBulkUpscaleOpen}
+        imageUrls={[form.mainImage, ...form.gallery]}
+        baseName={baseName}
+        onReplaceMany={(urlMap) => {
+          const remap = (u: string) => urlMap[u] ?? u;
+          setForm((prev) => ({
+            ...prev,
+            mainImage: remap(prev.mainImage),
+            gallery: prev.gallery.map(remap),
+          }));
         }}
       />
     </form>
