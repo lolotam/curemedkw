@@ -232,19 +232,26 @@ Deno.serve(async (req) => {
 
     const errors: string[] = [];
     let success: { result: AiResult; slot: Slot } | null = null;
+    const startedAt = Date.now();
 
     for (const slot of chain) {
+      const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
+      if (remaining < 5_000) {
+        errors.push(`skipped ${slot.provider}:${slot.model} -> out of time budget`);
+        break;
+      }
+      const slotTimeout = Math.min(PROVIDER_TIMEOUT_MS, remaining - 2_000);
       let res: AiResult;
       try {
         if (slot.provider === "google") {
           if (!googleKey) { errors.push(`${slot.provider}:${slot.model} -> GOOGLE_API_KEY missing`); continue; }
-          res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey);
+          res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey, slotTimeout);
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
-          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey);
+          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey, slotTimeout);
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
-          res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey);
+          res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);
         }
       } catch (e) {
         res = { ok: false, error: e instanceof Error ? e.message : String(e) };
