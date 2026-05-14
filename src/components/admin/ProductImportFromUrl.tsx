@@ -6,17 +6,44 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import type { ExtractedFields } from "@/lib/aiImport";
-import { startScrape, dismissScrape, useScrapeJob } from "@/lib/jobs/scrapeJobs";
+import { startScrape, dismissScrape, useScrapeJob, scrapeJobStore } from "@/lib/jobs/scrapeJobs";
 
 export interface ProductImportFromUrlProps {
   onImported: (fields: ExtractedFields, images: string[], sourceUrl: string) => void;
 }
 
+const ACTIVE_URL_KEY = "lov:scrape:activeUrl";
+
 export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) {
   const [url, setUrl] = useState("");
-  const [activeUrl, setActiveUrl] = useState<string | null>(null);
+  const [activeUrl, setActiveUrl] = useState<string | null>(() => {
+    // Reconnect to any persisted scrape job (running or finished but unhandled).
+    try {
+      const saved = typeof localStorage !== "undefined" ? localStorage.getItem(ACTIVE_URL_KEY) : null;
+      if (saved && scrapeJobStore.get(saved)) return saved;
+      // Fall back: pick the most recent job in the store, if any.
+      const all = scrapeJobStore.all();
+      if (all.length) {
+        const [k] = all.sort((a, b) => (b[1].startedAt || 0) - (a[1].startedAt || 0))[0];
+        return k;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  });
   const job = useScrapeJob(activeUrl);
   const handledKeyRef = useRef<string | null>(null);
+
+  // Persist activeUrl so we can reconnect after reload/navigation.
+  useEffect(() => {
+    try {
+      if (activeUrl) localStorage.setItem(ACTIVE_URL_KEY, activeUrl);
+      else localStorage.removeItem(ACTIVE_URL_KEY);
+    } catch {
+      // ignore
+    }
+  }, [activeUrl]);
 
   // When job completes, deliver result exactly once per (url, finishedAt) pair
   useEffect(() => {
