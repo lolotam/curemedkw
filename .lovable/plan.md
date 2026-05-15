@@ -1,68 +1,144 @@
-Plan to fix the persistent data loss
+# Diagnosis: Both errors are on your self-hosted Supabase
 
-1. Add real backend-backed job persistence
-- Create one admin-only table, for example `admin_background_jobs`, in the self-hosted database.
-- Store each scrape/upscale job with:
-  - `id`, `kind`, `status`, `user_id`
-  - `input` JSON, `result` JSON, `error`
-  - timestamps: `created_at`, `started_at`, `finished_at`, `updated_at`
-- Protect it with RLS using the existing `has_role(auth.uid(), 'admin')` function.
-- This keeps job state/results even if you leave `/admin/products/new`, refresh, or return later.
+`public/config.js` points the app at `https://supabase.curemedkw.com`. Every
+edge function call (test-connection, upscale-image-ai, scrape-product) goes to
+that host — **not** Lovable Cloud. So the secrets shown in Lovable's panel
+(ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.) are irrelevant to what actually runs
+in production.
 
-2. Convert scrape/import to an async job flow
-- Keep using the self-hosted Supabase runtime client (`clientRuntime.ts`) and do not switch back to Lovable Cloud credentials.
-- Change the frontend scrape flow from:
-  - call `scrape-product` and wait in the page
-- To:
-  - create/start scrape job
-  - return a `jobId` immediately
-  - poll job status until `succeeded` or `failed`
-  - store scraped/extracted result in the job table
-- When the user returns to the product editor, show the finished scrape job and allow applying it to the form.
+---
 
-3. Convert image upscaling to async/polling
-- Update single and bulk upscale flows so the browser does not own the only running process.
-- The function should create a job row and process it in the background where supported, then the UI polls by `jobId`.
-- Persist final image URLs in the job result, so “Use this image” is still available after navigating away or refreshing.
-- Keep the current self-hosted API keys server-side only: PICSART/OpenAI/Google/OpenRouter remain in the edge-runtime environment, never frontend code.
+## Error 1 — Anthropic "Edge Function returned a non-2xx status code"
 
-4. Add product editor draft autosave
-- Persist unsaved product form changes locally per editor route:
-  - new product draft: `/admin/products/new`
-  - existing product draft: `/admin/products/:id`
-- Autosave all form data after scrape import, manual edits, and image replacements.
-- On returning to the editor, restore the draft automatically or show a clear “restore/discard” prompt.
-- Clear the draft only after a successful product save/delete.
+`supabase/functions/ai-test-connection/index.ts` is written correctly: when a
+provider key is missing, it returns **HTTP 200** with `{ ok:false, error:"ANTHROPIC_API_KEY is not configured" }`.
 
-5. Make current UI reconnect to existing jobs
-- Update `jobStore` behavior so running jobs are not blindly marked “Interrupted by reload”.
-- If a persisted job has a backend `jobId`, rehydrate it and continue polling.
-- Add small status/recovery UI in:
-  - `ProductImportFromUrl`
-  - `ImageUpscaleDialog`
-  - `BulkImageUpscaleDialog`
-- This lets you recover finished scrape/upscale results even if the original dialog/page was closed.
+A **non-2xx** therefore means one of:
 
-6. Error handling and deployment notes
-- Return clear job errors like missing API key, admin role missing, provider timeout, or scrape failure.
-- Keep all calls using `supabase.functions.invoke()` through `clientRuntime.ts` so the app remains connected to `https://supabase.curemedkw.com` via `public/config.js` / runtime config.
-- Add/update self-hosted migration and function deployment scripts if needed so the same changes can be applied to Dokploy/self-hosted Supabase.
+1. **The deployed version on `supabase.curemedkw.com` is older** and doesn't
+   know the `"anthropic"` provider yet (returns 500 from an unhandled branch,
+   or 404 because the route is missing).
+2. **The function is crashing at boot** on the self-hosted edge runtime
+   (missing `SUPABASE_SERVICE_ROLE_KEY` env var → `createClient` throws → 500).
+3. **CORS/proxy 502** from your nginx in front of `edge-runtime`.
 
-Files expected to change
-- `supabase/functions/*` for async job start/status/processing
-- a new database migration for `admin_background_jobs`
-- `src/lib/jobs/jobStore.ts`
-- `src/lib/jobs/scrapeJobs.ts`
-- `src/lib/jobs/upscaleJobs.ts`
-- `src/lib/jobs/bulkUpscaleJobs.ts`
-- `src/components/admin/ProductImportFromUrl.tsx`
-- `src/components/admin/ImageUpscaleDialog.tsx`
-- `src/components/admin/BulkImageUpscaleDialog.tsx`
-- `src/pages/admin/AdminProductEditor.tsx`
+### How to confirm
 
-Validation
-- Start scrape on `/admin/products/new`, navigate away, return, confirm result can still be applied.
-- Start single upscale, close dialog/navigate away, return, confirm result remains available.
-- Start bulk upscale, leave page, return, confirm completed/failed item statuses persist.
-- Refresh during a job and confirm the UI reconnects instead of canceling it.
-- Confirm console still shows the self-hosted Supabase URL from runtime config.
+On your self-hosted box:
+
+```bash
+# 1. Check what version is deployed
+supabase functions list --project-ref <self-hosted-ref>
+
+# 2. Check live logs while you click "Test connection" again
+docker logs -f supabase-edge-functions
+# or: supabase functions logs ai-test-connection
+
+# 3. Confirm env vars present in the edge runtime container
+docker exec supabase-edge-functions env | grep -E 'ANTHROPIC|SUPABASE_(URL|SERVICE)'
+```
+
+### Fix
+
+```bash
+# From the project root, against the self-hosted instance:
+supabase functions deploy ai-test-connection \
+  --project-ref <self-hosted-ref> --no-verify-jwt=false
+
+# Make sure ANTHROPIC_API_KEY is set in the edge-runtime container:
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-... --project-ref <self-hosted-ref>
+# OR add to docker-compose env for the edge-runtime service and restart:
+docker compose restart edge-runtime
+```
+
+If after redeploy you still see non-2xx, the docker logs will show the exact
+stack trace — paste it back to me.
+
+---
+
+## Error 2 — Upscale "Failed to send a request to the Edge Function"
+
+This phrasing comes from `supabase-js` when the **fetch itself fails before a
+response is received** (network error, CORS rejection, 502 from proxy, or
+function not deployed). It is *different* from "non-2xx status code".
+
+Most likely causes on self-hosted:
+
+1. **`upscale-image-ai` is not deployed** on `supabase.curemedkw.com` (the
+   recent timeout/budget refactor only lives in your repo, not on the server).
+2. **nginx/Cloudflare in front of the edge runtime closes the connection**
+   before the function returns. Image upscaling can take 30–90s; if your proxy
+   has a `proxy_read_timeout` of 30s, the browser sees a network error.
+3. **CORS preflight fails** because the deployed function doesn't include the
+   `Access-Control-Allow-*` headers (older version).
+
+### How to confirm
+
+```bash
+# Open DevTools → Network → click the upscale button.
+# Look at the request to /functions/v1/upscale-image-ai
+#   - Status "(failed) net::ERR_FAILED"  →  CORS or proxy killed it
+#   - Status 504 / 502                    →  nginx timeout
+#   - Status 404                          →  function not deployed
+#   - No request at all (only OPTIONS)    →  CORS preflight failed
+```
+
+Also check:
+
+```bash
+docker logs -f supabase-edge-functions | grep upscale
+curl -i https://supabase.curemedkw.com/functions/v1/upscale-image-ai \
+  -X OPTIONS -H "Origin: https://curemedkw.lovable.app" \
+  -H "Access-Control-Request-Method: POST"
+```
+
+### Fix
+
+```bash
+# 1. Deploy the latest version (with the 35s/85s budget fix already in repo)
+supabase functions deploy upscale-image-ai --project-ref <self-hosted-ref>
+
+# 2. Make sure provider keys exist in the edge-runtime env:
+supabase secrets set OPENAI_API_KEY=... GOOGLE_API_KEY=... \
+  OPENROUTER_API_KEY=... PICSART_API_KEY=... --project-ref <self-hosted-ref>
+
+# 3. Bump nginx timeouts in front of supabase.curemedkw.com:
+#    location /functions/ {
+#      proxy_read_timeout   120s;
+#      proxy_send_timeout   120s;
+#      proxy_connect_timeout 30s;
+#    }
+#    Then: nginx -s reload
+```
+
+---
+
+## Is the issue on the self-hosting side?  →  **Yes, almost certainly**
+
+Both symptoms map cleanly to:
+
+- Outdated function code on the self-hosted edge runtime, **and/or**
+- Missing provider API keys in the edge-runtime container env, **and/or**
+- nginx in front of `supabase.curemedkw.com` killing long requests.
+
+Nothing in the source code in this repo is currently broken in a way that
+would explain the screenshots. The fix is **deployment + server config**, not
+a code change.
+
+---
+
+## What I need from you to go further
+
+If after redeploying + setting env vars + bumping nginx timeouts the errors
+persist, send me:
+
+1. Output of `docker logs supabase-edge-functions --tail=200` right after
+   reproducing each error.
+2. The full DevTools → Network entry (status code + response body) for the
+   failing `/functions/v1/ai-test-connection` and
+   `/functions/v1/upscale-image-ai` calls.
+3. Confirmation that `ANTHROPIC_API_KEY` (and the upscale provider keys) are
+   visible inside the edge-runtime container (`docker exec ... env | grep ...`).
+
+With those three, I can tell you exactly which line/config to change. No
+client-side code changes are warranted yet.
