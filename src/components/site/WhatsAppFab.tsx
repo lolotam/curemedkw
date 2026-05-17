@@ -1,4 +1,5 @@
 import { useI18n } from "@/lib/i18n";
+import { logOperation } from "@/lib/logs";
 
 const PHONE = "96560003759";
 
@@ -6,6 +7,11 @@ export function WhatsAppFab() {
   const { lang, t } = useI18n();
   const text = lang === "ar" ? "السلام عليكم، عندي استفسار عن المنتجات" : "Hello, I'd like to ask about your products";
   const href = `https://wa.me/${PHONE}?text=${encodeURIComponent(text)}`;
+
+  const handleClick = () => {
+    logOperation({ category: "whatsapp", operation: "whatsapp_click", status: "info", metadata: { phone: PHONE, page: window.location.pathname } });
+  };
+
   return (
     <a
       href={href}
@@ -13,6 +19,7 @@ export function WhatsAppFab() {
       rel="noopener noreferrer"
       aria-label={t("whatsapp.label")}
       className="fixed bottom-6 right-6 rtl:right-auto rtl:left-6 z-50 group"
+      onClick={handleClick}
     >
       <span className="absolute inset-0 rounded-full bg-[hsl(142,70%,49%)]/35 animate-ping" />
       <span

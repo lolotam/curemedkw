@@ -49,6 +49,7 @@ const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
 const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
 const AdminNotificationTemplates = lazy(() => import("./pages/admin/AdminNotificationTemplates"));
 const AdminBranding = lazy(() => import("./pages/admin/AdminBranding"));
+const AdminLogs = lazy(() => import("./pages/admin/AdminLogs"));
 
 const PageFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -111,6 +112,7 @@ const App = () => {
                   <Route path="coupons" element={<AdminCoupons />} />
                   <Route path="notifications" element={<AdminNotificationTemplates />} />
                   <Route path="branding" element={<AdminBranding />} />
+                  <Route path="logs" element={<AdminLogs />} />
                 </Route>
                 <Route path="/categories/:slug" element={<CategoryPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
