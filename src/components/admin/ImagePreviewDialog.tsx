@@ -1,6 +1,7 @@
+import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
 import { downloadImage } from "@/lib/downloadImage";
 
 type Props = {
@@ -12,16 +13,130 @@ type Props = {
 };
 
 export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: Props) {
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (!open) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+      setIsDragging(false);
+    }
+  }, [open]);
+
+  const zoomIn = () => setZoom((z) => Math.min(+(z + 0.25).toFixed(2), 5));
+
+  const zoomOut = () =>
+    setZoom((z) => {
+      const n = Math.max(+(z - 0.25).toFixed(2), 0.5);
+      if (n <= 1) setPan({ x: 0, y: 0 });
+      return n;
+    });
+
+  const resetZoom = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
+    e.preventDefault();
+    dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+    setIsDragging(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    setPan({ x: e.clientX - dragStart.current.x, y: e.clientY - dragStart.current.y });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.25 : 0.25;
+    setZoom((z) => {
+      const n = Math.min(Math.max(+(z + delta).toFixed(2), 0.5), 5);
+      if (n <= 1) setPan({ x: 0, y: 0 });
+      return n;
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl !grid-cols-1 grid-rows-[1fr_auto] p-0 gap-0 bg-background overflow-hidden">
         <DialogTitle className="sr-only">Image preview</DialogTitle>
-        <div className="flex items-center justify-center bg-muted/30 p-4 min-h-[40vh] max-h-[85vh] overflow-auto">
+        <div
+          className="relative flex items-center justify-center bg-muted/30 overflow-hidden"
+          style={{
+            height: "80vh",
+            cursor: isDragging ? "grabbing" : zoom > 1 ? "grab" : "default",
+          }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onWheel={handleWheel}
+        >
           {src ? (
-            <img src={src} alt={alt || ""} className="max-h-[80vh] max-w-full object-contain" />
+            <img
+              src={src}
+              alt={alt || ""}
+              draggable={false}
+              style={{
+                maxHeight: "100%",
+                maxWidth: "100%",
+                objectFit: "contain",
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transition: isDragging ? "none" : "transform 0.15s ease",
+                userSelect: "none",
+                pointerEvents: "none",
+              }}
+            />
           ) : null}
         </div>
-        <div className="flex justify-end gap-2 px-4 py-3 border-t border-border bg-background">
+        <div className="flex items-center gap-2 px-4 py-3 border-t border-border bg-background">
+          <div className="flex items-center gap-1 mr-auto">
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={zoomOut}
+              disabled={zoom <= 0.5}
+              title="Zoom out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-xs w-10 text-center tabular-nums select-none">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={zoomIn}
+              disabled={zoom >= 5}
+              title="Zoom in"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            {zoom !== 1 && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={resetZoom}
+                title="Reset zoom"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
           <Button
             type="button"
             variant="outline"
