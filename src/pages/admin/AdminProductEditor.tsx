@@ -24,6 +24,7 @@ import { ImagePreviewDialog } from "@/components/admin/ImagePreviewDialog";
 import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
 import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
+import LongDescriptionRewriteDialog from "@/components/admin/LongDescriptionRewriteDialog";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -179,6 +180,7 @@ export default function AdminProductEditor() {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [upscaleTarget, setUpscaleTarget] = useState<{ url: string; kind: "main" | "gallery"; index?: number } | null>(null);
   const [bulkUpscaleOpen, setBulkUpscaleOpen] = useState(false);
+  const [rewriteOpen, setRewriteOpen] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   const baseName = (form.sku || slugify(form.name) || "product").trim() || "product";
@@ -660,9 +662,20 @@ export default function AdminProductEditor() {
               <Field label="Short description" full>
                 <Textarea rows={2} value={form.shortDescription} onChange={(e) => update("shortDescription", e.target.value)} />
               </Field>
-              <Field label="Long description" full>
+              <div className="sm:col-span-2 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Long description</span>
+                  <button
+                    type="button"
+                    onClick={() => setRewriteOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    AI Rewrite
+                  </button>
+                </div>
                 <Textarea rows={5} value={form.longDescription} onChange={(e) => update("longDescription", e.target.value)} />
-              </Field>
+              </div>
             </div>
           </Card>
 
@@ -978,6 +991,13 @@ export default function AdminProductEditor() {
             gallery: prev.gallery.map(remap),
           }));
         }}
+      />
+
+      <LongDescriptionRewriteDialog
+        open={rewriteOpen}
+        onOpenChange={setRewriteOpen}
+        content={form.longDescription}
+        onApply={(text) => update("longDescription", text)}
       />
     </form>
   );

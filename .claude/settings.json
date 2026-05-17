@@ -1,0 +1,6 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "sh 'F:/Cure-med/curemedkw/.claude/statusline-command.sh'"
+  }
+}
