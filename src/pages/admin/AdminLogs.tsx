@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, ChevronDown } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { useAppLogs, type AppLog } from "@/lib/db";
+import { useAppLogs, useBulkDeleteAppLogs, type AppLog } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 const CATEGORY_COLORS: Record<string, string> = {
   auth:      "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
@@ -94,6 +96,8 @@ export default function AdminLogs() {
   const [status, setStatus] = useState("all");
   const [userSearch, setUserSearch] = useState("");
   const [selectedLog, setSelectedLog] = useState<AppLog | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const bulkDel = useBulkDeleteAppLogs();
 
   const { data: logs = [], isLoading, refetch, isFetching } = useAppLogs(dateFrom, dateTo);
 
@@ -117,6 +121,36 @@ export default function AdminLogs() {
     setDateTo(today);
   };
 
+  const allChecked = filtered.length > 0 && filtered.every((l) => selected.has(l.id));
+  const toggleAll = () => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allChecked) filtered.forEach((l) => next.delete(l.id));
+      else filtered.forEach((l) => next.add(l.id));
+      return next;
+    });
+  };
+  const toggleOne = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+  const bulkRemove = () => {
+    const ids = Array.from(selected);
+    if (!ids.length) return;
+    if (!confirm(`Delete ${ids.length} log entr${ids.length === 1 ? "y" : "ies"}?`)) return;
+    bulkDel.mutate(ids, {
+      onSuccess: () => {
+        toast.success(`Deleted ${ids.length}`);
+        setSelected(new Set());
+      },
+      onError: (e: Error) => toast.error(e.message),
+    });
+  };
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -124,10 +158,23 @@ export default function AdminLogs() {
           <h1 className="text-2xl font-bold">Operation Logs</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Track all app operations, AI calls, orders, auth events, and errors</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
-          <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={bulkRemove}
+              disabled={bulkDel.isPending}
+              className="gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete {selected.size}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -194,6 +241,9 @@ export default function AdminLogs() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
+              <TableHead className="w-10">
+                <Checkbox checked={allChecked} onCheckedChange={toggleAll} aria-label="Select all" />
+              </TableHead>
               <TableHead className="text-xs w-44">Timestamp</TableHead>
               <TableHead className="text-xs w-28">Category</TableHead>
               <TableHead className="text-xs">Operation</TableHead>
@@ -205,19 +255,26 @@ export default function AdminLogs() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center">
+                <TableCell colSpan={7} className="h-40 text-center">
                   <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
                 </TableCell>
               </TableRow>
             ) : filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground text-sm">
+                <TableCell colSpan={7} className="h-40 text-center text-muted-foreground text-sm">
                   No logs found for the selected filters
                 </TableCell>
               </TableRow>
             ) : (
               filtered.map((log) => (
                 <TableRow key={log.id} className="hover:bg-muted/30 transition-colors">
+                  <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selected.has(log.id)}
+                      onCheckedChange={() => toggleOne(log.id)}
+                      aria-label="Select row"
+                    />
+                  </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                     {format(new Date(log.createdAt), "dd MMM yy HH:mm:ss")}
                   </TableCell>

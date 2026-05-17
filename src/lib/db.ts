@@ -2207,3 +2207,32 @@ export function useAppLogs(dateFrom?: string, dateTo?: string) {
     },
   });
 }
+
+export function useBulkDeleteAppLogs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return;
+      const { error } = await supabase.from("app_logs").delete().in("id", ids);
+      if (error) throw error;
+    },
+    onSuccess: (_, ids) => {
+      qc.invalidateQueries({ queryKey: ["app_logs"] });
+      logOperation({
+        category: "admin",
+        operation: "app_logs_bulk_deleted",
+        status: "success",
+        metadata: { count: ids.length },
+      });
+    },
+    onError: (err, ids) => {
+      logOperation({
+        category: "admin",
+        operation: "app_logs_bulk_deleted",
+        status: "failed",
+        errorMessage: (err as Error).message,
+        metadata: { count: ids.length },
+      });
+    },
+  });
+}
