@@ -25,6 +25,7 @@ import { downloadImage, downloadImagesAsZip } from "@/lib/downloadImage";
 import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
 import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
 import LongDescriptionRewriteDialog from "@/components/admin/LongDescriptionRewriteDialog";
+import { logOperation } from "@/lib/logs";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -124,6 +125,9 @@ export default function AdminProductEditor() {
         if ((data as any)?.skipped) toast.info("Already translated. Click again to overwrite.");
         else toast.success("Translated to Arabic");
       }
+      if (!(data as any)?.skipped) {
+        logOperation({ category: "admin", operation: "product_translated", status: "success", metadata: { productId } });
+      }
       // Refresh local form so Arabic fields display
       const fresh = (data as any)?.translation;
       if (fresh) {
@@ -139,6 +143,7 @@ export default function AdminProductEditor() {
         }));
       }
     } catch (err: any) {
+      logOperation({ category: "admin", operation: "product_translated", status: "failed", errorMessage: err.message, metadata: { productId } });
       if (!opts.silent) toast.error("Translate failed: " + (err.message || "unknown"));
     } finally {
       setTranslating(false);

@@ -22,6 +22,7 @@ import {
   type BulkItem,
   type BulkItemStatus,
 } from "@/lib/jobs/bulkUpscaleJobs";
+import { logOperation } from "@/lib/logs";
 import { useTick } from "@/lib/jobs/jobStore";
 import type { UpscaleEngine } from "@/lib/jobs/upscaleJobs";
 
@@ -194,14 +195,15 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
     downloadImagesAsZip(urls, `${baseName}-upscaled-selected.zip`, `${baseName}-upscaled`);
   };
 
-  const replaceMap = (mode: "selected" | "all") => {
-    const targets = mode === "all" ? doneItems : doneItems.filter((it) => replaceSelected.has(it.src));
+  const replaceMap = (scope: "selected" | "all") => {
+    const targets = scope === "all" ? doneItems : doneItems.filter((it) => replaceSelected.has(it.src));
     if (!targets.length) {
       toast.info("Nothing to replace");
       return;
     }
     const map: Record<string, string> = {};
     targets.forEach((it) => { map[it.src] = it.resultUrl!; });
+    logOperation({ category: "ai", operation: "upscale_image", status: "success", metadata: { count: targets.length, engine, factor, mode } });
     onReplaceMany(map);
     toast.success(`Replaced ${targets.length} image(s) — remember to save the product`);
     dismissBulkUpscale(jobId);

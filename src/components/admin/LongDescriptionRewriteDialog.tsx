@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/clientRuntime";
+import { logOperation } from "@/lib/logs";
 
 interface Props {
   open: boolean;
@@ -54,6 +55,7 @@ export default function LongDescriptionRewriteDialog({ open, onOpenChange, conte
   const handleApply = () => {
     if (result) {
       onApply(result);
+      logOperation({ category: "ai", operation: "ai_rewrite", status: "success", metadata: { source: "long_description_rewrite" } });
       handleClose(false);
     }
   };
