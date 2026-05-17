@@ -14,7 +14,7 @@ import curemedBadge from "@/assets/curemed-c-badge.png";
 import { SlideStylePanel } from "@/components/admin/SlideStylePanel";
 import { SlideLivePreview } from "@/components/admin/SlideLivePreview";
 import { HeroIntervalCard } from "@/components/admin/HeroIntervalCard";
-import type { BrandKey } from "@/lib/db";
+import { useBrandingBrandCardLogo, useBrandingFavicon, type BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -519,15 +519,21 @@ function PageOption({
 }) {
   const isMain = pageKey === "curemed";
   const meta = isMain ? null : BRANDS[pageKey as BrandKey];
+  const { data: cardLogo } = useBrandingBrandCardLogo(isMain ? null : pageKey as BrandKey);
+  const { data: favicon } = useBrandingFavicon();
+  const logoSrc = (cardLogo && cardLogo.trim()) ? cardLogo.trim() : meta?.logo;
+  const mainSrc = (favicon && favicon.trim()) ? favicon.trim() : undefined;
   return (
     <span className="flex items-center gap-2.5 min-w-0">
       {meta ? (
         <span className="h-7 w-7 rounded-lg bg-white shadow-sm ring-1 ring-black/5 p-0.5 flex items-center justify-center shrink-0">
-          <img src={meta.logo} alt="" className="max-h-full max-w-full object-contain" />
+          <img src={logoSrc} alt="" className="max-h-full max-w-full object-contain" />
         </span>
       ) : (
-        <span className="h-7 w-7 rounded-lg bg-gradient-to-br from-brand to-brand/60 text-white shadow-sm flex items-center justify-center font-black text-xs shrink-0">
-          C
+        <span className="h-7 w-7 rounded-lg bg-white shadow-sm ring-1 ring-black/5 p-0.5 flex items-center justify-center shrink-0">
+          {mainSrc
+            ? <img src={mainSrc} alt="Curemed" className="max-h-full max-w-full object-contain" />
+            : <span className="font-black text-xs text-brand">C</span>}
         </span>
       )}
       <span className={cn("font-medium truncate", compact ? "text-sm" : "text-sm")}>
@@ -545,13 +551,17 @@ function PageOption({
 function PageBadge({ pageKey }: { pageKey: HeroPageKey }) {
   const isMain = pageKey === "curemed";
   const meta = isMain ? null : BRANDS[pageKey as BrandKey];
+  const { data: cardLogo } = useBrandingBrandCardLogo(isMain ? null : pageKey as BrandKey);
+  const { data: favicon } = useBrandingFavicon();
+  const logoSrc = (cardLogo && cardLogo.trim()) ? cardLogo.trim() : meta?.logo;
+  const mainSrc = (favicon && favicon.trim()) ? favicon.trim() : curemedBadge;
   return meta ? (
     <div className="h-12 w-12 rounded-xl bg-white shadow-md ring-1 ring-black/5 p-1.5 flex items-center justify-center shrink-0">
-      <img src={meta.logo} alt={meta.name} className="max-h-full max-w-full object-contain" />
+      <img src={logoSrc} alt={meta.name} className="max-h-full max-w-full object-contain" />
     </div>
   ) : (
     <div className="h-12 w-12 rounded-xl bg-white shadow-md ring-1 ring-black/5 p-1.5 flex items-center justify-center shrink-0">
-      <img src={curemedBadge} alt="Curemed" className="max-h-full max-w-full object-contain" />
+      <img src={mainSrc} alt="Curemed" className="max-h-full max-w-full object-contain" />
     </div>
   );
 }
