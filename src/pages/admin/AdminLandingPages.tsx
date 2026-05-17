@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Image as ImageIcon, Sparkles, Home, ListFilter } from "lucide-react";
 import { HERO_PAGES, type HeroPageKey } from "@/lib/heroSlides";
 import { BRANDS } from "@/lib/brands";
-import { type BrandKey } from "@/lib/db";
+import { useBrandingBrandCardLogo, useBrandingFavicon, type BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import curemedBadge from "@/assets/curemed-c-badge.png";
 
@@ -67,6 +67,10 @@ function BrandLandingCard({
   const isMain = pageKey === "curemed";
   const meta = isMain ? null : BRANDS[pageKey as BrandKey];
   const tagline = meta?.tagline.en;
+  const { data: cardLogo } = useBrandingBrandCardLogo(isMain ? null : pageKey as BrandKey);
+  const { data: favicon } = useBrandingFavicon();
+  const logoSrc = (cardLogo && cardLogo.trim()) ? cardLogo.trim() : meta?.logo;
+  const mainSrc = (favicon && favicon.trim()) ? favicon.trim() : curemedBadge;
 
   return (
     <Link
@@ -120,7 +124,7 @@ function BrandLandingCard({
           {meta ? (
             <div className="h-14 w-14 rounded-xl bg-white/95 backdrop-blur p-2 shadow-md ring-1 ring-black/5 flex items-center justify-center">
               <img
-                src={meta.logo}
+                src={logoSrc}
                 alt={meta.name}
                 className="max-h-full max-w-full object-contain"
                 loading="lazy"
@@ -129,7 +133,7 @@ function BrandLandingCard({
           ) : (
             <div className="h-14 w-14 rounded-xl bg-white/95 backdrop-blur p-2 shadow-md ring-1 ring-black/5 flex items-center justify-center">
               <img
-                src={curemedBadge}
+                src={mainSrc}
                 alt="Curemed"
                 className="max-h-full max-w-full object-contain"
                 loading="lazy"
