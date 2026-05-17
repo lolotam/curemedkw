@@ -31,6 +31,7 @@ import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
 import { COUNTRIES, findCountry, findGovernorate } from "@/lib/regionsData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { logOperation } from "@/lib/logs";
 import {
   ColorfulHeroBg,
   GlowCard,
@@ -167,6 +168,7 @@ export default function Checkout() {
       return;
     }
     try {
+      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal } });
       const order = await createOrder.mutateAsync({
         customerName: form.customerName,
         customerEmail: form.customerEmail,

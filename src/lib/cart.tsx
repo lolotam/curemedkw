@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Product } from "@/lib/db";
+import { logOperation } from "@/lib/logs";
 
 export interface CartItem {
   productId: string;
@@ -77,8 +78,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             },
           ];
         });
+        logOperation({ category: "cart", operation: "cart_add", status: "info", metadata: { product: product.name, productId: product.id, qty, price: product.price } });
       },
-      remove: (productId) => setItems((prev) => prev.filter((i) => i.productId !== productId)),
+      remove: (productId) => {
+        setItems((prev) => prev.filter((i) => i.productId !== productId));
+        logOperation({ category: "cart", operation: "cart_remove", status: "info", metadata: { productId } });
+      },
       setQuantity: (productId, qty) =>
         setItems((prev) =>
           prev

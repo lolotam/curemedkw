@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/clientRuntime";
+import { logOperation } from "@/lib/logs";
 
 export type DescFormat = "text" | "html";
 
@@ -35,10 +36,17 @@ export interface RewriteInput {
 }
 
 export async function rewriteDescription(input: RewriteInput): Promise<{ text: string; format: DescFormat }> {
-  const { data, error } = await supabase.functions.invoke("rewrite-description", { body: input });
-  if (error) throw new Error((data as any)?.error || error.message);
-  if ((data as any)?.error) throw new Error((data as any).error);
-  return data as { text: string; format: DescFormat };
+  const t0 = Date.now();
+  try {
+    const { data, error } = await supabase.functions.invoke("rewrite-description", { body: input });
+    if (error) throw new Error((data as any)?.error || error.message);
+    if ((data as any)?.error) throw new Error((data as any).error);
+    logOperation({ category: "ai", operation: "ai_rewrite", status: "success", durationMs: Date.now() - t0, metadata: { product: input.productName, template: input.templateId, model: (data as any)?.model ?? null } });
+    return data as { text: string; format: DescFormat };
+  } catch (e: any) {
+    logOperation({ category: "ai", operation: "ai_rewrite", status: "failed", durationMs: Date.now() - t0, errorMessage: e.message, metadata: { product: input.productName, template: input.templateId } });
+    throw e;
+  }
 }
 
 export function isHtml(s: string) {

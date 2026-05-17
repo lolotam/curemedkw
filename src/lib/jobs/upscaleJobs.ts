@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob } from "./jobStore";
+import { logOperation } from "@/lib/logs";
 
 export type UpscaleEngine = "picsart" | "ai";
 
@@ -64,6 +65,7 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
         resultUrl: data.url,
         meta: `PICSART · ${config.mode} · ${config.factor}× · ${config.format}`,
       });
+      logOperation({ category: "ai", operation: "upscale_image", status: "success", durationMs: Date.now() - startedAt, metadata: { engine: "picsart", mode: config.mode, factor: config.factor, format: config.format } });
     } else {
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
         body: {
@@ -87,6 +89,7 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
         resultUrl: (data as any).url,
         meta: `${PROVIDER_LABELS[provider] ?? provider} · ${(data as any).model}`,
       });
+      logOperation({ category: "ai", operation: "upscale_image_ai", status: "success", durationMs: Date.now() - startedAt, metadata: { engine: "ai", provider, model: (data as any).model } });
     }
   } catch (e: any) {
     const msg = e?.context?.error || e?.message || "Upscale failed";
@@ -97,6 +100,7 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
       finishedAt: Date.now(),
       error: String(msg),
     });
+    logOperation({ category: "ai", operation: config.engine === "picsart" ? "upscale_image" : "upscale_image_ai", status: "failed", durationMs: Date.now() - startedAt, errorMessage: String(msg), metadata: { engine: config.engine } });
   } finally {
     inflight.delete(key);
   }

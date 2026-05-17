@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { convertToWebP } from "@/lib/imageConvert";
+import { logOperation } from "@/lib/logs";
 
 export type BrandKey =
   | "flexitol"
@@ -184,6 +185,7 @@ export const qk = {
   coupons: ["coupons"] as const,
   notificationTemplates: ["notification_templates"] as const,
   adminUsers: ["admin", "users"] as const,
+  appLogs: (from?: string, to?: string) => ["app_logs", from, to] as const,
 };
 
 /* ============================================================
@@ -324,10 +326,14 @@ export function useCreateProduct() {
       await syncProductTags(input.tags ?? []);
       return { ...product, categoryIds: ids };
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.products });
       qc.invalidateQueries({ queryKey: qk.productsFeatured });
       qc.invalidateQueries({ queryKey: qk.tags });
+      logOperation({ category: "admin", operation: "product_created", status: "success", metadata: { name: vars.name, brand: vars.brand } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "product_created", status: "failed", errorMessage: (err as Error).message, metadata: { name: vars.name } });
     },
   });
 }
@@ -367,6 +373,10 @@ export function useUpdateProduct() {
       qc.invalidateQueries({ queryKey: qk.product(vars.id) });
       qc.invalidateQueries({ queryKey: qk.productsFeatured });
       qc.invalidateQueries({ queryKey: qk.tags });
+      logOperation({ category: "admin", operation: "product_updated", status: "success", metadata: { id: vars.id } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "product_updated", status: "failed", errorMessage: (err as Error).message, metadata: { id: vars.id } });
     },
   });
 }
@@ -378,7 +388,14 @@ export function useDeleteProduct() {
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.products }); qc.invalidateQueries({ queryKey: qk.productsFeatured }); },
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: qk.products });
+      qc.invalidateQueries({ queryKey: qk.productsFeatured });
+      logOperation({ category: "admin", operation: "product_deleted", status: "success", metadata: { id } });
+    },
+    onError: (err, id) => {
+      logOperation({ category: "admin", operation: "product_deleted", status: "failed", errorMessage: (err as Error).message, metadata: { id } });
+    },
   });
 }
 
@@ -390,9 +407,13 @@ export function useBulkDeleteProducts() {
       const { error } = await supabase.from("products").delete().in("id", ids);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, ids) => {
       qc.invalidateQueries({ queryKey: qk.products });
       qc.invalidateQueries({ queryKey: qk.productsFeatured });
+      logOperation({ category: "admin", operation: "products_bulk_deleted", status: "success", metadata: { count: ids.length } });
+    },
+    onError: (err, ids) => {
+      logOperation({ category: "admin", operation: "products_bulk_deleted", status: "failed", errorMessage: (err as Error).message, metadata: { count: ids.length } });
     },
   });
 }
@@ -574,7 +595,13 @@ export function useCreateCategory() {
       if (error) throw error;
       return rowToCategory(data as CategoryRow);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.categories }); },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      logOperation({ category: "admin", operation: "category_created", status: "success", metadata: { name: vars.nameEn } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "category_created", status: "failed", errorMessage: (err as Error).message, metadata: { name: vars.nameEn } });
+    },
   });
 }
 
@@ -587,7 +614,13 @@ export function useUpdateCategory() {
       if (error) throw error;
       return rowToCategory(data as CategoryRow);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.categories }); },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.categories });
+      logOperation({ category: "admin", operation: "category_updated", status: "success", metadata: { id: vars.id, name: vars.patch.nameEn } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "category_updated", status: "failed", errorMessage: (err as Error).message, metadata: { id: vars.id } });
+    },
   });
 }
 
@@ -598,9 +631,13 @@ export function useDeleteCategory() {
       const { error } = await supabase.from("categories").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: qk.categories });
       qc.invalidateQueries({ queryKey: qk.products });
+      logOperation({ category: "admin", operation: "category_deleted", status: "success", metadata: { id } });
+    },
+    onError: (err, id) => {
+      logOperation({ category: "admin", operation: "category_deleted", status: "failed", errorMessage: (err as Error).message, metadata: { id } });
     },
   });
 }
@@ -613,9 +650,13 @@ export function useBulkDeleteCategories() {
       const { error } = await supabase.from("categories").delete().in("id", ids);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, ids) => {
       qc.invalidateQueries({ queryKey: qk.categories });
       qc.invalidateQueries({ queryKey: qk.products });
+      logOperation({ category: "admin", operation: "categories_bulk_deleted", status: "success", metadata: { count: ids.length } });
+    },
+    onError: (err, ids) => {
+      logOperation({ category: "admin", operation: "categories_bulk_deleted", status: "failed", errorMessage: (err as Error).message, metadata: { count: ids.length } });
     },
   });
 }
@@ -725,7 +766,14 @@ export function useDeleteMessages() {
       const { error } = await supabase.from("messages").delete().in("id", ids);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.messages }); qc.invalidateQueries({ queryKey: qk.unreadCount }); },
+    onSuccess: (_, ids) => {
+      qc.invalidateQueries({ queryKey: qk.messages });
+      qc.invalidateQueries({ queryKey: qk.unreadCount });
+      logOperation({ category: "admin", operation: "messages_deleted", status: "success", metadata: { count: ids.length } });
+    },
+    onError: (err) => {
+      logOperation({ category: "admin", operation: "messages_deleted", status: "failed", errorMessage: (err as Error).message });
+    },
   });
 }
 
@@ -769,7 +817,13 @@ export function useDeleteSubscriber() {
       const { error } = await supabase.from("subscribers").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.subscribers }); },
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: qk.subscribers });
+      logOperation({ category: "admin", operation: "subscriber_deleted", status: "success", metadata: { id } });
+    },
+    onError: (err) => {
+      logOperation({ category: "admin", operation: "subscriber_deleted", status: "failed", errorMessage: (err as Error).message });
+    },
   });
 }
 
@@ -829,7 +883,13 @@ export function useUpsertTag() {
       if (error) throw error;
       return rowToTag(data as TagRow);
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.tags }); },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.tags });
+      logOperation({ category: "admin", operation: "tag_upserted", status: "success", metadata: { name: vars.name } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "tag_upserted", status: "failed", errorMessage: (err as Error).message, metadata: { name: vars.name } });
+    },
   });
 }
 
@@ -851,9 +911,13 @@ export function useRenameTag() {
         await supabase.from("products").update({ tags: next }).eq("id", p.id);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.tags });
       qc.invalidateQueries({ queryKey: qk.products });
+      logOperation({ category: "admin", operation: "tag_renamed", status: "success", metadata: { from: vars.oldName, to: vars.newName } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "tag_renamed", status: "failed", errorMessage: (err as Error).message, metadata: { from: vars.oldName, to: vars.newName } });
     },
   });
 }
@@ -873,9 +937,13 @@ export function useDeleteTag() {
         await supabase.from("products").update({ tags: next }).eq("id", p.id);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.tags });
       qc.invalidateQueries({ queryKey: qk.products });
+      logOperation({ category: "admin", operation: "tag_deleted", status: "success", metadata: { name: vars.name } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "tag_deleted", status: "failed", errorMessage: (err as Error).message, metadata: { name: vars.name } });
     },
   });
 }
@@ -1011,6 +1079,10 @@ export function useUpdateSiteSetting() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.siteSetting(vars.key) });
+      logOperation({ category: "admin", operation: "setting_updated", status: "success", metadata: { key: vars.key } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "setting_updated", status: "failed", errorMessage: (err as Error).message, metadata: { key: vars.key } });
     },
   });
 }
@@ -1242,10 +1314,14 @@ export function useApproveReview() {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.adminReviews });
       qc.invalidateQueries({ queryKey: qk.approvedReviews });
       qc.invalidateQueries({ queryKey: ["product_reviews"] });
+      logOperation({ category: "admin", operation: vars.approve ? "review_approved" : "review_rejected", status: "success", metadata: { reviewId: vars.id } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "review_approved", status: "failed", errorMessage: (err as Error).message, metadata: { reviewId: vars.id } });
     },
   });
 }
@@ -1257,10 +1333,14 @@ export function useDeleteReview() {
       const { error } = await supabase.from("product_reviews").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, id) => {
       qc.invalidateQueries({ queryKey: qk.adminReviews });
       qc.invalidateQueries({ queryKey: qk.approvedReviews });
       qc.invalidateQueries({ queryKey: ["product_reviews"] });
+      logOperation({ category: "admin", operation: "review_deleted", status: "success", metadata: { reviewId: id } });
+    },
+    onError: (err, id) => {
+      logOperation({ category: "admin", operation: "review_deleted", status: "failed", errorMessage: (err as Error).message, metadata: { reviewId: id } });
     },
   });
 }
@@ -1457,8 +1537,12 @@ export function useCreateOrder() {
       }
       return order;
     },
-    onSuccess: () => {
+    onSuccess: (order, vars) => {
       qc.invalidateQueries({ queryKey: qk.orders });
+      logOperation({ category: "order", operation: "order_created", status: "success", metadata: { order_number: order.orderNumber, total: order.total, payment_method: vars.paymentMethod, items_count: vars.items.length } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "order", operation: "order_created", status: "failed", errorMessage: (err as Error).message, metadata: { payment_method: vars.paymentMethod } });
     },
   });
 }
@@ -1518,6 +1602,10 @@ export function useUpdateOrder() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.orders });
       qc.invalidateQueries({ queryKey: qk.order(vars.id) });
+      logOperation({ category: "admin", operation: "order_updated", status: "success", metadata: { id: vars.id, patch: vars.patch } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "order_updated", status: "failed", errorMessage: (err as Error).message, metadata: { id: vars.id } });
     },
   });
 }
@@ -1773,6 +1861,10 @@ export function useCreateNotification() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: qk.myNotifications(vars.userId) });
       qc.invalidateQueries({ queryKey: qk.notificationsUnread(vars.userId) });
+      logOperation({ category: "admin", operation: "notification_created", status: "success", metadata: { title: vars.title, type: vars.type, userId: vars.userId } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "notification_created", status: "failed", errorMessage: (err as Error).message, metadata: { title: vars.title } });
     },
   });
 }
@@ -1939,7 +2031,13 @@ export function useUpsertCoupon() {
         if (error) throw error;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.coupons }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.coupons });
+      logOperation({ category: "admin", operation: vars.id ? "coupon_updated" : "coupon_created", status: "success", metadata: { code: vars.code, type: vars.discountType } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "coupon_upserted", status: "failed", errorMessage: (err as Error).message, metadata: { code: vars.code } });
+    },
   });
 }
 
@@ -1950,7 +2048,13 @@ export function useDeleteCoupon() {
       const { error } = await supabase.from("coupons").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.coupons }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: qk.coupons });
+      logOperation({ category: "admin", operation: "coupon_deleted", status: "success", metadata: { id } });
+    },
+    onError: (err) => {
+      logOperation({ category: "admin", operation: "coupon_deleted", status: "failed", errorMessage: (err as Error).message });
+    },
   });
 }
 
@@ -2028,7 +2132,13 @@ export function useToggleAdminRole() {
         if (error) throw error;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminUsers }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.adminUsers });
+      logOperation({ category: "admin", operation: "user_role_changed", status: "success", metadata: { userId: vars.userId, makeAdmin: vars.makeAdmin } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "user_role_changed", status: "failed", errorMessage: (err as Error).message, metadata: { userId: vars.userId } });
+    },
   });
 }
 
@@ -2042,6 +2152,58 @@ export function useToggleUserBlock() {
         .eq("id", userId);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.adminUsers }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: qk.adminUsers });
+      logOperation({ category: "admin", operation: vars.blocked ? "user_blocked" : "user_unblocked", status: "success", metadata: { userId: vars.userId } });
+    },
+    onError: (err, vars) => {
+      logOperation({ category: "admin", operation: "user_blocked", status: "failed", errorMessage: (err as Error).message, metadata: { userId: vars.userId } });
+    },
+  });
+}
+
+/* ============================================================
+ * App Logs (admin observability)
+ * ============================================================ */
+
+export interface AppLog {
+  id: string;
+  createdAt: string;
+  category: string;
+  operation: string;
+  status: string;
+  userId: string | null;
+  userEmail: string | null;
+  metadata: Record<string, unknown>;
+  errorMessage: string | null;
+  durationMs: number | null;
+}
+
+export function useAppLogs(dateFrom?: string, dateTo?: string) {
+  return useQuery({
+    queryKey: qk.appLogs(dateFrom, dateTo),
+    queryFn: async (): Promise<AppLog[]> => {
+      let q = supabase
+        .from("app_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (dateFrom) q = q.gte("created_at", dateFrom);
+      if (dateTo) q = q.lte("created_at", dateTo + "T23:59:59");
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        createdAt: r.created_at,
+        category: r.category,
+        operation: r.operation,
+        status: r.status,
+        userId: r.user_id ?? null,
+        userEmail: r.user_email ?? null,
+        metadata: r.metadata ?? {},
+        errorMessage: r.error_message ?? null,
+        durationMs: r.duration_ms ?? null,
+      }));
+    },
   });
 }

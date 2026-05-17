@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { createJobStore, useJob } from "./jobStore";
 import type { ExtractResult, ScrapeResult } from "@/lib/aiImport";
+import { logOperation } from "@/lib/logs";
 
 export type ScrapePhase = "scraping" | "extracting" | "done" | "error";
 
@@ -51,8 +52,10 @@ export async function startScrape(url: string): Promise<void> {
       attempts: d.attempts ?? [],
     };
     store.update(url, { status: "done", extracted, finishedAt: Date.now() });
+    logOperation({ category: "scrape", operation: "scrape_product", status: "success", metadata: { url, model: extracted.usedModel, primaryModel: extracted.primaryModel, attempts: extracted.attempts } });
   } catch (e: any) {
     store.update(url, { status: "error", error: e?.message || "Scrape failed", finishedAt: Date.now() });
+    logOperation({ category: "scrape", operation: "scrape_product", status: "failed", errorMessage: e?.message, metadata: { url } });
   } finally {
     inflight.delete(url);
   }
