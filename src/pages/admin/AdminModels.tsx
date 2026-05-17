@@ -11,6 +11,7 @@ import {
   Image as ImageIcon,
   Zap,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/clientRuntime";
@@ -48,6 +49,7 @@ import {
   type Slot,
 } from "@/lib/aiModels";
 import { useUpscalePrompt, DEFAULT_UPSCALE_PROMPT } from "@/lib/upscalePrompt";
+import { useLongDescPrompt, DEFAULT_LONG_DESC_PROMPT } from "@/lib/longDescPrompt";
 import { Textarea } from "@/components/ui/textarea";
 
 function formatPricePerM(value?: string | number) {
@@ -91,12 +93,15 @@ export default function AdminModels() {
       </Card>
 
       <Tabs defaultValue="chat" className="w-full">
-        <TabsList className="grid w-full max-w-sm grid-cols-2 mb-6">
+        <TabsList className="grid w-full max-w-lg grid-cols-3 mb-6">
           <TabsTrigger value="chat" className="gap-1.5">
             <MessageSquare className="h-3.5 w-3.5" /> Chat Models
           </TabsTrigger>
           <TabsTrigger value="image" className="gap-1.5">
             <ImageIcon className="h-3.5 w-3.5" /> Image Models
+          </TabsTrigger>
+          <TabsTrigger value="prompts" className="gap-1.5">
+            <FileText className="h-3.5 w-3.5" /> Prompt Templates
           </TabsTrigger>
         </TabsList>
 
@@ -118,8 +123,14 @@ export default function AdminModels() {
               />
             ))}
             {kind === "image" && <UpscalePromptCard />}
+            {kind === "chat" && <LongDescPromptCard />}
           </TabsContent>
         ))}
+
+        <TabsContent value="prompts" className="space-y-4">
+          <UpscalePromptCard />
+          <LongDescPromptCard />
+        </TabsContent>
       </Tabs>
 
       <div className="mt-6 flex justify-end">
@@ -456,6 +467,54 @@ function UpscalePromptCard() {
             onChange={(e) => setDraft(e.target.value)}
             disabled={loading}
             rows={6}
+            className="font-mono text-xs"
+          />
+          <div className="flex justify-end">
+            <Button size="sm" onClick={() => save(draft)} disabled={!dirty || loading}>
+              Save prompt
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function LongDescPromptCard() {
+  const { prompt, loading, save, reset } = useLongDescPrompt();
+  const [draft, setDraft] = useState(prompt);
+  useEffect(() => { setDraft(prompt); }, [prompt]);
+  const dirty = draft.trim() !== prompt.trim();
+  const isDefault = prompt.trim() === DEFAULT_LONG_DESC_PROMPT.trim();
+  return (
+    <Card className="p-5">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted text-muted-foreground border border-border shrink-0">
+          <FileText className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0 space-y-3">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="font-semibold text-sm">Long Description Prompt</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Used when admins click "AI Rewrite" on a product's long description.
+              </p>
+            </div>
+            {!isDefault && (
+              <button
+                type="button"
+                onClick={reset}
+                className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                <RotateCcw className="h-3 w-3" /> Reset to default
+              </button>
+            )}
+          </div>
+          <Textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            disabled={loading}
+            rows={8}
             className="font-mono text-xs"
           />
           <div className="flex justify-end">
