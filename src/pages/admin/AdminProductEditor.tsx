@@ -907,10 +907,10 @@ export default function AdminProductEditor() {
                 <Input value={form.sku} onChange={(e) => update("sku", e.target.value)} required />
               </Field>
               <Field label="Ingredients (one per line)" full>
-                <Textarea rows={4} value={form.ingredients.join("\n")} onChange={(e) => update("ingredients", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
+                <Textarea rows={4} value={form.ingredients.join("\n")} onChange={(e) => update("ingredients", e.target.value.split("\n").map((s) => s.trim()))} />
               </Field>
               <Field label="Benefits (one per line)" full>
-                <Textarea rows={4} value={form.benefits.join("\n")} onChange={(e) => update("benefits", e.target.value.split("\n").map((s) => s.trim()).filter(Boolean))} />
+                <Textarea rows={4} value={form.benefits.join("\n")} onChange={(e) => update("benefits", e.target.value.split("\n").map((s) => s.trim()))} />
               </Field>
               <Field label="How to use" full>
                 <Textarea rows={3} value={form.usage} onChange={(e) => update("usage", e.target.value)} />
