@@ -129,6 +129,10 @@ export function useAiModels() {
   }, []);
 
   const persist = useCallback(async (next: SlotsByKind) => {
+    const imageKeys = next.image.map((s) => `${s.provider}:${s.model}`);
+    if (imageKeys.every((k) => k === imageKeys[0])) {
+      toast.warning("All 3 image slots are identical — no real fallback coverage. Use different providers for each slot.");
+    }
     cache = next;
     setSlots(clone(next));
     broadcast();
