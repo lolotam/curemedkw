@@ -37,12 +37,14 @@ export default function ProductDetail() {
   const longDesc =
     isAr && product.longDescriptionAr ? product.longDescriptionAr : product.longDescription;
   const usage = isAr && product.usageAr ? product.usageAr : product.usage;
-  const benefits =
-    isAr && product.benefitsAr && product.benefitsAr.length ? product.benefitsAr : product.benefits;
-  const ingredients =
+  const benefits = (
+    isAr && product.benefitsAr && product.benefitsAr.length ? product.benefitsAr : product.benefits
+  ).filter(Boolean);
+  const ingredients = (
     isAr && product.ingredientsAr && product.ingredientsAr.length
       ? product.ingredientsAr
-      : product.ingredients;
+      : product.ingredients
+  ).filter(Boolean);
   const stockBadge = {
     in_stock: { label: t("common.inStock"), cls: "bg-green-500/10 text-green-700 dark:text-green-400" },
     low_stock: { label: t("common.lowStock"), cls: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },

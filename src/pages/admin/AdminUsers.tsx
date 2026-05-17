@@ -19,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function AdminUsers() {
-  const { data: users = [], isLoading } = useAdminUsers();
+  const { data: users = [], isLoading, isError, error } = useAdminUsers();
   const toggleAdmin = useToggleAdminRole();
   const toggleBlock = useToggleUserBlock();
   const [search, setSearch] = useState("");
@@ -42,6 +42,12 @@ export default function AdminUsers() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input placeholder="Search by name or phone…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
       </div>
+
+      {isError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          Failed to load users: {(error as Error)?.message ?? "Unknown error"}
+        </div>
+      )}
 
       <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <Table>

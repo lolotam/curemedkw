@@ -51,6 +51,13 @@ export function ProductCard({ product, compact = false }: { product: Product; co
             </>
           );
         })()}
+        {product.stockStatus === "out_of_stock" && (
+          <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center z-10">
+            <span className="bg-red-600/80 text-white text-sm font-bold px-4 py-2 rounded-full backdrop-blur-sm">
+              {t("common.outOfStock")}
+            </span>
+          </div>
+        )}
         {product.featured && (
           <span className="absolute top-3 left-3 rtl:left-auto rtl:right-3 inline-flex items-center gap-1 rounded-full bg-brand px-2.5 py-1 text-[10px] font-semibold text-white">
             <Star className="h-3 w-3 fill-current" /> {t("common.featured")}

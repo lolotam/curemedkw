@@ -16,19 +16,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    // Flag ensures we only log logins that happen after the initial session
-    // restore check. Supabase fires SIGNED_IN on page-load session restoration
-    // too, which would produce spurious login records on every refresh.
+    // Skip the page-load SIGNED_IN event (Supabase fires it on every session restore).
+    // Also deduplicate by access_token so tab minimize/restore — which can re-fire
+    // SIGNED_IN for the same session — doesn't produce a spurious login record.
     let initialResolved = false;
+    let lastLoggedToken: string | null = null;
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (event === "SIGNED_IN" && initialResolved) {
-        logOperation({ category: "auth", operation: "login", status: "success", userId: session?.user?.id ?? null, userEmail: session?.user?.email ?? null, metadata: { provider: session?.user?.app_metadata?.provider } });
+        const token = session?.access_token ?? null;
+        if (token && token !== lastLoggedToken) {
+          lastLoggedToken = token;
+          logOperation({ category: "auth", operation: "login", status: "success", userId: session?.user?.id ?? null, userEmail: session?.user?.email ?? null, metadata: { provider: session?.user?.app_metadata?.provider } });
+        }
       }
+      if (event === "SIGNED_OUT") lastLoggedToken = null;
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      lastLoggedToken = session?.access_token ?? null;
       initialResolved = true;
     });
     return () => sub.subscription.unsubscribe();
