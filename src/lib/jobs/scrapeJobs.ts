@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { createJobStore, useJob } from "./jobStore";
 import type { ExtractResult, ScrapeResult } from "@/lib/aiImport";
 import { logOperation } from "@/lib/logs";
+import type { ScrapeEndpoint } from "@/lib/scrapeEndpoint";
 
 export type ScrapePhase = "scraping" | "extracting" | "done" | "error";
 
@@ -25,7 +26,7 @@ const store = createJobStore<ScrapeJob>({
 
 const inflight = new Set<string>();
 
-export async function startScrape(url: string): Promise<void> {
+export async function startScrape(url: string, endpoint: ScrapeEndpoint = "self-hosted"): Promise<void> {
   const existing = store.get(url);
   if (existing && (existing.status === "scraping" || existing.status === "extracting") && inflight.has(url)) return;
 
@@ -33,7 +34,7 @@ export async function startScrape(url: string): Promise<void> {
   inflight.add(url);
 
   try {
-    const { data: sData, error: sErr } = await supabase.functions.invoke("scrape-product", { body: { url } });
+    const { data: sData, error: sErr } = await supabase.functions.invoke("scrape-product", { body: { url, endpoint } });
     if (sErr) throw new Error((sData as any)?.error || sErr.message);
     if ((sData as any)?.error) throw new Error((sData as any).error);
     const scraped = sData as ScrapeResult;
@@ -52,7 +53,7 @@ export async function startScrape(url: string): Promise<void> {
       attempts: d.attempts ?? [],
     };
     store.update(url, { status: "done", extracted, finishedAt: Date.now() });
-    logOperation({ category: "scrape", operation: "scrape_product", status: "success", metadata: { url, model: extracted.usedModel, primaryModel: extracted.primaryModel, attempts: extracted.attempts } });
+    logOperation({ category: "scrape", operation: "scrape_product", status: "success", metadata: { url, endpoint, model: extracted.usedModel, primaryModel: extracted.primaryModel, attempts: extracted.attempts } });
   } catch (e: any) {
     store.update(url, { status: "error", error: e?.message || "Scrape failed", finishedAt: Date.now() });
     logOperation({ category: "scrape", operation: "scrape_product", status: "failed", errorMessage: e?.message, metadata: { url } });

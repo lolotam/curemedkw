@@ -50,7 +50,9 @@ import {
 } from "@/lib/aiModels";
 import { useUpscalePrompt, DEFAULT_UPSCALE_PROMPT } from "@/lib/upscalePrompt";
 import { useLongDescPrompt, DEFAULT_LONG_DESC_PROMPT } from "@/lib/longDescPrompt";
+import { useScrapeEndpoint } from "@/lib/scrapeEndpoint";
 import { Textarea } from "@/components/ui/textarea";
+import { Server } from "lucide-react";
 
 function formatPricePerM(value?: string | number) {
   if (value === undefined || value === null || value === "") return "—";
@@ -123,13 +125,19 @@ export default function AdminModels() {
               />
             ))}
             {kind === "image" && <UpscalePromptCard />}
-            {kind === "chat" && <LongDescPromptCard />}
+            {kind === "chat" && (
+              <>
+                <LongDescPromptCard />
+                <ScrapingEndpointCard />
+              </>
+            )}
           </TabsContent>
         ))}
 
         <TabsContent value="prompts" className="space-y-4">
           <UpscalePromptCard />
           <LongDescPromptCard />
+          <ScrapingEndpointCard />
         </TabsContent>
       </Tabs>
 
@@ -521,6 +529,101 @@ function LongDescPromptCard() {
             <Button size="sm" onClick={() => save(draft)} disabled={!dirty || loading}>
               Save prompt
             </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ScrapingEndpointCard() {
+  const { endpoint, loading, save } = useScrapeEndpoint();
+  const [testing, setTesting] = useState(false);
+
+  const testConnection = async () => {
+    setTesting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("scrape-product", {
+        body: { url: "https://example.com", endpoint },
+      });
+      if (error || (data as any)?.error) {
+        toast.error(`Connection failed: ${(data as any)?.error || error?.message}`);
+      } else {
+        toast.success(`${endpoint === "cloud" ? "Cloud" : "Self-hosted"} endpoint is reachable`);
+      }
+    } catch (e) {
+      toast.error(`Connection failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-lg flex items-center justify-center bg-muted text-muted-foreground border border-border shrink-0">
+          <Server className="h-4 w-4" />
+        </div>
+        <div className="flex-1 min-w-0 space-y-3">
+          <div>
+            <h3 className="font-semibold text-sm">Scraping Endpoint</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Choose which Firecrawl instance to use for AI product import.
+            </p>
+          </div>
+
+          {loading ? (
+            <Skeleton className="h-16" />
+          ) : (
+            <div className="space-y-2">
+              <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/40 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="scrape-endpoint-admin"
+                  value="self-hosted"
+                  checked={endpoint === "self-hosted"}
+                  onChange={() => save("self-hosted")}
+                  className="accent-brand"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">Self-hosted — firecrawl.curemedkw.com</div>
+                  <div className="text-xs text-muted-foreground">Free, runs on your server. No API credits used.</div>
+                </div>
+                {endpoint === "self-hosted" && (
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Active</Badge>
+                )}
+              </label>
+
+              <label className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted/40 cursor-pointer transition-colors">
+                <input
+                  type="radio"
+                  name="scrape-endpoint-admin"
+                  value="cloud"
+                  checked={endpoint === "cloud"}
+                  onChange={() => save("cloud")}
+                  className="accent-brand"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium">Cloud — api.firecrawl.dev</div>
+                  <div className="text-xs text-muted-foreground">Official Firecrawl API (uses API credits).</div>
+                </div>
+                {endpoint === "cloud" && (
+                  <Badge variant="secondary" className="text-[10px] shrink-0">Active</Badge>
+                )}
+              </label>
+            </div>
+          )}
+
+          <div className="flex items-center gap-4 pt-1">
+            <button
+              type="button"
+              onClick={testConnection}
+              disabled={testing || loading}
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 disabled:opacity-50"
+            >
+              {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Zap className="h-3 w-3" />}
+              Test connection
+            </button>
           </div>
         </div>
       </div>

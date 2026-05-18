@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import type { ExtractedFields } from "@/lib/aiImport";
 import { startScrape, dismissScrape, useScrapeJob, scrapeJobStore } from "@/lib/jobs/scrapeJobs";
+import { useScrapeEndpoint } from "@/lib/scrapeEndpoint";
+import type { ScrapeEndpoint } from "@/lib/scrapeEndpoint";
 
 export interface ProductImportFromUrlProps {
   onImported: (fields: ExtractedFields, images: string[], sourceUrl: string) => void;
@@ -34,6 +36,14 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
   });
   const job = useScrapeJob(activeUrl);
   const handledKeyRef = useRef<string | null>(null);
+
+  const { endpoint: savedEndpoint } = useScrapeEndpoint();
+  const [endpoint, setEndpoint] = useState<ScrapeEndpoint>(savedEndpoint);
+
+  // Sync local endpoint state when the site setting loads from DB
+  useEffect(() => {
+    setEndpoint(savedEndpoint);
+  }, [savedEndpoint]);
 
   // Persist activeUrl so we can reconnect after reload/navigation.
   useEffect(() => {
@@ -78,7 +88,7 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
       return;
     }
     setActiveUrl(trimmed);
-    void startScrape(trimmed);
+    void startScrape(trimmed, endpoint);
   };
 
   const phase = job?.status ?? "idle";
@@ -95,6 +105,34 @@ export function ProductImportFromUrl({ onImported }: ProductImportFromUrlProps) 
         If the primary model is rate-limited or fails, the 2nd then 3rd model is tried automatically.
         Jobs continue running if you switch tabs or navigate away.
       </p>
+
+      <div className="flex items-center gap-4 text-xs">
+        <span className="text-muted-foreground font-medium shrink-0">Scraping endpoint:</span>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="radio"
+            name="scrape-endpoint"
+            value="self-hosted"
+            checked={endpoint === "self-hosted"}
+            onChange={() => setEndpoint("self-hosted")}
+            disabled={busy}
+            className="accent-brand"
+          />
+          Self-hosted
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="radio"
+            name="scrape-endpoint"
+            value="cloud"
+            checked={endpoint === "cloud"}
+            onChange={() => setEndpoint("cloud")}
+            disabled={busy}
+            className="accent-brand"
+          />
+          Cloud
+        </label>
+      </div>
 
       <div className="grid gap-3 sm:grid-cols-[1fr_auto] items-end">
         <div className="space-y-1.5">

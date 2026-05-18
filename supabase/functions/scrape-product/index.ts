@@ -77,21 +77,41 @@ Deno.serve(async (req) => {
     const url = String(body?.url ?? "").trim();
     if (!/^https?:\/\//i.test(url)) return json({ error: "Provide a valid http(s) URL" }, 400);
 
-    const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
-    if (!apiKey) return json({ error: "FIRECRAWL_API_KEY is not configured" }, 500);
+    const endpoint = body?.endpoint === "cloud" ? "cloud" : "self-hosted";
 
-    const fcRes = await fetch("https://api.firecrawl.dev/v2/scrape", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        url,
-        formats: ["markdown", "links", "html"],
-        onlyMainContent: true,
-      }),
-    });
+    let fcRes: Response;
+    if (endpoint === "cloud") {
+      const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
+      if (!apiKey) return json({ error: "FIRECRAWL_API_KEY is not configured" }, 500);
+      fcRes = await fetch("https://api.firecrawl.dev/v2/scrape", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url,
+          formats: ["markdown", "links", "html"],
+          onlyMainContent: true,
+        }),
+      });
+    } else {
+      const selfHostedUrl =
+        Deno.env.get("SELF_HOSTED_FIRECRAWL_URL") ?? "https://firecrawl.curemedkw.com/v1/scrape";
+      const selfHostedKey = Deno.env.get("SELF_HOSTED_FIRECRAWL_KEY") ?? "";
+      fcRes = await fetch(selfHostedUrl, {
+        method: "POST",
+        headers: {
+          ...(selfHostedKey ? { Authorization: `Bearer ${selfHostedKey}` } : {}),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          url,
+          formats: ["markdown", "links", "html"],
+          onlyMainContent: true,
+        }),
+      });
+    }
 
     if (fcRes.status === 402) {
       return json(
