@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_logs: {
+        Row: {
+          category: string
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          metadata: Json
+          operation: string
+          status: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          operation: string
+          status: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          metadata?: Json
+          operation?: string
+          status?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           cart_id: string
