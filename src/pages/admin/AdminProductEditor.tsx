@@ -15,7 +15,7 @@ import { useProduct, useCreateProduct, useUpdateProduct, useDeleteProduct, uploa
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { placeholderImage } from "@/lib/placeholder";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, isUpscaled } from "@/lib/utils";
 import { ProductImportFromUrl } from "@/components/admin/ProductImportFromUrl";
 import type { ExtractedFields } from "@/lib/aiImport";
 import { supabase } from "@/integrations/supabase/clientRuntime";
@@ -698,6 +698,14 @@ export default function AdminProductEditor() {
                   <img src={form.mainImage} alt="" className="h-full w-full object-cover" />
                 </button>
                 <span className="absolute top-1 left-1 bg-brand text-white text-[10px] font-bold px-1.5 py-0.5 rounded pointer-events-none">MAIN</span>
+                {isUpscaled(form.mainImage) && (
+                  <Badge
+                    variant="destructive"
+                    className="absolute top-1.5 right-1.5 z-10 text-[9px] px-1.5 py-0 pointer-events-none"
+                  >
+                    Upscaled
+                  </Badge>
+                )}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 pointer-events-none">
                   <Button
                     type="button"
@@ -824,6 +832,14 @@ export default function AdminProductEditor() {
                       >
                         <img src={src} alt="" className="h-full w-full object-cover" />
                       </button>
+                      {isUpscaled(src) && (
+                        <Badge
+                          variant="destructive"
+                          className="absolute top-1.5 right-1.5 z-10 text-[9px] px-1.5 py-0 pointer-events-none"
+                        >
+                          Upscaled
+                        </Badge>
+                      )}
                       <div
                         className={cn(
                           "absolute top-1.5 left-1.5 z-10 rounded bg-background/80 backdrop-blur-sm p-0.5 transition-opacity",

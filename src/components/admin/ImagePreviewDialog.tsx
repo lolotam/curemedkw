@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Download, ZoomIn, ZoomOut, RotateCcw, Copy, Check } from "lucide-react";
 import { downloadImage } from "@/lib/downloadImage";
+import { isUpscaled } from "@/lib/utils";
 
 type Props = {
   src: string | null;
@@ -16,6 +18,7 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [copied, setCopied] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -23,6 +26,7 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
       setZoom(1);
       setPan({ x: 0, y: 0 });
       setIsDragging(false);
+      setCopied(false);
     }
   }, [open]);
 
@@ -38,6 +42,14 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
   const resetZoom = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+  };
+
+  const handleCopy = () => {
+    if (!src) return;
+    navigator.clipboard.writeText(src).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -96,60 +108,95 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
               }}
             />
           ) : null}
+          {src && isUpscaled(src) && (
+            <Badge
+              variant="destructive"
+              className="absolute top-3 right-3 z-10 pointer-events-none text-xs"
+            >
+              Upscaled
+            </Badge>
+          )}
         </div>
-        <div className="flex items-center gap-2 px-4 py-3 border-t border-border bg-background">
-          <div className="flex items-center gap-1 mr-auto">
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={zoomOut}
-              disabled={zoom <= 0.5}
-              title="Zoom out"
-            >
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <span className="text-xs w-10 text-center tabular-nums select-none">
-              {Math.round(zoom * 100)}%
-            </span>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7"
-              onClick={zoomIn}
-              disabled={zoom >= 5}
-              title="Zoom in"
-            >
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            {zoom !== 1 && (
+        <div className="flex flex-col gap-2 px-4 py-3 border-t border-border bg-background">
+          {/* Row 1: zoom controls + download + close */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 mr-auto">
               <Button
                 type="button"
                 size="icon"
                 variant="ghost"
                 className="h-7 w-7"
-                onClick={resetZoom}
-                title="Reset zoom"
+                onClick={zoomOut}
+                disabled={zoom <= 0.5}
+                title="Zoom out"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <ZoomOut className="h-4 w-4" />
               </Button>
-            )}
+              <span className="text-xs w-10 text-center tabular-nums select-none">
+                {Math.round(zoom * 100)}%
+              </span>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7"
+                onClick={zoomIn}
+                disabled={zoom >= 5}
+                title="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              {zoom !== 1 && (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  onClick={resetZoom}
+                  title="Reset zoom"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!src}
+              onClick={() => src && downloadImage(src, filename)}
+              className="gap-1.5"
+            >
+              <Download className="h-4 w-4" /> Download
+            </Button>
+            <Button type="button" size="sm" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={!src}
-            onClick={() => src && downloadImage(src, filename)}
-            className="gap-1.5"
-          >
-            <Download className="h-4 w-4" /> Download
-          </Button>
-          <Button type="button" size="sm" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
+          {/* Row 2: URL display + copy */}
+          {src && (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground shrink-0">URL</span>
+              <input
+                readOnly
+                value={src}
+                onClick={(e) => (e.target as HTMLInputElement).select()}
+                className="flex-1 min-w-0 bg-muted/40 border border-border rounded px-2 py-1 text-[10px] font-mono text-muted-foreground truncate focus:outline-none focus:ring-1 focus:ring-ring cursor-text"
+                title={src}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopy}
+                className="gap-1.5 shrink-0"
+                title="Copy URL"
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? "Copied!" : "Copy"}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
