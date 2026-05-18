@@ -19,14 +19,13 @@ const DEFAULT_PROMPT =
 
 const DEFAULT_IMAGE_CHAIN: Slot[] = [
   { provider: "openai",     model: "gpt-image-2" },
-  { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
-  { provider: "google",     model: "gemini-2.0-flash-preview-image-generation" },
+  { provider: "openrouter", model: "google/gemini-3-pro-image-preview" },
 ];
 
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
 // Keep per-provider attempts short so we can try fallbacks AND still return
 // a real response (with CORS headers) before the proxy kills the connection.
-const PROVIDER_TIMEOUT_MS = 35_000;
+const PROVIDER_TIMEOUT_MS = 60_000;
 // Hard overall budget for the whole function (leave headroom under 100s).
 const TOTAL_BUDGET_MS = 85_000;
 
@@ -232,6 +231,19 @@ Deno.serve(async (req) => {
         .filter((s) => s.model.length > 0);
     }
     if (chain.length === 0) chain = DEFAULT_IMAGE_CHAIN;
+
+    // Deduplicate chain by provider:model so a misconfigured DB row with the
+    // same model twice (e.g. snapshot alias + rolling alias) doesn't burn the
+    // entire timeout budget on one model before fallbacks ever run.
+    {
+      const seen = new Set<string>();
+      chain = chain.filter((slot) => {
+        const key = `${slot.provider}:${slot.model}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
 
     // Fetch source image once
     const srcResp = await fetch(imageUrl);

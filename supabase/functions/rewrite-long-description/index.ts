@@ -41,6 +41,22 @@ Return only the rewritten and restyled product description in Markdown.
 Do not explain what you changed.
 Do not mention that you are an AI.`;
 
+// Validates a rewrite response. Treats responses that are only Markdown image
+// syntax (e.g. ![alt](url)) as failures so the chain can fall through to the
+// next model. Without this guard, a misconfigured ai_long_desc_prompt in
+// site_settings (e.g. accidentally pointing at an image-generation prompt)
+// causes text models to hallucinate image markdown which would otherwise be
+// returned to the admin UI as a falsely "successful" rewrite.
+function validateRewriteText(text: unknown): { ok: true; text: string } | { ok: false; error: string } {
+  if (typeof text !== "string" || !text.trim()) return { ok: false, error: "empty response" };
+  const stripped = text.trim();
+  const imageOnly = /^!\[[^\]]*\]\([^)]+\)\s*$/.test(stripped);
+  if (imageOnly || (stripped.length < 80 && /^!\[/.test(stripped))) {
+    return { ok: false, error: "response was image-markdown only (likely wrong prompt)" };
+  }
+  return { ok: true, text: stripped };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -148,9 +164,7 @@ Deno.serve(async (req) => {
       });
       if (!r.ok) return { ok: false, error: `HTTP ${r.status}: ${await r.text().catch(() => "")}` };
       const payload = await r.json().catch(() => null);
-      const text = payload?.choices?.[0]?.message?.content;
-      if (typeof text !== "string" || !text.trim()) return { ok: false, error: "empty response" };
-      return { ok: true, text: text.trim() };
+      return validateRewriteText(payload?.choices?.[0]?.message?.content);
     }
 
     async function callOpenAI(model: string): Promise<{ ok: boolean; text?: string; error?: string }> {
@@ -167,9 +181,7 @@ Deno.serve(async (req) => {
       });
       if (!r.ok) return { ok: false, error: `HTTP ${r.status}: ${await r.text().catch(() => "")}` };
       const payload = await r.json().catch(() => null);
-      const text = payload?.choices?.[0]?.message?.content;
-      if (typeof text !== "string" || !text.trim()) return { ok: false, error: "empty response" };
-      return { ok: true, text: text.trim() };
+      return validateRewriteText(payload?.choices?.[0]?.message?.content);
     }
 
     async function callGoogle(model: string): Promise<{ ok: boolean; text?: string; error?: string }> {
@@ -188,8 +200,7 @@ Deno.serve(async (req) => {
       const payload = await r.json().catch(() => null);
       const parts = payload?.candidates?.[0]?.content?.parts ?? [];
       const text = parts.find((p: any) => typeof p?.text === "string")?.text;
-      if (typeof text !== "string" || !text.trim()) return { ok: false, error: "empty response" };
-      return { ok: true, text: text.trim() };
+      return validateRewriteText(text);
     }
 
     async function callAnthropic(model: string): Promise<{ ok: boolean; text?: string; error?: string }> {
@@ -213,8 +224,7 @@ Deno.serve(async (req) => {
       const payload = await r.json().catch(() => null);
       const blocks = payload?.content ?? [];
       const text = blocks.find((b: any) => b?.type === "text")?.text;
-      if (typeof text !== "string" || !text.trim()) return { ok: false, error: "empty response" };
-      return { ok: true, text: text.trim() };
+      return validateRewriteText(text);
     }
 
     const dispatch = (slot: Slot) => {
