@@ -203,6 +203,8 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const imageUrl = String(body?.imageUrl ?? "").trim();
+    const imageBase64 = typeof body?.imageBase64 === "string" ? body.imageBase64 : "";
+    const imageMime = typeof body?.imageMime === "string" ? body.imageMime : "";
     const extraInstructions = String(body?.extraInstructions ?? "").trim();
     const sanitize = (s: unknown) => {
       const v = String(s ?? "").toLowerCase().trim().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
@@ -210,7 +212,8 @@ Deno.serve(async (req) => {
     };
     const brandSeg = sanitize(body?.brand);
     const slugSeg = sanitize(body?.productSlug);
-    if (!/^https?:\/\//i.test(imageUrl)) return json({ error: "Provide a valid http(s) imageUrl" }, 400);
+    if (!imageBase64 && !/^https?:\/\//i.test(imageUrl))
+      return json({ error: "Provide a valid http(s) imageUrl or imageBase64+imageMime" }, 400);
 
     // Load prompt + image slot chain from site_settings
     const [promptRow, modelsRow] = await Promise.all([
@@ -247,11 +250,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch source image once
-    const srcResp = await fetch(imageUrl);
-    if (!srcResp.ok) return json({ error: `Failed to fetch source image (${srcResp.status})` }, 400);
-    const srcMime = srcResp.headers.get("content-type") || "image/png";
-    const srcBytes = new Uint8Array(await srcResp.arrayBuffer());
+    // Resolve source image bytes — use pre-converted base64 when provided (AVIF/WebP → PNG)
+    let srcBytes: Uint8Array;
+    let srcMime: string;
+    if (imageBase64 && imageMime) {
+      srcBytes = base64ToBytes(imageBase64);
+      srcMime = imageMime;
+    } else {
+      const srcResp = await fetch(imageUrl);
+      if (!srcResp.ok) return json({ error: `Failed to fetch source image (${srcResp.status})` }, 400);
+      srcMime = srcResp.headers.get("content-type") || "image/png";
+      srcBytes = new Uint8Array(await srcResp.arrayBuffer());
+    }
     const srcBlob = new Blob([srcBytes], { type: srcMime });
     const srcB64 = bytesToBase64(srcBytes);
     const srcDataUrl = `data:${srcMime};base64,${srcB64}`;

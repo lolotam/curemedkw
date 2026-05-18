@@ -59,3 +59,39 @@ export async function convertToWebP(file: File, quality?: number): Promise<File>
     return file;
   }
 }
+
+const OPENAI_UNSUPPORTED_MIMES = new Set(["image/avif", "image/webp"]);
+
+export async function ensureOpenAISupportedFormat(
+  imageUrl: string,
+): Promise<{ imageUrl?: string; imageBase64?: string; imageMime?: string }> {
+  let mime = "";
+  try {
+    const head = await fetch(imageUrl, { method: "HEAD" });
+    mime = head.headers.get("content-type")?.split(";")[0].trim() ?? "";
+  } catch {
+    return { imageUrl };
+  }
+
+  if (!OPENAI_UNSUPPORTED_MIMES.has(mime)) return { imageUrl };
+
+  try {
+    const resp = await fetch(imageUrl);
+    const blob = await resp.blob();
+    const bitmap = await createImageBitmap(blob);
+    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { imageUrl };
+    ctx.drawImage(bitmap, 0, 0);
+    const pngBlob = await canvas.convertToBlob({ type: "image/png" });
+    const bytes = new Uint8Array(await pngBlob.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk)
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+    return { imageBase64: btoa(binary), imageMime: "image/png" };
+  } catch {
+    console.warn("[imageConvert] AVIF/WebP→PNG conversion failed, using original URL");
+    return { imageUrl };
+  }
+}

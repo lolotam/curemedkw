@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob } from "./jobStore";
 import { logOperation } from "@/lib/logs";
+import { ensureOpenAISupportedFormat } from "@/lib/imageConvert";
 
 export type UpscaleEngine = "picsart" | "ai";
 
@@ -67,9 +68,10 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
       });
       logOperation({ category: "ai", operation: "upscale_image", status: "success", durationMs: Date.now() - startedAt, metadata: { engine: "picsart", mode: config.mode, factor: config.factor, format: config.format } });
     } else {
+      const imgPayload = await ensureOpenAISupportedFormat(key);
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
         body: {
-          imageUrl: key,
+          ...imgPayload,
           extraInstructions: config.extraInstructions || undefined,
           brand: config.brand,
           productSlug: config.productSlug,
