@@ -28,9 +28,9 @@ export function logOperation(entry: LogEntry): void {
       status: entry.status,
       user_id: uid ?? null,
       user_email: email ?? null,
-      metadata: entry.metadata ?? {},
+      metadata: (entry.metadata ?? {}) as never,
       error_message: entry.errorMessage ?? null,
       duration_ms: entry.durationMs ?? null,
-    });
+    } as never);
   })().catch(() => {});
 }
