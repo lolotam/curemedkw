@@ -92,7 +92,17 @@ async function runOne(jobId: string, src: string, config: UpscaleConfig) {
     }
     patchItem(jobId, src, { status: "done", resultUrl, meta, elapsedMs: Date.now() - startedAt });
   } catch (e: any) {
-    const msg = e?.context?.error || e?.message || "Failed";
+    let msg = e?.message || "Failed";
+    try {
+      const ctx = e?.context;
+      if (ctx && typeof ctx.json === "function") {
+        const body = await ctx.clone().json();
+        if (Array.isArray(body?.details) && body.details.length) msg = body.details.join(" | ");
+        else if (body?.error) msg = body.error;
+      } else if (ctx?.error) {
+        msg = ctx.error;
+      }
+    } catch { /* ignore */ }
     patchItem(jobId, src, { status: "error", error: String(msg), elapsedMs: Date.now() - startedAt });
   }
 }

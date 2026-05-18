@@ -92,7 +92,17 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
       logOperation({ category: "ai", operation: "upscale_image_ai", status: "success", durationMs: Date.now() - startedAt, metadata: { engine: "ai", provider, model: (data as any).model } });
     }
   } catch (e: any) {
-    const msg = e?.context?.error || e?.message || "Upscale failed";
+    let msg = e?.message || "Upscale failed";
+    try {
+      const ctx = e?.context;
+      if (ctx && typeof ctx.json === "function") {
+        const body = await ctx.clone().json();
+        if (Array.isArray(body?.details) && body.details.length) msg = body.details[0];
+        else if (body?.error) msg = body.error;
+      } else if (ctx?.error) {
+        msg = ctx.error;
+      }
+    } catch { /* ignore */ }
     store.set(key, {
       status: "error",
       config,
