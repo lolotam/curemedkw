@@ -18,9 +18,9 @@ const DEFAULT_PROMPT =
   "Upscale this product image to a higher resolution. Preserve every product detail exactly: shape, colors, packaging text, logos, branding, materials, lighting and background. Do NOT add, remove, restyle or reinterpret anything. Output a clean, sharp, photorealistic version of the same image at a larger size.";
 
 const DEFAULT_IMAGE_CHAIN: Slot[] = [
-  { provider: "openai", model: "gpt-image-1" },
-  { provider: "openrouter", model: "google/gemini-3-pro-image-preview" },
-  { provider: "google", model: "gemini-3.1-flash-image-preview" },
+  { provider: "openai",     model: "gpt-image-2" },
+  { provider: "openrouter", model: "google/gemini-2.5-flash-image" },
+  { provider: "google",     model: "gemini-2.0-flash-preview-image-generation" },
 ];
 
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
@@ -150,15 +150,31 @@ async function callOpenRouter(model: string, prompt: string, imgDataUrl: string,
   }
   const data = await resp.json();
   const msg = data?.choices?.[0]?.message;
+
+  // Older OpenRouter format: msg.images[]
   const images = msg?.images;
   if (Array.isArray(images) && images[0]?.image_url?.url) {
     const url: string = images[0].image_url.url;
     const m = url.match(/^data:([^;]+);base64,(.+)$/);
     if (m) return { ok: true, bytes: base64ToBytes(m[2]), contentType: m[1] };
-    // remote URL fallback
     const r = await fetch(url);
     if (r.ok) return { ok: true, bytes: new Uint8Array(await r.arrayBuffer()), contentType: r.headers.get("content-type") || "image/png" };
   }
+
+  // Newer OpenRouter format (Gemini image models): msg.content[] with type="image_url"
+  const content = msg?.content;
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (item?.type === "image_url" && item?.image_url?.url) {
+        const url: string = item.image_url.url;
+        const m = url.match(/^data:([^;]+);base64,(.+)$/);
+        if (m) return { ok: true, bytes: base64ToBytes(m[2]), contentType: m[1] };
+        const r = await fetch(url);
+        if (r.ok) return { ok: true, bytes: new Uint8Array(await r.arrayBuffer()), contentType: r.headers.get("content-type") || "image/png" };
+      }
+    }
+  }
+
   return { ok: false, error: "openrouter: no image in response" };
 }
 
