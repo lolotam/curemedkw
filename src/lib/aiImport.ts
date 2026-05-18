@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
+import type { ScrapeEndpoint } from "@/lib/scrapeEndpoint";
 
 export interface ScrapeResult {
   markdown: string;
@@ -37,9 +38,9 @@ export interface OpenRouterModel {
   pricing: { prompt?: string; completion?: string } | null;
 }
 
-export async function scrapeProductUrl(url: string): Promise<ScrapeResult> {
+export async function scrapeProductUrl(url: string, endpoint?: ScrapeEndpoint): Promise<ScrapeResult> {
   const { data, error } = await supabase.functions.invoke("scrape-product", {
-    body: { url },
+    body: { url, endpoint },
   });
   if (error) throw new Error((data as any)?.error || error.message);
   if ((data as any)?.error) throw new Error((data as any).error);
