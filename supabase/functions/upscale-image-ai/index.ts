@@ -107,8 +107,10 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: str
   const fd = new FormData();
   fd.append("model", model);
   fd.append("prompt", prompt);
-  fd.append("image", srcBlob, "source.png");
-  fd.append("size", "auto");
+  // gpt-image-* requires the array field `image[]` on /v1/images/edits.
+  // Using singular `image` silently routes to the legacy DALL·E 2 path and
+  // returns a misleading "invalid model" 400. `size` is not valid on /edits.
+  fd.append("image[]", srcBlob, "source.png");
   const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
