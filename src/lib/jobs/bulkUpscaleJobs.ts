@@ -112,7 +112,13 @@ export async function startBulkUpscale(jobId: string, srcs: string[], config: Up
 
   try {
     let i = 0;
-    const runners = Array.from({ length: Math.min(CONCURRENCY, srcs.length) }, async () => {
+    const runners = Array.from({ length: Math.min(CONCURRENCY, srcs.length) }, async (_, workerIdx) => {
+      // Stagger starts: worker 0 fires immediately, worker 1 waits 5s, worker 2 waits 10s.
+      // Prevents all 3 requests hitting the self-hosted edge function gateway simultaneously,
+      // which causes Kong to drop 2 of the 3 connections under concurrent long-running load.
+      if (workerIdx > 0) {
+        await new Promise<void>(resolve => setTimeout(resolve, workerIdx * 5_000));
+      }
       while (i < srcs.length) {
         const idx = i++;
         await runOne(jobId, srcs[idx], config);
