@@ -127,9 +127,9 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, bra
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
         >
-          {src ? (
+          {effectiveSrc ? (
             <img
-              src={src}
+              src={effectiveSrc}
               alt={alt || ""}
               draggable={false}
               style={{
@@ -143,7 +143,7 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, bra
               }}
             />
           ) : null}
-          {src && isUpscaled(src) && (
+          {effectiveSrc && isUpscaled(effectiveSrc) && (
             <Badge
               variant="destructive"
               className="absolute top-3 right-3 z-10 pointer-events-none text-xs"
