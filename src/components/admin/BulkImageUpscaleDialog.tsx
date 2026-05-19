@@ -84,6 +84,7 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
   const [factor, setFactor] = useState<number>(2);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
   const [extraInstructions, setExtraInstructions] = useState("");
+  const [outputSize, setOutputSize] = useState<"1024x1024" | "1536x1536" | "2048x2048">("1024x1024");
 
   // Force AI engine when PICSART is disabled by admin flag.
   useEffect(() => {
