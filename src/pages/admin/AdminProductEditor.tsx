@@ -26,6 +26,7 @@ import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
 import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
 import LongDescriptionRewriteDialog from "@/components/admin/LongDescriptionRewriteDialog";
 import { logOperation } from "@/lib/logs";
+import { convertAndUploadImage } from "@/lib/imageConvert";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
