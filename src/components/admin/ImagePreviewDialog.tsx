@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, ZoomIn, ZoomOut, RotateCcw, Copy, Check } from "lucide-react";
+import { Download, ZoomIn, ZoomOut, RotateCcw, Copy, Check, Wand2, Loader2 } from "lucide-react";
 import { downloadImage } from "@/lib/downloadImage";
 import { isUpscaled } from "@/lib/utils";
+import { convertAndUploadImage } from "@/lib/imageConvert";
+import { toast } from "sonner";
 
 type Props = {
+  brand?: string;
+  slug?: string;
+  onConverted?: (oldUrl: string, newUrl: string) => void;
   src: string | null;
   alt?: string;
   filename?: string;
@@ -14,12 +19,42 @@ type Props = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: Props) {
+export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, brand, slug, onConverted }: Props) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [displaySrc, setDisplaySrc] = useState<string | null>(src);
   const dragStart = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setDisplaySrc(src);
+  }, [src]);
+
+  const effectiveSrc = displaySrc ?? src;
+  const bare = (effectiveSrc ?? "").split("?")[0].toLowerCase();
+  const isSafeExt = /\.(png|jpe?g)$/i.test(bare);
+  const canConvert = !!onConverted && !!effectiveSrc && !isSafeExt;
+
+  const handleConvert = async () => {
+    if (!effectiveSrc || !onConverted) return;
+    setConverting(true);
+    try {
+      const newUrl = await convertAndUploadImage(effectiveSrc, brand ?? "misc", slug ?? "misc");
+      if (newUrl && newUrl !== effectiveSrc) {
+        onConverted(effectiveSrc, newUrl);
+        setDisplaySrc(newUrl);
+        toast.success("Converted to PNG");
+      } else {
+        toast.error("Conversion failed — original URL kept");
+      }
+    } catch (e) {
+      toast.error("Conversion failed");
+    } finally {
+      setConverting(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) {
@@ -45,8 +80,8 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
   };
 
   const handleCopy = () => {
-    if (!src) return;
-    navigator.clipboard.writeText(src).then(() => {
+    if (!effectiveSrc) return;
+    navigator.clipboard.writeText(effectiveSrc).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
@@ -92,9 +127,9 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
           onMouseLeave={handleMouseUp}
           onWheel={handleWheel}
         >
-          {src ? (
+          {effectiveSrc ? (
             <img
-              src={src}
+              src={effectiveSrc}
               alt={alt || ""}
               draggable={false}
               style={{
@@ -108,7 +143,7 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
               }}
             />
           ) : null}
-          {src && isUpscaled(src) && (
+          {effectiveSrc && isUpscaled(effectiveSrc) && (
             <Badge
               variant="destructive"
               className="absolute top-3 right-3 z-10 pointer-events-none text-xs"
@@ -159,12 +194,26 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
                 </Button>
               )}
             </div>
+            {canConvert && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={converting}
+                onClick={handleConvert}
+                className="gap-1.5"
+                title="Convert WebP/AVIF to PNG and upload to our storage"
+              >
+                {converting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                {converting ? "Converting…" : "Convert to PNG"}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={!src}
-              onClick={() => src && downloadImage(src, filename)}
+              disabled={!effectiveSrc}
+              onClick={() => effectiveSrc && downloadImage(effectiveSrc, filename)}
               className="gap-1.5"
             >
               <Download className="h-4 w-4" /> Download
@@ -174,15 +223,15 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: P
             </Button>
           </div>
           {/* Row 2: URL display + copy */}
-          {src && (
+          {effectiveSrc && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-muted-foreground shrink-0">URL</span>
               <input
                 readOnly
-                value={src}
+                value={effectiveSrc}
                 onClick={(e) => (e.target as HTMLInputElement).select()}
                 className="flex-1 min-w-0 bg-muted/40 border border-border rounded px-2 py-1 text-[10px] font-mono text-muted-foreground truncate focus:outline-none focus:ring-1 focus:ring-ring cursor-text"
-                title={src}
+                title={effectiveSrc}
               />
               <Button
                 type="button"

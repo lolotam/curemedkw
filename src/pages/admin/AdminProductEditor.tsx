@@ -995,7 +995,18 @@ export default function AdminProductEditor() {
         open={!!previewSrc}
         onOpenChange={(o) => !o && setPreviewSrc(null)}
         filename={previewSrc === form.mainImage ? `${baseName}-main` : baseName}
+        brand={form.brand}
+        slug={productSlug}
+        onConverted={(oldUrl, newUrl) => {
+          setForm((f) => ({
+            ...f,
+            mainImage: f.mainImage === oldUrl ? newUrl : f.mainImage,
+            gallery: f.gallery.map((u) => (u === oldUrl ? newUrl : u)),
+          }));
+          setPreviewSrc(newUrl);
+        }}
       />
+
 
       <ImageUpscaleDialog
         open={!!upscaleTarget}
