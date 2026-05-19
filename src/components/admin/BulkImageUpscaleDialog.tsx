@@ -376,6 +376,34 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
                   </ol>
                 </div>
                 <div className="space-y-2">
+                  <Label className="text-sm font-medium">Output size</Label>
+                  <RadioGroup
+                    value={outputSize}
+                    onValueChange={(v) => setOutputSize(v as any)}
+                    className="grid grid-cols-3 gap-2"
+                  >
+                    {([
+                      ["1024x1024", "1K", "1024×1024"],
+                      ["1536x1536", "1.5K", "1536×1536"],
+                      ["2048x2048", "2K", "2048×2048"],
+                    ] as const).map(([val, label, sub]) => (
+                      <label
+                        key={val}
+                        className="flex items-start gap-2 rounded-md border border-border p-2.5 cursor-pointer hover:bg-muted/40"
+                      >
+                        <RadioGroupItem value={val} id={`bulk-os-${val}`} className="mt-0.5" />
+                        <div>
+                          <div className="text-sm font-medium">{label}</div>
+                          <div className="text-[11px] text-muted-foreground">{sub}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </RadioGroup>
+                  <p className="text-[11px] text-muted-foreground">
+                    Applies to OpenAI gpt-image-* only. OpenRouter / Google ignore this.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <Label className="text-sm font-medium">Extra instructions (optional)</Label>
                   <Textarea
                     value={extraInstructions}
