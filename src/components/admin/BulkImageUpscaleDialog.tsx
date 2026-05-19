@@ -76,13 +76,19 @@ const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
 
 export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, baseName = "image", storageContext, onReplaceMany }: Props) {
   const { slots } = useAiModels();
+  const { data: picsartEnabled = true } = usePicsartEngineEnabled();
 
   // Configuration
-  const [engine, setEngine] = useState<UpscaleEngine>("picsart");
+  const [engine, setEngine] = useState<UpscaleEngine>(picsartEnabled ? "picsart" : "ai");
   const [mode, setMode] = useState<Mode>("standard");
   const [factor, setFactor] = useState<number>(2);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
   const [extraInstructions, setExtraInstructions] = useState("");
+
+  // Force AI engine when PICSART is disabled by admin flag.
+  useEffect(() => {
+    if (!picsartEnabled && engine === "picsart") setEngine("ai");
+  }, [picsartEnabled, engine]);
 
   // Selection (input phase)
   const [selectedSrcs, setSelectedSrcs] = useState<Set<string>>(new Set());
