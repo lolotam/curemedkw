@@ -65,12 +65,20 @@ const OPENAI_UNSUPPORTED_MIMES = new Set(["image/avif", "image/webp"]);
 export async function ensureOpenAISupportedFormat(
   imageUrl: string,
 ): Promise<{ imageUrl?: string; imageBase64?: string; imageMime?: string }> {
-  let mime = "";
-  try {
-    const head = await fetch(imageUrl, { method: "HEAD" });
-    mime = head.headers.get("content-type")?.split(";")[0].trim() ?? "";
-  } catch {
-    return { imageUrl };
+  // Extension-first detection avoids CORS failures on HEAD requests to self-hosted storage.
+  // Supabase Storage preserves file extensions, so this is reliable for all uploaded assets.
+  const EXT_TO_MIME: Record<string, string> = { avif: "image/avif", webp: "image/webp" };
+  const urlPath = imageUrl.split("?")[0];
+  const ext = urlPath.split(".").pop()?.toLowerCase() ?? "";
+  let mime = EXT_TO_MIME[ext] ?? "";
+
+  if (!mime) {
+    try {
+      const head = await fetch(imageUrl, { method: "HEAD" });
+      mime = head.headers.get("content-type")?.split(";")[0].trim() ?? "";
+    } catch {
+      return { imageUrl };
+    }
   }
 
   if (!OPENAI_UNSUPPORTED_MIMES.has(mime)) return { imageUrl };

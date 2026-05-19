@@ -183,10 +183,8 @@ Deno.serve(async (req) => {
       .upload(path, resultBytes, { contentType, upsert: false });
     if (uploadErr) return json({ error: `Upload failed: ${uploadErr.message}` }, 500);
 
-    const { data: pub } = admin.storage.from("product-images").getPublicUrl(path);
-
     return json({
-      url: pub.publicUrl,
+      url: `${Deno.env.get("SUPABASE_PUBLIC_URL") || supabaseUrl}/storage/v1/object/public/product-images/${path}`,
       originalUrl: imageUrl,
       mode,
       factor: effectiveFactor,
