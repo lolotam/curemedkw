@@ -12,6 +12,7 @@ export interface UpscaleConfig {
   factor?: number;
   format?: "JPG" | "PNG" | "WEBP";
   extraInstructions?: string;
+  outputSize?: "1024x1024" | "1536x1536" | "2048x2048";
   brand?: string;
   productSlug?: string;
 }
