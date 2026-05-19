@@ -103,14 +103,16 @@ async function callGoogle(model: string, prompt: string, imgB64: string, imgMime
   return { ok: false, error: "google: no image in response" };
 }
 
-async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: string, timeoutMs: number): Promise<AiResult> {
+async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: string, timeoutMs: number, outputSize: string): Promise<AiResult> {
   const fd = new FormData();
   fd.append("model", model);
   fd.append("prompt", prompt);
   // gpt-image-* requires the array field `image[]` on /v1/images/edits.
   // Using singular `image` silently routes to the legacy DALL·E 2 path and
-  // returns a misleading "invalid model" 400. `size` is not valid on /edits.
+  // returns a misleading "invalid model" 400.
   fd.append("image[]", srcBlob, "source.png");
+  // `size` IS supported by gpt-image-* on /edits (1024x1024, 1536x1536, 2048x2048).
+  fd.append("size", outputSize);
   const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
