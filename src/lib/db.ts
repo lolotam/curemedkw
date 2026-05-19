@@ -1136,6 +1136,15 @@ export function useImageCompressionQuality() {
   return useSiteSetting<number>(IMAGE_COMPRESSION_QUALITY_KEY, 99);
 }
 
+// PICSART upscale engine visibility — admin-controlled. When false, the
+// PICSART option is hidden in single + bulk upscale dialogs.
+export const PICSART_ENGINE_ENABLED_KEY = "picsart_engine_enabled";
+export function usePicsartEngineEnabled() {
+  return useSiteSetting<boolean>(PICSART_ENGINE_ENABLED_KEY, true);
+}
+
+
+
 // Featured product card glass-strip background opacity (0-100). Default 70.
 export const FEATURED_GLASS_OPACITY_KEY = "featured_glass_opacity";
 
