@@ -25,6 +25,7 @@ import {
 import { logOperation } from "@/lib/logs";
 import { useTick } from "@/lib/jobs/jobStore";
 import type { UpscaleEngine } from "@/lib/jobs/upscaleJobs";
+import { usePicsartEngineEnabled } from "@/lib/db";
 
 type Mode = "standard" | "ultra";
 
@@ -75,13 +76,19 @@ const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
 
 export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, baseName = "image", storageContext, onReplaceMany }: Props) {
   const { slots } = useAiModels();
+  const { data: picsartEnabled = true } = usePicsartEngineEnabled();
 
   // Configuration
-  const [engine, setEngine] = useState<UpscaleEngine>("picsart");
+  const [engine, setEngine] = useState<UpscaleEngine>(picsartEnabled ? "picsart" : "ai");
   const [mode, setMode] = useState<Mode>("standard");
   const [factor, setFactor] = useState<number>(2);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
   const [extraInstructions, setExtraInstructions] = useState("");
+
+  // Force AI engine when PICSART is disabled by admin flag.
+  useEffect(() => {
+    if (!picsartEnabled && engine === "picsart") setEngine("ai");
+  }, [picsartEnabled, engine]);
 
   // Selection (input phase)
   const [selectedSrcs, setSelectedSrcs] = useState<Set<string>>(new Set());
@@ -274,13 +281,15 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
                 onValueChange={(v) => setEngine(v as UpscaleEngine)}
                 className="grid grid-cols-1 sm:grid-cols-2 gap-2"
               >
-                <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40">
-                  <RadioGroupItem value="picsart" id="bulk-e-pic" className="mt-0.5" />
-                  <div>
-                    <div className="text-sm font-medium">PICSART</div>
-                    <div className="text-xs text-muted-foreground">Deterministic resolution increase. Best for sharp upscale at a fixed factor.</div>
-                  </div>
-                </label>
+                {picsartEnabled && (
+                  <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40">
+                    <RadioGroupItem value="picsart" id="bulk-e-pic" className="mt-0.5" />
+                    <div>
+                      <div className="text-sm font-medium">PICSART</div>
+                      <div className="text-xs text-muted-foreground">Deterministic resolution increase. Best for sharp upscale at a fixed factor.</div>
+                    </div>
+                  </label>
+                )}
                 <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40">
                   <RadioGroupItem value="ai" id="bulk-e-ai" className="mt-0.5" />
                   <div>

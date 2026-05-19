@@ -1,50 +1,37 @@
-Fix the "Provide a valid http(s) imageUrl" error in bulk and single upscale flows by normalizing relative Storage URLs to absolute URLs before they reach the edge function.
-
-## Root cause
-
-Some image URLs in DB are stored as relative paths (e.g. `/storage/v1/object/public/...`). They flow through `ensureOpenAISupportedFormat()` unchanged (HEAD fetch fails silently → returns `{ imageUrl: relative }`), then `upscale-image-ai` edge function rejects with 400 `"Provide a valid http(s) imageUrl"`.
+Add an admin toggle on `/admin/flags` to show/hide the PICSART engine in both upscale dialogs.
 
 ## Changes
 
-### 1. `src/lib/imageConvert.ts`
-Add a small exported helper and a guard inside `ensureOpenAISupportedFormat`:
-
+### 1. `src/lib/db.ts`
+Add a new site-setting key + hook (mirrors existing `useImageCompressionEnabled`):
 ```ts
-export function toAbsoluteImageUrl(src: string): string {
-  if (!src) return src;
-  if (/^https?:\/\//i.test(src)) return src;
-  const base = (import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
-  if (!base) return src;
-  return `${base}${src.startsWith("/") ? "" : "/"}${src}`;
+export const PICSART_ENGINE_ENABLED_KEY = "picsart_engine_enabled";
+export function usePicsartEngineEnabled() {
+  return useSiteSetting<boolean>(PICSART_ENGINE_ENABLED_KEY, true);
 }
 ```
 
-At the top of `ensureOpenAISupportedFormat`, early-return for non-http(s) inputs so callers that forget to normalize still don't crash the edge function:
-```ts
-if (!/^https?:\/\//i.test(imageUrl)) return { imageUrl };
-```
-(The edge function will still reject, but this prevents wasted HEAD attempts and makes intent explicit.)
+### 2. `src/pages/admin/AdminFlags.tsx`
+Add a new card (next to `ImageCompressionCard`) with a single switch:
+- Label: "PICSART upscale engine"
+- Description: "Show the PICSART option in single and bulk upscale dialogs. When off, only the AI engine is available."
+- Reads `usePicsartEngineEnabled`, writes via `useUpdateSiteSetting` with key `PICSART_ENGINE_ENABLED_KEY`.
+- Same toast pattern as `HomeCarouselAutoscrollCard`.
 
-### 2. `src/lib/jobs/bulkUpscaleJobs.ts`
-In `runOne`, normalize `src` once at the top:
-```ts
-const absoluteSrc = toAbsoluteImageUrl(src);
-```
-Use `absoluteSrc` for both branches:
-- Picsart: pass `imageUrl: absoluteSrc`
-- AI: `await ensureOpenAISupportedFormat(absoluteSrc)`
+### 3. `src/components/admin/ImageUpscaleDialog.tsx`
+- Read `usePicsartEngineEnabled()`.
+- If disabled: force `engine` to `"ai"` on mount/when flag flips, and hide the PICSART `<RadioGroupItem>` (render only the AI option, or hide the entire RadioGroup if only one option remains and show a small note "Engine: AI").
 
-Keep `src` as the item key (so UI mapping by original src still works).
-
-### 3. `src/lib/jobs/upscaleJobs.ts`
-Same normalization in `startUpscale` — replace `key` with `toAbsoluteImageUrl(key)` for both `imageUrl` and `ensureOpenAISupportedFormat` calls. Keep the original `key` as the store key.
+### 4. `src/components/admin/BulkImageUpscaleDialog.tsx`
+Same change as #3.
 
 ## Out of scope
-- No DB cleanup of relative URLs (handled forward-only).
-- No edge function changes — the 400 guard there stays as a safety net.
-- Production deploy of `upscale-image-ai` is a separate server-side step (Claude Code prompt below in the chat reply, not in this plan).
+- No DB migration (uses existing `site_settings` table).
+- No edge function changes.
+- Default = enabled (true), so behavior is unchanged until an admin flips it off.
 
 ## Files touched
-- `src/lib/imageConvert.ts`
-- `src/lib/jobs/bulkUpscaleJobs.ts`
-- `src/lib/jobs/upscaleJobs.ts`
+- `src/lib/db.ts`
+- `src/pages/admin/AdminFlags.tsx`
+- `src/components/admin/ImageUpscaleDialog.tsx`
+- `src/components/admin/BulkImageUpscaleDialog.tsx`
