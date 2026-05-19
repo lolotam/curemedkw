@@ -30,8 +30,8 @@ export default function BrandPage() {
   const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [discountMin, setDiscountMin] = useState<number>(0); // 0 = any, otherwise min %
 
-  // Build category list with counts. Show ALL active categories (including
-  // those with 0 products in this brand) so users can see the full taxonomy.
+  // Build category list with counts. Only show active categories that contain
+  // products for this brand, so newly assigned categories appear with a badge.
   const brandCategories = useMemo(() => {
     const counts = new Map<string, number>();
     for (const p of brandProducts) {
@@ -42,6 +42,7 @@ export default function BrandPage() {
     }
     return categories
       .filter((c) => c.isActive !== false)
+      .filter((c) => (counts.get(c.id) || 0) > 0)
       .slice()
       .sort((a, b) => a.sortOrder - b.sortOrder || a.nameEn.localeCompare(b.nameEn))
       .map((c) => ({ ...c, count: counts.get(c.id) || 0 }));
@@ -104,35 +105,21 @@ export default function BrandPage() {
                     <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.areas")}</h4>
                     <div className="space-y-2.5">
                       {brandCategories.map((c) => {
-                        const empty = c.count === 0;
                         return (
                           <label
                             key={c.id}
-                            className={
-                              "flex items-center justify-between gap-2.5 text-sm transition-colors " +
-                              (empty
-                                ? "cursor-not-allowed opacity-60"
-                                : "cursor-pointer hover:text-brand")
-                            }
+                            className="flex items-center justify-between gap-2.5 text-sm transition-colors cursor-pointer hover:text-brand"
                           >
                             <span className="flex items-center gap-2.5 min-w-0">
                               <Checkbox
                                 checked={selectedCats.has(c.id)}
-                                onCheckedChange={() => !empty && toggleCat(c.id)}
-                                disabled={empty}
+                                onCheckedChange={() => toggleCat(c.id)}
                               />
                               <span className="truncate">
                                 {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
                               </span>
                             </span>
-                            <span
-                              className={
-                                "shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums " +
-                                (empty
-                                  ? "bg-muted text-muted-foreground"
-                                  : "bg-brand/10 text-brand")
-                              }
-                            >
+                            <span className="shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-brand/10 text-[11px] font-medium tabular-nums text-brand">
                               {c.count}
                             </span>
                           </label>
