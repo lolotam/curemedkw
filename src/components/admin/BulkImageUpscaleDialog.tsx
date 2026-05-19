@@ -25,6 +25,7 @@ import {
 import { logOperation } from "@/lib/logs";
 import { useTick } from "@/lib/jobs/jobStore";
 import type { UpscaleEngine } from "@/lib/jobs/upscaleJobs";
+import { usePicsartEngineEnabled } from "@/lib/db";
 
 type Mode = "standard" | "ultra";
 
