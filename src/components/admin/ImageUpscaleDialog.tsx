@@ -10,7 +10,15 @@ import { toast } from "sonner";
 import { useAiModels } from "@/lib/aiModels";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { Link } from "react-router-dom";
-import { startUpscale, dismissUpscale, useUpscaleJob, type UpscaleEngine } from "@/lib/jobs/upscaleJobs";
+import {
+  DEFAULT_UPSCALE_TARGET_SIZE,
+  UPSCALE_TARGET_OPTIONS,
+  startUpscale,
+  dismissUpscale,
+  useUpscaleJob,
+  type UpscaleEngine,
+  type UpscaleTargetSize,
+} from "@/lib/jobs/upscaleJobs";
 import { useTick } from "@/lib/jobs/jobStore";
 import { usePicsartEngineEnabled } from "@/lib/db";
 
@@ -23,9 +31,6 @@ interface Props {
   onReplace: (newUrl: string) => void;
   storageContext?: { brand?: string; productSlug?: string };
 }
-
-const STANDARD_FACTORS = [2, 4, 6, 8] as const;
-const ULTRA_FACTORS = [2, 4, 6, 8, 16] as const;
 
 function formatMs(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
@@ -49,13 +54,11 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
   const { data: picsartEnabled = true } = usePicsartEngineEnabled();
   const [engine, setEngine] = useState<UpscaleEngine>(picsartEnabled ? "picsart" : "ai");
   const [mode, setMode] = useState<Mode>("standard");
-  const [factor, setFactor] = useState<number>(2);
+  const [targetSize, setTargetSize] = useState<UpscaleTargetSize>(DEFAULT_UPSCALE_TARGET_SIZE);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
   const [extraInstructions, setExtraInstructions] = useState("");
-  const [outputSize, setOutputSize] = useState<"1024x1024" | "1536x1536" | "2048x2048">("1024x1024");
 
   const { slots } = useAiModels();
-  const factors = mode === "ultra" ? ULTRA_FACTORS : STANDARD_FACTORS;
 
   // Force AI engine when PICSART is disabled by admin flag.
   useEffect(() => {
@@ -66,17 +69,16 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
   const loading = job?.status === "running";
   const resultUrl = job?.status === "done" ? job.resultUrl : undefined;
   const elapsedMs = job?.finishedAt && job.startedAt ? job.finishedAt - job.startedAt : null;
-  const lastToastedRef = useToastOnceRef(job);
+  useToastOnceRef(job);
 
   const handleGenerate = async () => {
     if (!imageUrl) return;
     void startUpscale(imageUrl, {
       engine,
       mode,
-      factor,
+      targetSize,
       format,
       extraInstructions: extraInstructions.trim() || undefined,
-      outputSize,
       brand: storageContext?.brand,
       productSlug: storageContext?.productSlug,
     });
@@ -165,7 +167,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
                   <RadioGroupItem value="picsart" id="e-pic" className="mt-0.5" />
                   <div>
                     <div className="text-sm font-medium">PICSART</div>
-                    <div className="text-xs text-muted-foreground">Deterministic resolution increase. Best for sharp upscale at a fixed factor.</div>
+                    <div className="text-xs text-muted-foreground">Deterministic resolution increase. Best for sharp product-image upscaling.</div>
                   </div>
                 </label>
               )}
@@ -185,11 +187,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
                 <Label className="text-sm font-medium">Mode</Label>
                 <RadioGroup
                   value={mode}
-                  onValueChange={(v) => {
-                    const next = v as Mode;
-                    setMode(next);
-                    if (next === "standard" && factor === 16) setFactor(8);
-                  }}
+                  onValueChange={(v) => setMode(v as Mode)}
                   className="grid grid-cols-1 sm:grid-cols-2 gap-2"
                 >
                   <label className="flex items-start gap-3 rounded-md border border-border p-3 cursor-pointer hover:bg-muted/40">
@@ -207,31 +205,6 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
                     </div>
                   </label>
                 </RadioGroup>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Upscale factor</Label>
-                  <Select value={String(factor)} onValueChange={(v) => setFactor(Number(v))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {factors.map((f) => (
-                        <SelectItem key={f} value={String(f)}>{f}×</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Output format</Label>
-                  <Select value={format} onValueChange={(v) => setFormat(v as any)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="JPG">JPG</SelectItem>
-                      <SelectItem value="PNG">PNG</SelectItem>
-                      <SelectItem value="WEBP">WEBP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
             </>
           ) : (
@@ -253,34 +226,6 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
                 </ol>
               </div>
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Output size</Label>
-                <RadioGroup
-                  value={outputSize}
-                  onValueChange={(v) => setOutputSize(v as any)}
-                  className="grid grid-cols-3 gap-2"
-                >
-                  {([
-                    ["1024x1024", "1K", "1024×1024"],
-                    ["1536x1536", "1.5K", "1536×1536"],
-                    ["2048x2048", "2K", "2048×2048"],
-                  ] as const).map(([val, label, sub]) => (
-                    <label
-                      key={val}
-                      className="flex items-start gap-2 rounded-md border border-border p-2.5 cursor-pointer hover:bg-muted/40"
-                    >
-                      <RadioGroupItem value={val} id={`os-${val}`} className="mt-0.5" />
-                      <div>
-                        <div className="text-sm font-medium">{label}</div>
-                        <div className="text-[11px] text-muted-foreground">{sub}</div>
-                      </div>
-                    </label>
-                  ))}
-                </RadioGroup>
-                <p className="text-[11px] text-muted-foreground">
-                  Applies to OpenAI gpt-image-* only. OpenRouter / Google ignore this.
-                </p>
-              </div>
-              <div className="space-y-2">
                 <Label className="text-sm font-medium">Extra instructions (optional)</Label>
                 <Textarea
                   value={extraInstructions}
@@ -294,6 +239,40 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
               </div>
             </div>
           )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Quality / target size</Label>
+              <Select value={String(targetSize)} onValueChange={(v) => setTargetSize(Number(v) as UpscaleTargetSize)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {UPSCALE_TARGET_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {engine === "picsart"
+                  ? UPSCALE_TARGET_OPTIONS.find((o) => o.value === targetSize)?.description
+                  : UPSCALE_TARGET_OPTIONS.find((o) => o.value === targetSize)?.aiDescription}
+              </p>
+            </div>
+            {engine === "picsart" && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Output format</Label>
+                <Select value={format} onValueChange={(v) => setFormat(v as "JPG" | "PNG" | "WEBP")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="JPG">JPG</SelectItem>
+                    <SelectItem value="PNG">PNG</SelectItem>
+                    <SelectItem value="WEBP">WEBP</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">

@@ -1,8 +1,12 @@
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob, hashKey } from "./jobStore";
-import type { UpscaleConfig } from "./upscaleJobs";
 import { ensureOpenAISupportedFormat, toAbsoluteImageUrl } from "@/lib/imageConvert";
+import {
+  normalizeUpscaleTargetSize,
+  upscaleTargetLabel,
+  type UpscaleConfig,
+} from "./upscaleJobs";
 
 export type BulkItemStatus = "pending" | "loading" | "done" | "error";
 
@@ -24,6 +28,57 @@ export interface BulkUpscaleJob {
   items: BulkItem[];
 }
 
+interface FunctionErrorContext {
+  json?: () => Promise<unknown>;
+  clone?: () => FunctionErrorContext;
+  error?: unknown;
+}
+
+interface FunctionErrorLike {
+  message?: unknown;
+  context?: FunctionErrorContext;
+}
+
+interface PicsartUpscaleResponse {
+  url?: string;
+  factor?: number;
+  requestedTarget?: number;
+}
+
+interface AiUpscaleResponse {
+  url?: string;
+  provider?: keyof typeof PROVIDER_LABELS;
+  model?: string;
+  outputSize?: string;
+  requestedTarget?: number;
+  details?: unknown;
+  error?: unknown;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function functionErrorMessage(error: unknown, fallback: string): Promise<string> {
+  const err = error as FunctionErrorLike;
+  let message = typeof err.message === "string" ? err.message : fallback;
+  try {
+    const ctx = err.context;
+    if (ctx && typeof ctx.json === "function") {
+      const body = await (typeof ctx.clone === "function" ? ctx.clone() : ctx).json();
+      if (isRecord(body)) {
+        if (Array.isArray(body.details) && body.details.length) message = body.details.join(" | ");
+        else if (body.error) message = String(body.error);
+      }
+    } else if (ctx?.error) {
+      message = String(ctx.error);
+    }
+  } catch {
+    // keep the best message we already have
+  }
+  return message;
+}
+
 const store = createJobStore<BulkUpscaleJob>({
   storageKey: "lov:jobs:bulk-upscale",
   onInterruptedReload: (j) => {
@@ -43,7 +98,7 @@ const store = createJobStore<BulkUpscaleJob>({
 });
 
 const inflight = new Set<string>();
-const CONCURRENCY = 3;
+const REQUEST_STAGGER_MS = 5_000;
 
 function patchItem(jobId: string, src: string, patch: Partial<BulkItem>) {
   const job = store.get(jobId);
@@ -65,48 +120,43 @@ async function runOne(jobId: string, src: string, config: UpscaleConfig) {
           imageUrl: absoluteSrc,
           mode: config.mode,
           factor: config.factor,
+          targetSize: config.targetSize,
           format: config.format,
           brand: config.brand,
           productSlug: config.productSlug,
         },
       });
       if (error) throw error;
-      if (!data?.url) throw new Error("No result URL");
-      resultUrl = data.url;
-      meta = `PICSART · ${config.mode} · ${config.factor}× · ${config.format}`;
+      const result = data as PicsartUpscaleResponse | null;
+      if (!result?.url) throw new Error("No result URL");
+      resultUrl = result.url;
+      meta = `PICSART · ${upscaleTargetLabel(result.requestedTarget ?? config.targetSize)} target · ${Number(result.factor ?? config.factor)}x · ${config.format}`;
     } else {
       const imgPayload = await ensureOpenAISupportedFormat(absoluteSrc);
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
         body: {
           ...imgPayload,
-          outputSize: config.outputSize || "1024x1024",
+          targetSize: config.targetSize,
           extraInstructions: config.extraInstructions || undefined,
           brand: config.brand,
           productSlug: config.productSlug,
         },
       });
       if (error) throw error;
-      if (!data?.url) {
-        const details = Array.isArray((data as any)?.details) ? (data as any).details.join(" | ") : "";
+      const result = data as AiUpscaleResponse | null;
+      if (!result?.url) {
+        const details = Array.isArray(result?.details) ? result.details.join(" | ") : "";
         throw new Error(details || "No result URL");
       }
-      const provider = (data as any).provider as keyof typeof PROVIDER_LABELS;
-      resultUrl = (data as any).url;
-      meta = `${PROVIDER_LABELS[provider] ?? provider} · ${(data as any).model}`;
+      const provider = result.provider;
+      resultUrl = result.url;
+      const targetLabel = upscaleTargetLabel(result.requestedTarget ?? config.targetSize);
+      const sizeMeta = result.outputSize ? `${targetLabel} max · ${result.outputSize}` : `${targetLabel} max`;
+      meta = `${provider ? PROVIDER_LABELS[provider] ?? provider : "AI"} · ${sizeMeta} · ${result.model ?? "model"}`;
     }
     patchItem(jobId, src, { status: "done", resultUrl, meta, elapsedMs: Date.now() - startedAt });
-  } catch (e: any) {
-    let msg = e?.message || "Failed";
-    try {
-      const ctx = e?.context;
-      if (ctx && typeof ctx.json === "function") {
-        const body = await ctx.clone().json();
-        if (Array.isArray(body?.details) && body.details.length) msg = body.details.join(" | ");
-        else if (body?.error) msg = body.error;
-      } else if (ctx?.error) {
-        msg = ctx.error;
-      }
-    } catch { /* ignore */ }
+  } catch (e: unknown) {
+    const msg = await functionErrorMessage(e, "Failed");
     patchItem(jobId, src, { status: "error", error: String(msg), elapsedMs: Date.now() - startedAt });
   }
 }
@@ -120,23 +170,17 @@ export function bulkUpscaleJobIdFor(srcs: string[], productSlug?: string): strin
 export async function startBulkUpscale(jobId: string, srcs: string[], config: UpscaleConfig): Promise<void> {
   if (inflight.has(jobId)) return;
 
+  const resolvedConfig = { ...config, targetSize: normalizeUpscaleTargetSize(config.targetSize) };
   const items: BulkItem[] = srcs.map((src) => ({ src, status: "pending" as BulkItemStatus }));
-  store.set(jobId, { status: "running", config, startedAt: Date.now(), items });
+  store.set(jobId, { status: "running", config: resolvedConfig, startedAt: Date.now(), items });
   inflight.add(jobId);
 
   try {
-    let i = 0;
-    const runners = Array.from({ length: Math.min(CONCURRENCY, srcs.length) }, async (_, workerIdx) => {
-      // Stagger starts: worker 0 fires immediately, worker 1 waits 5s, worker 2 waits 10s.
-      // Prevents all 3 requests hitting the self-hosted edge function gateway simultaneously,
-      // which causes Kong to drop 2 of the 3 connections under concurrent long-running load.
-      if (workerIdx > 0) {
-        await new Promise<void>(resolve => setTimeout(resolve, workerIdx * 5_000));
+    const runners = srcs.map(async (src, idx) => {
+      if (idx > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, idx * REQUEST_STAGGER_MS));
       }
-      while (i < srcs.length) {
-        const idx = i++;
-        await runOne(jobId, srcs[idx], config);
-      }
+      await runOne(jobId, src, resolvedConfig);
     });
     await Promise.all(runners);
   } finally {

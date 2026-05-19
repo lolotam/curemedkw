@@ -14,6 +14,29 @@ const json = (body: unknown, status = 200) =>
 
 const STANDARD_FACTORS = new Set([2, 4, 6, 8]);
 const ULTRA_FACTORS = new Set([2, 4, 6, 8, 16]);
+const TARGET_SIZES = new Set([1024, 1536, 2048]);
+const DEFAULT_TARGET_SIZE = 1536;
+const MAX_PIXELS = 23_000_000; // Picsart hard cap (~23MP output)
+
+function normalizeTargetSize(value: unknown): number {
+  const n = Number(value);
+  return TARGET_SIZES.has(n) ? n : DEFAULT_TARGET_SIZE;
+}
+
+function pickFactorForTarget(dims: { w: number; h: number }, allowed: Set<number>, targetSize: number): { requested: number; effective: number; clamped: boolean } {
+  const inputPixels = dims.w * dims.h;
+  const longestSide = Math.max(dims.w, dims.h);
+  const ascending = [...allowed].sort((a, b) => a - b);
+  const requested = ascending.find((f) => longestSide * f >= targetSize) ?? ascending[ascending.length - 1];
+  const fitting = ascending.filter((f) => inputPixels * f * f <= MAX_PIXELS);
+  if (!fitting.length) {
+    throw new Error(`Image is too large to upscale (${dims.w}x${dims.h}). Picsart caps output at 23MP. Try a smaller source image.`);
+  }
+  const effective = fitting.includes(requested)
+    ? requested
+    : fitting.filter((f) => f <= requested).at(-1) ?? fitting[fitting.length - 1];
+  return { requested, effective, clamped: effective !== requested || longestSide * effective < targetSize };
+}
 
 function readImageSize(b: Uint8Array): { w: number; h: number } | null {
   // PNG: 8-byte sig, then IHDR at offset 16 (width), 20 (height), big-endian
@@ -97,6 +120,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const imageUrl = String(body?.imageUrl ?? "").trim();
     const mode = body?.mode === "ultra" ? "ultra" : "standard";
+    const hasTargetSize = body?.targetSize !== undefined;
+    const requestedTarget = normalizeTargetSize(body?.targetSize);
     const factor = Number(body?.factor);
     const format = ["JPG", "PNG", "WEBP"].includes(body?.format) ? body.format : "JPG";
     const sanitize = (s: unknown) => {
@@ -110,7 +135,7 @@ Deno.serve(async (req) => {
       return json({ error: "Provide a valid http(s) imageUrl" }, 400);
     }
     const allowed = mode === "ultra" ? ULTRA_FACTORS : STANDARD_FACTORS;
-    if (!allowed.has(factor)) {
+    if (!hasTargetSize && !allowed.has(factor)) {
       return json({ error: `Invalid factor for ${mode} mode` }, 400);
     }
 
@@ -123,21 +148,39 @@ Deno.serve(async (req) => {
 
     // Read intrinsic image dimensions from header bytes (PNG / JPEG / WebP / GIF)
     const dims = readImageSize(srcBuf);
-    let effectiveFactor = factor;
+    let requestedFactor = hasTargetSize ? 2 : factor;
+    let effectiveFactor = requestedFactor;
+    let clamped = false;
     if (dims) {
-      const MAX_PIXELS = 23_000_000; // Picsart hard cap (~23MP output)
-      const inputPixels = dims.w * dims.h;
-      const candidates = [...allowed].filter((f) => f <= factor).sort((a, b) => b - a);
-      const fit = candidates.find((f) => inputPixels * f * f <= MAX_PIXELS);
-      if (!fit) {
+      try {
+        if (hasTargetSize) {
+          const picked = pickFactorForTarget(dims, allowed, requestedTarget);
+          requestedFactor = picked.requested;
+          effectiveFactor = picked.effective;
+          clamped = picked.clamped;
+        } else {
+          const inputPixels = dims.w * dims.h;
+          const candidates = [...allowed].filter((f) => f <= factor).sort((a, b) => b - a);
+          const fit = candidates.find((f) => inputPixels * f * f <= MAX_PIXELS);
+          if (!fit) {
+            return json(
+              {
+                error: `Image is too large to upscale (${dims.w}x${dims.h}). Picsart caps output at 23MP. Try a smaller source image.`,
+              },
+              400,
+            );
+          }
+          effectiveFactor = fit;
+          clamped = effectiveFactor !== requestedFactor;
+        }
+      } catch (e) {
         return json(
           {
-            error: `Image is too large to upscale (${dims.w}×${dims.h}). Picsart caps output at 23MP. Try a smaller source image.`,
+            error: e instanceof Error ? e.message : "Unable to choose an upscale factor",
           },
           400,
         );
       }
-      effectiveFactor = fit;
     }
 
     // Build multipart form for Picsart
@@ -188,8 +231,9 @@ Deno.serve(async (req) => {
       originalUrl: imageUrl,
       mode,
       factor: effectiveFactor,
-      requestedFactor: factor,
-      clamped: effectiveFactor !== factor,
+      requestedFactor,
+      requestedTarget,
+      clamped,
       format,
     });
   } catch (e) {
