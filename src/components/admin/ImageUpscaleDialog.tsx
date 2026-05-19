@@ -253,7 +253,6 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
                 </ol>
               </div>
               <div className="space-y-2">
-              <div className="space-y-2">
                 <Label className="text-sm font-medium">Output size</Label>
                 <RadioGroup
                   value={outputSize}
