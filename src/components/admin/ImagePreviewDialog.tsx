@@ -80,8 +80,8 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, bra
   };
 
   const handleCopy = () => {
-    if (!src) return;
-    navigator.clipboard.writeText(src).then(() => {
+    if (!effectiveSrc) return;
+    navigator.clipboard.writeText(effectiveSrc).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
