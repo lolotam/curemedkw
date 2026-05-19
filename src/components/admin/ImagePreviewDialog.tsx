@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, ZoomIn, ZoomOut, RotateCcw, Copy, Check } from "lucide-react";
+import { Download, ZoomIn, ZoomOut, RotateCcw, Copy, Check, Wand2, Loader2 } from "lucide-react";
 import { downloadImage } from "@/lib/downloadImage";
 import { isUpscaled } from "@/lib/utils";
+import { convertAndUploadImage } from "@/lib/imageConvert";
+import { toast } from "sonner";
 
 type Props = {
+  brand?: string;
+  slug?: string;
+  onConverted?: (oldUrl: string, newUrl: string) => void;
   src: string | null;
   alt?: string;
   filename?: string;
