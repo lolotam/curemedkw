@@ -25,7 +25,7 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
 // Keep per-provider attempts short so we can try fallbacks AND still return
 // a real response (with CORS headers) before the proxy kills the connection.
-const PROVIDER_TIMEOUT_MS = 35_000;
+const PROVIDER_TIMEOUT_MS = 40_000;
 // Hard overall budget for the whole function (leave headroom under 100s).
 const TOTAL_BUDGET_MS = 96_000;
 const TARGET_SIZES = new Set([1024, 1536, 2048]);
@@ -46,8 +46,18 @@ function targetFromLegacyOutputSize(value: unknown): number | null {
 
 function openAiOutputSizeForTarget(targetSize: number, dims: { w: number; h: number } | null): "1024x1024" | "1536x1024" | "1024x1536" {
   if (targetSize <= 1024) return "1024x1024";
-  if (!dims || dims.w === dims.h) return "1024x1024";
+  // 1.5K+ requested: pick the largest canvas gpt-image-2 supports. Square inputs
+  // previously collapsed back to 1024x1024 here, silently ignoring the selection.
+  if (!dims) return "1024x1536";
+  if (dims.w === dims.h) return "1024x1536";
   return dims.w > dims.h ? "1536x1024" : "1024x1536";
+}
+
+// quality is the real latency knob for gpt-image-2: low ~10s, medium ~25s, high ~60-120s.
+function openAiQualityForTarget(targetSize: number): "low" | "medium" | "high" {
+  if (targetSize <= 1024) return "low";
+  if (targetSize <= 1536) return "medium";
+  return "high";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -170,12 +180,13 @@ async function callGoogle(model: string, prompt: string, imgB64: string, imgMime
   return { ok: false, error: "google: no image in response" };
 }
 
-async function callOpenAI(model: string, prompt: string, srcBlob: Blob, sourceName: string, key: string, timeoutMs: number, outputSize: string): Promise<AiResult> {
+async function callOpenAI(model: string, prompt: string, srcBlob: Blob, sourceName: string, key: string, timeoutMs: number, outputSize: string, quality: string): Promise<AiResult> {
   const fd = new FormData();
   fd.append("model", model);
   fd.append("prompt", prompt);
   fd.append("image[]", srcBlob, sourceName);
   fd.append("size", outputSize);
+  fd.append("quality", quality);
   const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
@@ -342,6 +353,7 @@ Deno.serve(async (req) => {
     const srcB64 = bytesToBase64(srcBytes);
     const srcDataUrl = `data:${srcMime};base64,${srcB64}`;
     const outputSize = openAiOutputSizeForTarget(requestedTarget, readImageSize(srcBytes));
+    const outputQuality = openAiQualityForTarget(requestedTarget);
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     const googleKey = Deno.env.get("GOOGLE_API_KEY");
@@ -378,7 +390,7 @@ Deno.serve(async (req) => {
           res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey, slotTimeout);
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
-          res = await callOpenAI(slot.model, fullPrompt, openAiBlob, openAiName, openaiKey, slotTimeout, outputSize);
+          res = await callOpenAI(slot.model, fullPrompt, openAiBlob, openAiName, openaiKey, slotTimeout, outputSize, outputQuality);
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
           res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);

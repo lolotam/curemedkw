@@ -13,19 +13,19 @@ export const UPSCALE_TARGET_OPTIONS: Array<{
     value: 1024,
     label: "1K",
     description: "Target about 1024px on the longest side.",
-    aiDescription: "AI outputs 1024x1024.",
+    aiDescription: "AI outputs 1024×1024 at low quality (~10s, lowest cost).",
   },
   {
     value: 1536,
     label: "1.5K",
     description: "Target about 1536px on the longest side.",
-    aiDescription: "AI uses the largest documented edit size by image orientation.",
+    aiDescription: "AI outputs up to 1536×1024 / 1024×1536 at medium quality (~25s).",
   },
   {
     value: 2048,
     label: "2K",
     description: "Target about 2048px on the longest side.",
-    aiDescription: "AI uses the largest documented edit size; PICSART targets 2K.",
+    aiDescription: "PICSART only — AI provider caps at 1.5K. Pick 1.5K for AI.",
   },
 ];
 

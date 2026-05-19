@@ -65,6 +65,11 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
     if (!picsartEnabled && engine === "picsart") setEngine("ai");
   }, [picsartEnabled, engine]);
 
+  // 2K is PICSART-only; gpt-image-2's max edit canvas is 1536. Clamp on engine switch.
+  useEffect(() => {
+    if (engine === "ai" && targetSize === 2048) setTargetSize(1536);
+  }, [engine, targetSize]);
+
   const job = useUpscaleJob(imageUrl);
   const loading = job?.status === "running";
   const resultUrl = job?.status === "done" ? job.resultUrl : undefined;
@@ -246,11 +251,13 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
               <Select value={String(targetSize)} onValueChange={(v) => setTargetSize(Number(v) as UpscaleTargetSize)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {UPSCALE_TARGET_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={String(option.value)}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
+                  {UPSCALE_TARGET_OPTIONS
+                    .filter((option) => engine === "picsart" || option.value !== 2048)
+                    .map((option) => (
+                      <SelectItem key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
