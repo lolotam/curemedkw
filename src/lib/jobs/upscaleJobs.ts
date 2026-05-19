@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob } from "./jobStore";
 import { logOperation } from "@/lib/logs";
-import { ensureOpenAISupportedFormat } from "@/lib/imageConvert";
+import { ensureOpenAISupportedFormat, toAbsoluteImageUrl } from "@/lib/imageConvert";
 
 export type UpscaleEngine = "picsart" | "ai";
 
