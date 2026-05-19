@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save, MoveHorizontal } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -10,6 +10,8 @@ import {
   useUpdatePriceVisibility,
   useSiteSetting,
   useUpdateSiteSetting,
+  usePicsartEngineEnabled,
+  PICSART_ENGINE_ENABLED_KEY,
   type PriceVisibility,
 } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
