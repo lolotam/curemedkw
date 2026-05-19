@@ -25,7 +25,11 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
 // Keep per-provider attempts short so we can try fallbacks AND still return
 // a real response (with CORS headers) before the proxy kills the connection.
-const PROVIDER_TIMEOUT_MS = 40_000;
+// gpt-image-2 edit endpoint baseline (measured 2026-05-19): ~17s moderation
+// + 10-50s generation. Real 1K low-quality requests on 200-500KB product PNGs
+// land at ~45s. We need a wide budget for OpenAI specifically; OpenRouter
+// gets the remainder (~14s) which still covers Gemini's typical 5-10s.
+const PROVIDER_TIMEOUT_MS = 80_000;
 // Hard overall budget for the whole function (leave headroom under 100s).
 const TOTAL_BUDGET_MS = 96_000;
 const TARGET_SIZES = new Set([1024, 1536, 2048]);
@@ -187,15 +191,20 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, sourceNa
   fd.append("image[]", srcBlob, sourceName);
   fd.append("size", outputSize);
   fd.append("quality", quality);
+  console.log(`[upscale-image-ai] openai request model=${model} size=${outputSize} quality=${quality} bytes=${srcBlob.size} mime=${srcBlob.type} timeout=${timeoutMs}ms`);
+  const t0 = Date.now();
   const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
     body: fd,
   }, timeoutMs, `openai:${model}`);
+  const dt = Date.now() - t0;
   if (!resp.ok) {
     const t = await resp.text();
-    return { ok: false, error: `openai ${resp.status}: ${t.slice(0, 500)}` };
+    console.warn(`[upscale-image-ai] openai response model=${model} status=${resp.status} elapsed=${dt}ms body=${t.slice(0, 200).replace(/\s+/g, " ")}`);
+    return { ok: false, error: `openai ${resp.status} (${dt}ms): ${t.slice(0, 500)}` };
   }
+  console.log(`[upscale-image-ai] openai response model=${model} status=200 elapsed=${dt}ms`);
   const data = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
   if (!b64) return { ok: false, error: "openai: no image in response" };
