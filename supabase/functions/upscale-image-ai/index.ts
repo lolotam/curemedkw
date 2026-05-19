@@ -300,7 +300,7 @@ Deno.serve(async (req) => {
           res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey, slotTimeout);
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
-          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey, slotTimeout);
+          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey, slotTimeout, outputSize);
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
           res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);
