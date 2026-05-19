@@ -25,13 +25,18 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
 // Keep per-provider attempts short so we can try fallbacks AND still return
 // a real response (with CORS headers) before the proxy kills the connection.
-// gpt-image-2 edit endpoint baseline (measured 2026-05-19): ~17s moderation
-// + 10-50s generation. Real 1K low-quality requests on 200-500KB product PNGs
-// land at ~45s. We need a wide budget for OpenAI specifically; OpenRouter
-// gets the remainder (~14s) which still covers Gemini's typical 5-10s.
-const PROVIDER_TIMEOUT_MS = 80_000;
-// Hard overall budget for the whole function (leave headroom under 100s).
-const TOTAL_BUDGET_MS = 96_000;
+// gpt-image-2 edit endpoint baseline (measured 2026-05-19):
+//   quality=low,  230KB PNG, size=1024x1024 → HTTP 200 in 45s
+//   quality=low,  230KB PNG, size=1536x1536 → HTTP 200 in 46s
+//   quality=medium, 378KB PNG, size=auto    → >80s (timed out)
+// Moderation alone is ~17s. Medium quality + larger payload pushes past 80s.
+// 90s slot timeout fits the observed ceiling with margin; OpenRouter then
+// gets TOTAL_BUDGET_MS-90-2 = 8s, enough for the typical 5-10s Gemini call.
+const PROVIDER_TIMEOUT_MS = 90_000;
+// Hard overall budget for the whole function. Cloudflare proxy in front of
+// self-hosted Supabase cuts at ~100s, so this is the ceiling we can use.
+// 100s = 90s OpenAI slot + 2s buffer + 8s OpenRouter fallback ≈ 100s wall.
+const TOTAL_BUDGET_MS = 100_000;
 const TARGET_SIZES = new Set([1024, 1536, 2048]);
 const DEFAULT_TARGET_SIZE = 1536;
 
