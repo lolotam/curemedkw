@@ -19,12 +19,42 @@ type Props = {
   onOpenChange: (open: boolean) => void;
 };
 
-export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange }: Props) {
+export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, brand, slug, onConverted }: Props) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [converting, setConverting] = useState(false);
+  const [displaySrc, setDisplaySrc] = useState<string | null>(src);
   const dragStart = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    setDisplaySrc(src);
+  }, [src]);
+
+  const effectiveSrc = displaySrc ?? src;
+  const bare = (effectiveSrc ?? "").split("?")[0].toLowerCase();
+  const isSafeExt = /\.(png|jpe?g)$/i.test(bare);
+  const canConvert = !!onConverted && !!effectiveSrc && !isSafeExt;
+
+  const handleConvert = async () => {
+    if (!effectiveSrc || !onConverted) return;
+    setConverting(true);
+    try {
+      const newUrl = await convertAndUploadImage(effectiveSrc, brand ?? "misc", slug ?? "misc");
+      if (newUrl && newUrl !== effectiveSrc) {
+        onConverted(effectiveSrc, newUrl);
+        setDisplaySrc(newUrl);
+        toast.success("Converted to PNG");
+      } else {
+        toast.error("Conversion failed — original URL kept");
+      }
+    } catch (e) {
+      toast.error("Conversion failed");
+    } finally {
+      setConverting(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) {
