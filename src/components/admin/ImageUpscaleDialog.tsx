@@ -46,7 +46,8 @@ function LiveTimerBadge({ startedAt }: { startedAt: number }) {
 }
 
 export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onReplace, storageContext }: Props) {
-  const [engine, setEngine] = useState<UpscaleEngine>("picsart");
+  const { data: picsartEnabled = true } = usePicsartEngineEnabled();
+  const [engine, setEngine] = useState<UpscaleEngine>(picsartEnabled ? "picsart" : "ai");
   const [mode, setMode] = useState<Mode>("standard");
   const [factor, setFactor] = useState<number>(2);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
@@ -54,6 +55,11 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
 
   const { slots } = useAiModels();
   const factors = mode === "ultra" ? ULTRA_FACTORS : STANDARD_FACTORS;
+
+  // Force AI engine when PICSART is disabled by admin flag.
+  useEffect(() => {
+    if (!picsartEnabled && engine === "picsart") setEngine("ai");
+  }, [picsartEnabled, engine]);
 
   const job = useUpscaleJob(imageUrl);
   const loading = job?.status === "running";
