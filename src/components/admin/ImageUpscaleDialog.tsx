@@ -52,6 +52,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
   const [factor, setFactor] = useState<number>(2);
   const [format, setFormat] = useState<"JPG" | "PNG" | "WEBP">("JPG");
   const [extraInstructions, setExtraInstructions] = useState("");
+  const [outputSize, setOutputSize] = useState<"1024x1024" | "1536x1536" | "2048x2048">("1024x1024");
 
   const { slots } = useAiModels();
   const factors = mode === "ultra" ? ULTRA_FACTORS : STANDARD_FACTORS;
