@@ -208,6 +208,8 @@ Deno.serve(async (req) => {
     const imageBase64 = typeof body?.imageBase64 === "string" ? body.imageBase64 : "";
     const imageMime = typeof body?.imageMime === "string" ? body.imageMime : "";
     const extraInstructions = String(body?.extraInstructions ?? "").trim();
+    const ALLOWED_SIZES = ["1024x1024", "1536x1536", "2048x2048"] as const;
+    const outputSize = ALLOWED_SIZES.includes(body?.outputSize) ? body.outputSize : "1024x1024";
     const sanitize = (s: unknown) => {
       const v = String(s ?? "").toLowerCase().trim().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
       return v.slice(0, 64) || "_unsorted";
