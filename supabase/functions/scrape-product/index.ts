@@ -14,13 +14,29 @@ const json = (body: unknown, status = 200) =>
 
 const IMG_RE = /\.(png|jpe?g|webp|gif|avif)(\?.*)?$/i;
 
+// Drop cache-buster query strings (?v=..., ?t=..., resize params, etc.) and any
+// URL fragment. Most CDNs (Shopify, WordPress) only use the query for cache
+// busting, so the bare URL still serves the same image — and downstream
+// consumers (OpenAI image edits, Picsart) get a clean filename to detect MIME
+// from the extension.
+function stripQuery(u: string): string {
+  try {
+    const x = new URL(u);
+    x.search = "";
+    x.hash = "";
+    return x.toString();
+  } catch {
+    return u.split("?")[0].split("#")[0];
+  }
+}
+
 function collectImages(payload: any): string[] {
   const out = new Set<string>();
   const add = (u: unknown) => {
     if (typeof u !== "string") return;
     if (!/^https?:\/\//i.test(u)) return;
     if (!IMG_RE.test(u)) return;
-    out.add(u);
+    out.add(stripQuery(u));
   };
 
   // From "links" format
