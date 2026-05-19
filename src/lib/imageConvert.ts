@@ -62,10 +62,21 @@ export async function convertToWebP(file: File, quality?: number): Promise<File>
 
 const OPENAI_UNSUPPORTED_MIMES = new Set(["image/avif", "image/webp"]);
 
+export function toAbsoluteImageUrl(src: string): string {
+  if (!src) return src;
+  if (/^https?:\/\//i.test(src)) return src;
+  const base = (import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+  if (!base) return src;
+  return `${base}${src.startsWith("/") ? "" : "/"}${src}`;
+}
+
 export async function ensureOpenAISupportedFormat(
   imageUrl: string,
   options: { allowExternal?: boolean } = {},
 ): Promise<{ imageUrl?: string; imageBase64?: string; imageMime?: string }> {
+  // Guard: must be absolute http(s) URL; callers should normalize first.
+  if (!/^https?:\/\//i.test(imageUrl)) return { imageUrl };
+
   // Extension-first detection avoids CORS failures on HEAD requests to self-hosted storage.
   // Supabase Storage preserves file extensions, so this is reliable for all uploaded assets.
   const EXT_TO_MIME: Record<string, string> = { avif: "image/avif", webp: "image/webp" };

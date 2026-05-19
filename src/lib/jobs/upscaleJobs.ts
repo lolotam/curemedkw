@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob } from "./jobStore";
 import { logOperation } from "@/lib/logs";
-import { ensureOpenAISupportedFormat } from "@/lib/imageConvert";
+import { ensureOpenAISupportedFormat, toAbsoluteImageUrl } from "@/lib/imageConvert";
 
 export type UpscaleEngine = "picsart" | "ai";
 
@@ -45,10 +45,11 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
   inflight.add(key);
 
   try {
+    const absoluteSrc = toAbsoluteImageUrl(key);
     if (config.engine === "picsart") {
       const { data, error } = await supabase.functions.invoke("upscale-image", {
         body: {
-          imageUrl: key,
+          imageUrl: absoluteSrc,
           mode: config.mode,
           factor: config.factor,
           format: config.format,
@@ -68,7 +69,7 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
       });
       logOperation({ category: "ai", operation: "upscale_image", status: "success", durationMs: Date.now() - startedAt, metadata: { engine: "picsart", mode: config.mode, factor: config.factor, format: config.format } });
     } else {
-      const imgPayload = await ensureOpenAISupportedFormat(key);
+      const imgPayload = await ensureOpenAISupportedFormat(absoluteSrc);
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
         body: {
           ...imgPayload,

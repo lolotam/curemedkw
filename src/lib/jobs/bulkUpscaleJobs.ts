@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob, hashKey } from "./jobStore";
 import type { UpscaleConfig } from "./upscaleJobs";
-import { ensureOpenAISupportedFormat } from "@/lib/imageConvert";
+import { ensureOpenAISupportedFormat, toAbsoluteImageUrl } from "@/lib/imageConvert";
 
 export type BulkItemStatus = "pending" | "loading" | "done" | "error";
 
@@ -56,12 +56,13 @@ async function runOne(jobId: string, src: string, config: UpscaleConfig) {
   const startedAt = Date.now();
   patchItem(jobId, src, { status: "loading", startedAt });
   try {
+    const absoluteSrc = toAbsoluteImageUrl(src);
     let resultUrl: string;
     let meta: string;
     if (config.engine === "picsart") {
       const { data, error } = await supabase.functions.invoke("upscale-image", {
         body: {
-          imageUrl: src,
+          imageUrl: absoluteSrc,
           mode: config.mode,
           factor: config.factor,
           format: config.format,
@@ -74,7 +75,7 @@ async function runOne(jobId: string, src: string, config: UpscaleConfig) {
       resultUrl = data.url;
       meta = `PICSART · ${config.mode} · ${config.factor}× · ${config.format}`;
     } else {
-      const imgPayload = await ensureOpenAISupportedFormat(src);
+      const imgPayload = await ensureOpenAISupportedFormat(absoluteSrc);
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
         body: {
           ...imgPayload,
