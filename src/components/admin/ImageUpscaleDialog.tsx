@@ -76,6 +76,7 @@ export default function ImageUpscaleDialog({ open, onOpenChange, imageUrl, onRep
       factor,
       format,
       extraInstructions: extraInstructions.trim() || undefined,
+      outputSize,
       brand: storageContext?.brand,
       productSlug: storageContext?.productSlug,
     });
