@@ -12,6 +12,7 @@ export interface UpscaleConfig {
   factor?: number;
   format?: "JPG" | "PNG" | "WEBP";
   extraInstructions?: string;
+  outputSize?: "1024x1024" | "1536x1536" | "2048x2048";
   brand?: string;
   productSlug?: string;
 }
@@ -73,6 +74,7 @@ export async function startUpscale(key: string, config: UpscaleConfig): Promise<
       const { data, error } = await supabase.functions.invoke("upscale-image-ai", {
         body: {
           ...imgPayload,
+          outputSize: config.outputSize || "1024x1024",
           extraInstructions: config.extraInstructions || undefined,
           brand: config.brand,
           productSlug: config.productSlug,

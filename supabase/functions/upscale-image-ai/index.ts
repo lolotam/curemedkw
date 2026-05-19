@@ -103,14 +103,16 @@ async function callGoogle(model: string, prompt: string, imgB64: string, imgMime
   return { ok: false, error: "google: no image in response" };
 }
 
-async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: string, timeoutMs: number): Promise<AiResult> {
+async function callOpenAI(model: string, prompt: string, srcBlob: Blob, key: string, timeoutMs: number, outputSize: string): Promise<AiResult> {
   const fd = new FormData();
   fd.append("model", model);
   fd.append("prompt", prompt);
   // gpt-image-* requires the array field `image[]` on /v1/images/edits.
   // Using singular `image` silently routes to the legacy DALL·E 2 path and
-  // returns a misleading "invalid model" 400. `size` is not valid on /edits.
+  // returns a misleading "invalid model" 400.
   fd.append("image[]", srcBlob, "source.png");
+  // `size` IS supported by gpt-image-* on /edits (1024x1024, 1536x1536, 2048x2048).
+  fd.append("size", outputSize);
   const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}` },
@@ -206,6 +208,8 @@ Deno.serve(async (req) => {
     const imageBase64 = typeof body?.imageBase64 === "string" ? body.imageBase64 : "";
     const imageMime = typeof body?.imageMime === "string" ? body.imageMime : "";
     const extraInstructions = String(body?.extraInstructions ?? "").trim();
+    const ALLOWED_SIZES = ["1024x1024", "1536x1536", "2048x2048"] as const;
+    const outputSize = ALLOWED_SIZES.includes(body?.outputSize) ? body.outputSize : "1024x1024";
     const sanitize = (s: unknown) => {
       const v = String(s ?? "").toLowerCase().trim().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
       return v.slice(0, 64) || "_unsorted";
@@ -296,7 +300,7 @@ Deno.serve(async (req) => {
           res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey, slotTimeout);
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
-          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey, slotTimeout);
+          res = await callOpenAI(slot.model, fullPrompt, srcBlob, openaiKey, slotTimeout, outputSize);
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
           res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);
