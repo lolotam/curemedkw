@@ -174,9 +174,6 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, sourceNa
   const fd = new FormData();
   fd.append("model", model);
   fd.append("prompt", prompt);
-  // gpt-image-* requires the array field `image[]` on /v1/images/edits.
-  // Using singular `image` silently routes to the legacy DALL·E 2 path and
-  // returns a misleading "invalid model" 400.
   fd.append("image[]", srcBlob, sourceName);
   fd.append("size", outputSize);
   const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
@@ -186,31 +183,7 @@ async function callOpenAI(model: string, prompt: string, srcBlob: Blob, sourceNa
   }, timeoutMs, `openai:${model}`);
   if (!resp.ok) {
     const t = await resp.text();
-    return { ok: false, error: `openai ${resp.status}: ${t.slice(0, 300)}` };
-  }
-  const data = await resp.json();
-  const b64 = data?.data?.[0]?.b64_json;
-  if (!b64) return { ok: false, error: "openai: no image in response" };
-  return { ok: true, bytes: base64ToBytes(b64), contentType: "image/png" };
-}
-
-async function callOpenAIUrl(model: string, prompt: string, imageUrl: string, key: string, timeoutMs: number, outputSize: string): Promise<AiResult> {
-  const resp = await fetchWithTimeout("https://api.openai.com/v1/images/edits", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      prompt,
-      images: [{ image_url: imageUrl }],
-      size: outputSize,
-    }),
-  }, timeoutMs, `openai:${model}`);
-  if (!resp.ok) {
-    const t = await resp.text();
-    return { ok: false, error: `openai ${resp.status}: ${t.slice(0, 300)}` };
+    return { ok: false, error: `openai ${resp.status}: ${t.slice(0, 500)}` };
   }
   const data = await resp.json();
   const b64 = data?.data?.[0]?.b64_json;
@@ -356,13 +329,16 @@ Deno.serve(async (req) => {
       srcMime = srcResp.headers.get("content-type") || "image/png";
       srcBytes = new Uint8Array(await srcResp.arrayBuffer());
     }
+    const isJpeg = srcMime.includes("jpeg") || srcMime.includes("jpg");
+    // OpenAI /v1/images/edits only accepts PNG and JPEG. When the source is
+    // WebP or AVIF, skip the OpenAI slot and let Google/OpenRouter handle it.
+    // (The client-side ensureOpenAISupportedFormat() converts to PNG when possible,
+    //  but external CDN images may arrive here in their original format.)
+    const openAiCompatMime = isJpeg ? "image/jpeg" : "image/png";
+    const openAiCompatExt = isJpeg ? "jpg" : "png";
+    const openAiBlob = new Blob([srcBytes], { type: openAiCompatMime });
+    const openAiName = `source.${openAiCompatExt}`;
     const srcBlob = new Blob([srcBytes], { type: srcMime });
-    const srcExt = srcMime.includes("jpeg") || srcMime.includes("jpg")
-      ? "jpg"
-      : srcMime.includes("webp")
-        ? "webp"
-        : "png";
-    const srcName = `source.${srcExt}`;
     const srcB64 = bytesToBase64(srcBytes);
     const srcDataUrl = `data:${srcMime};base64,${srcB64}`;
     const outputSize = openAiOutputSizeForTarget(requestedTarget, readImageSize(srcBytes));
@@ -402,9 +378,7 @@ Deno.serve(async (req) => {
           res = await callGoogle(slot.model, fullPrompt, srcB64, srcMime, googleKey, slotTimeout);
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
-          res = imageUrl
-            ? await callOpenAIUrl(slot.model, fullPrompt, imageUrl, openaiKey, slotTimeout, outputSize)
-            : await callOpenAI(slot.model, fullPrompt, srcBlob, srcName, openaiKey, slotTimeout, outputSize);
+          res = await callOpenAI(slot.model, fullPrompt, openAiBlob, openAiName, openaiKey, slotTimeout, outputSize);
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
           res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);
