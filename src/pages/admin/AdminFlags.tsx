@@ -199,6 +199,42 @@ function HomeCarouselAutoscrollCard() {
   );
 }
 
+function PicsartEngineCard() {
+  const { data: enabled = true, isLoading } = usePicsartEngineEnabled();
+  const update = useUpdateSiteSetting();
+
+  const setEnabled = (v: boolean) => {
+    update.mutate(
+      { key: PICSART_ENGINE_ENABLED_KEY, value: v },
+      {
+        onSuccess: () => toast.success("Saved"),
+        onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+      },
+    );
+  };
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+          <Sparkles className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">PICSART upscale engine</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Show the PICSART option in single and bulk upscale dialogs. When off, only the AI engine is available.
+          </p>
+        </div>
+        <Switch
+          checked={!!enabled}
+          onCheckedChange={(v) => setEnabled(!!v)}
+          disabled={isLoading || update.isPending}
+        />
+      </div>
+    </Card>
+  );
+}
+
 function FlagRow({
   icon,
   title,
