@@ -26,6 +26,7 @@ import ImageUpscaleDialog from "@/components/admin/ImageUpscaleDialog";
 import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
 import LongDescriptionRewriteDialog from "@/components/admin/LongDescriptionRewriteDialog";
 import { logOperation } from "@/lib/logs";
+import { convertAndUploadImage } from "@/lib/imageConvert";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -278,7 +279,22 @@ export default function AdminProductEditor() {
     update("gallery", [oldMain, ...form.gallery.filter((g) => g !== src)]);
   };
 
-  const applyImported = (fields: ExtractedFields, images: string[], sourceUrl?: string) => {
+  const applyImported = async (fields: ExtractedFields, images: string[], sourceUrl?: string) => {
+    // Convert scraped WebP/AVIF URLs to PNG in our own storage so OpenAI
+    // upscale (which rejects those formats) works downstream.
+    let finalImages = images;
+    if (images.length) {
+      const brand = fields.brand || form.brand;
+      const slug = slugify(fields.name || form.name || "_unsorted");
+      finalImages = await Promise.all(
+        images.map((u) => convertAndUploadImage(u, brand, slug)),
+      );
+      const convertedCount = finalImages.filter((u, i) => u !== images[i]).length;
+      if (convertedCount > 0) {
+        toast.success(`Converted ${convertedCount} image(s) to PNG`);
+      }
+    }
+
     setForm((f) => {
       const next = { ...f };
       if (sourceUrl && sourceUrl.trim()) next.sourceUrl = sourceUrl.trim();
@@ -309,9 +325,9 @@ export default function AdminProductEditor() {
       if (fields.benefits?.length) next.benefits = fields.benefits;
       if (fields.usage) next.usage = fields.usage;
 
-      if (images.length) {
+      if (finalImages.length) {
         const isPlaceholder = next.mainImage.startsWith("data:");
-        const [first, ...rest] = images;
+        const [first, ...rest] = finalImages;
         if (isPlaceholder) {
           next.mainImage = first;
           const merged = [...rest, ...next.gallery].filter(
@@ -319,7 +335,7 @@ export default function AdminProductEditor() {
           );
           next.gallery = merged;
         } else {
-          const merged = [...images, ...next.gallery].filter(
+          const merged = [...finalImages, ...next.gallery].filter(
             (u, i, a) => a.indexOf(u) === i && u !== next.mainImage,
           );
           next.gallery = merged;
