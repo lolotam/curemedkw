@@ -12,6 +12,7 @@ import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { Link } from "react-router-dom";
 import { startUpscale, dismissUpscale, useUpscaleJob, type UpscaleEngine } from "@/lib/jobs/upscaleJobs";
 import { useTick } from "@/lib/jobs/jobStore";
+import { usePicsartEngineEnabled } from "@/lib/db";
 
 type Mode = "standard" | "ultra";
 
