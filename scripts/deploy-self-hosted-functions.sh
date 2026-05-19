@@ -13,6 +13,7 @@
 #   - openai-models        (lists OpenAI models for admin UI)
 #   - google-models        (lists Google Gemini models for admin UI)
 #   - upscale-image        (Picsart AI upscale, admin-only, used by product editor)
+#   - upscale-image-ai     (OpenAI/Gemini AI upscale, admin-only, used by product editor)
 #   - migrate-storage-copy (one-shot ops helper, not invoked by the app)
 #
 # All functions deploy with --no-verify-jwt because they perform their own
