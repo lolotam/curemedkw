@@ -64,6 +64,7 @@ const OPENAI_UNSUPPORTED_MIMES = new Set(["image/avif", "image/webp"]);
 
 export async function ensureOpenAISupportedFormat(
   imageUrl: string,
+  options: { allowExternal?: boolean } = {},
 ): Promise<{ imageUrl?: string; imageBase64?: string; imageMime?: string }> {
   // Extension-first detection avoids CORS failures on HEAD requests to self-hosted storage.
   // Supabase Storage preserves file extensions, so this is reliable for all uploaded assets.
@@ -83,17 +84,20 @@ export async function ensureOpenAISupportedFormat(
 
   if (!OPENAI_UNSUPPORTED_MIMES.has(mime)) return { imageUrl };
 
-  // Only attempt client-side canvas conversion for images from our own
-  // Supabase Storage. External CDN images (e.g. pharmazone.com) either
-  // block CORS fetches or produce oversized base64 bodies that the edge
-  // runtime rejects silently. The edge function fetches them server-side.
-  try {
-    const hostname = new URL(imageUrl).hostname;
-    if (!hostname.includes("supabase") && !hostname.includes("curemedkw")) {
+  // By default we only attempt client-side canvas conversion for images from
+  // our own Supabase Storage. External CDN images (e.g. pharmazone.com) often
+  // block CORS fetches. The upscale edge function fetches them server-side.
+  // Pass `allowExternal: true` to attempt conversion regardless (used by the
+  // import flow, which falls back to the original URL on CORS failure).
+  if (!options.allowExternal) {
+    try {
+      const hostname = new URL(imageUrl).hostname;
+      if (!hostname.includes("supabase") && !hostname.includes("curemedkw")) {
+        return { imageUrl };
+      }
+    } catch {
       return { imageUrl };
     }
-  } catch {
-    return { imageUrl };
   }
 
   try {
@@ -114,5 +118,60 @@ export async function ensureOpenAISupportedFormat(
   } catch {
     console.warn("[imageConvert] AVIF/WebP→PNG conversion failed, using original URL");
     return { imageUrl };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Convert scraped external image → PNG and upload to our own storage so
+// downstream consumers (OpenAI upscale, etc.) get a clean PNG URL.
+// ---------------------------------------------------------------------------
+
+import { supabase } from "@/integrations/supabase/clientRuntime";
+
+const SAFE_EXT_RE = /\.(png|jpe?g)$/i;
+
+function sanitizeSeg(s: string): string {
+  const v = (s ?? "").toLowerCase().trim().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "");
+  return v.slice(0, 64) || "_unsorted";
+}
+
+/**
+ * For use during product import.
+ * - If the URL already ends in .png/.jpg/.jpeg, returns it unchanged.
+ * - If it's WebP/AVIF, converts to PNG client-side (via OffscreenCanvas)
+ *   and uploads to the `product-images` bucket under
+ *   `<brand>/<slug>/imported/<uuid>.png`, returning the public URL.
+ * - On any failure (CORS, decode error, upload error), returns the original
+ *   URL so the import never breaks.
+ */
+export async function convertAndUploadImage(
+  url: string,
+  brand: string,
+  slug: string,
+): Promise<string> {
+  try {
+    const bare = url.split("?")[0];
+    if (SAFE_EXT_RE.test(bare)) return url;
+
+    const res = await ensureOpenAISupportedFormat(url, { allowExternal: true });
+    if (!res.imageBase64 || !res.imageMime) return url;
+
+    const bin = atob(res.imageBase64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: "image/png" });
+
+    const path = `${sanitizeSeg(brand)}/${sanitizeSeg(slug)}/imported/${crypto.randomUUID()}.png`;
+    const { error } = await supabase.storage
+      .from("product-images")
+      .upload(path, blob, { contentType: "image/png", upsert: false });
+    if (error) {
+      console.warn("[imageConvert] upload failed, falling back to original URL", error);
+      return url;
+    }
+    return supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
+  } catch (e) {
+    console.warn("[imageConvert] convertAndUploadImage failed, falling back to original URL", e);
+    return url;
   }
 }
