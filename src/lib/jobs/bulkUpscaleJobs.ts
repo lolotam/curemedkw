@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/clientRuntime";
 import { PROVIDER_LABELS } from "@/lib/aiProviders";
 import { createJobStore, useJob, hashKey } from "./jobStore";
 import type { UpscaleConfig } from "./upscaleJobs";
-import { ensureOpenAISupportedFormat } from "@/lib/imageConvert";
+import { ensureOpenAISupportedFormat, toAbsoluteImageUrl } from "@/lib/imageConvert";
 
 export type BulkItemStatus = "pending" | "loading" | "done" | "error";
 
