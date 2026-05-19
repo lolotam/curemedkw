@@ -94,6 +94,8 @@ export default function AdminFlags() {
         <ImageCompressionCard />
       </div>
 
+      <PicsartEngineCard />
+
       <Card className="p-5 mb-6 border-brand/30 bg-brand-soft/40">
         <FlagRow
           icon={draft.global ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
