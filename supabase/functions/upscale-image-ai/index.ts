@@ -48,13 +48,12 @@ function targetFromLegacyOutputSize(value: unknown): number | null {
   return null;
 }
 
-function openAiOutputSizeForTarget(targetSize: number, dims: { w: number; h: number } | null): "1024x1024" | "1536x1024" | "1024x1536" {
-  if (targetSize <= 1024) return "1024x1024";
-  // 1.5K+ requested: pick the largest canvas gpt-image-2 supports. Square inputs
-  // previously collapsed back to 1024x1024 here, silently ignoring the selection.
-  if (!dims) return "1024x1536";
-  if (dims.w === dims.h) return "1024x1536";
-  return dims.w > dims.h ? "1536x1024" : "1024x1536";
+// Always pass "auto" so gpt-image-2 picks an output size that matches the input
+// image's aspect ratio (and the prompt). Forcing a fixed size like 1024x1536
+// reframes square product photos as portrait, which is rarely what we want.
+// The 1K/1.5K/2K selector continues to drive `quality` (latency tier), not size.
+function openAiOutputSizeForTarget(_targetSize: number, _dims: { w: number; h: number } | null): "auto" {
+  return "auto";
 }
 
 // quality is the real latency knob for gpt-image-2: low ~10s, medium ~25s, high ~60-120s.

@@ -13,13 +13,13 @@ export const UPSCALE_TARGET_OPTIONS: Array<{
     value: 1024,
     label: "1K",
     description: "Target about 1024px on the longest side.",
-    aiDescription: "AI outputs 1024×1024 at low quality (~10s, lowest cost).",
+    aiDescription: "AI: quality=low, aspect auto from input (~30-45s, lowest cost).",
   },
   {
     value: 1536,
     label: "1.5K",
     description: "Target about 1536px on the longest side.",
-    aiDescription: "AI outputs up to 1536×1024 / 1024×1536 at medium quality (~25s).",
+    aiDescription: "AI: quality=medium, aspect auto from input (~45-60s).",
   },
   {
     value: 2048,
