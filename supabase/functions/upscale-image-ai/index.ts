@@ -25,7 +25,7 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
 // Keep per-provider attempts short so we can try fallbacks AND still return
 // a real response (with CORS headers) before the proxy kills the connection.
-const PROVIDER_TIMEOUT_MS = 60_000;
+const PROVIDER_TIMEOUT_MS = 35_000;
 // Hard overall budget for the whole function (leave headroom under 100s).
 const TOTAL_BUDGET_MS = 85_000;
 
@@ -273,6 +273,10 @@ Deno.serve(async (req) => {
     const errors: string[] = [];
     let success: { result: AiResult; slot: Slot } | null = null;
     const startedAt = Date.now();
+    // OpenAI images/edits accepts PNG and JPEG only. Skip OpenAI slots when
+    // the source is WebP/AVIF so Google/OpenRouter are reached immediately
+    // instead of burning the entire timeout budget on a certain rejection.
+    const srcNeedsConversion = srcMime === "image/webp" || srcMime === "image/avif";
 
     for (const slot of chain) {
       const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
@@ -281,6 +285,10 @@ Deno.serve(async (req) => {
         break;
       }
       const slotTimeout = Math.min(PROVIDER_TIMEOUT_MS, remaining - 2_000);
+      if (srcNeedsConversion && slot.provider === "openai") {
+        errors.push(`skipped ${slot.provider}:${slot.model} -> source format ${srcMime} requires PNG/JPEG`);
+        continue;
+      }
       let res: AiResult;
       try {
         if (slot.provider === "google") {

@@ -83,6 +83,19 @@ export async function ensureOpenAISupportedFormat(
 
   if (!OPENAI_UNSUPPORTED_MIMES.has(mime)) return { imageUrl };
 
+  // Only attempt client-side canvas conversion for images from our own
+  // Supabase Storage. External CDN images (e.g. pharmazone.com) either
+  // block CORS fetches or produce oversized base64 bodies that the edge
+  // runtime rejects silently. The edge function fetches them server-side.
+  try {
+    const hostname = new URL(imageUrl).hostname;
+    if (!hostname.includes("supabase") && !hostname.includes("curemedkw")) {
+      return { imageUrl };
+    }
+  } catch {
+    return { imageUrl };
+  }
+
   try {
     const resp = await fetch(imageUrl);
     const blob = await resp.blob();
