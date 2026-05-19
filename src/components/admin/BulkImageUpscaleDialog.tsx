@@ -161,6 +161,7 @@ export default function BulkImageUpscaleDialog({ open, onOpenChange, imageUrls, 
       factor,
       format,
       extraInstructions: extraInstructions.trim() || undefined,
+      outputSize,
       brand: storageContext?.brand,
       productSlug: storageContext?.productSlug,
     });
