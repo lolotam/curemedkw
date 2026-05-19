@@ -194,12 +194,26 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, bra
                 </Button>
               )}
             </div>
+            {canConvert && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={converting}
+                onClick={handleConvert}
+                className="gap-1.5"
+                title="Convert WebP/AVIF to PNG and upload to our storage"
+              >
+                {converting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                {converting ? "Converting…" : "Convert to PNG"}
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={!src}
-              onClick={() => src && downloadImage(src, filename)}
+              disabled={!effectiveSrc}
+              onClick={() => effectiveSrc && downloadImage(effectiveSrc, filename)}
               className="gap-1.5"
             >
               <Download className="h-4 w-4" /> Download
@@ -209,15 +223,15 @@ export function ImagePreviewDialog({ src, alt, filename, open, onOpenChange, bra
             </Button>
           </div>
           {/* Row 2: URL display + copy */}
-          {src && (
+          {effectiveSrc && (
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-muted-foreground shrink-0">URL</span>
               <input
                 readOnly
-                value={src}
+                value={effectiveSrc}
                 onClick={(e) => (e.target as HTMLInputElement).select()}
                 className="flex-1 min-w-0 bg-muted/40 border border-border rounded px-2 py-1 text-[10px] font-mono text-muted-foreground truncate focus:outline-none focus:ring-1 focus:ring-ring cursor-text"
-                title={src}
+                title={effectiveSrc}
               />
               <Button
                 type="button"
