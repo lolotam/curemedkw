@@ -65,6 +65,13 @@ function LegacyCategoryRedirect() {
   return <Navigate to={`/category/${slug ?? ""}`} replace />;
 }
 
+function RootRoute() {
+  const { data: enabled, isLoading } = useLoaderPageEnabled();
+  if (isLoading) return <PageFallback />;
+  if (enabled === false) return <Navigate to="/curemed" replace />;
+  return <Loading />;
+}
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
