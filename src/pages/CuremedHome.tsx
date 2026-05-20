@@ -349,11 +349,42 @@ function FeaturedGlassCard({
   const { lang, t } = useI18n();
   const { add } = useCart();
   const { data: glassOpacity = 70 } = useFeaturedGlassOpacity();
+  const { data: hoverCfg = DEFAULT_PRODUCT_CARD_HOVER } = useProductCardHover();
   const opacity = Math.max(0, Math.min(100, Number(glassOpacity) || 0)) / 100;
   const name = lang === "ar" && product.nameAr ? product.nameAr : product.name;
   const price = Number(product.price) || 0;
   const original = product.originalPrice ? Number(product.originalPrice) : null;
   const hasDiscount = original !== null && original > price;
+
+  const images = useMemo(() => {
+    const all = [product.mainImage, ...(product.gallery || [])].filter(Boolean) as string[];
+    return Array.from(new Set(all));
+  }, [product.mainImage, product.gallery]);
+
+  const [hovered, setHovered] = useState(false);
+  const [loopIdx, setLoopIdx] = useState(0);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (hoverCfg.mode === "loop" && hovered && images.length > 1) {
+      const ms = Math.max(300, (hoverCfg.intervalSec || 1) * 1000);
+      timerRef.current = window.setInterval(() => {
+        setLoopIdx((i) => (i + 1) % images.length);
+      }, ms);
+    } else if (!hovered) {
+      setLoopIdx(0);
+    }
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [hovered, hoverCfg.mode, hoverCfg.intervalSec, images.length]);
 
   const handleAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -362,23 +393,55 @@ function FeaturedGlassCard({
     toast.success(lang === "ar" ? "تمت الإضافة إلى السلة" : "Added to cart");
   };
 
+  const secondImage = images[1];
+
   return (
     <Link
       to={`/${brand.slug}/product/${product.id}`}
       data-brand={brand.themeAttr}
       aria-hidden={isClone ? "true" : undefined}
       tabIndex={isClone ? -1 : undefined}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       className="group/card relative shrink-0 w-72 md:w-80 h-96 mr-5 rounded-3xl overflow-hidden bg-brand-soft border border-border transition-all hover:-translate-y-1 hover:shadow-2xl"
     >
-      {/* Full-bleed image */}
-      <img
-        src={product.mainImage}
-        alt={name}
-        width={800}
-        height={800}
-        loading="lazy"
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-105"
-      />
+      {/* Full-bleed image(s) */}
+      {hoverCfg.mode === "loop" && images.length > 1 ? (
+        images.map((src, i) => (
+          <img
+            key={src + i}
+            src={src}
+            alt={name}
+            width={800}
+            height={800}
+            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 group-hover/card:scale-105 ${i === (hovered ? loopIdx : 0) ? "opacity-100" : "opacity-0"}`}
+          />
+        ))
+      ) : (
+        <>
+          <img
+            src={images[0] || product.mainImage}
+            alt={name}
+            width={800}
+            height={800}
+            loading="lazy"
+            className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover/card:scale-105 ${secondImage ? "group-hover/card:opacity-0" : ""}`}
+          />
+          {secondImage && (
+            <img
+              src={secondImage}
+              alt={name}
+              width={800}
+              height={800}
+              loading="lazy"
+              className="absolute inset-0 w-full h-full object-cover opacity-0 transition-all duration-700 group-hover/card:opacity-100 group-hover/card:scale-105"
+            />
+          )}
+        </>
+      )}
 
       {/* Top gradient for legibility of the discount badge */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
