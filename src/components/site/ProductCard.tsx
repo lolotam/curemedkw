@@ -59,34 +59,53 @@ export function ProductCard({ product, compact = false }: { product: Product; co
     <Link
       to={`/${brand.slug}/product/${product.id}`}
       data-brand={brand.themeAttr}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       className="group relative block rounded-2xl border border-border bg-card overflow-hidden transition-all hover:-translate-y-1 hover:shadow-lg"
     >
       <div className="relative aspect-square bg-brand-soft overflow-hidden">
-        {(() => {
-          const secondImage = product.gallery?.find((u) => u && u !== product.mainImage);
-          return (
-            <>
-              <img
-                src={product.mainImage}
-                alt={name}
-                width={800}
-                height={800}
-                className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${secondImage ? "group-hover:opacity-0" : ""}`}
-                loading="lazy"
-              />
-              {secondImage && (
+        {hoverCfg.mode === "loop" && images.length > 1 ? (
+          images.map((src, i) => (
+            <img
+              key={src + i}
+              src={src}
+              alt={name}
+              width={800}
+              height={800}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 group-hover:scale-105 ${i === (hovered ? loopIdx : 0) ? "opacity-100" : "opacity-0"}`}
+              loading="lazy"
+            />
+          ))
+        ) : (
+          (() => {
+            const secondImage = images[1];
+            return (
+              <>
                 <img
-                  src={secondImage}
+                  src={images[0] || product.mainImage}
                   alt={name}
                   width={800}
                   height={800}
-                  className="absolute inset-0 h-full w-full object-cover opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:scale-105"
+                  className={`absolute inset-0 h-full w-full object-cover transition-all duration-500 group-hover:scale-105 ${secondImage ? "group-hover:opacity-0" : ""}`}
                   loading="lazy"
                 />
-              )}
-            </>
-          );
-        })()}
+                {secondImage && (
+                  <img
+                    src={secondImage}
+                    alt={name}
+                    width={800}
+                    height={800}
+                    className="absolute inset-0 h-full w-full object-cover opacity-0 transition-all duration-500 group-hover:opacity-100 group-hover:scale-105"
+                    loading="lazy"
+                  />
+                )}
+              </>
+            );
+          })()
+        )}
+
         {product.stockStatus === "out_of_stock" && (
           <div className="absolute inset-0 bg-red-600/40 flex items-center justify-center z-10">
             <span className="bg-red-600/80 text-white text-sm font-bold px-4 py-2 rounded-full backdrop-blur-sm">
