@@ -12,6 +12,7 @@ export function ProductCard({ product, compact = false }: { product: Product; co
   const { t, lang } = useI18n();
   const brand = BRANDS[product.brand];
   const { data: visibility } = usePriceVisibility();
+  const { data: hoverCfg = DEFAULT_PRODUCT_CARD_HOVER } = useProductCardHover();
   const priceHidden = !!visibility && (visibility.global || visibility.brands[product.brand]);
   const hasDiscount = !!product.originalPrice && product.originalPrice > product.price && product.price > 0;
   const pct = hasDiscount ? Math.round((1 - product.price / (product.originalPrice as number)) * 100) : 0;
@@ -21,6 +22,39 @@ export function ProductCard({ product, compact = false }: { product: Product; co
     lang === "ar" && product.shortDescriptionAr
       ? product.shortDescriptionAr
       : product.shortDescription;
+
+  // Build unique image list for hover effects
+  const images = useMemo(() => {
+    const all = [product.mainImage, ...(product.gallery || [])].filter(Boolean) as string[];
+    return Array.from(new Set(all));
+  }, [product.mainImage, product.gallery]);
+
+  const [hovered, setHovered] = useState(false);
+  const [loopIdx, setLoopIdx] = useState(0);
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (hoverCfg.mode === "loop" && hovered && images.length > 1) {
+      const ms = Math.max(300, (hoverCfg.intervalSec || 1) * 1000);
+      timerRef.current = window.setInterval(() => {
+        setLoopIdx((i) => (i + 1) % images.length);
+      }, ms);
+    } else if (!hovered) {
+      setLoopIdx(0);
+    }
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [hovered, hoverCfg.mode, hoverCfg.intervalSec, images.length]);
+
+
   return (
     <Link
       to={`/${brand.slug}/product/${product.id}`}
