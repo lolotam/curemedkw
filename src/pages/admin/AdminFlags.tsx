@@ -101,6 +101,8 @@ export default function AdminFlags() {
         <ImageCompressionCard />
       </div>
 
+      <ProductCardHoverCard />
+
       <PicsartEngineCard />
 
       <Card className="p-5 mb-6 border-brand/30 bg-brand-soft/40">
