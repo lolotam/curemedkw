@@ -190,23 +190,35 @@ function PartnersMenu({ active, label }: { active: boolean; label: string }) {
             ))}
           </div>
           <div className="w-1/2 border-l border-border bg-muted/30 flex items-center justify-center p-4">
-            <Link
-              to={`/${hoveredBrand.slug}`}
-              className="flex items-center justify-center w-full h-full transition-opacity hover:opacity-80"
-              aria-label={hoveredBrand.name}
-            >
-              <img
-                src={hoveredBrand.logo}
-                alt={hoveredBrand.name}
-                className="max-h-24 max-w-full object-contain"
-              />
-            </Link>
+            <BrandLogoPreview brand={hoveredBrand} />
           </div>
+
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
+
+function BrandLogoPreview({ brand }: { brand: typeof BRAND_LIST[number] }) {
+  const { data: brandLogo } = useBrandingBrandLogo(brand.key);
+  const { data: brandingLogo } = useBrandingLogo();
+  const { data: removeBg } = useBrandingLogoRemoveBg();
+  const src = (brandLogo?.trim()) || (brandingLogo?.trim()) || brand.logo;
+  return (
+    <Link
+      to={`/${brand.slug}`}
+      className="flex items-center justify-center w-full h-full transition-opacity hover:opacity-80"
+      aria-label={brand.name}
+    >
+      <img
+        src={src}
+        alt={brand.name}
+        className={cn("max-h-24 max-w-full object-contain brand-logo-img", removeBg && "brand-logo-img--remove-white")}
+      />
+    </Link>
+  );
+}
+
 
 function AdminBell() {
   const [open, setOpen] = useState(false);
