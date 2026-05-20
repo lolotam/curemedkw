@@ -10,6 +10,7 @@ import Loading from "./pages/Loading";
 import { BrandingHead } from "@/components/site/BrandingHead";
 import { CartProvider } from "@/lib/cart";
 import { AuthProvider } from "@/lib/auth";
+import { useLoaderPageEnabled } from "@/lib/db";
 
 /* ---- Lazy-loaded pages ---- */
 const CuremedHome = lazy(() => import("./pages/CuremedHome"));
