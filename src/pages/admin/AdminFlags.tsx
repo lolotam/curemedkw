@@ -99,6 +99,8 @@ export default function AdminFlags() {
 
       <HomeCarouselAutoscrollCard />
 
+      <LoadingPageCard />
+
       <div className="mb-6">
         <ImageCompressionCard />
       </div>
