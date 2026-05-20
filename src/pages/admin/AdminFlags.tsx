@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images, PlayCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -17,6 +17,8 @@ import {
   useProductCardHover,
   PRODUCT_CARD_HOVER_KEY,
   DEFAULT_PRODUCT_CARD_HOVER,
+  useLoaderPageEnabled,
+  LOADER_PAGE_ENABLED_KEY,
   type ProductCardHover,
   type PriceVisibility,
 } from "@/lib/db";
@@ -96,6 +98,8 @@ export default function AdminFlags() {
       </header>
 
       <HomeCarouselAutoscrollCard />
+
+      <LoadingPageCard />
 
       <div className="mb-6">
         <ImageCompressionCard />
@@ -203,6 +207,42 @@ function HomeCarouselAutoscrollCard() {
             disabled={update.isPending}
           />
         </label>
+      </div>
+    </Card>
+  );
+}
+
+function LoadingPageCard() {
+  const { data: enabled = true, isLoading } = useLoaderPageEnabled();
+  const update = useUpdateSiteSetting();
+
+  const setEnabled = (v: boolean) => {
+    update.mutate(
+      { key: LOADER_PAGE_ENABLED_KEY, value: v },
+      {
+        onSuccess: () => toast.success("Saved"),
+        onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+      },
+    );
+  };
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+          <PlayCircle className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Intro loading page</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            When off, visitors skip the intro loading page and go straight to the Curemed home page.
+          </p>
+        </div>
+        <Switch
+          checked={!!enabled}
+          onCheckedChange={(v) => setEnabled(!!v)}
+          disabled={isLoading || update.isPending}
+        />
       </div>
     </Card>
   );

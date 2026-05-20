@@ -10,6 +10,7 @@ import Loading from "./pages/Loading";
 import { BrandingHead } from "@/components/site/BrandingHead";
 import { CartProvider } from "@/lib/cart";
 import { AuthProvider } from "@/lib/auth";
+import { useLoaderPageEnabled } from "@/lib/db";
 
 /* ---- Lazy-loaded pages ---- */
 const CuremedHome = lazy(() => import("./pages/CuremedHome"));
@@ -64,6 +65,13 @@ function LegacyCategoryRedirect() {
   return <Navigate to={`/category/${slug ?? ""}`} replace />;
 }
 
+function RootRoute() {
+  const { data: enabled, isLoading } = useLoaderPageEnabled();
+  if (isLoading) return <PageFallback />;
+  if (enabled === false) return <Navigate to="/curemed" replace />;
+  return <Loading />;
+}
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -78,7 +86,7 @@ const App = () => {
             <BrowserRouter>
               <Suspense fallback={<PageFallback />}>
               <Routes>
-                <Route path="/" element={<Loading />} />
+                <Route path="/" element={<RootRoute />} />
                 <Route path="/curemed" element={<CuremedHome />} />
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<ContactUs />} />
