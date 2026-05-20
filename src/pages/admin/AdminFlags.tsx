@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { toast } from "sonner";
 import {
   usePriceVisibility,
@@ -12,6 +14,10 @@ import {
   useUpdateSiteSetting,
   usePicsartEngineEnabled,
   PICSART_ENGINE_ENABLED_KEY,
+  useProductCardHover,
+  PRODUCT_CARD_HOVER_KEY,
+  DEFAULT_PRODUCT_CARD_HOVER,
+  type ProductCardHover,
   type PriceVisibility,
 } from "@/lib/db";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
@@ -22,6 +28,7 @@ import {
   type HomeCarouselAutoscroll,
 } from "./AdminLandingPages";
 import { ImageCompressionCard } from "@/components/admin/ImageCompressionCard";
+
 
 export default function AdminFlags() {
   const { data, isLoading } = usePriceVisibility();
