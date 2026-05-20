@@ -17,6 +17,8 @@ import {
   useProductCardHover,
   PRODUCT_CARD_HOVER_KEY,
   DEFAULT_PRODUCT_CARD_HOVER,
+  useLoaderPageEnabled,
+  LOADER_PAGE_ENABLED_KEY,
   type ProductCardHover,
   type PriceVisibility,
 } from "@/lib/db";
