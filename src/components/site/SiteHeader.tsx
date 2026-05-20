@@ -156,6 +156,7 @@ export function SiteHeader() {
 }
 
 function PartnersMenu({ active, label }: { active: boolean; label: string }) {
+  const [hoveredBrand, setHoveredBrand] = useState(BRAND_LIST[0]);
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -172,14 +173,36 @@ function PartnersMenu({ active, label }: { active: boolean; label: string }) {
           <ChevronDown className="h-3.5 w-3.5" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-56">
-        {BRAND_LIST.map((b) => (
-          <DropdownMenuItem key={b.key} asChild>
-            <Link to={`/${b.slug}`} className="cursor-pointer font-medium">
-              {b.shortName ?? b.name}
+      <DropdownMenuContent align="start" className="w-[28rem] p-0 overflow-hidden">
+        <div className="flex">
+          <div className="w-1/2 p-1">
+            {BRAND_LIST.map((b) => (
+              <DropdownMenuItem
+                key={b.key}
+                asChild
+                onMouseEnter={() => setHoveredBrand(b)}
+                onFocus={() => setHoveredBrand(b)}
+              >
+                <Link to={`/${b.slug}`} className="cursor-pointer font-medium">
+                  {b.shortName ?? b.name}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+          </div>
+          <div className="w-1/2 border-l border-border bg-muted/30 flex items-center justify-center p-4">
+            <Link
+              to={`/${hoveredBrand.slug}`}
+              className="flex items-center justify-center w-full h-full transition-opacity hover:opacity-80"
+              aria-label={hoveredBrand.name}
+            >
+              <img
+                src={hoveredBrand.logo}
+                alt={hoveredBrand.name}
+                className="max-h-24 max-w-full object-contain"
+              />
             </Link>
-          </DropdownMenuItem>
-        ))}
+          </div>
+        </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
