@@ -244,6 +244,102 @@ function PicsartEngineCard() {
   );
 }
 
+function ProductCardHoverCard() {
+  const { data: cfg = DEFAULT_PRODUCT_CARD_HOVER, isLoading } = useProductCardHover();
+  const update = useUpdateSiteSetting();
+  const [interval, setIntervalVal] = useState<string>(String(cfg.intervalSec ?? 1));
+
+  useEffect(() => {
+    setIntervalVal(String(cfg.intervalSec ?? 1));
+  }, [cfg.intervalSec]);
+
+  const save = (next: ProductCardHover) => {
+    update.mutate(
+      { key: PRODUCT_CARD_HOVER_KEY, value: next },
+      {
+        onSuccess: () => toast.success("Saved"),
+        onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+      },
+    );
+  };
+
+  const setMode = (mode: "swap" | "loop") => {
+    save({ mode, intervalSec: cfg.intervalSec ?? 1 });
+  };
+
+  const commitInterval = () => {
+    const n = Number(interval);
+    if (!Number.isFinite(n) || n <= 0) {
+      setIntervalVal(String(cfg.intervalSec ?? 1));
+      return;
+    }
+    const clamped = Math.min(10, Math.max(0.5, n));
+    if (clamped === cfg.intervalSec) return;
+    save({ mode: cfg.mode, intervalSec: clamped });
+  };
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-start gap-4 mb-4">
+        <div className="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+          <Images className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Product card hover animation</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Choose how product cards animate when a visitor hovers over them.
+          </p>
+        </div>
+      </div>
+
+      <RadioGroup
+        value={cfg.mode}
+        onValueChange={(v) => setMode(v as "swap" | "loop")}
+        disabled={isLoading || update.isPending}
+        className="gap-2"
+      >
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5 cursor-pointer">
+          <RadioGroupItem value="swap" id="hover-swap" className="mt-0.5" />
+          <div className="flex-1">
+            <Label htmlFor="hover-swap" className="cursor-pointer">First &amp; second image only</Label>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              On hover, fade from the main image to the second gallery image.
+            </p>
+          </div>
+        </label>
+        <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5 cursor-pointer">
+          <RadioGroupItem value="loop" id="hover-loop" className="mt-0.5" />
+          <div className="flex-1">
+            <Label htmlFor="hover-loop" className="cursor-pointer">Infinite loop through all images</Label>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              While hovered, cycle through every product image and loop back to the first.
+            </p>
+            {cfg.mode === "loop" && (
+              <div className="mt-3 flex items-center gap-2">
+                <Label htmlFor="hover-interval" className="text-xs">Seconds between images</Label>
+                <Input
+                  id="hover-interval"
+                  type="number"
+                  min={0.5}
+                  max={10}
+                  step={0.5}
+                  value={interval}
+                  onChange={(e) => setIntervalVal(e.target.value)}
+                  onBlur={commitInterval}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                  className="w-24 h-8"
+                />
+              </div>
+            )}
+          </div>
+        </label>
+      </RadioGroup>
+    </Card>
+  );
+}
+
+
+
 function FlagRow({
   icon,
   title,
