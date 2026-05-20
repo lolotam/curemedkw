@@ -1,20 +1,27 @@
 ## Goal
 
-In the Partners dropdown, the right-side preview should render the same header logo each brand uses (admin-overridden via `useBrandingBrandLogo`), not the static `b.logo` from `BRAND_LIST`.
+Make the admin "Product card hover" setting (First & second image / Infinite loop through all images) apply to the home page Featured carousel as well. The setting already drives `ProductCard` (used by Brand pages, Category pages, and Product detail related lists), but the home Featured carousel uses a separate `FeaturedGlassCard` that only ever shows `product.mainImage`.
 
-## Change (single file: `src/components/site/SiteHeader.tsx`)
+## Change (single file: `src/pages/CuremedHome.tsx`)
 
-1. Extract a new small component `BrandLogoPreview` that takes `brand` (a `BRAND_LIST` item).
-   - Calls `useBrandingBrandLogo(brand.key)` to get the admin-uploaded header logo for that brand.
-   - Falls back to the global `brandingLogo` (default header logo) when the brand-specific override is empty — matching the header's own `logoSrc` precedence.
-   - Final fallback: `brand.logo` (card logo) only if neither setting is configured, so the preview is never blank.
-   - Renders the `<Link to={`/${brand.slug}`}>` + `<img>` currently in the right half, and reuses the `brand-logo-img` / `brand-logo-img--remove-white` classes (reading `useBrandingLogoRemoveBg`) so transparency handling matches the header.
+In `FeaturedGlassCard`:
 
-2. In `PartnersMenu`, replace the inline right-half `<Link><img/></Link>` block with `<BrandLogoPreview brand={hoveredBrand} />`. Keep the existing container styling (`w-1/2 border-l border-border bg-muted/30 flex items-center justify-center p-4`).
+1. Import and read the same hover config used by `ProductCard`:
+   - `useProductCardHover` + `DEFAULT_PRODUCT_CARD_HOVER` from `@/lib/db`.
+2. Build the same unique image list: `[mainImage, ...gallery]` deduped via `useMemo`.
+3. Add the same `hovered` state with `onMouseEnter` / `onMouseLeave` / `onFocus` / `onBlur` on the `<Link>`.
+4. Render images using the same two-mode logic as `ProductCard`:
+   - **swap mode (default):** keep current main `<img>`, add a second `<img>` overlay that fades in on hover (only if a 2nd image exists). Preserves the existing `object-cover` + `group-hover/card:scale-105` zoom.
+   - **loop mode:** stack all images absolutely; cycle `loopIdx` with a `setInterval` based on `hoverCfg.intervalSec` (min 300 ms), same cleanup pattern as `ProductCard`. Reset to 0 on mouse leave.
+5. Keep all existing styling untouched: full-bleed image area, top gradient, discount badge, frosted info strip, discover link, add-to-cart button.
 
-3. No changes to the left list, widths, hover behavior, or any other file.
+## Out of scope
+
+- `ProductCard` (already supports both modes).
+- Admin Flags UI (already exposes the two options).
+- No changes to `db.ts`, brand pages, or category pages.
 
 ## Notes
 
-- `useBrandingBrandLogo` is already imported in this file.
-- Hooks run per-render of `BrandLogoPreview`, so React's rules-of-hooks are respected (one hook call per brand key as it changes).
+- `Product` type already exposes `mainImage` and `gallery`, same shape used by `ProductCard`.
+- Hooks are called unconditionally at the top of `FeaturedGlassCard`, preserving rules-of-hooks.
