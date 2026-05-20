@@ -190,18 +190,9 @@ function PartnersMenu({ active, label }: { active: boolean; label: string }) {
             ))}
           </div>
           <div className="w-1/2 border-l border-border bg-muted/30 flex items-center justify-center p-4">
-            <Link
-              to={`/${hoveredBrand.slug}`}
-              className="flex items-center justify-center w-full h-full transition-opacity hover:opacity-80"
-              aria-label={hoveredBrand.name}
-            >
-              <img
-                src={hoveredBrand.logo}
-                alt={hoveredBrand.name}
-                className="max-h-24 max-w-full object-contain"
-              />
-            </Link>
+            <BrandLogoPreview brand={hoveredBrand} />
           </div>
+
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
