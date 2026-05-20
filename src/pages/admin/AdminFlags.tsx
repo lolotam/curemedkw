@@ -212,6 +212,42 @@ function HomeCarouselAutoscrollCard() {
   );
 }
 
+function LoadingPageCard() {
+  const { data: enabled = true, isLoading } = useLoaderPageEnabled();
+  const update = useUpdateSiteSetting();
+
+  const setEnabled = (v: boolean) => {
+    update.mutate(
+      { key: LOADER_PAGE_ENABLED_KEY, value: v },
+      {
+        onSuccess: () => toast.success("Saved"),
+        onError: (e: any) => toast.error(e?.message ?? "Failed to save"),
+      },
+    );
+  };
+
+  return (
+    <Card className="p-5 mb-6">
+      <div className="flex items-start gap-4">
+        <div className="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
+          <PlayCircle className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Intro loading page</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            When off, visitors skip the intro loading page and go straight to the Curemed home page.
+          </p>
+        </div>
+        <Switch
+          checked={!!enabled}
+          onCheckedChange={(v) => setEnabled(!!v)}
+          disabled={isLoading || update.isPending}
+        />
+      </div>
+    </Card>
+  );
+}
+
 function PicsartEngineCard() {
   const { data: enabled = true, isLoading } = usePicsartEngineEnabled();
   const update = useUpdateSiteSetting();
