@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images, PlayCircle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
