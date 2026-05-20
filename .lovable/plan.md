@@ -1,39 +1,63 @@
-Add an output-size selector to the AI upscale flow (single + bulk) and wire it through to OpenAI's `/v1/images/edits` `size` form field. OpenRouter and Google calls are untouched.
+## Goal
 
-Note: the existing comment in `callOpenAI` says "`size` is not valid on /edits". That comment was written for the legacy DALL·E-2 path; gpt-image-* does accept `size` on `/edits`. The comment will be updated.
+Add a configurable product-card hover animation, plus admin controls in `/admin/flags` to pick between the existing two-image swap and a new infinite gallery loop with an adjustable interval.
 
-## Changes
+## Behavior
 
-### 1. `src/lib/jobs/upscaleJobs.ts`
-- Add `outputSize?: "1024x1024" | "1536x1536" | "2048x2048"` to `UpscaleConfig`.
-- In `startUpscale` (AI branch), pass `outputSize: config.outputSize || "1024x1024"` into the `supabase.functions.invoke("upscale-image-ai", { body: ... })` body.
+- **Mode 1 — "First & second image only"** (current behavior): on hover, fade from main image to the second gallery image. On unhover, fade back.
+- **Mode 2 — "Infinite loop through all images"**: on hover, cycle through `[mainImage, ...gallery]` (deduped) one by one every N seconds (admin-configured, default 1s). On unhover, reset to main image. If the product has only one image, do nothing.
 
-### 2. `src/lib/jobs/bulkUpscaleJobs.ts`
-- In `runOne` AI branch, same: pass `outputSize: config.outputSize || "1024x1024"` in invoke body.
+Both modes apply globally to every `ProductCard` on the storefront.
 
-### 3. `supabase/functions/upscale-image-ai/index.ts`
-- Parse and validate `outputSize` from request body: allow only `"1024x1024" | "1536x1536" | "2048x2048"`, default `"1024x1024"`.
-- Change `callOpenAI` signature to accept `outputSize` and `fd.append("size", outputSize)` in the FormData.
-- Update the misleading comment about `size`.
-- Do NOT pass `outputSize` to `callOpenRouter` or `callGoogle`.
+## Admin UI — `src/pages/admin/AdminFlags.tsx`
 
-### 4. `src/components/admin/ImageUpscaleDialog.tsx`
-- Add `const [outputSize, setOutputSize] = useState<"1024x1024"|"1536x1536"|"2048x2048">("1024x1024")`.
-- Render a small `RadioGroup` (3 chips: 1K / 1.5K / 2K) only when `engine === "ai"`, placed just above the "Extra instructions" field.
-- Pass `outputSize` to `startUpscale` config.
+Add a new card `ProductCardHoverCard` (placed near other site-wide toggles, e.g. above `PicsartEngineCard`):
 
-### 5. `src/components/admin/BulkImageUpscaleDialog.tsx`
-- Same state + selector + config wiring as #4.
+- Radio group with 2 options:
+  1. First & second image only
+  2. Infinite loop through all images
+- When option 2 is selected, show a numeric input (seconds between images, min 0.5, max 10, step 0.5, default 1).
+- Saves immediately via `useUpdateSiteSetting` (same pattern as `PicsartEngineCard` / `HomeCarouselAutoscrollCard`).
+
+## Setting storage — `src/lib/db.ts`
+
+Add one new site setting key + hook:
+
+```ts
+export const PRODUCT_CARD_HOVER_KEY = "product_card_hover";
+export type ProductCardHover = {
+  mode: "swap" | "loop";
+  intervalSec: number; // used only when mode === "loop"
+};
+export const DEFAULT_PRODUCT_CARD_HOVER: ProductCardHover = { mode: "swap", intervalSec: 1 };
+export function useProductCardHover() {
+  return useSiteSetting<ProductCardHover>(PRODUCT_CARD_HOVER_KEY, DEFAULT_PRODUCT_CARD_HOVER);
+}
+```
+
+No DB migration — `site_settings` already stores JSON keys.
+
+## Card component — `src/components/site/ProductCard.tsx`
+
+Replace the current pure-CSS hover swap with a small stateful image layer:
+
+- Read `useProductCardHover()`.
+- Build `images = [product.mainImage, ...gallery].filter(unique & truthy)`.
+- Track `hovered` (onMouseEnter/Leave, also onFocus/Blur for keyboard) and `index`.
+- **Mode `swap`**: keep current two-image cross-fade behavior (use `images[0]` and `images[1]` if it exists). Visual output identical to today.
+- **Mode `loop`** with ≥2 images: while hovered, `setInterval(() => setIndex(i => (i+1) % images.length), intervalSec*1000)`. On leave, clear interval and reset index to 0. Render a single `<img>` whose `src` is `images[index]` with a short opacity transition for a smooth fade.
+- Clean up interval on unmount and when hover toggles off.
+
+No change to layout, badges, price block, or AddToCartButton — only the image layer logic.
 
 ## Out of scope
-- No DB migration.
-- No OpenRouter/Google changes.
-- No new admin flag.
-- Self-hosted deploy of `upscale-image-ai` is a server-side step the user runs after merge.
+
+- No per-brand or per-product override.
+- No new DB tables/migrations.
+- No changes to admin product editor or gallery management.
 
 ## Files touched
-- `src/lib/jobs/upscaleJobs.ts`
-- `src/lib/jobs/bulkUpscaleJobs.ts`
-- `supabase/functions/upscale-image-ai/index.ts`
-- `src/components/admin/ImageUpscaleDialog.tsx`
-- `src/components/admin/BulkImageUpscaleDialog.tsx`
+
+- `src/lib/db.ts` — add `PRODUCT_CARD_HOVER_KEY`, type, default, hook.
+- `src/pages/admin/AdminFlags.tsx` — add `ProductCardHoverCard`.
+- `src/components/site/ProductCard.tsx` — implement two hover modes driven by the setting.
