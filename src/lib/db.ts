@@ -1196,6 +1196,13 @@ export function useLoaderVideoUrl() {
   return useSiteSetting<string>(LOADER_VIDEO_KEY, LOADER_VIDEO_DEFAULT);
 }
 
+// Whether to show the intro/loading page at "/". When false, "/" redirects
+// straight to /curemed.
+export const LOADER_PAGE_ENABLED_KEY = "loader_page_enabled";
+export function useLoaderPageEnabled() {
+  return useSiteSetting<boolean>(LOADER_PAGE_ENABLED_KEY, true);
+}
+
 /** Uploads a video to the public `hero-media` bucket under `branding/` and returns the public URL. */
 export async function uploadBrandingVideo(file: File, prefix: string): Promise<string> {
   const ext = (file.name.split(".").pop() || "mp4").toLowerCase().replace(/[^a-z0-9]/g, "");
