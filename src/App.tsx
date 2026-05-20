@@ -86,7 +86,7 @@ const App = () => {
             <BrowserRouter>
               <Suspense fallback={<PageFallback />}>
               <Routes>
-                <Route path="/" element={<Loading />} />
+                <Route path="/" element={<RootRoute />} />
                 <Route path="/curemed" element={<CuremedHome />} />
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<ContactUs />} />
