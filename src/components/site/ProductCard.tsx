@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Product } from "@/lib/db";
 import { BRANDS } from "@/lib/brands";
 import { useI18n } from "@/lib/i18n";
 import { Star, MessageCircle } from "lucide-react";
-import { usePriceVisibility } from "@/lib/db";
+import { usePriceVisibility, useProductCardHover, DEFAULT_PRODUCT_CARD_HOVER } from "@/lib/db";
 import { AddToCartButton } from "@/components/site/AddToCartButton";
+
 
 export function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
   const { t, lang } = useI18n();
