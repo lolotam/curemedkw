@@ -1144,6 +1144,20 @@ export function usePicsartEngineEnabled() {
 }
 
 
+// Product card hover animation — admin-controlled.
+// "swap": fade between first and second image (default).
+// "loop": cycle through all images while hovered with `intervalSec` delay.
+export const PRODUCT_CARD_HOVER_KEY = "product_card_hover";
+export type ProductCardHover = {
+  mode: "swap" | "loop";
+  intervalSec: number;
+};
+export const DEFAULT_PRODUCT_CARD_HOVER: ProductCardHover = { mode: "swap", intervalSec: 1 };
+export function useProductCardHover() {
+  return useSiteSetting<ProductCardHover>(PRODUCT_CARD_HOVER_KEY, DEFAULT_PRODUCT_CARD_HOVER);
+}
+
+
 
 // Featured product card glass-strip background opacity (0-100). Default 70.
 export const FEATURED_GLASS_OPACITY_KEY = "featured_glass_opacity";
