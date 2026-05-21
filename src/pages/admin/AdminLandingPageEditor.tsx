@@ -308,17 +308,15 @@ export default function AdminLandingPageEditor() {
       </div>
 
       {meta ? (
-        <header className="mb-6 flex items-center gap-3">
-          <PageBadge pageKey={meta.key} />
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold leading-tight">
-              Hero slides — {meta.label}
-            </h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Upload images or videos. Inactive slides are hidden from the live site.
-            </p>
-          </div>
-        </header>
+        <AdminPageHeader
+          eyebrow="Landing editor"
+          eyebrowIcon={LayoutGrid}
+          title={<>Hero slides — {meta.label}</>}
+          subtitle="Upload images or videos. Inactive slides are hidden from the live site."
+          gradient="violet-fuchsia-pink"
+          actions={<PageBadge pageKey={meta.key} />}
+        />
+
       ) : null}
 
       {!meta ? (
