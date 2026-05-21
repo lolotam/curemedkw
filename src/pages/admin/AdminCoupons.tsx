@@ -14,7 +14,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Plus, Pencil, Trash2 } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Ticket } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { toast } from "sonner";
 import {
   useCoupons, useUpsertCoupon, useDeleteCoupon, type Coupon, type CouponType,
@@ -67,16 +68,20 @@ export default function AdminCoupons() {
   };
 
   return (
-    <div className="p-8 space-y-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Coupons</h1>
-          <p className="text-sm text-muted-foreground">{coupons.length} coupons total.</p>
-        </div>
-        <Button onClick={() => open()} className="bg-brand hover:bg-brand/90 text-white">
-          <Plus className="h-4 w-4 mr-1" /> New coupon
-        </Button>
-      </header>
+    <div className="p-6 md:p-10 max-w-7xl space-y-6">
+      <AdminPageHeader
+        eyebrow="Coupons"
+        eyebrowIcon={Ticket}
+        title="Coupons"
+        subtitle={`${coupons.length} coupons total.`}
+        gradient="amber-orange-rose"
+        actions={
+          <Button onClick={() => open()} className="bg-brand hover:bg-brand/90 text-white">
+            <Plus className="h-4 w-4 mr-1" /> New coupon
+          </Button>
+        }
+      />
+
 
       <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <Table>
