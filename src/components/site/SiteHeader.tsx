@@ -141,11 +141,12 @@ export function SiteHeader() {
               <MobileItem
                 key={b.key}
                 to={`/${b.slug}`}
-                label={b.shortName ?? b.name}
+                label={lang === "ar" ? (b.shortNameAr ?? b.nameAr) : (b.shortName ?? b.name)}
                 onClick={() => setOpen(false)}
                 indent
               />
             ))}
+
             <MobileItem to="/about" label={t("nav.about")} onClick={() => setOpen(false)} />
             <MobileItem to="/contact" label={t("nav.contact")} onClick={() => setOpen(false)} />
           </div>
