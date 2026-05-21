@@ -261,7 +261,8 @@ function AdminBell() {
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col" dir="ltr">
           <SheetHeader className="p-5 border-b border-border text-left">
             <SheetTitle className="flex items-center gap-2">
-              <Bell className="h-4 w-4" /> Notifications
+              <Mail className="h-4 w-4" /> Messages
+
             </SheetTitle>
             <SheetDescription>
               {unreadCount} unread of {messages.length} total
