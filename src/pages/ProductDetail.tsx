@@ -90,30 +90,30 @@ export default function ProductDetail() {
         }}
       />
       <div className="bg-brand-soft border-b border-border/40">
-        <div className="container py-3 text-sm text-muted-foreground flex items-center gap-2">
-          <Link to={`/${meta.slug}`} className="inline-flex items-center gap-1 hover:text-brand"><ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {meta.name}</Link>
-          <span>/</span><span className="text-foreground line-clamp-1 flex-1">{name}</span>
+        <div className="container py-3 text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
+          <Link to={`/${meta.slug}`} className="inline-flex items-center gap-1 hover:text-brand shrink-0"><ArrowLeft className="h-4 w-4 rtl:rotate-180" /> <span className="hidden sm:inline">{meta.name}</span></Link>
+          <span className="shrink-0">/</span><span className="text-foreground line-clamp-1 flex-1 min-w-0">{name}</span>
           {isAdmin && (
             <Link
-              to={`/admin/products/${product.id}`}
-              className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-brand text-white px-3 py-1.5 text-xs font-semibold hover:bg-brand/90 shrink-0"
+              to={`/admin/products/${product.slug ?? product.id}`}
+              className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-brand text-white px-2 sm:px-3 py-1.5 text-xs font-semibold hover:bg-brand/90 shrink-0"
               title="Edit product"
             >
-              <Pencil className="h-3.5 w-3.5" /> Edit
+              <Pencil className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Edit</span>
             </Link>
           )}
         </div>
       </div>
-      <section className="container py-10 md:py-16 grid lg:grid-cols-2 gap-10 lg:gap-16">
+      <section className="container py-6 md:py-16 grid lg:grid-cols-2 gap-6 lg:gap-16 pb-28 lg:pb-16">
         <div>
-          <div className="aspect-square rounded-3xl overflow-hidden bg-brand-soft border border-border">
+          <div className="aspect-square rounded-2xl md:rounded-3xl overflow-hidden bg-brand-soft border border-border">
             <ImageZoom src={images[activeImg]} alt={name} />
           </div>
 
           {images.length > 1 && (
-            <div className="mt-4 grid grid-cols-4 gap-3">
+            <div className="mt-3 sm:mt-4 flex sm:grid sm:grid-cols-4 gap-2 sm:gap-3 overflow-x-auto sm:overflow-visible no-scrollbar snap-x snap-mandatory -mx-1 sm:mx-0 px-1 sm:px-0">
               {images.map((src, i) => (
-                <button key={i} onClick={() => setActiveImg(i)} className={cn("aspect-square rounded-xl overflow-hidden border-2 transition-all bg-brand-soft", activeImg === i ? "border-brand" : "border-border hover:border-brand/40")}>
+                <button key={i} onClick={() => setActiveImg(i)} className={cn("shrink-0 w-20 h-20 sm:w-auto sm:h-auto sm:aspect-square rounded-lg sm:rounded-xl overflow-hidden border-2 transition-all bg-brand-soft snap-start", activeImg === i ? "border-brand" : "border-border hover:border-brand/40")}>
                    <img src={src} alt="" width={200} height={200} className="h-full w-full object-cover" loading="lazy" />
                 </button>
               ))}
@@ -121,12 +121,12 @@ export default function ProductDetail() {
           )}
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wider text-brand">{meta.name} · {category}</p>
-          <h1 className="mt-2 text-3xl md:text-4xl font-bold">{name}</h1>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand line-clamp-1">{meta.name} · {category}</p>
+          <h1 className="mt-2 text-2xl sm:text-3xl md:text-4xl font-bold leading-tight">{name}</h1>
           {product.featured && (
             <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-brand text-white px-2.5 py-1 text-xs font-semibold"><Star className="h-3 w-3 fill-current" /> {t("common.featured")}</span>
           )}
-          <p className="mt-4 text-base text-foreground/80">{shortDesc}</p>
+          <p className="mt-4 text-sm sm:text-base text-foreground/80">{shortDesc}</p>
           {priceHidden ? (
             <div className="mt-6 flex items-center gap-3 flex-wrap">
               <Button asChild size="lg" className="bg-brand hover:bg-brand/90 text-white">
@@ -144,34 +144,36 @@ export default function ProductDetail() {
             const save = hasDiscount ? ((product.originalPrice as number) - product.price) : 0;
             return (
               <div className="mt-6 space-y-2">
-                <div className="flex items-baseline gap-3 flex-wrap">
+                <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
                   {hasDiscount ? (
                     <>
-                      <span className="text-4xl font-bold text-red-600">KD {product.price.toFixed(2)}</span>
-                      <span className="text-xl line-through text-muted-foreground">KD {(product.originalPrice as number).toFixed(2)}</span>
-                      <span className="inline-flex items-center rounded-full bg-red-600 text-white px-2.5 py-1 text-xs font-bold">-{pct}% {t("discount.off")}</span>
+                      <span className="text-3xl sm:text-4xl font-bold text-red-600">KD {product.price.toFixed(2)}</span>
+                      <span className="text-base sm:text-xl line-through text-muted-foreground">KD {(product.originalPrice as number).toFixed(2)}</span>
+                      <span className="inline-flex items-center rounded-full bg-red-600 text-white px-2 sm:px-2.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-bold">-{pct}% {t("discount.off")}</span>
                     </>
                   ) : (
-                    <span className="text-4xl font-bold">KD {product.price.toFixed(2)}</span>
+                    <span className="text-3xl sm:text-4xl font-bold">KD {product.price.toFixed(2)}</span>
                   )}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className={cn("text-xs font-semibold rounded-full px-2.5 py-1", stockBadge.cls)}>
                     {stockBadge.label}
                   </span>
+                  {hasDiscount && (
+                    <span className="text-xs sm:text-sm font-medium text-red-600">{t("discount.save")} KD {save.toFixed(2)}</span>
+                  )}
                 </div>
-                {hasDiscount && (
-                  <p className="text-sm font-medium text-red-600">{t("discount.save")} KD {save.toFixed(2)}</p>
-                )}
               </div>
             );
           })()}
           {!priceHidden && product.stockStatus !== "out_of_stock" && (
-            <div className="mt-6">
+            <div className="mt-6 hidden lg:block">
               <AddToCartButton product={product} size="lg" fullWidth />
             </div>
           )}
           <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg bg-muted/50 p-3"><p className="text-muted-foreground text-xs">{t("product.size")}</p><p className="font-semibold mt-0.5">{product.size}</p></div>
-            <div className="rounded-lg bg-muted/50 p-3"><p className="text-muted-foreground text-xs">{t("product.sku")}</p><p className="font-semibold mt-0.5">{product.sku}</p></div>
+            <div className="rounded-lg bg-muted/50 p-3"><p className="text-muted-foreground text-xs">{t("product.size")}</p><p className="font-semibold mt-0.5 break-words">{product.size}</p></div>
+            <div className="rounded-lg bg-muted/50 p-3"><p className="text-muted-foreground text-xs">{t("product.sku")}</p><p className="font-semibold mt-0.5 break-words">{product.sku}</p></div>
           </div>
           <div className="mt-8 space-y-6">
             <div><h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground mb-3">{t("product.benefits")}</h3>
@@ -184,6 +186,27 @@ export default function ProductDetail() {
           <Button asChild size="lg" className="mt-8 bg-brand hover:bg-brand/90 text-white"><a href={`/${meta.slug}#contact`}>{t("product.inquire")}</a></Button>
         </div>
       </section>
+
+      {/* Sticky mobile add-to-cart bar */}
+      {product.stockStatus !== "out_of_stock" && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur border-t border-border px-3 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] flex items-center gap-3 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]">
+          {priceHidden ? (
+            <Button asChild className="w-full bg-brand hover:bg-brand/90 text-white">
+              <Link to="/contact"><MessageCircle className="h-4 w-4 mr-2" /> {t("price.contactForPrice")}</Link>
+            </Button>
+          ) : (
+            <>
+              <div className="flex flex-col leading-tight shrink-0">
+                <span className="text-[10px] uppercase text-muted-foreground">{t("common.featured") /* placeholder noop */ && t("product.size") /* keep tree-shake friendly */}</span>
+                <span className="text-base font-bold text-foreground">KD {product.price.toFixed(2)}</span>
+              </div>
+              <div className="flex-1">
+                <AddToCartButton product={product} fullWidth />
+              </div>
+            </>
+          )}
+        </div>
+      )}
       <ProductReviews productId={product.id} />
       {related.length > 0 && (
         <section className="container py-12 md:py-16">
