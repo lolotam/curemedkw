@@ -25,8 +25,8 @@ export function SiteFooter({ brand = "curemed" }: { brand?: string }) {
     ? `@${brandMeta.instagramHandle}`
     : `@${instagram.replace(/\/+$/, "").split("/").pop()}`;
   return (
-    <footer className="border-t border-border/50 bg-muted/30 mt-16">
-      <div className="container py-12 grid gap-8 md:grid-cols-4">
+    <footer className="border-t border-border/50 bg-muted/30 mt-10 md:mt-16 pb-[env(safe-area-inset-bottom)]">
+      <div className="container py-8 md:py-12 grid gap-8 sm:grid-cols-2 md:grid-cols-4">
         <div className="space-y-3">
           <img
             src={logo}
