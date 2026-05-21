@@ -124,27 +124,27 @@ export function ProductCard({ product, compact = false }: { product: Product; co
           </span>
         )}
       </div>
-      <div className="p-4">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-brand">
+      <div className="p-3 sm:p-4">
+        <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-brand line-clamp-1">
           {brand.name} · {category}
         </p>
-        <h3 className="mt-1 font-semibold text-foreground line-clamp-2">{name}</h3>
+        <h3 className="mt-1 font-semibold text-sm sm:text-base text-foreground line-clamp-2">{name}</h3>
         {!compact && (
-          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2">{shortDesc}</p>
+          <p className="mt-1.5 text-xs text-muted-foreground line-clamp-2 hidden sm:block">{shortDesc}</p>
         )}
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           {priceHidden ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand text-white px-3 py-1.5 text-xs font-semibold">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand text-white px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold">
               <MessageCircle className="h-3.5 w-3.5" /> {t("price.contactUs")}
             </span>
           ) : hasDiscount ? (
-            <div className="flex items-baseline gap-2">
-              <span className="text-[10px] uppercase font-semibold text-muted-foreground">{t("discount.was")}</span>
-              <span className="text-xs line-through text-muted-foreground">KD {(product.originalPrice as number).toFixed(2)}</span>
-              <span className="text-base font-bold text-red-600">KD {product.price.toFixed(2)}</span>
+            <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2 min-w-0">
+              <span className="hidden sm:inline text-[10px] uppercase font-semibold text-muted-foreground">{t("discount.was")}</span>
+              <span className="text-[11px] sm:text-xs line-through text-muted-foreground">KD {(product.originalPrice as number).toFixed(2)}</span>
+              <span className="text-sm sm:text-base font-bold text-red-600">KD {product.price.toFixed(2)}</span>
             </div>
           ) : (
-            <span className="text-base font-bold text-foreground">KD {product.price.toFixed(2)}</span>
+            <span className="text-sm sm:text-base font-bold text-foreground">KD {product.price.toFixed(2)}</span>
           )}
           {!priceHidden && product.stockStatus !== "out_of_stock" && (
             <AddToCartButton product={product} iconOnly />
