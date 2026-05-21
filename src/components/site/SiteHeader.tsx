@@ -95,7 +95,7 @@ export function SiteHeader() {
 
         <nav className="hidden items-center gap-3 xl:gap-5 lg:flex">
           <NavItem to="/curemed" label={t("nav.home")} active={isActive("/curemed")} />
-          <PartnersMenu active={BRAND_LIST.some((b) => location.pathname.startsWith(`/${b.slug}`))} label={t("nav.partners")} />
+          <PartnersMenu active={BRAND_LIST.some((b) => location.pathname.startsWith(`/${b.slug}`))} label={t("nav.partners")} lang={lang} />
           <NavItem to="/about" label={t("nav.about")} active={isActive("/about")} />
           <NavItem to="/contact" label={t("nav.contact")} active={isActive("/contact")} />
         </nav>
