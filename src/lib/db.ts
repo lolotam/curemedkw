@@ -2243,8 +2243,12 @@ export function useBulkDeleteAppLogs() {
   return useMutation({
     mutationFn: async (ids: string[]) => {
       if (!ids.length) return;
-      const { error } = await supabase.from("app_logs").delete().in("id", ids);
-      if (error) throw error;
+      const CHUNK = 100;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const { error } = await supabase.from("app_logs").delete().in("id", slice);
+        if (error) throw error;
+      }
     },
     onSuccess: (_, ids) => {
       qc.invalidateQueries({ queryKey: ["app_logs"] });
