@@ -26,6 +26,7 @@ const noSave = {
   } as React.CSSProperties,
 };
 
+/**
  * Product image with click-to-open zoom lightbox.
  * Includes basic anti-save protections (right-click, drag, selection disabled).
  */
