@@ -16,6 +16,7 @@ import { SlideLivePreview } from "@/components/admin/SlideLivePreview";
 import { HeroIntervalCard } from "@/components/admin/HeroIntervalCard";
 import { useBrandingBrandCardLogo, useBrandingFavicon, type BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { useToast } from "@/hooks/use-toast";
 import {
   HERO_PAGES,
