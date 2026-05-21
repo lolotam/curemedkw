@@ -63,7 +63,7 @@ export default function ProductDetail() {
       <Seo
         title={`${name} — ${meta.name} | Curemed Kuwait`}
         description={(shortDesc || longDesc || `${name} by ${meta.name}, available at Curemed Kuwait.`).toString().replace(/\s+/g, " ").slice(0, 160)}
-        path={`/${meta.slug}/product/${product.id}`}
+        path={`/${meta.slug}/product/${product.slug}`}
         image={product.mainImage}
         ogType="product"
         jsonLd={{
@@ -84,7 +84,7 @@ export default function ProductDetail() {
                     product.stockStatus === "out_of_stock"
                       ? "https://schema.org/OutOfStock"
                       : "https://schema.org/InStock",
-                  url: `https://curemedkw.lovable.app/${meta.slug}/product/${product.id}`,
+                  url: `https://curemedkw.lovable.app/${meta.slug}/product/${product.slug}`,
                 },
               }),
         }}

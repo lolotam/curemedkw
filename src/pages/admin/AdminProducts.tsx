@@ -324,7 +324,7 @@ export default function AdminProducts() {
                   <td className="px-4 py-3"><FeaturedToggleCell id={p.id} featured={p.featured} /></td>
                   <td className="px-4 py-3 text-right"><div className="inline-flex gap-1">
                     <Button asChild variant="ghost" size="sm" title="View product page">
-                      <Link to={`/${BRANDS[p.brand].slug}/product/${p.id}`}>
+                      <Link to={`/${BRANDS[p.brand].slug}/product/${p.slug}`}>
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Link>
                     </Button>

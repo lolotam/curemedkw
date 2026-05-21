@@ -397,7 +397,7 @@ function FeaturedGlassCard({
 
   return (
     <Link
-      to={`/${brand.slug}/product/${product.id}`}
+      to={`/${brand.slug}/product/${product.slug}`}
       data-brand={brand.themeAttr}
       aria-hidden={isClone ? "true" : undefined}
       tabIndex={isClone ? -1 : undefined}

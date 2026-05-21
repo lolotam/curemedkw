@@ -57,7 +57,7 @@ export function ProductCard({ product, compact = false }: { product: Product; co
 
   return (
     <Link
-      to={`/${brand.slug}/product/${product.id}`}
+      to={`/${brand.slug}/product/${product.slug}`}
       data-brand={brand.themeAttr}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
