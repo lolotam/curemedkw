@@ -124,7 +124,7 @@ const App = () => {
                 </Route>
                 <Route path="/categories/:slug" element={<CategoryPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
-                <Route path="/:brand/product/:id" element={<ProductDetail />} />
+                <Route path="/:brand/product/:slug" element={<ProductDetail />} />
                 <Route path="/:brand" element={<BrandPage />} />
                 {/* Legacy WordPress URL redirects (preserve SEO signals) */}
                 <Route path="/about-us" element={<Navigate to="/about" replace />} />
