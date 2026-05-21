@@ -616,6 +616,7 @@ export type Database = {
           short_description_ar: string
           size: string
           sku: string
+          slug: string
           source_url: string
           stock_status: Database["public"]["Enums"]["stock_status"]
           tags: string[]
@@ -647,6 +648,7 @@ export type Database = {
           short_description_ar?: string
           size?: string
           sku: string
+          slug: string
           source_url?: string
           stock_status?: Database["public"]["Enums"]["stock_status"]
           tags?: string[]
@@ -678,6 +680,7 @@ export type Database = {
           short_description_ar?: string
           size?: string
           sku?: string
+          slug?: string
           source_url?: string
           stock_status?: Database["public"]["Enums"]["stock_status"]
           tags?: string[]
@@ -921,6 +924,7 @@ export type Database = {
         Returns: boolean
       }
       next_order_number: { Args: never; Returns: string }
+      slugify: { Args: { _input: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
