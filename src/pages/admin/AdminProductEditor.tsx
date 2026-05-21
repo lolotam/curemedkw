@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye, Check, ChevronsUpDown, Sparkles } from "lucide-react";
+import { ArrowLeft, Upload, X, Star, Trash2, Plus, Languages, Download, Eye, Check, ChevronsUpDown, Sparkles, Package } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -469,33 +470,39 @@ export default function AdminProductEditor() {
   };
 
   return (
-    <form onSubmit={save} className="p-8 max-w-5xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/products")} className="gap-1">
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{isNew ? "Add product" : "Edit product"}</h1>
-        </div>
-        {!isNew && (
-          <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
-            <Trash2 className="h-4 w-4" /> Delete
-          </Button>
-        )}
-        {!isNew && id && (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={translating}
-            onClick={() => translate(id, { overwrite: true })}
-            className="gap-1.5"
-          >
-            <Languages className="h-4 w-4" />
-            {translating ? "Translating…" : "Translate to Arabic"}
-          </Button>
-        )}
-        <Button type="submit" disabled={!!priceError} className="bg-brand hover:bg-brand/90 text-white">Save</Button>
-      </div>
+    <form onSubmit={save} className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow={isNew ? "New product" : "Edit product"}
+        eyebrowIcon={Package}
+        title={isNew ? "Add product" : "Edit product"}
+        gradient="violet-fuchsia-pink"
+        actions={
+          <>
+            <Button type="button" variant="ghost" size="sm" onClick={() => navigate("/admin/products")} className="gap-1">
+              <ArrowLeft className="h-4 w-4" /> Back
+            </Button>
+            {!isNew && (
+              <Button type="button" variant="outline" onClick={remove} className="gap-1.5 text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4" /> Delete
+              </Button>
+            )}
+            {!isNew && id && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={translating}
+                onClick={() => translate(id, { overwrite: true })}
+                className="gap-1.5"
+              >
+                <Languages className="h-4 w-4" />
+                {translating ? "Translating…" : "Translate to Arabic"}
+              </Button>
+            )}
+            <Button type="submit" disabled={!!priceError} className="bg-brand hover:bg-brand/90 text-white">Save</Button>
+          </>
+        }
+      />
+
 
       {draftRestored && (
         <div className="mb-6 flex items-center justify-between gap-3 rounded-lg border border-brand/40 bg-brand/5 px-4 py-2.5">
