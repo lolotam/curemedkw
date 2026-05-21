@@ -1,43 +1,29 @@
-## Problem
+## Goal
+Make the admin product editor URL use the product **slug** instead of the UUID:
+`/admin/products/{slug}` (e.g. `/admin/products/hand-balm`) — matching the public product URL style.
 
-In the product image zoom dialog (`src/components/site/ImageZoom.tsx`), pressing the `+` button or scrolling the wheel updates the percentage indicator (e.g. 100% → 150% → 200%) but the image itself does not visibly grow.
+## Why no SQL migration is needed
+- `products.slug` was added in the previous migration (with backfill + auto-slug trigger).
+- `useProduct()` in `src/lib/db.ts` already resolves by slug first and falls back to UUID, so old `/admin/products/{uuid}` bookmarks keep working.
+- No schema changes required.
 
-Root cause: the `<img>` has both `max-h-full max-w-full object-contain` **and** the CSS `transform: scale(...)`. The flex parent uses the image's natural layout box (capped by `max-h/max-w-full`) and centers it. Combined with `transition-transform` and `pointer-events-none` on the same element, scaling the `<img>` directly is unreliable across browsers — the image's intrinsic box stays the same and the visual transform appears suppressed or clipped.
+## Frontend changes
 
-The robust fix is the standard lightbox pattern: scale a **wrapper div** instead of the `<img>`, and let the image inside use its natural size.
+### 1. `src/pages/admin/AdminProducts.tsx`
+Replace the two links that use `p.id` with `p.slug` (fallback to `p.id` for safety):
+- Row title link (around line 295)
+- Edit pencil button (around line 331)
 
-## Changes (only `src/components/site/ImageZoom.tsx`)
+### 2. `src/pages/admin/AdminProductEditor.tsx`
+After successful create (around line 433):
+- `navigate(\`/admin/products/${created.slug ?? created.id}\`)`
 
-1. Replace the inner `<img>` in the dialog with a transformed wrapper:
-   ```tsx
-   <div
-     className="will-change-transform"
-     style={{
-       transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-       transformOrigin: "center center",
-       transition: dragRef.current ? "none" : "transform 120ms ease-out",
-     }}
-   >
-     <img
-       src={src}
-       alt={alt}
-       className="block max-h-[90vh] max-w-[90vw] object-contain select-none"
-       {...noSave}
-     />
-   </div>
-   ```
-   - The wrapper is what scales, so the visible image clearly grows.
-   - `max-h-[90vh] max-w-[90vw]` sets the base size (100% state); scale multiplies from there.
-   - Drop `pointer-events-none` and `transition-transform` from the `<img>` — handlers already live on the parent area, and the wrapper owns the transition.
+After successful update, redirect to the slug URL if the current route param differs from the saved slug (handles slug edits / first-time slug assignment), so the browser URL stays canonical.
 
-2. Keep all existing logic intact: zoom in/out/reset buttons, wheel, keyboard (+ / - / 0), drag-to-pan, click-to-zoom, anti-save handlers, dialog open/close.
+### 3. `src/App.tsx`
+No route change needed — `/admin/products/:id` already matches any string; the `:id` param is just treated as a slug by `useProduct`.
 
-3. No changes to `ProductDetail.tsx`, no new files, no other components touched.
-
-## Verification
-
-- Open any product page → click main image → dialog opens at 100%.
-- Click `+` → image visibly grows to 150%, 200%, … up to 500%.
-- Mouse wheel up/down zooms; `0` resets; `-` zooms out and recenters at 100%.
-- When zoomed, cursor becomes grab/grabbing and drag pans the image.
-- Right-click / drag-save still blocked.
+## Result
+- Admin edit URLs become `/admin/products/hand-balm` style.
+- Old UUID URLs still resolve (legacy fallback in `useProduct`).
+- No SQL to run on self-hosted Supabase.
