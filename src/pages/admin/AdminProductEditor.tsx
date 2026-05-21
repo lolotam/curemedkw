@@ -430,14 +430,20 @@ export default function AdminProductEditor() {
         clearDraft(created.id);
         // Auto-translate new product in background
         translate(created.id, { silent: true });
-        navigate(`/admin/products/${created.id}`);
-      } else if (id) {
-        await updateMut.mutateAsync({ id, patch: form });
+        navigate(`/admin/products/${created.slug || created.id}`);
+      } else if (existing?.id) {
+        const updated = await updateMut.mutateAsync({ id: existing.id, patch: form });
         toast.success("Product updated");
-        clearDraft(id);
+        clearDraft(existing.id);
+        if (id) clearDraft(id);
         // Auto-translate after edit, only if Arabic name still missing
         if (!form.nameAr || !form.nameAr.trim()) {
-          translate(id, { silent: true });
+          translate(existing.id, { silent: true });
+        }
+        // Keep the URL canonical (slug form), in case slug changed or we arrived via UUID
+        const canonical = updated.slug || existing.slug || existing.id;
+        if (id !== canonical) {
+          navigate(`/admin/products/${canonical}`, { replace: true });
         }
       }
     } catch (err: any) {
@@ -446,12 +452,13 @@ export default function AdminProductEditor() {
   };
 
   const remove = async () => {
-    if (!id || isNew) return;
+    if (!existing?.id || isNew) return;
     if (confirm(`Delete "${form.name}"?`)) {
       try {
-        await deleteMut.mutateAsync(id);
+        await deleteMut.mutateAsync(existing.id);
         toast.success("Deleted");
-        clearDraft(id);
+        clearDraft(existing.id);
+        if (id) clearDraft(id);
         navigate("/admin/products");
       } catch (err: any) { toast.error(err.message); }
     }
