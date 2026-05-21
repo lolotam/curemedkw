@@ -50,7 +50,7 @@ export function AdminPageShell({
   eyebrowIcon: EyebrowIcon = Sparkles,
   actions,
   gradient = "sky-violet-pink",
-  maxWidthClass = "max-w-7xl",
+  maxWidthClass = "w-full max-w-none",
   children,
 }: AdminPageShellProps) {
   return (
