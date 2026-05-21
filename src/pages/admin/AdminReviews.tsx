@@ -38,7 +38,7 @@ export default function AdminReviews() {
   };
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl">
+    <div className="p-6 md:p-10 w-full max-w-none">
       <AdminPageHeader
         eyebrow="Reviews"
         eyebrowIcon={Star}

@@ -153,7 +153,7 @@ export default function AdminLogs() {
   };
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl space-y-5">
+    <div className="p-6 md:p-10 w-full max-w-none space-y-5">
       <AdminPageHeader
         eyebrow="Logs"
         eyebrowIcon={ScrollText}

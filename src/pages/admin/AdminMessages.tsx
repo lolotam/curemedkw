@@ -34,7 +34,7 @@ export default function AdminMessages() {
   const toggleSelect = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl">
+    <div className="p-6 md:p-10 w-full max-w-none">
       <AdminPageHeader
         eyebrow="Messages"
         eyebrowIcon={Mail}
