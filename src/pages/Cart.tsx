@@ -95,21 +95,21 @@ export default function Cart() {
   return (
     <SiteLayout>
       {/* ===================== HERO ===================== */}
-      <section className="relative overflow-hidden py-16 md:py-20">
+      <section className="relative overflow-hidden py-8 md:py-16">
         <ColorfulHeroBg />
         <div className="container">
           <div className="animate-fade-in flex items-center gap-3">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand backdrop-blur-md shadow-sm">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 sm:px-4 py-1.5 text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.2em] text-brand backdrop-blur-md shadow-sm">
               <ShoppingBag className="h-3.5 w-3.5" />
               {t("cart.title")}
             </span>
           </div>
-          <h1 className="mt-5 text-4xl md:text-6xl font-bold tracking-tight animate-fade-in [animation-delay:120ms]">
+          <h1 className="mt-4 text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight animate-fade-in [animation-delay:120ms]">
             <span className="bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 bg-clip-text text-transparent">
               {t("cart.title")}
             </span>
           </h1>
-          <p className="mt-3 text-base md:text-lg text-muted-foreground animate-fade-in [animation-delay:200ms]">
+          <p className="mt-2 text-sm sm:text-base md:text-lg text-muted-foreground animate-fade-in [animation-delay:200ms]">
             {items.length} {items.length === 1 ? t("cart.itemSingular") : t("cart.itemPlural")}
           </p>
         </div>
