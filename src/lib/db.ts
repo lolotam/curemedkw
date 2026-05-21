@@ -20,9 +20,11 @@ export type StockStatus = "in_stock" | "low_stock" | "out_of_stock";
 
 export interface Product {
   id: string;
+  slug: string;
   brand: BrandKey;
   name: string;
   category: string;
+
   categoryId: string | null;
   categoryIds: string[];
   price: number;
