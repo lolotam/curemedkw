@@ -73,7 +73,7 @@ export interface Subscriber {
 }
 
 type ProductRow = {
-  id: string; brand: BrandKey; name: string; category: string; price: number;
+  id: string; slug: string; brand: BrandKey; name: string; category: string; price: number;
   short_description: string; long_description: string; main_image: string;
   gallery: string[]; ingredients: string[]; benefits: string[]; usage: string;
   size: string; sku: string; stock_status: StockStatus; featured: boolean;
