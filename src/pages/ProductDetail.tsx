@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { ProductReviews } from "@/components/site/ProductReviews";
 import { AddToCartButton } from "@/components/site/AddToCartButton";
 import { useAdminSession } from "@/lib/admin";
+import { ImageZoom } from "@/components/site/ImageZoom";
+
 
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
@@ -100,8 +102,9 @@ export default function ProductDetail() {
       <section className="container py-10 md:py-16 grid lg:grid-cols-2 gap-10 lg:gap-16">
         <div>
           <div className="aspect-square rounded-3xl overflow-hidden bg-brand-soft border border-border">
-            <img src={images[activeImg]} alt={name} width={800} height={800} className="h-full w-full object-cover" loading="lazy" />
+            <ImageZoom src={images[activeImg]} alt={name} />
           </div>
+
           {images.length > 1 && (
             <div className="mt-4 grid grid-cols-4 gap-3">
               {images.map((src, i) => (
