@@ -16,6 +16,8 @@ export interface BrandMeta {
   slug: string;
   name: string;
   shortName?: string;
+  nameAr: string;
+  shortNameAr?: string;
   tagline: { en: string; ar: string };
   about: { en: string; ar: string };
   themeAttr: string;
@@ -26,11 +28,13 @@ export interface BrandMeta {
   seo: { en: string; ar: string };
 }
 
+
 export const BRANDS: Record<BrandKey, BrandMeta> = {
   flexitol: {
     key: "flexitol",
     slug: "flexitol",
     name: "Flexitol",
+    nameAr: "فليكسيتول",
     tagline: {
       en: "Intense moisturization for very dry skin",
       ar: "ترطيب مكثف للبشرة شديدة الجفاف",
@@ -52,6 +56,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "kapiva",
     slug: "kapiva",
     name: "Kapiva",
+    nameAr: "كابيفا",
     tagline: {
       en: "Modern Ayurveda for everyday wellness",
       ar: "أيورفيدا حديثة لعافية يومية",
@@ -73,6 +78,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "nada",
     slug: "nada",
     name: "NADA",
+    nameAr: "ندا",
     tagline: {
       en: "Breath & belly freshness in one capsule",
       ar: "انتعاش الفم والمعدة في كبسولة واحدة",
@@ -94,6 +100,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "abc",
     slug: "australian-bodycare",
     name: "ABC",
+    nameAr: "ABC",
     shortName: "ABC",
     tagline: {
       en: "Tea Tree Oil care for healthy skin every day",
@@ -116,6 +123,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "lafes",
     slug: "lafes",
     name: "Lafe's",
+    nameAr: "لافز",
     tagline: {
       en: "Clean, natural personal care",
       ar: "عناية شخصية طبيعية ونقية",
@@ -138,6 +146,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "hartington",
     slug: "hartington",
     name: "Hartington",
+    nameAr: "هارتنجتون",
     shortName: "Hartington",
     tagline: {
       en: "Trusted pharmaceutical care",
@@ -161,6 +170,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "phytophar",
     slug: "phytophar",
     name: "Phytophar",
+    nameAr: "فيتوفار",
     tagline: {
       en: "Plant-based wellness solutions",
       ar: "حلول عافية نباتية",
@@ -183,6 +193,7 @@ export const BRANDS: Record<BrandKey, BrandMeta> = {
     key: "hualunhongli",
     slug: "hualunhongli",
     name: "Hualunhongli",
+    nameAr: "هيلون-هونجلاي",
     shortName: "Hualunhongli",
     tagline: {
       en: "Self-heating relief & trusted wound care",
