@@ -156,8 +156,9 @@ export function SiteHeader() {
   );
 }
 
-function PartnersMenu({ active, label }: { active: boolean; label: string }) {
+function PartnersMenu({ active, label, lang }: { active: boolean; label: string; lang: "en" | "ar" }) {
   const [hoveredBrand, setHoveredBrand] = useState(BRAND_LIST[0]);
+  const isAr = lang === "ar";
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -175,7 +176,7 @@ function PartnersMenu({ active, label }: { active: boolean; label: string }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-[28rem] p-0 overflow-hidden">
-        <div className="flex">
+        <div className={cn("flex", isAr && "flex-row-reverse")} dir={isAr ? "rtl" : "ltr"}>
           <div className="w-1/2 p-1">
             {BRAND_LIST.map((b) => (
               <DropdownMenuItem
@@ -185,12 +186,12 @@ function PartnersMenu({ active, label }: { active: boolean; label: string }) {
                 onFocus={() => setHoveredBrand(b)}
               >
                 <Link to={`/${b.slug}`} className="cursor-pointer font-medium">
-                  {b.shortName ?? b.name}
+                  {isAr ? (b.shortNameAr ?? b.nameAr) : (b.shortName ?? b.name)}
                 </Link>
               </DropdownMenuItem>
             ))}
           </div>
-          <div className="w-1/2 border-l border-border bg-muted/30 flex items-center justify-center p-4">
+          <div className={cn("w-1/2 bg-muted/30 flex items-center justify-center p-4", isAr ? "border-r border-border" : "border-l border-border")}>
             <BrandLogoPreview brand={hoveredBrand} />
           </div>
 
@@ -199,6 +200,7 @@ function PartnersMenu({ active, label }: { active: boolean; label: string }) {
     </DropdownMenu>
   );
 }
+
 
 function BrandLogoPreview({ brand }: { brand: typeof BRAND_LIST[number] }) {
   const { data: brandLogo } = useBrandingBrandLogo(brand.key);
