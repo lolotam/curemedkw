@@ -1,35 +1,37 @@
-# Make Admin Pages Full-Width & Responsive
+## Goal
+Translate brand display names to Arabic in the header, and ensure the Partners dropdown in Arabic shows names on the right (RTL) with the logo preview on the left.
 
-## Problem
-After the recent style refactor, every `/admin/*` page wraps its content in `<div className="p-6 md:p-10 max-w-7xl">`. On a 1950px viewport this caps the content at ~1280px, leaving the Products table cramped and clipping the right-most columns (Original price, Stock, Featured, Actions) without a usable horizontal scrollbar.
+## Changes
 
-Root causes:
-1. `max-w-7xl` on the page wrapper artificially limits width even when the viewport is much wider.
-2. `AdminPageShell` defaults to the same `max-w-7xl`, so any page using it inherits the same cap.
-3. `AdminLayout`'s `<main>` is fine, but the inner cap means the table never gets to fill the available space, and there's no outer horizontal scroll because the page content fits within the 1280px box.
+### 1. `src/lib/brands.ts`
+Add an Arabic name field to `BrandMeta`:
+```ts
+nameAr: string;
+shortNameAr?: string;
+```
+Set values:
+- flexitol → فليكسيتول
+- kapiva → كابيفا
+- nada (NADA) → ندا
+- abc (ABC / Australian Bodycare) → keep ABC (user didn't list it; leave as-is)
+- lafes → لافز
+- hartington → هارتنجتون
+- phytophar → فيتوفار
+- hualunhongli → هيلون-هونجلاي
 
-## Fix
+### 2. `src/components/site/SiteHeader.tsx`
+- Import `useI18n` (already used elsewhere — verify) and pick the localized name helper:
+  ```ts
+  const displayName = (b) => lang === "ar" ? (b.shortNameAr ?? b.nameAr) : (b.shortName ?? b.name);
+  ```
+- Use it in:
+  - Mobile menu list (line 144)
+  - `PartnersMenu` dropdown items (line 187)
+- In `PartnersMenu`'s `DropdownMenuContent` inner `<div className="flex">`, add `lang === "ar" && "flex-row-reverse"` so the brand-name column sits on the right and the logo preview on the left in Arabic. Keep widths/borders as-is (the border becomes the right edge of the logo panel automatically; adjust `border-l` → use `border-l` still works since it's on the logo column which is now on the left — switch to `border-r` conditionally to keep the divider between the two halves).
 
-### 1. `src/components/admin/AdminPageShell.tsx`
-- Change default `maxWidthClass` from `"max-w-7xl"` to `"max-w-none w-full"` so admin pages span the full available area inside `<main>`. Keep the prop overridable for any page that wants a narrower reading column later.
+### 3. Out of scope
+No changes to routes, slugs, SEO meta, or other pages — only the header's display names and dropdown direction.
 
-### 2. Update each admin page wrapper
-Replace `<div className="p-6 md:p-10 max-w-7xl">` with `<div className="p-6 md:p-10 w-full max-w-none">` in:
-- `src/pages/admin/AdminProducts.tsx` (the page from the screenshot)
-- `AdminOrders.tsx`, `AdminUsers.tsx`, `AdminCoupons.tsx`, `AdminCategories.tsx`, `AdminTags.tsx`, `AdminReviews.tsx`, `AdminModels.tsx`, `AdminNotificationTemplates.tsx`, `AdminLandingPages.tsx`, `AdminLandingPageEditor.tsx`, `AdminBranding.tsx`, `AdminFlags.tsx`, `AdminMessages.tsx`, `AdminSubscribers.tsx`, `AdminLogs.tsx`, `AdminProductEditor.tsx`, `AdminOverview.tsx`
-
-This lets the Products table breathe and reveals all columns at ≥1500px viewports.
-
-### 3. Guarantee horizontal scroll on the Products table (and any wide table) for smaller widths
-In `AdminProducts.tsx` the table is already wrapped with `<div className="overflow-x-auto">`, but the inner `<table className="w-full text-sm">` collapses to the parent width and squashes cells instead of scrolling. Two small tweaks:
-- Add `min-w-[1100px]` to the `<table>` so it keeps a comfortable column layout and the wrapper actually scrolls horizontally when the viewport is narrower than that.
-- Add `whitespace-nowrap` to numeric / status columns (price, original price, stock, featured, actions header) so they don't wrap into multiple lines on mid-size screens.
-
-### 4. AdminLayout `<main>` overflow
-Keep `flex-1 min-w-0` but change `overflow-hidden` → `overflow-x-hidden` so vertical scrolling is unaffected and any inner `overflow-x-auto` container can still scroll its own content. The animated backdrop already uses `absolute inset-0` so it stays contained.
-
-## Out of scope
-- No changes to data, queries, filters, or table logic.
-- No restyle of the glass cards, gradients, or header chrome.
-- No changes to public site, auth, or non-admin pages.
-- Dialogs are not touched in this pass.
+## Technical notes
+- The app already toggles `document.documentElement.dir="rtl"` for Arabic, but Radix `DropdownMenuContent` is portaled and may not inherit, so explicit `flex-row-reverse` is the reliable fix.
+- No DB / backend / i18n JSON changes needed; brand names live in `brands.ts`.
