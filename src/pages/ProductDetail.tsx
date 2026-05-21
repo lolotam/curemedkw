@@ -16,17 +16,22 @@ import { ImageZoom } from "@/components/site/ImageZoom";
 
 
 export default function ProductDetail() {
-  const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
+  const { brand: brandSlug, slug } = useParams<{ brand: string; slug: string }>();
   const { t, lang } = useI18n();
   const [activeImg, setActiveImg] = useState(0);
   const brandKey = brandSlug ? slugToBrand(brandSlug) : null;
   if (!brandKey) return <Navigate to="/curemed" replace />;
-  const { data: product, isLoading } = useProduct(id);
+  const { data: product, isLoading } = useProduct(slug);
   const { data: brandList = [] } = useProductsByBrand(brandKey);
   const { data: visibility } = usePriceVisibility();
   const { isAdmin } = useAdminSession();
   if (isLoading) return null;
   if (!product || product.brand !== brandKey) return <Navigate to={`/${brandSlug}`} replace />;
+  // Canonicalize legacy UUID URLs → slug URL
+  if (product.slug && slug !== product.slug) {
+    return <Navigate to={`/${brandSlug}/product/${product.slug}`} replace />;
+  }
+
   const meta = BRANDS[brandKey];
   const priceHidden = !!visibility && (visibility.global || visibility.brands[product.brand]);
   const related = brandList.filter((p) => p.id !== product.id).slice(0, 4);
@@ -58,7 +63,7 @@ export default function ProductDetail() {
       <Seo
         title={`${name} — ${meta.name} | Curemed Kuwait`}
         description={(shortDesc || longDesc || `${name} by ${meta.name}, available at Curemed Kuwait.`).toString().replace(/\s+/g, " ").slice(0, 160)}
-        path={`/${meta.slug}/product/${product.id}`}
+        path={`/${meta.slug}/product/${product.slug}`}
         image={product.mainImage}
         ogType="product"
         jsonLd={{
@@ -79,7 +84,7 @@ export default function ProductDetail() {
                     product.stockStatus === "out_of_stock"
                       ? "https://schema.org/OutOfStock"
                       : "https://schema.org/InStock",
-                  url: `https://curemedkw.lovable.app/${meta.slug}/product/${product.id}`,
+                  url: `https://curemedkw.lovable.app/${meta.slug}/product/${product.slug}`,
                 },
               }),
         }}

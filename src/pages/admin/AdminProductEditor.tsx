@@ -29,7 +29,7 @@ import LongDescriptionRewriteDialog from "@/components/admin/LongDescriptionRewr
 import { logOperation } from "@/lib/logs";
 import { convertAndUploadImage } from "@/lib/imageConvert";
 
-const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "createdAt" | "updatedAt"> => ({
+const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "slug" | "createdAt" | "updatedAt"> => ({
   brand,
   name: "",
   category: BRANDS[brand].categories[0],
