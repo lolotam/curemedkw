@@ -1,9 +1,10 @@
 import { useParams, Navigate } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { CheckCircle2, ShieldCheck, Leaf, Award } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Leaf, Award, SlidersHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { ProductCard } from "@/components/site/ProductCard";
 import { AutoCarousel } from "@/components/site/AutoCarousel";
