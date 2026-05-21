@@ -92,7 +92,9 @@ type ProductRow = {
 
 const rowToProduct = (r: ProductRow): Product => ({
   id: r.id,
+  slug: (r as any).slug ?? "",
   brand: r.brand,
+
   name: r.name,
   category: r.category,
   categoryId: r.category_id ?? null,
