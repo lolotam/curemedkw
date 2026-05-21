@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Check, Loader2, Star, Trash2, X } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -37,13 +38,15 @@ export default function AdminReviews() {
   };
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold">Product reviews</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Approve customer reviews to show them on the product page and the homepage testimonials.
-        </p>
-      </header>
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Reviews"
+        eyebrowIcon={Star}
+        title="Product reviews"
+        subtitle="Approve customer reviews to show them on the product page and the homepage testimonials."
+        gradient="amber-orange-rose"
+      />
+
 
       <div className="flex gap-2 mb-5">
         {(["pending", "approved", "all"] as const).map((k) => (

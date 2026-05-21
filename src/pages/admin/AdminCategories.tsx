@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Trash2, Pencil, Upload, X, ImagePlus, CornerDownRight, FolderPlus } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Upload, X, ImagePlus, CornerDownRight, FolderPlus, Tags } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -173,16 +174,20 @@ export default function AdminCategories() {
   const editingParentSeed = isNew ? (editing as { parentId: string | null }).parentId : null;
 
   return (
-    <div className="p-8">
-      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold">Categories</h1>
-          <p className="text-muted-foreground mt-1">Bilingual product categories with optional subcategories. Drag-free re-parenting via the editor.</p>
-        </div>
-        <Button onClick={() => setEditing({ mode: "new", parentId: null })} className="bg-brand hover:bg-brand/90 text-white gap-2">
-          <Plus className="h-4 w-4" /> Add category
-        </Button>
-      </div>
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Categories"
+        eyebrowIcon={Tags}
+        title="Categories"
+        subtitle="Bilingual product categories with optional subcategories. Drag-free re-parenting via the editor."
+        gradient="cyan-sky-blue"
+        actions={
+          <Button onClick={() => setEditing({ mode: "new", parentId: null })} className="bg-brand hover:bg-brand/90 text-white gap-2">
+            <Plus className="h-4 w-4" /> Add category
+          </Button>
+        }
+      />
+
 
       <Card className="p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-center">

@@ -12,6 +12,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Loader2, Plus, Pencil, Trash2, Bell } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { toast } from "sonner";
 import {
   useNotificationTemplates, useUpsertNotificationTemplate,
@@ -47,21 +48,20 @@ export default function AdminNotificationTemplates() {
   };
 
   return (
-    <div className="p-8 space-y-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Bell className="h-6 w-6" /> Notification templates
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Reusable subject &amp; body for order updates and admin messages.
-            Use placeholders like <code className="font-mono text-xs">{"{{order_number}}"}</code>, <code className="font-mono text-xs">{"{{customer_name}}"}</code>, <code className="font-mono text-xs">{"{{status}}"}</code>.
-          </p>
-        </div>
-        <Button onClick={() => open()} className="bg-brand hover:bg-brand/90 text-white">
-          <Plus className="h-4 w-4 mr-1" /> New template
-        </Button>
-      </header>
+    <div className="p-6 md:p-10 max-w-7xl space-y-6">
+      <AdminPageHeader
+        eyebrow="Notifications"
+        eyebrowIcon={Bell}
+        title="Notification templates"
+        subtitle={<>Reusable subject &amp; body for order updates and admin messages. Use placeholders like <code className="font-mono text-xs">{"{{order_number}}"}</code>, <code className="font-mono text-xs">{"{{customer_name}}"}</code>, <code className="font-mono text-xs">{"{{status}}"}</code>.</>}
+        gradient="rose-pink-fuchsia"
+        actions={
+          <Button onClick={() => open()} className="bg-brand hover:bg-brand/90 text-white">
+            <Plus className="h-4 w-4 mr-1" /> New template
+          </Button>
+        }
+      />
+
 
       <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <Table>

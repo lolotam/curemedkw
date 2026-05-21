@@ -3,7 +3,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle, Info, CheckCircle2, XCircle, Upload } from "lucide-react";
+import { Image as ImageIcon, Save, RotateCcw, Loader2, AlertTriangle, Info, CheckCircle2, XCircle, Upload, Palette } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
@@ -34,18 +35,15 @@ import { BRAND_LIST } from "@/lib/brands";
 
 export default function AdminBranding() {
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto space-y-6">
-      <header className="flex items-center gap-3">
-        <div className="h-12 w-12 rounded-xl bg-brand/10 text-brand flex items-center justify-center shrink-0">
-          <ImageIcon className="h-6 w-6" />
-        </div>
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold leading-tight">Branding</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Paste a URL for your site logo and favicon. Changes apply immediately across the site.
-          </p>
-        </div>
-      </header>
+    <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-6">
+      <AdminPageHeader
+        eyebrow="Branding"
+        eyebrowIcon={Palette}
+        title="Branding"
+        subtitle="Paste a URL for your site logo and favicon. Changes apply immediately across the site."
+        gradient="sky-violet-pink"
+      />
+
 
       <BrandingField
         title="Site logo"

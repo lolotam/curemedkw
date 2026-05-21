@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink, ChevronDown, Check, ArrowUp, ArrowDown, ArrowUpDown, X } from "lucide-react";
+import { Plus, Package, Search, Star, Trash2, Pencil, Loader2, ExternalLink, ChevronDown, Check, ArrowUp, ArrowDown, ArrowUpDown, X } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -159,19 +160,25 @@ export default function AdminProducts() {
   const selectedCatNames = categories.filter((c) => catFilter.has(c.id)).map((c) => c.nameEn);
 
   return (
-    <div className="p-8">
-      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold">Products</h1>
-            <span className="inline-flex items-center justify-center min-w-[2rem] h-7 px-2 rounded-full bg-brand/10 text-brand text-sm font-semibold tabular-nums">
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Catalog"
+        eyebrowIcon={Package}
+        title={
+          <span className="inline-flex items-center gap-3">
+            Products
+            <span className="inline-flex items-center justify-center min-w-[2rem] h-8 px-2.5 rounded-full bg-brand/10 text-brand text-base font-semibold tabular-nums align-middle">
               {allProducts.length}
             </span>
-          </div>
-          <p className="text-muted-foreground mt-1">Manage products across all four brands</p>
-        </div>
-        <Button asChild className="bg-brand hover:bg-brand/90 text-white gap-2"><Link to="/admin/products/new"><Plus className="h-4 w-4" /> Add product</Link></Button>
-      </div>
+          </span>
+        }
+        subtitle="Manage products across all four brands"
+        gradient="sky-violet-pink"
+        actions={
+          <Button asChild className="bg-brand hover:bg-brand/90 text-white gap-2"><Link to="/admin/products/new"><Plus className="h-4 w-4" /> Add product</Link></Button>
+        }
+      />
+
       <Card className="p-4 mb-4 space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
           <div className="relative flex-1 min-w-[200px]"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Download, Trash2, Search, Users } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { useSubscribers, useDeleteSubscriber } from "@/lib/db";
 import { toast } from "sonner";
 
@@ -24,11 +25,18 @@ export default function AdminSubscribers() {
     URL.revokeObjectURL(url); toast.success("Exported");
   };
   return (
-    <div className="p-8">
-      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
-        <div><h1 className="text-3xl font-bold">Subscribers</h1><p className="text-muted-foreground mt-1">{all.length} email subscribers</p></div>
-        <Button onClick={exportCsv} className="gap-2 bg-brand hover:bg-brand/90 text-white" disabled={!all.length}><Download className="h-4 w-4" /> Export CSV</Button>
-      </div>
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Subscribers"
+        eyebrowIcon={Users}
+        title="Subscribers"
+        subtitle={`${all.length} email subscribers`}
+        gradient="amber-orange-rose"
+        actions={
+          <Button onClick={exportCsv} className="gap-2 bg-brand hover:bg-brand/90 text-white" disabled={!all.length}><Download className="h-4 w-4" /> Export CSV</Button>
+        }
+      />
+
       <Card className="p-4 mb-4"><div className="relative max-w-sm"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search emails…" className="pl-9" /></div></Card>
       <Card className="overflow-hidden">

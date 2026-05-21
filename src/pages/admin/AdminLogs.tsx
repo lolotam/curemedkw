@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { RefreshCw, ChevronDown, Trash2 } from "lucide-react";
+import { RefreshCw, ChevronDown, Trash2, ScrollText } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { format } from "date-fns";
 import { useAppLogs, useBulkDeleteAppLogs, type AppLog } from "@/lib/db";
 import { Button } from "@/components/ui/button";
@@ -152,30 +153,34 @@ export default function AdminLogs() {
   };
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Operation Logs</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Track all app operations, AI calls, orders, auth events, and errors</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {selected.size > 0 && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={bulkRemove}
-              disabled={bulkDel.isPending}
-              className="gap-1.5"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete {selected.size}
+    <div className="p-6 md:p-10 max-w-7xl space-y-5">
+      <AdminPageHeader
+        eyebrow="Logs"
+        eyebrowIcon={ScrollText}
+        title="Operation Logs"
+        subtitle="Track all app operations, AI calls, orders, auth events, and errors"
+        gradient="indigo-violet-purple"
+        actions={
+          <>
+            {selected.size > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={bulkRemove}
+                disabled={bulkDel.isPending}
+                className="gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" /> Delete {selected.size}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
+              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="gap-1.5">
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
+
 
       {/* Filters */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">

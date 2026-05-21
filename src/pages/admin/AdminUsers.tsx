@@ -10,7 +10,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Search, Send, Shield, ShieldOff, Ban, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, Send, Shield, ShieldOff, Ban, CheckCircle2, UserCog } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { toast } from "sonner";
 import {
   useAdminUsers, useToggleAdminRole, useToggleUserBlock,
@@ -32,11 +33,15 @@ export default function AdminUsers() {
   });
 
   return (
-    <div className="p-8 space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold">Users</h1>
-        <p className="text-sm text-muted-foreground">{users.length} registered • Manage roles, block, and send notifications.</p>
-      </header>
+    <div className="p-6 md:p-10 max-w-7xl space-y-6">
+      <AdminPageHeader
+        eyebrow="Users"
+        eyebrowIcon={UserCog}
+        title="Users"
+        subtitle={`${users.length} registered · Manage roles, block, and send notifications.`}
+        gradient="indigo-violet-purple"
+      />
+
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
