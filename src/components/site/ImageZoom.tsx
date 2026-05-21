@@ -26,11 +26,8 @@ const noSave = {
   } as React.CSSProperties,
 };
 
-/**
  * Product image with click-to-open zoom lightbox.
- * Includes basic anti-save protections (right-click, drag, selection disabled,
- * watermark overlay). Not bulletproof — anyone can screenshot, but it raises
- * the bar enough to deter casual reuse.
+ * Includes basic anti-save protections (right-click, drag, selection disabled).
  */
 export function ImageZoom({ src, alt, className }: ImageZoomProps) {
   const [open, setOpen] = useState(false);
@@ -176,23 +173,6 @@ export function ImageZoom({ src, alt, className }: ImageZoomProps) {
               }}
               {...noSave}
             />
-
-            {/* Watermark overlay */}
-            <div
-              aria-hidden
-              className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden"
-            >
-              <div
-                className="text-foreground/10 font-bold whitespace-nowrap select-none"
-                style={{
-                  fontSize: "clamp(2rem, 6vw, 5rem)",
-                  transform: "rotate(-30deg)",
-                  letterSpacing: "0.2em",
-                }}
-              >
-                CUREMED · CUREMED · CUREMED
-              </div>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
