@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, Navigate, Link } from "react-router-dom";
-import { ArrowLeft, Search, X } from "lucide-react";
+import { ArrowLeft, Search, X, SlidersHorizontal } from "lucide-react";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Seo } from "@/components/site/Seo";
 import { ProductCard } from "@/components/site/ProductCard";
@@ -11,6 +11,7 @@ import { BRAND_LIST } from "@/lib/brands";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
   Select,
   SelectContent,
