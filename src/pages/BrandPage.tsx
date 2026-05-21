@@ -91,73 +91,59 @@ export default function BrandPage() {
 
       <CategoryCarousel />
 
-      <section id="products" className="container py-16 md:py-24">
-        <div className="mb-10">
-          <h2 className="text-3xl md:text-4xl font-bold">{meta.name}</h2>
-          <p className="mt-2 text-muted-foreground">{t("brands.subtitle")}</p>
+      <section id="products" className="container py-10 md:py-20">
+        <div className="mb-6 md:mb-10 flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold">{meta.name}</h2>
+            <p className="mt-2 text-sm md:text-base text-muted-foreground">{t("brands.subtitle")}</p>
+          </div>
+          {brandCategories.length > 0 && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm" className="lg:hidden gap-2">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  {t("filter.title")}
+                  {(selectedCats.size + (discountMin > 0 ? 1 : 0)) > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[10px] font-bold">
+                      {selectedCats.size + (discountMin > 0 ? 1 : 0)}
+                    </span>
+                  )}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[85vw] sm:w-[400px] overflow-y-auto">
+                <SheetHeader className="text-left">
+                  <SheetTitle>{t("filter.title")}</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4">
+                  <BrandFilterPanel
+                    brandCategories={brandCategories}
+                    selectedCats={selectedCats}
+                    toggleCat={toggleCat}
+                    discountMin={discountMin}
+                    setDiscountMin={setDiscountMin}
+                    onClear={() => { setSelectedCats(new Set()); setDiscountMin(0); }}
+                    t={t}
+                    lang={lang}
+                  />
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
         </div>
         {brandProducts.length > 0 && (
           <div className="grid lg:grid-cols-[240px_1fr] gap-8">
             {brandCategories.length > 0 ? (
-              <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
-                <div>
-                  <h3 className="text-lg font-bold text-brand">{t("filter.title")}</h3>
-                  <div className="border-t border-border mt-2 pt-3">
-                    <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.areas")}</h4>
-                    <div className="space-y-2.5">
-                      {brandCategories.map((c) => {
-                        return (
-                          <label
-                            key={c.id}
-                            className="flex items-center justify-between gap-2.5 text-sm transition-colors cursor-pointer hover:text-brand"
-                          >
-                            <span className="flex items-center gap-2.5 min-w-0">
-                              <Checkbox
-                                checked={selectedCats.has(c.id)}
-                                onCheckedChange={() => toggleCat(c.id)}
-                              />
-                              <span className="truncate">
-                                {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
-                              </span>
-                            </span>
-                            <span className="shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-brand/10 text-[11px] font-medium tabular-nums text-brand">
-                              {c.count}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                  <div className="border-t border-border mt-4 pt-3">
-                    <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.discount")}</h4>
-                    <div className="space-y-2">
-                      {[
-                        { v: 0, key: "filter.discount.any" },
-                        { v: 0.01, key: "filter.discount.onSale" },
-                        { v: 10, key: "filter.discount.10" },
-                        { v: 20, key: "filter.discount.20" },
-                        { v: 30, key: "filter.discount.30" },
-                        { v: 50, key: "filter.discount.50" },
-                      ].map((opt) => (
-                        <label key={opt.v} className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-brand">
-                          <input
-                            type="radio"
-                            name="discount-filter"
-                            className="accent-brand"
-                            checked={discountMin === opt.v}
-                            onChange={() => setDiscountMin(opt.v)}
-                          />
-                          <span>{t(opt.key)}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                {(selectedCats.size > 0 || discountMin > 0) && (
-                  <Button variant="ghost" size="sm" onClick={() => { setSelectedCats(new Set()); setDiscountMin(0); }}>
-                    {t("filter.clear")}
-                  </Button>
-                )}
+              <aside className="hidden lg:block space-y-4 lg:sticky lg:top-24 lg:self-start">
+                <BrandFilterPanel
+                  brandCategories={brandCategories}
+                  selectedCats={selectedCats}
+                  toggleCat={toggleCat}
+                  discountMin={discountMin}
+                  setDiscountMin={setDiscountMin}
+                  onClear={() => { setSelectedCats(new Set()); setDiscountMin(0); }}
+                  t={t}
+                  lang={lang}
+                />
               </aside>
             ) : <div className="hidden lg:block" />}
             <div className="min-w-0">
@@ -168,7 +154,7 @@ export default function BrandPage() {
               ) : filteredProducts.length === 0 ? (
                 <p className="text-center text-muted-foreground py-12">{t("category.noProducts")}</p>
               ) : (
-                <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-3 sm:gap-5 grid-cols-2 sm:grid-cols-2 xl:grid-cols-3">
                   {filteredProducts.map((p) => <ProductCard key={p.id} product={p} />)}
                 </div>
               )}
@@ -177,28 +163,117 @@ export default function BrandPage() {
         )}
       </section>
 
-      <section className="bg-brand-soft py-16 md:py-24">
+      <section className="bg-brand-soft py-10 md:py-20">
         <div className="container">
-          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-center mb-8 md:mb-12">
             {t("brand.why.title").replace("{brand}", meta.name)}
           </h2>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:gap-6 grid-cols-2 lg:grid-cols-4">
             {[
               { icon: ShieldCheck, key: "brand.why.clinical" },
               { icon: CheckCircle2, key: "brand.why.trusted" },
               { icon: Leaf, key: "brand.why.skinFriendly" },
               { icon: Award, key: "brand.why.awardWinning" },
             ].map((b, i) => (
-              <Card key={i} className="p-6 bg-background border-brand/10">
-                <div className="h-12 w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand">
-                  <b.icon className="h-6 w-6" />
+              <Card key={i} className="p-4 sm:p-6 bg-background border-brand/10">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-brand/10 flex items-center justify-center text-brand">
+                  <b.icon className="h-5 w-5 sm:h-6 sm:w-6" />
                 </div>
-                <h3 className="mt-4 font-semibold">{t(b.key)}</h3>
+                <h3 className="mt-3 sm:mt-4 font-semibold text-sm sm:text-base">{t(b.key)}</h3>
               </Card>
             ))}
           </div>
         </div>
       </section>
+
+      <Testimonials />
+      <FAQ />
+      <ContactSection brand={brandKey} />
+      <Newsletter />
+    </SiteLayout>
+  );
+}
+
+function BrandFilterPanel({
+  brandCategories,
+  selectedCats,
+  toggleCat,
+  discountMin,
+  setDiscountMin,
+  onClear,
+  t,
+  lang,
+}: {
+  brandCategories: Array<{ id: string; nameEn: string; nameAr?: string | null; count: number }>;
+  selectedCats: Set<string>;
+  toggleCat: (id: string) => void;
+  discountMin: number;
+  setDiscountMin: (v: number) => void;
+  onClear: () => void;
+  t: (k: string) => string;
+  lang: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-bold text-brand">{t("filter.title")}</h3>
+        <div className="border-t border-border mt-2 pt-3">
+          <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.areas")}</h4>
+          <div className="space-y-2.5">
+            {brandCategories.map((c) => (
+              <label
+                key={c.id}
+                className="flex items-center justify-between gap-2.5 text-sm transition-colors cursor-pointer hover:text-brand"
+              >
+                <span className="flex items-center gap-2.5 min-w-0">
+                  <Checkbox
+                    checked={selectedCats.has(c.id)}
+                    onCheckedChange={() => toggleCat(c.id)}
+                  />
+                  <span className="truncate">
+                    {lang === "ar" && c.nameAr ? c.nameAr : c.nameEn}
+                  </span>
+                </span>
+                <span className="shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full bg-brand/10 text-[11px] font-medium tabular-nums text-brand">
+                  {c.count}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="border-t border-border mt-4 pt-3">
+          <h4 className="text-sm font-semibold text-brand mb-3">{t("filter.discount")}</h4>
+          <div className="space-y-2">
+            {[
+              { v: 0, key: "filter.discount.any" },
+              { v: 0.01, key: "filter.discount.onSale" },
+              { v: 10, key: "filter.discount.10" },
+              { v: 20, key: "filter.discount.20" },
+              { v: 30, key: "filter.discount.30" },
+              { v: 50, key: "filter.discount.50" },
+            ].map((opt) => (
+              <label key={opt.v} className="flex items-center gap-2.5 text-sm cursor-pointer hover:text-brand">
+                <input
+                  type="radio"
+                  name="discount-filter"
+                  className="accent-brand"
+                  checked={discountMin === opt.v}
+                  onChange={() => setDiscountMin(opt.v)}
+                />
+                <span>{t(opt.key)}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+      {(selectedCats.size > 0 || discountMin > 0) && (
+        <Button variant="ghost" size="sm" onClick={onClear}>
+          {t("filter.clear")}
+        </Button>
+      )}
+    </div>
+  );
+}
 
       <Testimonials />
       <FAQ />
