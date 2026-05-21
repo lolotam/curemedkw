@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 import { ProductReviews } from "@/components/site/ProductReviews";
 import { AddToCartButton } from "@/components/site/AddToCartButton";
 import { useAdminSession } from "@/lib/admin";
+import { ImageZoom } from "@/components/site/ImageZoom";
+
 
 export default function ProductDetail() {
   const { brand: brandSlug, id } = useParams<{ brand: string; id: string }>();
