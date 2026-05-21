@@ -245,10 +245,11 @@ function AdminBell() {
         variant="ghost"
         size="icon"
         onClick={() => setOpen(true)}
-        aria-label="Notifications"
+        aria-label="Admin messages"
         className="relative"
       >
-        <Bell className="h-4 w-4" />
+        <Mail className="h-4 w-4" />
+
         {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold leading-none">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -260,7 +261,8 @@ function AdminBell() {
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col" dir="ltr">
           <SheetHeader className="p-5 border-b border-border text-left">
             <SheetTitle className="flex items-center gap-2">
-              <Bell className="h-4 w-4" /> Notifications
+              <Mail className="h-4 w-4" /> Messages
+
             </SheetTitle>
             <SheetDescription>
               {unreadCount} unread of {messages.length} total
