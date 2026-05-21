@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Image as ImageIcon, Sparkles, Home, ListFilter } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { HERO_PAGES, type HeroPageKey } from "@/lib/heroSlides";
 import { BRANDS } from "@/lib/brands";
 import { useBrandingBrandCardLogo, useBrandingFavicon, type BrandKey } from "@/lib/db";
@@ -15,9 +16,21 @@ export const DEFAULT_HOME_CAROUSEL_AUTOSCROLL: HomeCarouselAutoscroll = {
 
 export default function AdminLandingPages() {
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Landing"
+        eyebrowIcon={ImageIcon}
+        title="Landing Pages"
+        subtitle="Manage hero slides (images & videos) for each landing page."
+        gradient="violet-fuchsia-pink"
+        actions={
+          <span className="text-xs font-medium text-muted-foreground bg-muted/50 rounded-full px-3 py-1.5 border border-border">
+            {HERO_PAGES.length} pages
+          </span>
+        }
+      />
 
-      <div className="mb-4 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <div className="mb-6 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
         <p className="text-sm text-foreground/80 flex items-center gap-2">
           <ListFilter className="h-4 w-4 text-brand" />
           Tip: use the unified editor with the page dropdown to switch quickly between brands.
@@ -29,20 +42,7 @@ export default function AdminLandingPages() {
           Open unified editor <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
-      <header className="mb-8 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-brand">
-            <Sparkles className="h-3 w-3" /> Admin
-          </span>
-          <h1 className="mt-2 text-2xl md:text-3xl font-bold">Landing Pages</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage hero slides (images &amp; videos) for each landing page.
-          </p>
-        </div>
-        <span className="text-xs font-medium text-muted-foreground bg-muted/50 rounded-full px-3 py-1.5 border border-border">
-          {HERO_PAGES.length} pages
-        </span>
-      </header>
+
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {HERO_PAGES.map((p, i) => (
