@@ -470,7 +470,7 @@ export default function AdminProductEditor() {
   };
 
   return (
-    <form onSubmit={save} className="p-6 md:p-10 max-w-7xl">
+    <form onSubmit={save} className="p-6 md:p-10 w-full max-w-none">
       <AdminPageHeader
         eyebrow={isNew ? "New product" : "Edit product"}
         eyebrowIcon={Package}

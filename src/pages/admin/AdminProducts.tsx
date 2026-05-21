@@ -160,7 +160,7 @@ export default function AdminProducts() {
   const selectedCatNames = categories.filter((c) => catFilter.has(c.id)).map((c) => c.nameEn);
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl">
+    <div className="p-6 md:p-10 w-full max-w-none">
       <AdminPageHeader
         eyebrow="Catalog"
         eyebrowIcon={Package}
@@ -275,7 +275,7 @@ export default function AdminProducts() {
       </Card>
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[1100px] text-sm">
             <thead className="bg-muted/50 text-xs uppercase tracking-wider text-muted-foreground"><tr>
               <th className="px-4 py-3 w-10"><Checkbox checked={allChecked} onCheckedChange={toggleAll} /></th>
               <th className="px-4 py-3 w-12 text-left">#</th>

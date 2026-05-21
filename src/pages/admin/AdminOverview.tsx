@@ -67,7 +67,7 @@ export default function AdminOverview() {
 
   return (
     <div className="relative">
-      <div className="p-6 md:p-10 max-w-7xl">
+      <div className="p-6 md:p-10 w-full max-w-none">
         {/* Header */}
         <div className="mb-10 animate-fade-in">
           <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-brand backdrop-blur-md shadow-sm">

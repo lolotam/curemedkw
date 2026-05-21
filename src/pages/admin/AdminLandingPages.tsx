@@ -16,7 +16,7 @@ export const DEFAULT_HOME_CAROUSEL_AUTOSCROLL: HomeCarouselAutoscroll = {
 
 export default function AdminLandingPages() {
   return (
-    <div className="p-6 md:p-10 max-w-7xl">
+    <div className="p-6 md:p-10 w-full max-w-none">
       <AdminPageHeader
         eyebrow="Landing"
         eyebrowIcon={ImageIcon}

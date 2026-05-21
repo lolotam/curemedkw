@@ -68,7 +68,7 @@ export default function AdminCoupons() {
   };
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl space-y-6">
+    <div className="p-6 md:p-10 w-full max-w-none space-y-6">
       <AdminPageHeader
         eyebrow="Coupons"
         eyebrowIcon={Ticket}
