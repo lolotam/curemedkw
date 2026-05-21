@@ -164,16 +164,22 @@ export function ImageZoom({ src, alt, className }: ImageZoomProps) {
               if (scale === 1) zoomIn();
             }}
           >
-            <img
-              src={src}
-              alt={alt}
-              className="max-h-full max-w-full object-contain transition-transform duration-100 ease-out pointer-events-none"
+            <div
+              className="will-change-transform"
               style={{
                 transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                ...noSave.style,
+                transformOrigin: "center center",
+                transition: dragRef.current ? "none" : "transform 120ms ease-out",
               }}
-              {...noSave}
-            />
+            >
+              <img
+                src={src}
+                alt={alt}
+                className="block max-h-[85vh] max-w-[90vw] object-contain select-none"
+                {...noSave}
+              />
+            </div>
+
           </div>
         </DialogContent>
       </Dialog>
