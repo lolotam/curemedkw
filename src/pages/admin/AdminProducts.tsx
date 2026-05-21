@@ -292,7 +292,7 @@ export default function AdminProducts() {
                 <tr key={p.id} className="border-t border-border hover:bg-muted/30">
                   <td className="px-4 py-3"><Checkbox checked={selected.has(p.id)} onCheckedChange={() => toggleOne(p.id)} /></td>
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground tabular-nums">{i + 1}</td>
-                  <td className="px-4 py-3"><Link to={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0">
+                  <td className="px-4 py-3"><Link to={`/admin/products/${p.slug || p.id}`} className="flex items-center gap-3 min-w-0">
                     <img src={p.mainImage} alt="" className="h-10 w-10 rounded-md object-cover shrink-0" />
                     <div className="min-w-0"><p className="font-medium truncate">{p.name}</p><p className="text-xs text-muted-foreground">{p.sku}</p></div></Link></td>
                   <td className="px-4 py-3"><InlineBrandCell product={p} /></td>
@@ -328,7 +328,7 @@ export default function AdminProducts() {
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Link>
                     </Button>
-                    <Button asChild variant="ghost" size="sm" title="Edit product"><Link to={`/admin/products/${p.id}`}><Pencil className="h-3.5 w-3.5" /></Link></Button>
+                    <Button asChild variant="ghost" size="sm" title="Edit product"><Link to={`/admin/products/${p.slug || p.id}`}><Pencil className="h-3.5 w-3.5" /></Link></Button>
                     <Button variant="ghost" size="sm" onClick={() => remove(p.id, p.name)} className="text-destructive hover:text-destructive" title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div></td>
                 </tr>
