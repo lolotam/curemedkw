@@ -279,6 +279,3 @@ function BrandFilterSidebar({
     </div>
   );
 }
-    </SiteLayout>
-  );
-}
