@@ -207,7 +207,7 @@ export default function Checkout() {
   return (
     <SiteLayout>
       {/* ===================== HERO ===================== */}
-      <section className="relative overflow-hidden py-16 md:py-20">
+      <section className="relative overflow-hidden py-8 md:py-16">
         <ColorfulHeroBg />
         <div className="container">
           <Link
@@ -216,7 +216,7 @@ export default function Checkout() {
           >
             <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {t("cart.title")}
           </Link>
-          <h1 className="mt-4 text-4xl md:text-6xl font-bold tracking-tight animate-fade-in [animation-delay:120ms]">
+          <h1 className="mt-3 text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight animate-fade-in [animation-delay:120ms]">
             <span className="bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 bg-clip-text text-transparent">
               {t("checkout.title")}
             </span>
