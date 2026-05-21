@@ -274,11 +274,3 @@ function BrandFilterPanel({
     </div>
   );
 }
-
-      <Testimonials />
-      <FAQ />
-      <ContactSection brand={brandKey} />
-      <Newsletter />
-    </SiteLayout>
-  );
-}
