@@ -197,8 +197,10 @@ export default function ProductDetail() {
           ) : (
             <>
               <div className="flex flex-col leading-tight shrink-0">
-                <span className="text-[10px] uppercase text-muted-foreground">{t("common.featured") /* placeholder noop */ && t("product.size") /* keep tree-shake friendly */}</span>
-                <span className="text-base font-bold text-foreground">KD {product.price.toFixed(2)}</span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <span className="text-[10px] line-through text-muted-foreground">KD {product.originalPrice.toFixed(2)}</span>
+                )}
+                <span className={cn("text-base font-bold", product.originalPrice && product.originalPrice > product.price ? "text-red-600" : "text-foreground")}>KD {product.price.toFixed(2)}</span>
               </div>
               <div className="flex-1">
                 <AddToCartButton product={product} fullWidth />
