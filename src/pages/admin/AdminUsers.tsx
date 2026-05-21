@@ -10,7 +10,8 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Loader2, Search, Send, Shield, ShieldOff, Ban, CheckCircle2 } from "lucide-react";
+import { Loader2, Search, Send, Shield, ShieldOff, Ban, CheckCircle2, UserCog } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { toast } from "sonner";
 import {
   useAdminUsers, useToggleAdminRole, useToggleUserBlock,
