@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Plus, Pencil, Trash2, Tag as TagIcon, ExternalLink, RefreshCw } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -54,11 +55,15 @@ export default function AdminTags() {
   };
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">Tags</h1>
-        <p className="text-muted-foreground mt-1">Master list of product tags. Rename and deletes also update every linked product.</p>
-      </div>
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Tags"
+        eyebrowIcon={TagIcon}
+        title="Tags"
+        subtitle="Master list of product tags. Rename and deletes also update every linked product."
+        gradient="rose-pink-fuchsia"
+      />
+
 
       <Card className="p-4 mb-4 flex gap-2">
         <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New tag name…" onKeyDown={(e) => e.key === "Enter" && add()} />
