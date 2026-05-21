@@ -121,7 +121,7 @@ export function AdminLayout() {
           </Button>
         </div>
       </aside>
-      <main className="relative flex-1 min-w-0 overflow-hidden">
+      <main className="relative flex-1 min-w-0 overflow-x-hidden">
         {/* Animated gradient backdrop — shared across every /admin/* page */}
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
           <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.06] via-violet-500/[0.05] to-pink-500/[0.06]" />
