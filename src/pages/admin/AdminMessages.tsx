@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Trash2, Mail, MailOpen, X } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { useMessages, useMarkMessageRead, useDeleteMessages, type Message } from "@/lib/db";
 import { BRANDS } from "@/lib/brands";
 import { toast } from "sonner";
@@ -33,11 +34,18 @@ export default function AdminMessages() {
   const toggleSelect = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
 
   return (
-    <div className="p-8">
-      <div className="flex items-start justify-between mb-6">
-        <div><h1 className="text-3xl font-bold">Messages</h1><p className="text-muted-foreground mt-1">{all.length} total · {all.filter((m) => !m.read).length} unread</p></div>
-        {selected.length > 0 && <Button variant="outline" onClick={removeSelected} className="gap-1.5 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete {selected.length}</Button>}
-      </div>
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Messages"
+        eyebrowIcon={Mail}
+        title="Messages"
+        subtitle={`${all.length} total · ${all.filter((m) => !m.read).length} unread`}
+        gradient="rose-pink-fuchsia"
+        actions={selected.length > 0 ? (
+          <Button variant="outline" onClick={removeSelected} className="gap-1.5 text-destructive hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete {selected.length}</Button>
+        ) : null}
+      />
+
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
         <Card className="overflow-hidden">
           {all.length === 0 ? (
