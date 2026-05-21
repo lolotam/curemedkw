@@ -132,56 +132,29 @@ export default function CategoryPage() {
 
       {subcategories.length > 0 && <SubcategoryCarousel categories={subcategories} />}
 
-      <section className="container py-10 md:py-14">
+      <section className="container py-6 md:py-14">
         <div className={showSidebar ? "flex gap-8 items-start" : ""}>
-          {/* Left sidebar: brand filters */}
+          {/* Left sidebar: brand filters (desktop only) */}
           {showSidebar && (
             <aside className="hidden lg:block w-56 shrink-0 space-y-4 sticky top-24 self-start">
-              <div>
-                <h3 className="text-lg font-bold text-brand">Filter</h3>
-                <div className="border-t border-border mt-2 pt-3">
-                  <h4 className="text-sm font-semibold text-brand mb-3">Brands</h4>
-                  <div className="space-y-2.5">
-                    {categoryBrands.map((b) => (
-                      <label
-                        key={b.key}
-                        className="flex items-center justify-between gap-2.5 text-sm cursor-pointer hover:text-brand transition-colors"
-                      >
-                        <span className="flex items-center gap-2.5 min-w-0">
-                          <Checkbox
-                            checked={selectedBrands.has(b.key)}
-                            onCheckedChange={() => toggleBrand(b.key)}
-                          />
-                          <span className="truncate">{b.name}</span>
-                        </span>
-                        <span className="shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums bg-brand/10 text-brand">
-                          {b.count}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {selectedBrands.size > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedBrands(new Set())}
-                >
-                  Clear filters
-                </Button>
-              )}
+              <BrandFilterSidebar
+                categoryBrands={categoryBrands}
+                selectedBrands={selectedBrands}
+                toggleBrand={toggleBrand}
+                onClear={() => setSelectedBrands(new Set())}
+                t={t}
+              />
             </aside>
           )}
 
           {/* Main content */}
           <div className="flex-1 min-w-0 space-y-5">
-            {/* Toolbar: search + sort */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
+            {/* Toolbar */}
+            <div className="grid grid-cols-1 md:flex md:flex-wrap md:items-center gap-3">
+              <div className="relative md:flex-1 md:max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search products…"
+                  placeholder={t("category.searchPh")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 pr-8"
@@ -190,51 +163,64 @@ export default function CategoryPage() {
                   <button
                     onClick={() => setSearchQuery("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
                   >
                     <X className="h-4 w-4" />
                   </button>
                 )}
               </div>
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="price_asc">Price: Low → High</SelectItem>
-                  <SelectItem value="price_desc">Price: High → Low</SelectItem>
-                  <SelectItem value="name_asc">Name: A → Z</SelectItem>
-                  <SelectItem value="name_desc">Name: Z → A</SelectItem>
-                </SelectContent>
-              </Select>
-              {/* Mobile brand filter chips */}
-              {showSidebar && categoryBrands.length > 0 && (
-                <div className="lg:hidden flex flex-wrap gap-2">
-                  {categoryBrands.map((b) => (
-                    <button
-                      key={b.key}
-                      onClick={() => toggleBrand(b.key)}
-                      className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                        selectedBrands.has(b.key)
-                          ? "border-brand bg-brand text-white"
-                          : "border-border bg-card hover:border-brand hover:text-brand"
-                      }`}
-                    >
-                      {b.name}
-                      <span className="opacity-70">{b.count}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="flex gap-2">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                  <SelectTrigger className="flex-1 md:w-44">
+                    <SelectValue placeholder={t("category.sortBy")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">{t("category.sort.newest")}</SelectItem>
+                    <SelectItem value="price_asc">{t("category.sort.priceAsc")}</SelectItem>
+                    <SelectItem value="price_desc">{t("category.sort.priceDesc")}</SelectItem>
+                    <SelectItem value="name_asc">{t("category.sort.nameAsc")}</SelectItem>
+                    <SelectItem value="name_desc">{t("category.sort.nameDesc")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                {showSidebar && (
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="outline" className="lg:hidden gap-2 shrink-0">
+                        <SlidersHorizontal className="h-4 w-4" />
+                        <span>{t("filter.title")}</span>
+                        {selectedBrands.size > 0 && (
+                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-brand text-white text-[10px] font-bold">
+                            {selectedBrands.size}
+                          </span>
+                        )}
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="w-[85vw] sm:w-[400px] overflow-y-auto">
+                      <SheetHeader className="text-left">
+                        <SheetTitle>{t("filter.title")}</SheetTitle>
+                      </SheetHeader>
+                      <div className="mt-4">
+                        <BrandFilterSidebar
+                          categoryBrands={categoryBrands}
+                          selectedBrands={selectedBrands}
+                          toggleBrand={toggleBrand}
+                          onClear={() => setSelectedBrands(new Set())}
+                          t={t}
+                        />
+                      </div>
+                    </SheetContent>
+                  </Sheet>
+                )}
+              </div>
             </div>
 
             {/* Product grid */}
             {filteredProducts.length === 0 ? (
               <p className="text-center text-muted-foreground py-16">
-                {hasFilters ? "No products match your filters." : t("category.noProducts")}
+                {hasFilters ? t("category.noMatches") : t("category.noProducts")}
               </p>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <div className="grid gap-3 sm:gap-5 grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredProducts.map((p) => (
                   <ProductCard key={p.id} product={p} />
                 ))}
@@ -243,6 +229,56 @@ export default function CategoryPage() {
           </div>
         </div>
       </section>
+    </SiteLayout>
+  );
+}
+
+function BrandFilterSidebar({
+  categoryBrands,
+  selectedBrands,
+  toggleBrand,
+  onClear,
+  t,
+}: {
+  categoryBrands: Array<{ key: string; name: string; count: number }>;
+  selectedBrands: Set<string>;
+  toggleBrand: (key: string) => void;
+  onClear: () => void;
+  t: (k: string) => string;
+}) {
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold text-brand">{t("filter.title")}</h3>
+      <div className="border-t border-border pt-3">
+        <h4 className="text-sm font-semibold text-brand mb-3">{t("nav.brands")}</h4>
+        <div className="space-y-2.5">
+          {categoryBrands.map((b) => (
+            <label
+              key={b.key}
+              className="flex items-center justify-between gap-2.5 text-sm cursor-pointer hover:text-brand transition-colors"
+            >
+              <span className="flex items-center gap-2.5 min-w-0">
+                <Checkbox
+                  checked={selectedBrands.has(b.key)}
+                  onCheckedChange={() => toggleBrand(b.key)}
+                />
+                <span className="truncate">{b.name}</span>
+              </span>
+              <span className="shrink-0 inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full text-[11px] font-medium tabular-nums bg-brand/10 text-brand">
+                {b.count}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {selectedBrands.size > 0 && (
+        <Button variant="ghost" size="sm" onClick={onClear}>
+          {t("filter.clear")}
+        </Button>
+      )}
+    </div>
+  );
+}
     </SiteLayout>
   );
 }
