@@ -68,14 +68,15 @@ export default function AdminModels() {
   const { slots, setSlot, resetSlot, resetAll } = useAiModels();
 
   return (
-    <div className="p-8 max-w-5xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold">AI Models</h1>
-        <p className="text-muted-foreground mt-1 max-w-3xl">
-          Configure AI providers and models for chat (used by AI product import) and image generation.
-          Within each tab, models are tried top-to-bottom — Primary first, then Fallback #2, then #3.
-        </p>
-      </div>
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="AI"
+        eyebrowIcon={Sparkles}
+        title="AI Models"
+        subtitle="Configure AI providers and models for chat (used by AI product import) and image generation. Within each tab, models are tried top-to-bottom — Primary first, then Fallback #2, then #3."
+        gradient="indigo-violet-purple"
+      />
+
 
       <Card className="p-5 mb-6 flex items-center gap-4">
         <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-brand to-brand/60 flex items-center justify-center shrink-0">
