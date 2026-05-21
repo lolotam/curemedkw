@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Plus, Search, Star, Trash2, Pencil, Loader2, ExternalLink, ChevronDown, Check, ArrowUp, ArrowDown, ArrowUpDown, X } from "lucide-react";
+import { Plus, Package, Search, Star, Trash2, Pencil, Loader2, ExternalLink, ChevronDown, Check, ArrowUp, ArrowDown, ArrowUpDown, X } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
