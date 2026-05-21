@@ -16,6 +16,8 @@ export interface BrandMeta {
   slug: string;
   name: string;
   shortName?: string;
+  nameAr: string;
+  shortNameAr?: string;
   tagline: { en: string; ar: string };
   about: { en: string; ar: string };
   themeAttr: string;
@@ -25,6 +27,7 @@ export interface BrandMeta {
   instagramHandle?: string;
   seo: { en: string; ar: string };
 }
+
 
 export const BRANDS: Record<BrandKey, BrandMeta> = {
   flexitol: {
