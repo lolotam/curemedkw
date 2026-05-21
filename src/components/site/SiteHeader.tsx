@@ -82,14 +82,14 @@ export function SiteHeader() {
         hidden && "-translate-y-full",
       )}
     >
-      <div className="container flex h-24 items-center justify-between gap-4">
-        <Link to="/curemed" className="flex items-center gap-2">
+      <div className="container flex h-16 md:h-20 xl:h-24 items-center justify-between gap-2 md:gap-4">
+        <Link to="/curemed" className="flex items-center gap-2 min-w-0">
           <img
             src={logoSrc}
             alt="Curemed"
             width={240}
             height={96}
-            className={cn("h-20 w-auto brand-logo-img", removeBg && "brand-logo-img--remove-white")}
+            className={cn("h-10 md:h-14 xl:h-20 w-auto brand-logo-img", removeBg && "brand-logo-img--remove-white")}
           />
         </Link>
 
@@ -100,38 +100,40 @@ export function SiteHeader() {
           <NavItem to="/contact" label={t("nav.contact")} active={isActive("/contact")} />
         </nav>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 sm:gap-1">
           {isAdmin && <AdminBell />}
           <UserNotificationBell />
           <CartIcon />
-          <UserMenu />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLang(lang === "en" ? "ar" : "en")}
-            className="gap-1.5"
-            aria-label={t("header.toggleLang")}
-          >
-            <Globe className="h-4 w-4" />
-            <span className="text-xs font-semibold">{lang === "en" ? "AR" : "EN"}</span>
-          </Button>
-          <Button variant="ghost" size="icon" onClick={toggle} aria-label={t("header.toggleTheme")}>
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
+          <div className="hidden sm:flex items-center gap-0.5">
+            <UserMenu />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLang(lang === "en" ? "ar" : "en")}
+              className="gap-1.5"
+              aria-label={t("header.toggleLang")}
+            >
+              <Globe className="h-4 w-4" />
+              <span className="text-xs font-semibold">{lang === "en" ? "AR" : "EN"}</span>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={toggle} aria-label={t("header.toggleTheme")}>
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </Button>
+          </div>
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="lg:hidden h-10 w-10"
             onClick={() => setOpen(!open)}
             aria-label={t("header.menu")}
           >
-            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </Button>
         </div>
       </div>
 
       {open && (
-        <div className="border-t border-border/50 bg-background lg:hidden">
+        <div className="border-t border-border/50 bg-background lg:hidden max-h-[calc(100vh-4rem)] overflow-y-auto">
           <div className="container flex flex-col gap-1 py-3">
             <MobileItem to="/curemed" label={t("nav.home")} onClick={() => setOpen(false)} />
             <div className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -149,10 +151,63 @@ export function SiteHeader() {
 
             <MobileItem to="/about" label={t("nav.about")} onClick={() => setOpen(false)} />
             <MobileItem to="/contact" label={t("nav.contact")} onClick={() => setOpen(false)} />
+
+            <div className="sm:hidden border-t border-border/50 mt-2 pt-2 flex items-center gap-2 px-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setLang(lang === "en" ? "ar" : "en"); }}
+                className="flex-1 gap-1.5"
+              >
+                <Globe className="h-4 w-4" />
+                {lang === "en" ? "العربية" : "English"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={toggle} className="flex-1 gap-1.5">
+                {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {theme === "dark" ? "Light" : "Dark"}
+              </Button>
+            </div>
+            <div className="sm:hidden mt-1">
+              <MobileUserLinks onNavigate={() => setOpen(false)} />
+            </div>
           </div>
         </div>
       )}
     </header>
+  );
+}
+
+function MobileUserLinks({ onNavigate }: { onNavigate: () => void }) {
+  const { user, signOut } = useAuth();
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const { isAdmin } = useAdminSession();
+  const go = (path: string) => { onNavigate(); navigate(path); };
+  if (!user) {
+    return (
+      <Button
+        variant="default"
+        size="sm"
+        onClick={() => go("/auth")}
+        className="w-full gap-2 bg-brand hover:bg-brand/90"
+      >
+        <UserIcon className="h-4 w-4" /> {t("nav.signin")}
+      </Button>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <MobileItem to="/account" label={t("nav.account")} onClick={onNavigate} />
+      <MobileItem to="/account" label={t("nav.myOrders")} onClick={onNavigate} />
+      {isAdmin && <MobileItem to="/admin" label={t("nav.admin")} onClick={onNavigate} />}
+      <button
+        type="button"
+        onClick={async () => { await signOut(); onNavigate(); navigate("/"); }}
+        className="text-left rounded-md px-3 py-2.5 text-sm font-medium hover:bg-muted inline-flex items-center gap-2 text-destructive"
+      >
+        <LogOut className="h-4 w-4" /> {t("nav.signout")}
+      </button>
+    </div>
   );
 }
 
