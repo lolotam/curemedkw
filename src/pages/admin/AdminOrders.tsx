@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
