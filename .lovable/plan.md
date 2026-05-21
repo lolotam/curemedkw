@@ -1,37 +1,23 @@
 ## Goal
-Translate brand display names to Arabic in the header, and ensure the Partners dropdown in Arabic shows names on the right (RTL) with the logo preview on the left.
+Add a zoom-on-hover magnifier effect to the main product image on the product detail page.
 
-## Changes
+## Approach
+Create a small, self-contained `ImageZoom` component that:
+- Renders the main product image at normal size in the existing square container.
+- On hover (desktop / pointer:fine), tracks the cursor position and shows a circular magnifier lens following the cursor, displaying a 2.5x zoomed-in portion of the image.
+- Falls back to the plain image on touch devices (no hover) — no behavior change for mobile.
+- Shows a small magnifier icon (lucide `Search`) badge in the corner as an affordance.
 
-### 1. `src/lib/brands.ts`
-Add an Arabic name field to `BrandMeta`:
-```ts
-nameAr: string;
-shortNameAr?: string;
-```
-Set values:
-- flexitol → فليكسيتول
-- kapiva → كابيفا
-- nada (NADA) → ندا
-- abc (ABC / Australian Bodycare) → keep ABC (user didn't list it; leave as-is)
-- lafes → لافز
-- hartington → هارتنجتون
-- phytophar → فيتوفار
-- hualunhongli → هيلون-هونجلاي
+Implementation:
+- New file `src/components/site/ImageZoom.tsx`.
+- Uses a `ref` on the container, `onMouseMove` to compute the cursor's relative %, and renders a lens div with `backgroundImage: url(src)`, `backgroundSize: 250%`, `backgroundPosition` set from the cursor %.
+- Lens: ~180px circle, soft shadow, hidden until hover.
+- Accessible: keeps the underlying `<img>` for SEO/alt; lens is decorative (`aria-hidden`).
 
-### 2. `src/components/site/SiteHeader.tsx`
-- Import `useI18n` (already used elsewhere — verify) and pick the localized name helper:
-  ```ts
-  const displayName = (b) => lang === "ar" ? (b.shortNameAr ?? b.nameAr) : (b.shortName ?? b.name);
-  ```
-- Use it in:
-  - Mobile menu list (line 144)
-  - `PartnersMenu` dropdown items (line 187)
-- In `PartnersMenu`'s `DropdownMenuContent` inner `<div className="flex">`, add `lang === "ar" && "flex-row-reverse"` so the brand-name column sits on the right and the logo preview on the left in Arabic. Keep widths/borders as-is (the border becomes the right edge of the logo panel automatically; adjust `border-l` → use `border-l` still works since it's on the logo column which is now on the left — switch to `border-r` conditionally to keep the divider between the two halves).
+### Edit
+`src/pages/ProductDetail.tsx` line 102-104: replace the `<img>` inside the `aspect-square` wrapper with `<ImageZoom src={images[activeImg]} alt={name} />`. Thumbnails and everything else stay unchanged.
 
-### 3. Out of scope
-No changes to routes, slugs, SEO meta, or other pages — only the header's display names and dropdown direction.
-
-## Technical notes
-- The app already toggles `document.documentElement.dir="rtl"` for Arabic, but Radix `DropdownMenuContent` is portaled and may not inherit, so explicit `flex-row-reverse` is the reliable fix.
-- No DB / backend / i18n JSON changes needed; brand names live in `brands.ts`.
+## Out of scope
+- Lightbox / fullscreen viewer.
+- Pinch-to-zoom on mobile.
+- Thumbnail zoom.
