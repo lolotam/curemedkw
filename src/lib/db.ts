@@ -285,20 +285,30 @@ export function useDiscountedProducts() {
   });
 }
 
-export function useProduct(id: string | undefined) {
+export function useProduct(slugOrId: string | undefined) {
   return useQuery({
-    queryKey: qk.product(id ?? ""),
-    enabled: !!id,
+    queryKey: qk.product(slugOrId ?? ""),
+    enabled: !!slugOrId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products").select("*").eq("id", id!).maybeSingle();
+      const key = slugOrId!;
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key);
+      // Try slug first
+      let { data, error } = await supabase
+        .from("products").select("*").eq("slug", key).maybeSingle();
       if (error) throw error;
+      // Legacy UUID fallback
+      if (!data && isUuid) {
+        const res = await supabase
+          .from("products").select("*").eq("id", key).maybeSingle();
+        if (res.error) throw res.error;
+        data = res.data;
+      }
       if (!data) return null;
       const product = rowToProduct(data as ProductRow);
       const { data: links, error: linkErr } = await supabase
         .from("product_categories")
         .select("category_id")
-        .eq("product_id", id!);
+        .eq("product_id", product.id);
       if (linkErr) throw linkErr;
       const ids = (links ?? []).map((l: any) => l.category_id as string);
       return {
@@ -308,6 +318,7 @@ export function useProduct(id: string | undefined) {
     },
   });
 }
+
 
 export function useCreateProduct() {
   const qc = useQueryClient();
