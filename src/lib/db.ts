@@ -125,7 +125,7 @@ const rowToProduct = (r: ProductRow): Product => ({
   ingredientsAr: r.ingredients_ar ?? [],
 });
 
-export type ProductInput = Omit<Product, "id" | "createdAt" | "updatedAt">;
+export type ProductInput = Omit<Product, "id" | "slug" | "createdAt" | "updatedAt"> & { slug?: string };
 
 const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   const out: any = {};
