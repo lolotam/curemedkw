@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images, PlayCircle } from "lucide-react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images, PlayCircle, Flag } from "lucide-react";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -67,35 +68,36 @@ export default function AdminFlags() {
   const reset = () => data && setDraft(data);
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl">
-      <header className="mb-6 flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Site flags</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Site-wide toggles: home page carousel auto-scroll, image compression on upload,
-            and price visibility.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {dirty && (
-            <Button variant="ghost" onClick={reset}>
-              Discard
-            </Button>
-          )}
-          <Button
-            onClick={save}
-            disabled={!dirty || update.isPending}
-            className="bg-brand hover:bg-brand/90 text-white"
-          >
-            {update.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Save className="h-4 w-4 mr-2" />
+    <div className="p-6 md:p-10 max-w-7xl">
+      <AdminPageHeader
+        eyebrow="Flags"
+        eyebrowIcon={Flag}
+        title="Site flags"
+        subtitle="Site-wide toggles: home page carousel auto-scroll, image compression on upload, and price visibility."
+        gradient="emerald-teal-cyan"
+        actions={
+          <>
+            {dirty && (
+              <Button variant="ghost" onClick={reset}>
+                Discard
+              </Button>
             )}
-            Save changes
-          </Button>
-        </div>
-      </header>
+            <Button
+              onClick={save}
+              disabled={!dirty || update.isPending}
+              className="bg-brand hover:bg-brand/90 text-white"
+            >
+              {update.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save changes
+            </Button>
+          </>
+        }
+      />
+
 
       <HomeCarouselAutoscrollCard />
 
