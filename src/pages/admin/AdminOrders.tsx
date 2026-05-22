@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -298,6 +299,16 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
                         body: `Your order status has been updated to ${v}.`,
                         type: "order",
                         link: `/order-confirmation/${order.id}`,
+                      });
+                    }
+                    if (v === "shipped" && order.customerPhone) {
+                      void supabase.functions.invoke("send-whatsapp", {
+                        body: {
+                          event: "order.shipped",
+                          to: [order.customerPhone],
+                          order_id: order.id,
+                          data: { order_number: order.orderNumber, customer_name: order.customerName },
+                        },
                       });
                     }
                     toast.success("Status updated");

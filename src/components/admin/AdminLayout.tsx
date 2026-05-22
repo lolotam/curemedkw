@@ -1,5 +1,5 @@
 import { Link, NavLink, Navigate, Outlet, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon, Sparkles, Tags, Tag, Flag, Star, ShoppingBag, Ticket, UserCog, Bell, Palette, ScrollText } from "lucide-react";
+import { LayoutDashboard, Package, Mail, Users, LogOut, ExternalLink, Moon, Sun, Image as ImageIcon, Sparkles, Tags, Tag, Flag, Star, ShoppingBag, Ticket, UserCog, Bell, Palette, ScrollText, MessageCircle } from "lucide-react";
 import { adminLogout, useAdminSession } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/lib/theme";
@@ -23,6 +23,7 @@ const NAV = [
   { to: "/admin/branding", icon: Palette, label: "Branding" },
   { to: "/admin/flags", icon: Flag, label: "Site Flags" },
   { to: "/admin/messages", icon: Mail, label: "Messages" },
+  { to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
   { to: "/admin/subscribers", icon: Users, label: "Subscribers" },
   { to: "/admin/logs", icon: ScrollText, label: "Logs" },
 ];
