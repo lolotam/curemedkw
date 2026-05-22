@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       const phone = normalizePhone(rawPhone);
       if (!phone) continue;
 
-      const payload = { to: phone, message, type: "text" };
+      const payload = { action: "send_text", to: phone, message };
       let status = "sent";
       let respJson: any = null;
       let errMsg: string | null = null;
@@ -124,6 +124,9 @@ Deno.serve(async (req) => {
         if (!r.ok) {
           status = "failed";
           errMsg = `HTTP ${r.status}: ${text.slice(0, 300)}`;
+        } else if (respJson && respJson.success === false) {
+          status = "failed";
+          errMsg = `Postora rejected: ${respJson.error ?? text.slice(0, 300)}`;
         }
       } catch (e) {
         status = "failed";
