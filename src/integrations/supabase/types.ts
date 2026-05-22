@@ -911,6 +911,42 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_send_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event: string
+          id: string
+          order_id: string | null
+          recipient: string
+          request_payload: Json
+          response_payload: Json
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event: string
+          id?: string
+          order_id?: string | null
+          recipient: string
+          request_payload?: Json
+          response_payload?: Json
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event?: string
+          id?: string
+          order_id?: string | null
+          recipient?: string
+          request_payload?: Json
+          response_payload?: Json
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
