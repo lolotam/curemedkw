@@ -300,6 +300,16 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
                         link: `/order-confirmation/${order.id}`,
                       });
                     }
+                    if (v === "shipped" && order.customerPhone) {
+                      void supabase.functions.invoke("send-whatsapp", {
+                        body: {
+                          event: "order.shipped",
+                          to: [order.customerPhone],
+                          order_id: order.id,
+                          data: { order_number: order.orderNumber, customer_name: order.customerName },
+                        },
+                      });
+                    }
                     toast.success("Status updated");
                   }}
                 >
