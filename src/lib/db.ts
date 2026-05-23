@@ -1553,22 +1553,13 @@ export function useCreateOrder() {
         const { error: itemErr } = await supabase.from("order_items").insert(itemRows);
         if (itemErr) throw itemErr;
       }
-      // Best-effort: bump coupon usage and notify the user.
+      // Best-effort: bump coupon usage via SECURITY DEFINER RPC.
       if (input.couponCode) {
         try {
-          const { data: cur } = await supabase
-            .from("coupons")
-            .select("id, used_count")
-            .eq("code", input.couponCode)
-            .maybeSingle();
-          if (cur) {
-            await supabase
-              .from("coupons")
-              .update({ used_count: (cur.used_count ?? 0) + 1 })
-              .eq("id", cur.id);
-          }
+          await supabase.rpc("increment_coupon_usage", { _code: input.couponCode });
         } catch {/* ignore */}
       }
+
       if (userData?.user?.id) {
         try {
           await supabase.from("notifications").insert({
