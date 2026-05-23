@@ -2095,23 +2095,31 @@ export function useDeleteCoupon() {
 }
 
 export async function validateCoupon(code: string, subtotal: number): Promise<{ ok: true; coupon: Coupon; discount: number } | { ok: false; reason: string }> {
-  const { data, error } = await supabase
-    .from("coupons")
-    .select("*")
-    .eq("code", code.trim().toUpperCase())
-    .eq("is_active", true)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("validate_coupon", {
+    _code: code,
+    _subtotal: subtotal,
+  });
   if (error) return { ok: false, reason: error.message };
-  if (!data) return { ok: false, reason: "Invalid coupon code" };
-  const c = rowToCoupon(data);
-  if (c.expiresAt && new Date(c.expiresAt) < new Date()) return { ok: false, reason: "Coupon has expired" };
-  if (c.maxUses !== null && c.usedCount >= c.maxUses) return { ok: false, reason: "Coupon usage limit reached" };
-  if (subtotal < c.minOrderAmount) return { ok: false, reason: `Minimum order amount: KD ${c.minOrderAmount.toFixed(2)}` };
-  const discount = c.discountType === "percent"
-    ? Math.round((subtotal * c.discountValue) / 100 * 1000) / 1000
-    : Math.min(subtotal, c.discountValue);
-  return { ok: true, coupon: c, discount };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, reason: "Invalid coupon code" };
+  if (!row.ok) return { ok: false, reason: row.reason ?? "Invalid coupon code" };
+  const coupon: Coupon = {
+    id: row.coupon_id,
+    code: code.trim().toUpperCase(),
+    description: "",
+    discountType: row.discount_type as Coupon["discountType"],
+    discountValue: Number(row.discount_value),
+    minOrderAmount: Number(row.min_order_amount ?? 0),
+    maxUses: null,
+    usedCount: 0,
+    expiresAt: null,
+    isActive: true,
+    createdAt: "",
+    updatedAt: "",
+  };
+  return { ok: true, coupon, discount: Number(row.discount) };
 }
+
 
 /* ============================================================
  * Admin: Users
