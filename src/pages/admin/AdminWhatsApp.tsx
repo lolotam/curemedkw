@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, Plus, X, Send, Loader2 } from "lucide-react";
+import { MessageCircle, Plus, X, Send, Loader2, Eye, EyeOff, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface WaSettings {
   enabled: boolean;
   language: "ar" | "en";
+  api_key: string;
   admin_numbers: string[];
   events: {
     order_paid: boolean;
@@ -28,6 +29,7 @@ interface WaSettings {
 const DEFAULT: WaSettings = {
   enabled: true,
   language: "ar",
+  api_key: "",
   admin_numbers: [],
   events: {
     order_paid: true,
@@ -60,6 +62,9 @@ export default function AdminWhatsApp() {
   const [saving, setSaving] = useState(false);
   const [testTo, setTestTo] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyEditing, setKeyEditing] = useState(false);
+  const [showKey, setShowKey] = useState(false);
 
   const settingsQ = useQuery({
     queryKey: ["wa_settings"],
@@ -92,11 +97,18 @@ export default function AdminWhatsApp() {
 
   const save = async () => {
     setSaving(true);
+    // Merge new key only if the admin typed one; otherwise keep stored value.
+    const nextKey = keyEditing && keyInput.trim() ? keyInput.trim() : s.api_key;
+    const payload: WaSettings = { ...s, api_key: nextKey };
     const { error } = await supabase
       .from("site_settings")
-      .upsert({ key: "whatsapp_integration", value: s as any }, { onConflict: "key" });
+      .upsert({ key: "whatsapp_integration", value: payload as any }, { onConflict: "key" });
     setSaving(false);
     if (error) return toast.error(error.message);
+    setS(payload);
+    setKeyInput("");
+    setKeyEditing(false);
+    setShowKey(false);
     toast.success("Settings saved");
     qc.invalidateQueries({ queryKey: ["wa_settings"] });
   };
@@ -155,6 +167,58 @@ export default function AdminWhatsApp() {
             </Select>
           </div>
         </div>
+      </div>
+
+      {/* Postora API key */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-base">Postora API key</Label>
+          </div>
+          <Badge variant={s.api_key ? "default" : "secondary"}>
+            {s.api_key ? `Key set •••• ${s.api_key.slice(-4)}` : "No key"}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Paste the API key from your Postora account. Saved to the database and used by all WhatsApp messages — switch accounts anytime by pasting a new key and hitting Save.
+        </p>
+        {keyEditing ? (
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                type={showKey ? "text" : "password"}
+                placeholder="Paste new Postora API key"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                autoComplete="off"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showKey ? "Hide key" : "Show key"}
+              >
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setKeyEditing(false); setKeyInput(""); setShowKey(false); }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button type="button" variant="outline" onClick={() => setKeyEditing(true)}>
+            {s.api_key ? "Replace key" : "Add key"}
+          </Button>
+        )}
+        {keyEditing && (
+          <p className="text-xs text-muted-foreground">Click <b>Save settings</b> below to apply the new key.</p>
+        )}
       </div>
 
       {/* Admin numbers */}
