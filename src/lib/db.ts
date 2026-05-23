@@ -1280,12 +1280,12 @@ export function useProductReviews(productId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("product_reviews")
-        .select("*")
+        .select("id,product_id,reviewer_name,rating,comment,is_approved,created_at")
         .eq("product_id", productId!)
         .eq("is_approved", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data as ReviewRow[]).map(rowToReview);
+      return (data as Omit<ReviewRow, "reviewer_email">[]).map((r) => rowToReview({ ...r, reviewer_email: null }));
     },
   });
 }
@@ -1296,15 +1296,16 @@ export function useApprovedReviews() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("product_reviews")
-        .select("*")
+        .select("id,product_id,reviewer_name,rating,comment,is_approved,created_at")
         .eq("is_approved", true)
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data as ReviewRow[]).map(rowToReview);
+      return (data as Omit<ReviewRow, "reviewer_email">[]).map((r) => rowToReview({ ...r, reviewer_email: null }));
     },
   });
 }
+
 
 export function useAdminReviews() {
   return useQuery({
