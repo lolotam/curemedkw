@@ -169,6 +169,58 @@ export default function AdminWhatsApp() {
         </div>
       </div>
 
+      {/* Postora API key */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-base">Postora API key</Label>
+          </div>
+          <Badge variant={s.api_key ? "default" : "secondary"}>
+            {s.api_key ? `Key set •••• ${s.api_key.slice(-4)}` : "No key"}
+          </Badge>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Paste the API key from your Postora account. Saved to the database and used by all WhatsApp messages — switch accounts anytime by pasting a new key and hitting Save.
+        </p>
+        {keyEditing ? (
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                type={showKey ? "text" : "password"}
+                placeholder="Paste new Postora API key"
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                autoComplete="off"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label={showKey ? "Hide key" : "Show key"}
+              >
+                {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => { setKeyEditing(false); setKeyInput(""); setShowKey(false); }}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button type="button" variant="outline" onClick={() => setKeyEditing(true)}>
+            {s.api_key ? "Replace key" : "Add key"}
+          </Button>
+        )}
+        {keyEditing && (
+          <p className="text-xs text-muted-foreground">Click <b>Save settings</b> below to apply the new key.</p>
+        )}
+      </div>
+
       {/* Admin numbers */}
       <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
         <Label className="text-base">Admin WhatsApp numbers</Label>
