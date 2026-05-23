@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 interface WaSettings {
   enabled: boolean;
   language: "ar" | "en";
+  api_key: string;
   admin_numbers: string[];
   events: {
     order_paid: boolean;
@@ -28,6 +29,7 @@ interface WaSettings {
 const DEFAULT: WaSettings = {
   enabled: true,
   language: "ar",
+  api_key: "",
   admin_numbers: [],
   events: {
     order_paid: true,
