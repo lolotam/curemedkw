@@ -107,11 +107,12 @@ Deno.serve(async (req) => {
       if (!phone) continue;
 
       const payload = { action: "send_text", to: phone, message };
+      const url = `${POSTORA_ENDPOINT}?action=send_text`;
       let status = "sent";
       let respJson: any = null;
       let errMsg: string | null = null;
       try {
-        const r = await fetch(POSTORA_ENDPOINT, {
+        const r = await fetch(url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
