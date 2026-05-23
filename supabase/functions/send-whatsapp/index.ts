@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     }
     const { event, to, data, order_id } = parsed.data;
 
-    const apiKey = Deno.env.get("POSTORA_WHATSAPP_API_KEY");
+    // apiKey is resolved below from site_settings (preferred) with env-var fallback.
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
