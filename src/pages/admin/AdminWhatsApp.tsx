@@ -62,6 +62,9 @@ export default function AdminWhatsApp() {
   const [saving, setSaving] = useState(false);
   const [testTo, setTestTo] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
+  const [keyInput, setKeyInput] = useState("");
+  const [keyEditing, setKeyEditing] = useState(false);
+  const [showKey, setShowKey] = useState(false);
 
   const settingsQ = useQuery({
     queryKey: ["wa_settings"],
