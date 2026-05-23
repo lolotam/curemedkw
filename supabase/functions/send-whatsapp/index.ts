@@ -88,6 +88,12 @@ Deno.serve(async (req) => {
     const eventKey = event.replace(".", "_"); // order.paid -> order_paid
     const eventEnabled = eventsCfg[eventKey] !== false;
 
+    // Prefer the key saved via /admin/whatsapp UI; fall back to env var.
+    const apiKey =
+      (typeof settings.api_key === "string" && settings.api_key.trim()) ||
+      Deno.env.get("POSTORA_WHATSAPP_API_KEY") ||
+      "";
+
     if (!apiKey || !enabled || !eventEnabled) {
       return new Response(
         JSON.stringify({ skipped: true, reason: !apiKey ? "no_api_key" : !enabled ? "disabled" : "event_off" }),
