@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
       const phone = normalizePhone(rawPhone);
       if (!phone) continue;
 
-      const payload = { action: "send_text", to: phone, message };
+      const payload = { action: "send_text", to: phone, text: message, message };
       const url = `${POSTORA_ENDPOINT}?action=send_text`;
       let status = "sent";
       let respJson: any = null;
