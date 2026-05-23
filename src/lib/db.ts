@@ -1280,12 +1280,12 @@ export function useProductReviews(productId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("product_reviews")
-        .select("*")
+        .select("id,product_id,reviewer_name,rating,comment,is_approved,created_at")
         .eq("product_id", productId!)
         .eq("is_approved", true)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data as ReviewRow[]).map(rowToReview);
+      return (data as Omit<ReviewRow, "reviewer_email">[]).map((r) => rowToReview({ ...r, reviewer_email: null }));
     },
   });
 }
@@ -1296,15 +1296,16 @@ export function useApprovedReviews() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("product_reviews")
-        .select("*")
+        .select("id,product_id,reviewer_name,rating,comment,is_approved,created_at")
         .eq("is_approved", true)
         .order("created_at", { ascending: false })
         .limit(50);
       if (error) throw error;
-      return (data as ReviewRow[]).map(rowToReview);
+      return (data as Omit<ReviewRow, "reviewer_email">[]).map((r) => rowToReview({ ...r, reviewer_email: null }));
     },
   });
 }
+
 
 export function useAdminReviews() {
   return useQuery({
@@ -1553,22 +1554,13 @@ export function useCreateOrder() {
         const { error: itemErr } = await supabase.from("order_items").insert(itemRows);
         if (itemErr) throw itemErr;
       }
-      // Best-effort: bump coupon usage and notify the user.
+      // Best-effort: bump coupon usage via SECURITY DEFINER RPC.
       if (input.couponCode) {
         try {
-          const { data: cur } = await supabase
-            .from("coupons")
-            .select("id, used_count")
-            .eq("code", input.couponCode)
-            .maybeSingle();
-          if (cur) {
-            await supabase
-              .from("coupons")
-              .update({ used_count: (cur.used_count ?? 0) + 1 })
-              .eq("id", cur.id);
-          }
+          await supabase.rpc("increment_coupon_usage", { _code: input.couponCode });
         } catch {/* ignore */}
       }
+
       if (userData?.user?.id) {
         try {
           await supabase.from("notifications").insert({
@@ -2104,23 +2096,31 @@ export function useDeleteCoupon() {
 }
 
 export async function validateCoupon(code: string, subtotal: number): Promise<{ ok: true; coupon: Coupon; discount: number } | { ok: false; reason: string }> {
-  const { data, error } = await supabase
-    .from("coupons")
-    .select("*")
-    .eq("code", code.trim().toUpperCase())
-    .eq("is_active", true)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("validate_coupon", {
+    _code: code,
+    _subtotal: subtotal,
+  });
   if (error) return { ok: false, reason: error.message };
-  if (!data) return { ok: false, reason: "Invalid coupon code" };
-  const c = rowToCoupon(data);
-  if (c.expiresAt && new Date(c.expiresAt) < new Date()) return { ok: false, reason: "Coupon has expired" };
-  if (c.maxUses !== null && c.usedCount >= c.maxUses) return { ok: false, reason: "Coupon usage limit reached" };
-  if (subtotal < c.minOrderAmount) return { ok: false, reason: `Minimum order amount: KD ${c.minOrderAmount.toFixed(2)}` };
-  const discount = c.discountType === "percent"
-    ? Math.round((subtotal * c.discountValue) / 100 * 1000) / 1000
-    : Math.min(subtotal, c.discountValue);
-  return { ok: true, coupon: c, discount };
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { ok: false, reason: "Invalid coupon code" };
+  if (!row.ok) return { ok: false, reason: row.reason ?? "Invalid coupon code" };
+  const coupon: Coupon = {
+    id: row.coupon_id,
+    code: code.trim().toUpperCase(),
+    description: "",
+    discountType: row.discount_type as Coupon["discountType"],
+    discountValue: Number(row.discount_value),
+    minOrderAmount: Number(row.min_order_amount ?? 0),
+    maxUses: null,
+    usedCount: 0,
+    expiresAt: null,
+    isActive: true,
+    createdAt: "",
+    updatedAt: "",
+  };
+  return { ok: true, coupon, discount: Number(row.discount) };
 }
+
 
 /* ============================================================
  * Admin: Users

@@ -959,8 +959,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_coupon_usage: { Args: { _code: string }; Returns: undefined }
       next_order_number: { Args: never; Returns: string }
       slugify: { Args: { _input: string }; Returns: string }
+      validate_coupon: {
+        Args: { _code: string; _subtotal: number }
+        Returns: {
+          coupon_id: string
+          discount: number
+          discount_type: string
+          discount_value: number
+          min_order_amount: number
+          ok: boolean
+          reason: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"
