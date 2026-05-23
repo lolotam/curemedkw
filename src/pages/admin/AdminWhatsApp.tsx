@@ -97,11 +97,18 @@ export default function AdminWhatsApp() {
 
   const save = async () => {
     setSaving(true);
+    // Merge new key only if the admin typed one; otherwise keep stored value.
+    const nextKey = keyEditing && keyInput.trim() ? keyInput.trim() : s.api_key;
+    const payload: WaSettings = { ...s, api_key: nextKey };
     const { error } = await supabase
       .from("site_settings")
-      .upsert({ key: "whatsapp_integration", value: s as any }, { onConflict: "key" });
+      .upsert({ key: "whatsapp_integration", value: payload as any }, { onConflict: "key" });
     setSaving(false);
     if (error) return toast.error(error.message);
+    setS(payload);
+    setKeyInput("");
+    setKeyEditing(false);
+    setShowKey(false);
     toast.success("Settings saved");
     qc.invalidateQueries({ queryKey: ["wa_settings"] });
   };
