@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase edge runtime secrets — never commit
+edge-secrets*.json
+*.secrets.json
+.env.production.local
+/etc/curemed/
