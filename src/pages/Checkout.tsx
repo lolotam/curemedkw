@@ -641,71 +641,51 @@ function SectionCard({
   );
 }
 
-function PaymentOption({
+function MethodRow({
   selected,
   onSelect,
-  icon: Icon,
+  logo,
   title,
-  desc,
-  variant,
+  currency,
 }: {
   selected: boolean;
   onSelect: () => void;
-  icon: LucideIcon;
+  logo: string;
   title: string;
-  desc: string;
-  variant: GradientKey;
+  currency: string;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className={cn(
-        "group relative text-left rounded-2xl p-5 transition-all duration-300",
-        "border-2 backdrop-blur",
+        "group flex w-full items-center gap-4 rounded-2xl border-2 px-4 py-3.5 text-left transition-all duration-300",
         selected
-          ? "border-transparent bg-gradient-to-br from-sky-500/10 via-violet-500/10 to-pink-500/10 shadow-lg shadow-violet-500/20 scale-[1.02]"
-          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-1 hover:shadow-md",
+          ? "border-sky-500 bg-sky-500/5 shadow-md shadow-sky-500/15"
+          : "border-border bg-card/60 hover:border-sky-400/60 hover:-translate-y-0.5 hover:shadow-sm",
       )}
     >
-      {selected && (
-        <span className="absolute -top-2 -right-2 rtl:right-auto rtl:-left-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 via-violet-500 to-pink-500 text-white text-[10px] font-bold shadow-md">
-          ✓
-        </span>
-      )}
-      <div className="flex items-center gap-3 font-semibold">
-        <Icon3D icon={Icon} variant={variant} size="sm" />
-        <span className="text-base">{title}</span>
-      </div>
-      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{desc}</p>
-    </button>
-  );
-}
+      {/* Radio indicator */}
+      <span
+        className={cn(
+          "relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+          selected ? "border-sky-500" : "border-muted-foreground/40",
+        )}
+      >
+        {selected && <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />}
+      </span>
 
-function OnlineMethodOption({
-  selected,
-  onSelect,
-  icon: Icon,
-  title,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "group flex items-center gap-2.5 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all duration-300",
-        selected
-          ? "border-transparent bg-gradient-to-br from-sky-500/15 via-violet-500/15 to-pink-500/15 shadow-md shadow-violet-500/20"
-          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-0.5",
-      )}
-    >
-      <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-violet-500" : "text-muted-foreground")} />
-      <span className="truncate">{title}</span>
+      {/* Logo */}
+      <span className="flex h-10 w-14 shrink-0 items-center justify-center rounded-lg bg-white p-1 ring-1 ring-border/60">
+        <img src={logo} alt={title} className="max-h-full max-w-full object-contain" />
+      </span>
+
+      {/* Label */}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base font-bold">{title}</span>
+        <span className="block text-xs text-muted-foreground">{currency}</span>
+      </span>
     </button>
   );
 }
