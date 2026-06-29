@@ -176,13 +176,14 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!profile) return;
+    // Saved/typed values always win; profile only fills fields left empty.
     setForm((f) => ({
       ...f,
       customerName: f.customerName || profile.fullName,
       customerEmail: f.customerEmail || user?.email || "",
       customerPhone: f.customerPhone || profile.phone,
-      country: profile.country || f.country,
-      governorate: profile.governorate || f.governorate,
+      country: f.country || profile.country,
+      governorate: f.governorate || profile.governorate,
       area: f.area || profile.area,
       block: f.block || profile.block,
       street: f.street || profile.street,
@@ -190,6 +191,7 @@ export default function Checkout() {
       addressLine: f.addressLine || profile.addressLine,
     }));
   }, [profile, user]);
+
 
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
