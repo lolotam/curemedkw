@@ -207,6 +207,7 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgTitle, setMsgTitle] = useState("");
   const [msgBody, setMsgBody] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   // Sync notes when order loads
   const noteValue = adminNotes !== "" ? adminNotes : order?.adminNotes ?? "";
