@@ -105,6 +105,17 @@ export default function AdminOrders() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={payFilter} onValueChange={(v) => setPayFilter(v as any)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All payments</SelectItem>
+                {(["pending", "pending_payment", "paid", "payment_failed", "pending_status_update", "refunded"] as PaymentStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </>
         }
       />
