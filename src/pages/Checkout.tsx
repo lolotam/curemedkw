@@ -41,7 +41,7 @@ import {
   type GradientKey,
 } from "@/components/site/ColorfulFx";
 import type { LucideIcon } from "lucide-react";
-import { createMyFatoorahPayment, type OnlinePaymentMethod } from "@/lib/payment";
+import { createMyFatoorahPayment, sha256Hex, saveGuestToken, type OnlinePaymentMethod } from "@/lib/payment";
 import { Smartphone } from "lucide-react";
 
 const COUPON_KEY = "curemed.appliedCoupon";
