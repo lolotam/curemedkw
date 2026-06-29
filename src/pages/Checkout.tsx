@@ -295,10 +295,10 @@ export default function Checkout() {
         <ColorfulHeroBg />
         <div className="container">
           <Link
-            to="/cart"
+            to="/curemed"
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-brand transition-colors animate-fade-in"
           >
-            <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {t("cart.title")}
+            <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> {t("checkout.continueShopping")}
           </Link>
           <h1 className="mt-3 text-3xl sm:text-4xl md:text-6xl font-bold tracking-tight animate-fade-in [animation-delay:120ms]">
             <span className="bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500 bg-clip-text text-transparent">
@@ -499,9 +499,6 @@ export default function Checkout() {
                   </h2>
                 </div>
 
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  {t("checkout.editCart")}
-                </p>
                 <ul className="divide-y divide-border/60 mb-4 max-h-80 overflow-y-auto pr-1 -mr-1">
                   {items.map((i) => (
                     <li key={i.productId} className="flex gap-3 py-3 text-sm">
@@ -555,6 +552,16 @@ export default function Checkout() {
                     </li>
                   ))}
                 </ul>
+
+                {items.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={clear}
+                    className="text-xs font-medium text-muted-foreground hover:text-rose-500 transition-colors mb-3"
+                  >
+                    {t("cart.clear")}
+                  </button>
+                )}
 
                 <div className="mb-4">
                   <CouponInput

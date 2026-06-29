@@ -97,6 +97,7 @@ export const TRANSLATIONS: Dict = {
   "checkout.error.address": { en: "Please complete your delivery address.", ar: "يرجى إكمال عنوان التوصيل." },
   "checkout.error.country": { en: "Please select country and governorate.", ar: "يرجى اختيار الدولة والمحافظة." },
   "checkout.editCart": { en: "Edit your cart", ar: "تعديل سلتك" },
+  "checkout.continueShopping": { en: "Continue shopping", ar: "متابعة التسوق" },
   "cart.decrease": { en: "Decrease", ar: "إنقاص" },
   "cart.increase": { en: "Increase", ar: "زيادة" },
   "cart.remove": { en: "Remove", ar: "إزالة" },

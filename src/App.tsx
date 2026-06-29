@@ -20,7 +20,7 @@ const CategoryPage = lazy(() => import("./pages/CategoryPage"));
 const AboutUs = lazy(() => import("./pages/AboutUs"));
 const ContactUs = lazy(() => import("./pages/ContactUs"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const Cart = lazy(() => import("./pages/Cart"));
+
 const Checkout = lazy(() => import("./pages/Checkout"));
 const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
 const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
@@ -92,7 +92,7 @@ const App = () => {
                 <Route path="/curemed" element={<CuremedHome />} />
                 <Route path="/about" element={<AboutUs />} />
                 <Route path="/contact" element={<ContactUs />} />
-                <Route path="/cart" element={<Cart />} />
+                <Route path="/cart" element={<Navigate to="/checkout" replace />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-confirmation/:id" element={<OrderConfirmation />} />
                 <Route path="/payment/callback" element={<PaymentCallback />} />
