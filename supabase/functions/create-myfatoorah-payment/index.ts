@@ -9,12 +9,14 @@ import {
   myfatoorahRequest,
   MyFatoorahError,
 } from "../_shared/myfatoorah.ts";
+import { verifyGuestToken } from "../_shared/hash.ts";
 
 const BodySchema = z.object({
   order_id: z.string().uuid(),
   payment_method: z
-    .enum(["KNET", "CARD", "APPLE_PAY", "GOOGLE_PAY", "BENEFIT", "STC_PAY"])
+    .enum(["KNET", "CARD", "APPLE_PAY", "GOOGLE_PAY"])
     .default("CARD"),
+  payment_session_token: z.string().min(8).max(200).optional(),
 });
 
 interface CreatePaymentData {
