@@ -353,6 +353,7 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
               </Section>
             )}
 
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs uppercase font-semibold text-muted-foreground">Order status</label>
                 <Select
