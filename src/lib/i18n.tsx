@@ -79,7 +79,7 @@ export const TRANSLATIONS: Dict = {
   "checkout.creatingPayment": { en: "Creating payment…", ar: "جارٍ إنشاء الدفع…" },
   "checkout.redirecting": { en: "Redirecting to payment page…", ar: "جارٍ التحويل إلى صفحة الدفع…" },
   "checkout.paymentFailed": { en: "Could not start payment. Please try again.", ar: "تعذّر بدء الدفع. حاول مرة أخرى." },
-  "checkout.error.generic": { en: "Something went wrong. Please try again.", ar: "حدث خطأ ما. حاول مرة أخرى." },
+  
   "payment.verifying": { en: "Verifying your payment…", ar: "جارٍ التحقق من الدفع…" },
   "payment.successTitle": { en: "Payment successful", ar: "تم الدفع بنجاح" },
   "payment.successDesc": { en: "Your order is confirmed. Thank you!", ar: "تم تأكيد طلبك. شكراً لك!" },
