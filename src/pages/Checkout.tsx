@@ -78,6 +78,9 @@ export default function Checkout() {
     notes: "",
   });
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [payMode, setPayMode] = useState<"cod" | "online">("cod");
+  const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
+  const [redirecting, setRedirecting] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
 
   useEffect(() => { setApplied(loadCoupon()); }, []);
