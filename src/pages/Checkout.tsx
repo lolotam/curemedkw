@@ -606,9 +606,9 @@ export default function Checkout() {
                   {!createOrder.isPending && !redirecting && <Sparkles className="h-4 w-4 mr-2" />}
                   {redirecting
                     ? t("checkout.redirecting")
-                    : createOrder.isPending && payMode === "online"
+                    : createOrder.isPending
                       ? t("checkout.creatingPayment")
-                      : t("checkout.placeOrder")}
+                      : t("checkout.payNow")}
                 </Button>
               </GlowCard>
             </Reveal>
