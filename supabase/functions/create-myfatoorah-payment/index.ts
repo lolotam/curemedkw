@@ -1,7 +1,7 @@
 // Create a MyFatoorah Hosted Payment Page (v3) request for an order.
 // Returns a PaymentURL the frontend redirects the customer to.
 import { z } from "npm:zod@3";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsHeaders, json, jsonError } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import {
   getMyFatoorahConfig,
@@ -27,12 +27,16 @@ interface CreatePaymentData {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method !== "POST") {
+    console.error("create-myfatoorah-payment: method_not_allowed");
+    return jsonError("method_not_allowed", "Method not allowed.", 405);
+  }
 
   try {
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) {
-      return json({ error: parsed.error.flatten().fieldErrors }, 400);
+      console.error("create-myfatoorah-payment: invalid_request_body");
+      return jsonError("invalid_request_body", "Invalid request body.", 400);
     }
     const { order_id, payment_method, payment_session_token } = parsed.data;
 
@@ -56,26 +60,43 @@ Deno.serve(async (req) => {
       .eq("id", order_id)
       .maybeSingle();
     if (orderErr) throw orderErr;
-    if (!order) return json({ error: "Order not found" }, 404);
+    if (!order) {
+      console.error(`create-myfatoorah-payment: order_not_found order=${order_id}`);
+      return jsonError("order_not_found", "Order not found.", 404);
+    }
 
     // Ownership: logged-in user must own the order; guest orders require a valid token.
     if (order.user_id) {
       if (!callerId || callerId !== order.user_id) {
-        return json({ error: "Not authorized for this order" }, 403);
+        console.error(`create-myfatoorah-payment: unauthorized_order order=${order_id}`);
+        return jsonError(
+          "unauthorized_order",
+          "You are not authorized to pay for this order.",
+          403,
+        );
       }
     } else {
       const tokenError = await verifyGuestToken(
         order.payment_session_token_hash,
         payment_session_token,
       );
-      if (tokenError) return json({ error: tokenError }, 403);
+      if (tokenError) {
+        console.error(
+          `create-myfatoorah-payment: invalid_guest_payment_token order=${order_id}`,
+        );
+        return jsonError(
+          "invalid_guest_payment_token",
+          tokenError ?? "Invalid payment session token.",
+          403,
+        );
+      }
     }
 
     if (order.payment_status === "paid") {
-      return json({ error: "Order is already paid" }, 409);
+      return jsonError("order_already_paid", "This order has already been paid.", 409);
     }
     if (order.order_status === "cancelled") {
-      return json({ error: "Order is cancelled" }, 409);
+      return jsonError("order_cancelled", "This order has been cancelled.", 409);
     }
 
     // Recompute amount server-side from order_items + discount (never trust client).
@@ -85,7 +106,8 @@ Deno.serve(async (req) => {
       .eq("order_id", order_id);
     if (itemsErr) throw itemsErr;
     if (!items || items.length === 0) {
-      return json({ error: "Order has no items" }, 400);
+      console.error(`create-myfatoorah-payment: order_has_no_items order=${order_id}`);
+      return jsonError("order_has_no_items", "Order has no items.", 400);
     }
     const subtotal = items.reduce(
       (s, i) => s + Number(i.unit_price) * Number(i.quantity),
@@ -105,14 +127,27 @@ Deno.serve(async (req) => {
     // Source of truth is the stored order total; recomputed amount must match it.
     if (Math.abs(computed - storedTotal) > 0.001) {
       console.error(
-        `amount_mismatch order=${order_id} computed=${computed} stored=${storedTotal}`,
+        `create-myfatoorah-payment: amount_mismatch order=${order_id} computed=${computed} stored=${storedTotal}`,
       );
-      return json({ error: "amount_mismatch", success: false }, 400);
+      return jsonError("amount_mismatch", "Order amount could not be verified.", 400);
     }
     const amount = storedTotal;
-    if (amount <= 0) return json({ error: "Invalid order amount" }, 400);
+    if (amount <= 0) {
+      console.error(
+        `create-myfatoorah-payment: invalid_amount order=${order_id} amount=${amount}`,
+      );
+      return jsonError("invalid_amount", "Invalid order amount.", 400);
+    }
 
-    const config = getMyFatoorahConfig();
+    let config;
+    try {
+      config = getMyFatoorahConfig();
+    } catch {
+      console.error(
+        "create-myfatoorah-payment: missing_secret — MYFATOORAH_TOKEN not set",
+      );
+      return jsonError("missing_secret", "Payment provider is not configured.", 500);
+    }
     const currency = config.currency;
     const idempotencyKey =
       `myfatoorah:create:${order_id}:${payment_method}:${amount.toFixed(3)}`;
@@ -219,10 +254,13 @@ Deno.serve(async (req) => {
         .from("payment_attempts")
         .update({ status: "failed", error_message: message })
         .eq("id", attempt.id);
-      return json({ success: false, error: message }, 502);
+      console.error(
+        `create-myfatoorah-payment: myfatoorah_api_error order=${order_id} msg=${message}`,
+      );
+      return jsonError("myfatoorah_api_error", message, 502);
     }
   } catch (err) {
-    console.error("create-myfatoorah-payment error:", (err as Error).message);
-    return json({ error: "Failed to create payment" }, 500);
+    console.error("create-myfatoorah-payment: internal_error:", (err as Error).message);
+    return jsonError("internal_error", "Failed to create payment.", 500);
   }
 });

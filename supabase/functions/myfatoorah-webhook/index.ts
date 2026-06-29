@@ -1,6 +1,6 @@
 // MyFatoorah Webhook v2 receiver (PAYMENT_STATUS_CHANGED).
 // Public endpoint (verify_jwt = false) — secured via HMAC-SHA256 signature.
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsHeaders, json, jsonError } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { getMyFatoorahConfig } from "../_shared/myfatoorah.ts";
 import { verifyMyFatoorahSignature } from "../_shared/payment-security.ts";
@@ -8,7 +8,9 @@ import { applyPaymentToOrder, extractDetails, findOrder } from "../_shared/apply
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method !== "POST") {
+    return jsonError("method_not_allowed", "Method not allowed.", 405);
+  }
 
   try {
     const raw = await req.text();
@@ -87,9 +89,9 @@ Deno.serve(async (req) => {
 
     return json({ success: true, processed: !!order }, 200);
   } catch (err) {
-    console.error("myfatoorah-webhook error:", (err as Error).message);
+    console.error("myfatoorah-webhook: internal_error:", (err as Error).message);
     // Return 200 to avoid unnecessary retries on our internal errors? No —
     // signal failure so MyFatoorah retries per dashboard config.
-    return json({ success: false, message: "Internal error" }, 500);
+    return jsonError("internal_error", "Internal error", 500);
   }
 });

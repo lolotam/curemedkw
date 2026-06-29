@@ -1,7 +1,7 @@
 // Verify a MyFatoorah payment after redirect (callback). Calls Get Payment
 // Details, updates the order with downgrade protection, logs a payment_event.
 import { z } from "npm:zod@3";
-import { corsHeaders, json } from "../_shared/cors.ts";
+import { corsHeaders, json, jsonError } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { getMyFatoorahConfig, myfatoorahRequest, MyFatoorahError } from "../_shared/myfatoorah.ts";
 import { applyPaymentToOrder, extractDetails, findOrder } from "../_shared/apply-payment.ts";
@@ -22,15 +22,29 @@ interface PaymentDetails {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  if (req.method !== "POST") {
+    console.error("verify-myfatoorah-payment: method_not_allowed");
+    return jsonError("method_not_allowed", "Method not allowed.", 405);
+  }
 
   try {
     const parsed = BodySchema.safeParse(await req.json());
-    if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
+    if (!parsed.success) {
+      console.error("verify-myfatoorah-payment: invalid_request_body");
+      return jsonError("invalid_request_body", "Invalid request body.", 400);
+    }
     const { payment_id, order_id, payment_session_token } = parsed.data;
 
     const admin = getAdminClient();
-    const config = getMyFatoorahConfig();
+    let config;
+    try {
+      config = getMyFatoorahConfig();
+    } catch {
+      console.error(
+        "verify-myfatoorah-payment: missing_secret — MYFATOORAH_TOKEN not set",
+      );
+      return jsonError("missing_secret", "Payment provider is not configured.", 500);
+    }
 
     // Resolve caller identity (optional — supports guest orders).
     let callerId: string | null = null;
@@ -74,14 +88,30 @@ Deno.serve(async (req) => {
     if (order) {
       if (order.user_id) {
         if (!callerId || callerId !== order.user_id) {
-          return json({ error: "Not authorized for this order" }, 403);
+          console.error(
+            `verify-myfatoorah-payment: unauthorized_order payment_id=${payment_id}`,
+          );
+          return jsonError(
+            "unauthorized_order",
+            "You are not authorized for this order.",
+            403,
+          );
         }
       } else {
         const tokenError = await verifyGuestToken(
           order.payment_session_token_hash,
           payment_session_token,
         );
-        if (tokenError) return json({ error: tokenError }, 403);
+        if (tokenError) {
+          console.error(
+            `verify-myfatoorah-payment: invalid_guest_payment_token payment_id=${payment_id}`,
+          );
+          return jsonError(
+            "invalid_guest_payment_token",
+            tokenError ?? "Invalid payment session token.",
+            403,
+          );
+        }
       }
     }
 
@@ -99,7 +129,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (!order) return json({ error: "Order not found for this payment" }, 404);
+    if (!order) {
+      console.error(
+        `verify-myfatoorah-payment: order_not_found payment_id=${payment_id}`,
+      );
+      return jsonError("order_not_found", "Order not found for this payment.", 404);
+    }
 
     const d = extractDetails(details);
     const result = await applyPaymentToOrder(admin, order, details);
@@ -135,7 +170,7 @@ Deno.serve(async (req) => {
           : "Payment status is still pending. We will update your order shortly.",
     });
   } catch (err) {
-    console.error("verify-myfatoorah-payment error:", (err as Error).message);
-    return json({ error: "Failed to verify payment" }, 500);
+    console.error("verify-myfatoorah-payment: internal_error:", (err as Error).message);
+    return jsonError("internal_error", "Failed to verify payment.", 500);
   }
 });

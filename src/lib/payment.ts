@@ -71,7 +71,8 @@ export async function createMyFatoorahPayment(
       const ctx = (error as { context?: Response }).context;
       if (ctx && typeof ctx.json === "function") {
         const body = await ctx.json();
-        if (body?.error) message = typeof body.error === "string" ? body.error : message;
+        if (body?.message && typeof body.message === "string") message = body.message;
+        else if (body?.error && typeof body.error === "string") message = body.error;
       }
     } catch { /* ignore */ }
     return { success: false, order_id: orderId, error: message };
