@@ -173,8 +173,9 @@ export default function Checkout() {
       toast.error(t("checkout.error.address"));
       return;
     }
+    const online = payMode === "online";
     try {
-      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal } });
+      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, pay_mode: payMode } });
       const order = await createOrder.mutateAsync({
         customerName: form.customerName,
         customerEmail: form.customerEmail,
@@ -189,7 +190,7 @@ export default function Checkout() {
         building: form.building,
         addressLine: form.addressLine,
         notes: form.notes,
-        paymentMethod,
+        paymentMethod: online ? "pay_by_link" : "cod",
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
         items: items.map((i) => ({
@@ -201,6 +202,24 @@ export default function Checkout() {
           unitPrice: i.price,
         })),
       });
+
+      // ---------- Online payment via MyFatoorah ----------
+      if (online) {
+        setRedirecting(true);
+        const res = await createMyFatoorahPayment(order.id, onlineMethod);
+        if (res.success && res.payment_url) {
+          clear();
+          saveCoupon(null);
+          // Redirect the browser to MyFatoorah's hosted payment page.
+          window.location.href = res.payment_url;
+          return;
+        }
+        setRedirecting(false);
+        toast.error(res.error || t("checkout.paymentFailed"));
+        return;
+      }
+
+      // ---------- Cash on delivery ----------
       clear();
       saveCoupon(null);
       toast.success(t("checkout.success"));
@@ -256,9 +275,11 @@ export default function Checkout() {
 
       navigate(`/order-confirmation/${order.id}`);
     } catch (err: any) {
+      setRedirecting(false);
       toast.error(err?.message || t("checkout.error.generic"));
     }
   };
+
 
   return (
     <SiteLayout>
