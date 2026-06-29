@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send } from "lucide-react";
+import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
