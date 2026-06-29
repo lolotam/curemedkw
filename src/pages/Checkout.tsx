@@ -466,54 +466,24 @@ export default function Checkout() {
                 variant="amber"
                 title={t("checkout.payment")}
               >
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <PaymentOption
-                    selected={payMode === "cod"}
-                    onSelect={() => setPayMode("cod")}
-                    icon={Banknote}
-                    title={t("checkout.cod")}
-                    desc={t("checkout.codDesc")}
-                    variant="amber"
-                  />
-                  <PaymentOption
-                    selected={payMode === "online"}
-                    onSelect={() => setPayMode("online")}
-                    icon={CreditCard}
-                    title={t("checkout.payOnline")}
-                    desc={t("checkout.payOnlineDesc")}
-                    variant="violet"
-                  />
+                <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                  {t("checkout.paymentDesc")}
+                </p>
+                <div className="space-y-3">
+                  {methods.map((m) => (
+                    <MethodRow
+                      key={m.method}
+                      selected={onlineMethod === m.method}
+                      onSelect={() => setOnlineMethod(m.method)}
+                      logo={m.logo}
+                      title={t(m.labelKey)}
+                      currency={t("checkout.currency")}
+                    />
+                  ))}
                 </div>
-
-                {payMode === "online" && (
-                  <div className="mt-5 animate-fade-in">
-                    <p className="text-xs font-medium text-muted-foreground mb-2.5">
-                      {t("checkout.chooseMethod")}
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <OnlineMethodOption
-                        selected={onlineMethod === "KNET"}
-                        onSelect={() => setOnlineMethod("KNET")}
-                        icon={Wallet}
-                        title={t("checkout.method.knet")}
-                      />
-                      <OnlineMethodOption
-                        selected={onlineMethod === "CARD"}
-                        onSelect={() => setOnlineMethod("CARD")}
-                        icon={CreditCard}
-                        title={t("checkout.method.card")}
-                      />
-                      <OnlineMethodOption
-                        selected={onlineMethod === "APPLE_PAY"}
-                        onSelect={() => setOnlineMethod("APPLE_PAY")}
-                        icon={Smartphone}
-                        title={t("checkout.method.applePay")}
-                      />
-                    </div>
-                  </div>
-                )}
               </SectionCard>
             </Reveal>
+
           </div>
 
           {/* Summary */}
