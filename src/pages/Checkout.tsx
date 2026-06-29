@@ -201,14 +201,13 @@ export default function Checkout() {
       toast.error(t("checkout.error.address"));
       return;
     }
-    const online = payMode === "online";
-    // For online payments we authorize the (possibly guest) payment with a
-    // one-time token. Only the SHA-256 hash is stored on the order; the raw
-    // token stays in sessionStorage and never touches the URL.
-    const rawPaymentToken = online ? crypto.randomUUID() : null;
-    const paymentTokenHash = rawPaymentToken ? await sha256Hex(rawPaymentToken) : null;
+    // Online payment via MyFatoorah is the only checkout path. Authorize the
+    // (possibly guest) payment with a one-time token. Only the SHA-256 hash is
+    // stored on the order; the raw token stays in sessionStorage.
+    const rawPaymentToken = crypto.randomUUID();
+    const paymentTokenHash = await sha256Hex(rawPaymentToken);
     try {
-      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, pay_mode: payMode } });
+      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, method: onlineMethod } });
       const order = await createOrder.mutateAsync({
         customerName: form.customerName,
         customerEmail: form.customerEmail,
@@ -223,7 +222,7 @@ export default function Checkout() {
         building: form.building,
         addressLine: form.addressLine,
         notes: form.notes,
-        paymentMethod: online ? "pay_by_link" : "cod",
+        paymentMethod: "pay_by_link",
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
         paymentSessionTokenHash: paymentTokenHash,
@@ -237,29 +236,7 @@ export default function Checkout() {
         })),
       });
 
-      // ---------- Online payment via MyFatoorah ----------
-      if (online) {
-        setRedirecting(true);
-        if (rawPaymentToken) saveGuestToken(order.id, rawPaymentToken);
-        const res = await createMyFatoorahPayment(order.id, onlineMethod, rawPaymentToken);
-        if (res.success && res.payment_url) {
-          clear();
-          saveCoupon(null);
-          // Redirect the browser to MyFatoorah's hosted payment page.
-          window.location.href = res.payment_url;
-          return;
-        }
-        setRedirecting(false);
-        toast.error(res.error || t("checkout.paymentFailed"));
-        return;
-      }
-
-      // ---------- Cash on delivery ----------
-      clear();
-      saveCoupon(null);
-      toast.success(t("checkout.success"));
-
-      // Fire WhatsApp notifications (best-effort, never blocks checkout)
+      // Notify admins of the new order (best-effort, never blocks checkout).
       void (async () => {
         try {
           const { data: settingRow } = await supabase
@@ -270,8 +247,6 @@ export default function Checkout() {
           const settings: any = settingRow?.value ?? {};
           const adminNumbers: string[] = Array.isArray(settings.admin_numbers) ? settings.admin_numbers : [];
           const itemsSummary = items.map((i) => `• ${i.name} ×${i.quantity}`).join("\n");
-          const invoiceUrl = `${window.location.origin}/order-confirmation/${order.id}`;
-
           if (adminNumbers.length > 0) {
             void supabase.functions.invoke("send-whatsapp", {
               body: {
@@ -288,32 +263,29 @@ export default function Checkout() {
               },
             });
           }
-          if (form.customerPhone) {
-            void supabase.functions.invoke("send-whatsapp", {
-              body: {
-                event: "order.paid",
-                to: [form.customerPhone],
-                order_id: order.id,
-                data: {
-                  customer_name: form.customerName,
-                  order_number: order.orderNumber,
-                  total: order.total.toFixed(2),
-                  invoice_url: invoiceUrl,
-                },
-              },
-            });
-          }
         } catch (e) {
           console.warn("WhatsApp notify failed (non-blocking):", e);
         }
       })();
 
-      navigate(`/order-confirmation/${order.id}`);
+      // Create the MyFatoorah hosted payment and redirect.
+      setRedirecting(true);
+      saveGuestToken(order.id, rawPaymentToken);
+      const res = await createMyFatoorahPayment(order.id, onlineMethod, rawPaymentToken);
+      if (res.success && res.payment_url) {
+        clear();
+        saveCoupon(null);
+        window.location.href = res.payment_url;
+        return;
+      }
+      setRedirecting(false);
+      toast.error(res.error || t("checkout.paymentFailed"));
     } catch (err: any) {
       setRedirecting(false);
       toast.error(err?.message || t("checkout.error.generic"));
     }
   };
+
 
 
   return (
