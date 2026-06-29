@@ -454,6 +454,7 @@ export type Database = {
           myfatoorah_card_brand: string | null
           myfatoorah_card_last4: string | null
           myfatoorah_invoice_id: string | null
+          myfatoorah_invoice_reference: string | null
           myfatoorah_payment_id: string | null
           myfatoorah_payment_url: string | null
           myfatoorah_reference_id: string | null
@@ -501,6 +502,7 @@ export type Database = {
           myfatoorah_card_brand?: string | null
           myfatoorah_card_last4?: string | null
           myfatoorah_invoice_id?: string | null
+          myfatoorah_invoice_reference?: string | null
           myfatoorah_payment_id?: string | null
           myfatoorah_payment_url?: string | null
           myfatoorah_reference_id?: string | null
@@ -548,6 +550,7 @@ export type Database = {
           myfatoorah_card_brand?: string | null
           myfatoorah_card_last4?: string | null
           myfatoorah_invoice_id?: string | null
+          myfatoorah_invoice_reference?: string | null
           myfatoorah_payment_id?: string | null
           myfatoorah_payment_url?: string | null
           myfatoorah_reference_id?: string | null

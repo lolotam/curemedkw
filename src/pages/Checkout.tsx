@@ -2,8 +2,6 @@ import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  CreditCard,
-  Banknote,
   Loader2,
   User,
   MapPin,
@@ -12,10 +10,10 @@ import {
   Sparkles,
   Tag,
   ShoppingBag,
-  Globe,
   Plus,
   Minus,
   Trash2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +40,12 @@ import {
 } from "@/components/site/ColorfulFx";
 import type { LucideIcon } from "lucide-react";
 import { createMyFatoorahPayment, sha256Hex, saveGuestToken, type OnlinePaymentMethod } from "@/lib/payment";
-import { Smartphone } from "lucide-react";
+import { canUseApplePay, canUseGooglePay } from "@/lib/deviceWallets";
+import knetLogo from "@/assets/payment/knet.png";
+import cardLogo from "@/assets/payment/visa-mastercard.png";
+import applePayLogo from "@/assets/payment/apple-pay.png";
+import googlePayLogo from "@/assets/payment/google-pay.png";
+
 
 const COUPON_KEY = "curemed.appliedCoupon";
 function loadCoupon(): AppliedCoupon | null {
@@ -55,6 +58,18 @@ function saveCoupon(c: AppliedCoupon | null) {
   if (c) sessionStorage.setItem(COUPON_KEY, JSON.stringify(c));
   else sessionStorage.removeItem(COUPON_KEY);
 }
+
+interface PaymentMethodItem {
+  method: OnlinePaymentMethod;
+  labelKey: string;
+  logo: string;
+}
+
+// KNET + Visa/MasterCard are always offered; device wallets are appended at runtime.
+const BASE_METHODS: PaymentMethodItem[] = [
+  { method: "KNET", labelKey: "checkout.method.knet", logo: knetLogo },
+  { method: "CARD", labelKey: "checkout.method.card", logo: cardLogo },
+];
 
 export default function Checkout() {
   const { items, subtotal, clear, setQuantity, remove } = useCart();
@@ -77,10 +92,24 @@ export default function Checkout() {
     addressLine: "",
     notes: "",
   });
-  const [payMode, setPayMode] = useState<"cod" | "online">("cod");
   const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
   const [redirecting, setRedirecting] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+
+  // Available payment methods: KNET + Visa/MasterCard always; wallets only on
+  // supported devices. Built once on mount to avoid SSR/hydration mismatches.
+  const [methods, setMethods] = useState<PaymentMethodItem[]>(BASE_METHODS);
+  useEffect(() => {
+    const list = [...BASE_METHODS];
+    if (canUseApplePay()) {
+      list.push({ method: "APPLE_PAY", labelKey: "checkout.method.applePay", logo: applePayLogo });
+    }
+    if (canUseGooglePay()) {
+      list.push({ method: "GOOGLE_PAY", labelKey: "checkout.method.googlePay", logo: googlePayLogo });
+    }
+    setMethods(list);
+  }, []);
+
 
   useEffect(() => { setApplied(loadCoupon()); }, []);
   useEffect(() => {
@@ -172,14 +201,13 @@ export default function Checkout() {
       toast.error(t("checkout.error.address"));
       return;
     }
-    const online = payMode === "online";
-    // For online payments we authorize the (possibly guest) payment with a
-    // one-time token. Only the SHA-256 hash is stored on the order; the raw
-    // token stays in sessionStorage and never touches the URL.
-    const rawPaymentToken = online ? crypto.randomUUID() : null;
-    const paymentTokenHash = rawPaymentToken ? await sha256Hex(rawPaymentToken) : null;
+    // Online payment via MyFatoorah is the only checkout path. Authorize the
+    // (possibly guest) payment with a one-time token. Only the SHA-256 hash is
+    // stored on the order; the raw token stays in sessionStorage.
+    const rawPaymentToken = crypto.randomUUID();
+    const paymentTokenHash = await sha256Hex(rawPaymentToken);
     try {
-      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, pay_mode: payMode } });
+      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, method: onlineMethod } });
       const order = await createOrder.mutateAsync({
         customerName: form.customerName,
         customerEmail: form.customerEmail,
@@ -194,7 +222,7 @@ export default function Checkout() {
         building: form.building,
         addressLine: form.addressLine,
         notes: form.notes,
-        paymentMethod: online ? "pay_by_link" : "cod",
+        paymentMethod: "pay_by_link",
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
         paymentSessionTokenHash: paymentTokenHash,
@@ -208,29 +236,7 @@ export default function Checkout() {
         })),
       });
 
-      // ---------- Online payment via MyFatoorah ----------
-      if (online) {
-        setRedirecting(true);
-        if (rawPaymentToken) saveGuestToken(order.id, rawPaymentToken);
-        const res = await createMyFatoorahPayment(order.id, onlineMethod, rawPaymentToken);
-        if (res.success && res.payment_url) {
-          clear();
-          saveCoupon(null);
-          // Redirect the browser to MyFatoorah's hosted payment page.
-          window.location.href = res.payment_url;
-          return;
-        }
-        setRedirecting(false);
-        toast.error(res.error || t("checkout.paymentFailed"));
-        return;
-      }
-
-      // ---------- Cash on delivery ----------
-      clear();
-      saveCoupon(null);
-      toast.success(t("checkout.success"));
-
-      // Fire WhatsApp notifications (best-effort, never blocks checkout)
+      // Notify admins of the new order (best-effort, never blocks checkout).
       void (async () => {
         try {
           const { data: settingRow } = await supabase
@@ -241,8 +247,6 @@ export default function Checkout() {
           const settings: any = settingRow?.value ?? {};
           const adminNumbers: string[] = Array.isArray(settings.admin_numbers) ? settings.admin_numbers : [];
           const itemsSummary = items.map((i) => `• ${i.name} ×${i.quantity}`).join("\n");
-          const invoiceUrl = `${window.location.origin}/order-confirmation/${order.id}`;
-
           if (adminNumbers.length > 0) {
             void supabase.functions.invoke("send-whatsapp", {
               body: {
@@ -259,32 +263,29 @@ export default function Checkout() {
               },
             });
           }
-          if (form.customerPhone) {
-            void supabase.functions.invoke("send-whatsapp", {
-              body: {
-                event: "order.paid",
-                to: [form.customerPhone],
-                order_id: order.id,
-                data: {
-                  customer_name: form.customerName,
-                  order_number: order.orderNumber,
-                  total: order.total.toFixed(2),
-                  invoice_url: invoiceUrl,
-                },
-              },
-            });
-          }
         } catch (e) {
           console.warn("WhatsApp notify failed (non-blocking):", e);
         }
       })();
 
-      navigate(`/order-confirmation/${order.id}`);
+      // Create the MyFatoorah hosted payment and redirect.
+      setRedirecting(true);
+      saveGuestToken(order.id, rawPaymentToken);
+      const res = await createMyFatoorahPayment(order.id, onlineMethod, rawPaymentToken);
+      if (res.success && res.payment_url) {
+        clear();
+        saveCoupon(null);
+        window.location.href = res.payment_url;
+        return;
+      }
+      setRedirecting(false);
+      toast.error(res.error || t("checkout.paymentFailed"));
     } catch (err: any) {
       setRedirecting(false);
       toast.error(err?.message || t("checkout.error.generic"));
     }
   };
+
 
 
   return (
@@ -465,54 +466,24 @@ export default function Checkout() {
                 variant="amber"
                 title={t("checkout.payment")}
               >
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <PaymentOption
-                    selected={payMode === "cod"}
-                    onSelect={() => setPayMode("cod")}
-                    icon={Banknote}
-                    title={t("checkout.cod")}
-                    desc={t("checkout.codDesc")}
-                    variant="amber"
-                  />
-                  <PaymentOption
-                    selected={payMode === "online"}
-                    onSelect={() => setPayMode("online")}
-                    icon={CreditCard}
-                    title={t("checkout.payOnline")}
-                    desc={t("checkout.payOnlineDesc")}
-                    variant="violet"
-                  />
+                <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                  {t("checkout.paymentDesc")}
+                </p>
+                <div className="space-y-3">
+                  {methods.map((m) => (
+                    <MethodRow
+                      key={m.method}
+                      selected={onlineMethod === m.method}
+                      onSelect={() => setOnlineMethod(m.method)}
+                      logo={m.logo}
+                      title={t(m.labelKey)}
+                      currency={t("checkout.currency")}
+                    />
+                  ))}
                 </div>
-
-                {payMode === "online" && (
-                  <div className="mt-5 animate-fade-in">
-                    <p className="text-xs font-medium text-muted-foreground mb-2.5">
-                      {t("checkout.chooseMethod")}
-                    </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <OnlineMethodOption
-                        selected={onlineMethod === "KNET"}
-                        onSelect={() => setOnlineMethod("KNET")}
-                        icon={Wallet}
-                        title={t("checkout.method.knet")}
-                      />
-                      <OnlineMethodOption
-                        selected={onlineMethod === "CARD"}
-                        onSelect={() => setOnlineMethod("CARD")}
-                        icon={CreditCard}
-                        title={t("checkout.method.card")}
-                      />
-                      <OnlineMethodOption
-                        selected={onlineMethod === "APPLE_PAY"}
-                        onSelect={() => setOnlineMethod("APPLE_PAY")}
-                        icon={Smartphone}
-                        title={t("checkout.method.applePay")}
-                      />
-                    </div>
-                  </div>
-                )}
               </SectionCard>
             </Reveal>
+
           </div>
 
           {/* Summary */}
@@ -635,9 +606,9 @@ export default function Checkout() {
                   {!createOrder.isPending && !redirecting && <Sparkles className="h-4 w-4 mr-2" />}
                   {redirecting
                     ? t("checkout.redirecting")
-                    : createOrder.isPending && payMode === "online"
+                    : createOrder.isPending
                       ? t("checkout.creatingPayment")
-                      : t("checkout.placeOrder")}
+                      : t("checkout.payNow")}
                 </Button>
               </GlowCard>
             </Reveal>
@@ -670,71 +641,51 @@ function SectionCard({
   );
 }
 
-function PaymentOption({
+function MethodRow({
   selected,
   onSelect,
-  icon: Icon,
+  logo,
   title,
-  desc,
-  variant,
+  currency,
 }: {
   selected: boolean;
   onSelect: () => void;
-  icon: LucideIcon;
+  logo: string;
   title: string;
-  desc: string;
-  variant: GradientKey;
+  currency: string;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
+      aria-pressed={selected}
       className={cn(
-        "group relative text-left rounded-2xl p-5 transition-all duration-300",
-        "border-2 backdrop-blur",
+        "group flex w-full items-center gap-4 rounded-2xl border-2 px-4 py-3.5 text-left transition-all duration-300",
         selected
-          ? "border-transparent bg-gradient-to-br from-sky-500/10 via-violet-500/10 to-pink-500/10 shadow-lg shadow-violet-500/20 scale-[1.02]"
-          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-1 hover:shadow-md",
+          ? "border-sky-500 bg-sky-500/5 shadow-md shadow-sky-500/15"
+          : "border-border bg-card/60 hover:border-sky-400/60 hover:-translate-y-0.5 hover:shadow-sm",
       )}
     >
-      {selected && (
-        <span className="absolute -top-2 -right-2 rtl:right-auto rtl:-left-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 via-violet-500 to-pink-500 text-white text-[10px] font-bold shadow-md">
-          ✓
-        </span>
-      )}
-      <div className="flex items-center gap-3 font-semibold">
-        <Icon3D icon={Icon} variant={variant} size="sm" />
-        <span className="text-base">{title}</span>
-      </div>
-      <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{desc}</p>
-    </button>
-  );
-}
+      {/* Radio indicator */}
+      <span
+        className={cn(
+          "relative inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+          selected ? "border-sky-500" : "border-muted-foreground/40",
+        )}
+      >
+        {selected && <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />}
+      </span>
 
-function OnlineMethodOption({
-  selected,
-  onSelect,
-  icon: Icon,
-  title,
-}: {
-  selected: boolean;
-  onSelect: () => void;
-  icon: LucideIcon;
-  title: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onSelect}
-      className={cn(
-        "group flex items-center gap-2.5 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all duration-300",
-        selected
-          ? "border-transparent bg-gradient-to-br from-sky-500/15 via-violet-500/15 to-pink-500/15 shadow-md shadow-violet-500/20"
-          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-0.5",
-      )}
-    >
-      <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-violet-500" : "text-muted-foreground")} />
-      <span className="truncate">{title}</span>
+      {/* Logo */}
+      <span className="flex h-10 w-14 shrink-0 items-center justify-center rounded-lg bg-white p-1 ring-1 ring-border/60">
+        <img src={logo} alt={title} className="max-h-full max-w-full object-contain" />
+      </span>
+
+      {/* Label */}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-base font-bold">{title}</span>
+        <span className="block text-xs text-muted-foreground">{currency}</span>
+      </span>
     </button>
   );
 }

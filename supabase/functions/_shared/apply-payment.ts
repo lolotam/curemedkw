@@ -6,10 +6,12 @@ import { mapMyFatoorahStatus, type MappedStatus } from "./payment-status.ts";
 
 export interface ResolvedDetails {
   invoiceId?: string | null;
+  invoiceReference?: string | null;
   paymentId?: string | null;
   transactionId?: string | null;
   referenceId?: string | null;
   trackId?: string | null;
+  paymentMethod?: string | null;
   cardBrand?: string | null;
   cardLast4?: string | null;
   errorCode?: string | null;
@@ -27,16 +29,19 @@ export function extractDetails(data: unknown): ResolvedDetails {
   const last4 = number ? number.replace(/[^0-9]/g, "").slice(-4) : null;
   return {
     invoiceId: invoice.Id ?? null,
+    invoiceReference: invoice.Reference ?? null,
     paymentId: txn.PaymentId ?? null,
     transactionId: txn.Id ?? null,
     referenceId: txn.ReferenceId ?? null,
     trackId: txn.TrackId ?? null,
+    paymentMethod: txn.PaymentMethod ?? null,
     cardBrand: card.Brand ?? null,
     cardLast4: last4,
     errorCode: error.Code || null,
     errorMessage: error.Message || null,
   };
 }
+
 
 export interface ApplyResult {
   mapped: MappedStatus;
@@ -67,13 +72,17 @@ export async function applyPaymentToOrder(
     payment_status: mapped.paymentStatus,
     payment_verified_at: new Date().toISOString(),
     myfatoorah_invoice_id: details.invoiceId ?? undefined,
+    myfatoorah_invoice_reference: details.invoiceReference ?? undefined,
     myfatoorah_payment_id: details.paymentId ?? undefined,
     myfatoorah_transaction_id: details.transactionId ?? undefined,
     myfatoorah_reference_id: details.referenceId ?? undefined,
     myfatoorah_track_id: details.trackId ?? undefined,
+    // Actual method used per the provider response (source of truth over the requested one).
+    payment_online_method: details.paymentMethod ?? undefined,
     myfatoorah_card_brand: details.cardBrand ?? undefined,
     myfatoorah_card_last4: details.cardLast4 ?? undefined,
   };
+
 
   if (mapped.isSuccess) {
     patch.paid_at = new Date().toISOString();
