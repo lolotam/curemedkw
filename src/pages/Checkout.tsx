@@ -2,8 +2,6 @@ import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  CreditCard,
-  Banknote,
   Loader2,
   User,
   MapPin,
@@ -12,10 +10,10 @@ import {
   Sparkles,
   Tag,
   ShoppingBag,
-  Globe,
   Plus,
   Minus,
   Trash2,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,7 +40,12 @@ import {
 } from "@/components/site/ColorfulFx";
 import type { LucideIcon } from "lucide-react";
 import { createMyFatoorahPayment, sha256Hex, saveGuestToken, type OnlinePaymentMethod } from "@/lib/payment";
-import { Smartphone } from "lucide-react";
+import { canUseApplePay, canUseGooglePay } from "@/lib/deviceWallets";
+import knetLogo from "@/assets/payment/knet.png";
+import cardLogo from "@/assets/payment/visa-mastercard.png";
+import applePayLogo from "@/assets/payment/apple-pay.png";
+import googlePayLogo from "@/assets/payment/google-pay.png";
+
 
 const COUPON_KEY = "curemed.appliedCoupon";
 function loadCoupon(): AppliedCoupon | null {
