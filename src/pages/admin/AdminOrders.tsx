@@ -155,7 +155,7 @@ export default function AdminOrders() {
                       {o.paymentStatus}
                     </span>
                     <div className="text-[10px] text-muted-foreground mt-0.5">
-                      {o.paymentMethod === "cod" ? "COD" : "Pay by link"}
+                      {o.paymentMethod === "cod" ? "COD" : "Online"}
                     </div>
                   </TableCell>
                   <TableCell>
