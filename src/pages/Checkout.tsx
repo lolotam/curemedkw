@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { useCart } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
-import { useCreateOrder, useProfile, type PaymentMethod } from "@/lib/db";
+import { useCreateOrder, useProfile } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
 import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
@@ -41,6 +41,8 @@ import {
   type GradientKey,
 } from "@/components/site/ColorfulFx";
 import type { LucideIcon } from "lucide-react";
+import { createMyFatoorahPayment, type OnlinePaymentMethod } from "@/lib/payment";
+import { Smartphone } from "lucide-react";
 
 const COUPON_KEY = "curemed.appliedCoupon";
 function loadCoupon(): AppliedCoupon | null {
@@ -75,7 +77,9 @@ export default function Checkout() {
     addressLine: "",
     notes: "",
   });
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
+  const [payMode, setPayMode] = useState<"cod" | "online">("cod");
+  const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
+  const [redirecting, setRedirecting] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
 
   useEffect(() => { setApplied(loadCoupon()); }, []);
@@ -168,8 +172,9 @@ export default function Checkout() {
       toast.error(t("checkout.error.address"));
       return;
     }
+    const online = payMode === "online";
     try {
-      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal } });
+      logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, pay_mode: payMode } });
       const order = await createOrder.mutateAsync({
         customerName: form.customerName,
         customerEmail: form.customerEmail,
@@ -184,7 +189,7 @@ export default function Checkout() {
         building: form.building,
         addressLine: form.addressLine,
         notes: form.notes,
-        paymentMethod,
+        paymentMethod: online ? "pay_by_link" : "cod",
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
         items: items.map((i) => ({
@@ -196,6 +201,24 @@ export default function Checkout() {
           unitPrice: i.price,
         })),
       });
+
+      // ---------- Online payment via MyFatoorah ----------
+      if (online) {
+        setRedirecting(true);
+        const res = await createMyFatoorahPayment(order.id, onlineMethod);
+        if (res.success && res.payment_url) {
+          clear();
+          saveCoupon(null);
+          // Redirect the browser to MyFatoorah's hosted payment page.
+          window.location.href = res.payment_url;
+          return;
+        }
+        setRedirecting(false);
+        toast.error(res.error || t("checkout.paymentFailed"));
+        return;
+      }
+
+      // ---------- Cash on delivery ----------
       clear();
       saveCoupon(null);
       toast.success(t("checkout.success"));
@@ -251,9 +274,11 @@ export default function Checkout() {
 
       navigate(`/order-confirmation/${order.id}`);
     } catch (err: any) {
+      setRedirecting(false);
       toast.error(err?.message || t("checkout.error.generic"));
     }
   };
+
 
   return (
     <SiteLayout>
@@ -435,22 +460,50 @@ export default function Checkout() {
               >
                 <div className="grid sm:grid-cols-2 gap-4">
                   <PaymentOption
-                    selected={paymentMethod === "cod"}
-                    onSelect={() => setPaymentMethod("cod")}
+                    selected={payMode === "cod"}
+                    onSelect={() => setPayMode("cod")}
                     icon={Banknote}
                     title={t("checkout.cod")}
                     desc={t("checkout.codDesc")}
                     variant="amber"
                   />
                   <PaymentOption
-                    selected={paymentMethod === "pay_by_link"}
-                    onSelect={() => setPaymentMethod("pay_by_link")}
+                    selected={payMode === "online"}
+                    onSelect={() => setPayMode("online")}
                     icon={CreditCard}
-                    title={t("checkout.payByLink")}
-                    desc={t("checkout.payByLinkDesc")}
+                    title={t("checkout.payOnline")}
+                    desc={t("checkout.payOnlineDesc")}
                     variant="violet"
                   />
                 </div>
+
+                {payMode === "online" && (
+                  <div className="mt-5 animate-fade-in">
+                    <p className="text-xs font-medium text-muted-foreground mb-2.5">
+                      {t("checkout.chooseMethod")}
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      <OnlineMethodOption
+                        selected={onlineMethod === "KNET"}
+                        onSelect={() => setOnlineMethod("KNET")}
+                        icon={Wallet}
+                        title={t("checkout.method.knet")}
+                      />
+                      <OnlineMethodOption
+                        selected={onlineMethod === "CARD"}
+                        onSelect={() => setOnlineMethod("CARD")}
+                        icon={CreditCard}
+                        title={t("checkout.method.card")}
+                      />
+                      <OnlineMethodOption
+                        selected={onlineMethod === "APPLE_PAY"}
+                        onSelect={() => setOnlineMethod("APPLE_PAY")}
+                        icon={Smartphone}
+                        title={t("checkout.method.applePay")}
+                      />
+                    </div>
+                  </div>
+                )}
               </SectionCard>
             </Reveal>
           </div>
@@ -561,7 +614,7 @@ export default function Checkout() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={createOrder.isPending}
+                  disabled={createOrder.isPending || redirecting}
                   className={cn(
                     "mt-6 w-full rounded-full font-semibold text-white",
                     "bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500",
@@ -569,11 +622,15 @@ export default function Checkout() {
                     "transition-all duration-300 hover:scale-[1.02]",
                   )}
                 >
-                  {createOrder.isPending && (
+                  {(createOrder.isPending || redirecting) && (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   )}
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {t("checkout.placeOrder")}
+                  {!createOrder.isPending && !redirecting && <Sparkles className="h-4 w-4 mr-2" />}
+                  {redirecting
+                    ? t("checkout.redirecting")
+                    : createOrder.isPending && payMode === "online"
+                      ? t("checkout.creatingPayment")
+                      : t("checkout.placeOrder")}
                 </Button>
               </GlowCard>
             </Reveal>
@@ -643,6 +700,34 @@ function PaymentOption({
         <span className="text-base">{title}</span>
       </div>
       <p className="text-xs text-muted-foreground mt-3 leading-relaxed">{desc}</p>
+    </button>
+  );
+}
+
+function OnlineMethodOption({
+  selected,
+  onSelect,
+  icon: Icon,
+  title,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group flex items-center gap-2.5 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all duration-300",
+        selected
+          ? "border-transparent bg-gradient-to-br from-sky-500/15 via-violet-500/15 to-pink-500/15 shadow-md shadow-violet-500/20"
+          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-0.5",
+      )}
+    >
+      <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-violet-500" : "text-muted-foreground")} />
+      <span className="truncate">{title}</span>
     </button>
   );
 }

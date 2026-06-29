@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send } from "lucide-react";
+import { Loader2, Package, Eye, Trash2, Search, MessageSquare, Send, Copy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Button } from "@/components/ui/button";
@@ -39,9 +39,15 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 
 const PAY_COLORS: Record<PaymentStatus, string> = {
   pending: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  pending_payment: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  pending_status_update: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
   paid: "bg-green-500/10 text-green-700 dark:text-green-300",
   failed: "bg-red-500/10 text-red-700 dark:text-red-300",
+  payment_failed: "bg-red-500/10 text-red-700 dark:text-red-300",
+  payment_cancelled: "bg-red-500/10 text-red-700 dark:text-red-300",
+  payment_expired: "bg-red-500/10 text-red-700 dark:text-red-300",
   refunded: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
+  partially_refunded: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 };
 
 export default function AdminOrders() {
@@ -51,12 +57,14 @@ export default function AdminOrders() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [payFilter, setPayFilter] = useState<PaymentStatus | "all">("all");
   const [openId, setOpenId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
       if (statusFilter !== "all" && o.orderStatus !== statusFilter) return false;
+      if (payFilter !== "all" && o.paymentStatus !== payFilter) return false;
       if (!q) return true;
       return (
         o.orderNumber.toLowerCase().includes(q) ||
@@ -65,7 +73,7 @@ export default function AdminOrders() {
         o.customerEmail.toLowerCase().includes(q)
       );
     });
-  }, [orders, search, statusFilter]);
+  }, [orders, search, statusFilter, payFilter]);
 
   return (
     <div className="p-6 md:p-10 w-full max-w-none space-y-6">
@@ -93,6 +101,17 @@ export default function AdminOrders() {
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 {(["new", "confirmed", "processing", "shipped", "delivered", "cancelled"] as OrderStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={payFilter} onValueChange={(v) => setPayFilter(v as any)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Payment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All payments</SelectItem>
+                {(["pending", "pending_payment", "paid", "payment_failed", "pending_status_update", "refunded"] as PaymentStatus[]).map((s) => (
                   <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
@@ -201,6 +220,7 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
   const [msgOpen, setMsgOpen] = useState(false);
   const [msgTitle, setMsgTitle] = useState("");
   const [msgBody, setMsgBody] = useState("");
+  const [verifying, setVerifying] = useState(false);
 
   // Sync notes when order loads
   const noteValue = adminNotes !== "" ? adminNotes : order?.adminNotes ?? "";
@@ -285,6 +305,68 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
               </div>
             </Section>
 
+            {(order.paymentProvider && order.paymentProvider !== "none") && (
+              <Section title="Payment details">
+                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <PayRow label="Provider" value={order.paymentProvider} />
+                  <PayRow label="Method" value={order.paymentOnlineMethod || order.paymentMethod} />
+                  <PayRow
+                    label="Amount"
+                    value={order.paymentAmount != null ? `${order.paymentCurrency || "KWD"} ${order.paymentAmount.toFixed(3)}` : null}
+                  />
+                  <PayRow label="Status" value={order.paymentStatus} />
+                  <PayRow label="Invoice ID" value={order.myfatoorahInvoiceId} copyable />
+                  <PayRow label="Payment ID" value={order.myfatoorahPaymentId} copyable />
+                  <PayRow label="Transaction ID" value={order.myfatoorahTransactionId} copyable />
+                  <PayRow label="Reference ID" value={order.myfatoorahReferenceId} copyable />
+                  <PayRow label="Track ID" value={order.myfatoorahTrackId} copyable />
+                  <PayRow
+                    label="Card"
+                    value={order.myfatoorahCardBrand || order.myfatoorahCardLast4
+                      ? `${order.myfatoorahCardBrand || ""} ${order.myfatoorahCardLast4 ? `•••• ${order.myfatoorahCardLast4}` : ""}`.trim()
+                      : null}
+                  />
+                  <PayRow label="Paid at" value={order.paidAt ? new Date(order.paidAt).toLocaleString() : null} />
+                  <PayRow label="Failed at" value={order.failedAt ? new Date(order.failedAt).toLocaleString() : null} />
+                  <PayRow label="Last verified" value={order.paymentVerifiedAt ? new Date(order.paymentVerifiedAt).toLocaleString() : null} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {order.myfatoorahPaymentId && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={verifying}
+                      onClick={async () => {
+                        setVerifying(true);
+                        try {
+                          const { data, error } = await supabase.functions.invoke("verify-myfatoorah-payment", {
+                            body: { payment_id: order.myfatoorahPaymentId, order_id: order.id },
+                          });
+                          if (error) throw error;
+                          toast.success(`Payment status: ${data?.payment_status ?? "updated"}`);
+                        } catch (e: any) {
+                          toast.error(e?.message || "Verification failed");
+                        } finally {
+                          setVerifying(false);
+                        }
+                      }}
+                    >
+                      {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                      Verify payment now
+                    </Button>
+                  )}
+                  {order.myfatoorahPaymentUrl && order.paymentStatus !== "paid" && (
+                    <Button asChild size="sm" variant="outline" className="gap-1.5">
+                      <a href={order.myfatoorahPaymentUrl} target="_blank" rel="noreferrer">
+                        Open payment URL →
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </Section>
+            )}
+
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs uppercase font-semibold text-muted-foreground">Order status</label>
@@ -333,7 +415,7 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
                 >
                   <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(["pending", "paid", "failed", "refunded"] as PaymentStatus[]).map((s) => (
+                    {(["pending", "pending_payment", "paid", "failed", "payment_failed", "payment_cancelled", "payment_expired", "pending_status_update", "refunded", "partially_refunded"] as PaymentStatus[]).map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -422,6 +504,27 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
     <div className={cn("flex justify-between", bold && "font-bold text-base pt-1")}>
       <span className={cn(!bold && "text-muted-foreground")}>{label}</span>
       <span>{value}</span>
+    </div>
+  );
+}
+
+function PayRow({ label, value, copyable }: { label: string; value?: string | null; copyable?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 py-0.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-1.5 font-medium truncate max-w-[60%] text-right">
+        <span className="truncate">{value}</span>
+        {copyable && (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground shrink-0"
+            onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        )}
+      </span>
     </div>
   );
 }
