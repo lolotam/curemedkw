@@ -73,6 +73,22 @@ Deno.serve(async (req) => {
       orderId: order_id ?? null,
     });
 
+    // Authorize access to this order before exposing any status.
+    if (order) {
+      if (order.user_id) {
+        if (!callerId || callerId !== order.user_id) {
+          return json({ error: "Not authorized for this order" }, 403);
+        }
+      } else {
+        const tokenError = await verifyGuestToken(
+          order.payment_session_token_hash,
+          payment_session_token,
+        );
+        if (tokenError) return json({ error: tokenError }, 403);
+      }
+    }
+
+
     // Provider unreachable -> pending_status_update.
     if (!details) {
       if (order && order.payment_status !== "paid") {
