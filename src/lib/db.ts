@@ -1396,7 +1396,17 @@ export function useDeleteReview() {
 
 export type OrderStatus = "new" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
 export type PaymentMethod = "pay_by_link" | "cod";
-export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+export type PaymentStatus =
+  | "pending"
+  | "paid"
+  | "failed"
+  | "refunded"
+  | "pending_payment"
+  | "payment_failed"
+  | "payment_cancelled"
+  | "payment_expired"
+  | "pending_status_update"
+  | "partially_refunded";
 
 export interface OrderItem {
   id: string;
@@ -1434,6 +1444,21 @@ export interface Order {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   orderStatus: OrderStatus;
+  paymentProvider?: string | null;
+  paymentOnlineMethod?: string | null;
+  paymentAmount?: number | null;
+  paymentCurrency?: string | null;
+  myfatoorahInvoiceId?: string | null;
+  myfatoorahPaymentId?: string | null;
+  myfatoorahPaymentUrl?: string | null;
+  myfatoorahTransactionId?: string | null;
+  myfatoorahReferenceId?: string | null;
+  myfatoorahTrackId?: string | null;
+  myfatoorahCardBrand?: string | null;
+  myfatoorahCardLast4?: string | null;
+  paidAt?: string | null;
+  failedAt?: string | null;
+  paymentVerifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   items?: OrderItem[];
@@ -1463,6 +1488,21 @@ const rowToOrder = (r: any, items?: OrderItem[]): Order => ({
   paymentMethod: r.payment_method,
   paymentStatus: r.payment_status,
   orderStatus: r.order_status,
+  paymentProvider: r.payment_provider ?? null,
+  paymentOnlineMethod: r.payment_online_method ?? null,
+  paymentAmount: r.payment_amount != null ? Number(r.payment_amount) : null,
+  paymentCurrency: r.payment_currency ?? null,
+  myfatoorahInvoiceId: r.myfatoorah_invoice_id ?? null,
+  myfatoorahPaymentId: r.myfatoorah_payment_id ?? null,
+  myfatoorahPaymentUrl: r.myfatoorah_payment_url ?? null,
+  myfatoorahTransactionId: r.myfatoorah_transaction_id ?? null,
+  myfatoorahReferenceId: r.myfatoorah_reference_id ?? null,
+  myfatoorahTrackId: r.myfatoorah_track_id ?? null,
+  myfatoorahCardBrand: r.myfatoorah_card_brand ?? null,
+  myfatoorahCardLast4: r.myfatoorah_card_last4 ?? null,
+  paidAt: r.paid_at ?? null,
+  failedAt: r.failed_at ?? null,
+  paymentVerifiedAt: r.payment_verified_at ?? null,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
   items,
@@ -1496,6 +1536,8 @@ export interface CreateOrderInput {
   paymentMethod: PaymentMethod;
   couponCode?: string | null;
   discountAmount?: number;
+  /** SHA-256 hash of the guest payment session token (online payments only). */
+  paymentSessionTokenHash?: string | null;
   items: Array<{
     productId: string;
     productName: string;
@@ -1535,6 +1577,7 @@ export function useCreateOrder() {
           total,
           coupon_code: input.couponCode ?? null,
           payment_method: input.paymentMethod,
+          payment_session_token_hash: input.paymentSessionTokenHash ?? null,
         } as any)
         .select("*")
         .single();

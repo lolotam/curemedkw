@@ -1,60 +1,81 @@
-## Goal
-Let admins change the Postora API key from `/admin/whatsapp` UI. Saving updates the database, and the `send-whatsapp` edge function picks it up immediately — no redeploy, no secret editing. Works the same on Lovable Cloud and on self-hosted Supabase.
+# MyFatoorah Hardening Plan (final, with all corrections)
 
-## Approach
-Store the Postora API key inside the existing `whatsapp_integration` row in `site_settings` (jsonb), and make the edge function read from there first, falling back to the `POSTORA_WHATSAPP_API_KEY` env var only if the DB value is empty.
+The core integration already exists and works: 3 edge functions, shared helpers, `payment_attempts` / `payment_events` tables, expanded order columns, local idempotency cache, webhook + verify with downgrade protection, and admin order visibility. This plan applies only the security/correctness fixes flagged across review rounds. Every DB change ships as a migration **and** as a raw SQL script to run on self-hosted Supabase.
 
-This way:
-- Admin pastes a new key in the UI → hits **Save** → DB updated → next message uses the new key.
-- Switching Postora accounts = paste new key, save. Done.
-- Self-hosted deployments work identically (it's just a row in `site_settings`).
+## What stays as-is (already correct)
+- **Local idempotency** via `payment_attempts.idempotency_key` (reused before re-calling provider).
+- **Success is final** — `apply-payment.ts` never downgrades a `paid` order (used by both verify + webhook).
+- **`PaymentId` stored from the create response** (in both the attempt row and order).
+- **Webhook** is signature-verified server-to-server; no customer-auth change needed.
 
-## Changes
+## Decision: payment_status enum
+Already expanded **additively** (`pending/paid/failed/refunded` kept; `pending_payment`, `payment_failed`, `payment_cancelled`, `payment_expired`, `pending_status_update`, `partially_refunded` added) and wired into the admin UI. Recommendation: **keep it** — reverting means another migration plus rewiring admin UI for no functional gain. Say the word if you still want the simple-enum + separate `myfatoorah_status text` design instead.
 
-### 1. Frontend — `src/pages/admin/AdminWhatsApp.tsx`
-- Extend `WaSettings` with `api_key: string`.
-- Add a new card **"Postora API key"** above "Admin numbers" containing:
-  - A password-style `Input` (masked) with show/hide toggle.
-  - Helper text: "Paste the API key from your Postora account. Used to send all WhatsApp messages."
-  - A small status badge: "Key set" / "No key" based on whether a value exists.
-- The existing **Save settings** button persists it together with the rest of the settings (no separate save flow needed).
-- Never read the key back into the UI in plaintext after first save — show only `••••••••` + last 4 chars, with an "Edit" action that clears the field for a new value. (Prevents shoulder-surfing the stored key.)
+## Phase A — Database migration (security)
 
-### 2. Backend — `supabase/functions/send-whatsapp/index.ts`
-- After loading `settings` from `site_settings`, resolve the key as:
-  ```
-  const apiKey = (settings.api_key as string | undefined)?.trim()
-              || Deno.env.get("POSTORA_WHATSAPP_API_KEY");
-  ```
-- Keep the existing "skipped: no_api_key" behavior if neither is present.
-- No other logic changes.
+### A1. Lock down raw payment tables (admin-only, keep `authenticated` grant)
+Do **not** revoke `SELECT` from `authenticated` — admins use that DB role and RLS needs the table grant present. Instead remove only `anon` access + the customer policies, and rely on admin-only RLS.
 
-### 3. Security
-- `site_settings` already restricts `UPDATE`/`INSERT` to admins via RLS — good.
-- BUT `SELECT` on `site_settings` is currently **public** (`Anyone can read site settings`). That means the saved Postora key would be readable by anyone hitting the table directly. We must fix this before storing a secret there.
+```text
+-- payment_attempts
+DROP POLICY IF EXISTS "Customers view own payment attempts" ON public.payment_attempts;
+REVOKE ALL ON public.payment_attempts FROM anon;
+GRANT SELECT ON public.payment_attempts TO authenticated;   -- RLS still restricts to admins
+GRANT ALL    ON public.payment_attempts TO service_role;
 
-Two options for the migration (will ask the user to pick — see Questions):
-
-**Option A (simpler, recommended):** Tighten `site_settings` SELECT so the `whatsapp_integration` row is admin-only, while other settings rows stay public:
-```sql
-DROP POLICY "Anyone can read site settings" ON public.site_settings;
-CREATE POLICY "Public can read non-secret settings" ON public.site_settings
-  FOR SELECT USING (key NOT IN ('whatsapp_integration'));
-CREATE POLICY "Admins can read all settings" ON public.site_settings
-  FOR SELECT USING (has_role(auth.uid(), 'admin'::app_role));
+-- payment_events
+DROP POLICY IF EXISTS "Customers view own payment events" ON public.payment_events;
+REVOKE ALL ON public.payment_events FROM anon;
+GRANT SELECT ON public.payment_events TO authenticated;
+GRANT ALL    ON public.payment_events TO service_role;
 ```
-The edge function uses the service role, so it bypasses RLS — unaffected.
+The existing `Admins view all payment attempts/events` policies (`has_role(auth.uid(),'admin')`) remain the only SELECT path; RLS stays enabled. Customers get safe status from their `orders` row only.
 
-**Option B:** Store the key in a separate `secret_settings` table that is admin-only end-to-end. More work, cleaner separation.
+### A2. Stop leaking raw provider payloads on the customer-readable `orders` table
+`orders.payment_raw_response jsonb` exists. Customers can read their own order row and the frontend uses `select("*")`, so this could leak. Nothing currently writes to it, so the fix is: never write it, and null any existing values. Raw payloads live only in `payment_attempts.request_payload` / `response_payload` and `payment_events.raw_payload`.
 
-### 4. Self-hosted migration
-The plan creates **one SQL migration file** under `supabase/migrations/`. On self-hosted Supabase you run it with the existing `scripts/apply-self-hosted-migrations.sh` (already in repo). I'll also list the exact `psql` one-liner in the chat reply when implementing.
+```text
+UPDATE public.orders SET payment_raw_response = NULL WHERE payment_raw_response IS NOT NULL;
+COMMENT ON COLUMN public.orders.payment_raw_response IS 'DEPRECATED: do not write. Raw payloads live in payment_attempts/payment_events.';
+```
+`orders` keeps only safe summary fields: `payment_provider`, `payment_online_method`, `payment_status`, `payment_amount`, `payment_currency`, `myfatoorah_invoice_id`, `myfatoorah_payment_id`, transaction/reference/track IDs, `paid_at`, `failed_at`, `payment_verified_at`, `payment_error_code/message`.
 
-## Files touched
-- `src/pages/admin/AdminWhatsApp.tsx` — add API-key card + state.
-- `supabase/functions/send-whatsapp/index.ts` — prefer DB key over env.
-- `supabase/migrations/<new>.sql` — restrict `site_settings` SELECT (Option A or B).
+### A3. Guest payment token — store a SHA-256 hash, never plaintext
+```text
+ALTER TABLE public.orders
+  ADD COLUMN IF NOT EXISTS payment_session_token_hash text;
+CREATE INDEX IF NOT EXISTS idx_orders_payment_session_token_hash
+  ON public.orders (payment_session_token_hash)
+  WHERE payment_session_token_hash IS NOT NULL;
+```
 
-## Out of scope
-- Rotating the env-var secret (no longer needed once the DB key works).
-- Multi-account/workspace switching UI — current flow is one active key at a time.
+## Phase B — Edge function hardening
+
+**`create-myfatoorah-payment/index.ts`**
+- Restrict Zod `payment_method` to `["KNET","CARD","APPLE_PAY","GOOGLE_PAY"]` (drop `BENEFIT`, `STC_PAY`).
+- Accept optional `payment_session_token` (raw) in the body. Ownership rule:
+  - `order.user_id` present → require matching authenticated caller (already done).
+  - `order.user_id IS NULL` → SHA-256 the raw token (`crypto.subtle.digest`), compare to `order.payment_session_token_hash`; **403 if missing or mismatch**. No token, no guest payment.
+- Amount source of truth: recompute `sum(unit_price × qty) − discount_amount (+ delivery/tax when those columns exist)` and **compare to `order.total`**; reject with 400 `amount_mismatch` if they differ beyond 0.001. Charge `order.total`.
+- Continue to **not** write `payment_raw_response` on the order.
+
+**`verify-myfatoorah-payment/index.ts`**
+- Apply the same hashed-guest-token check before refreshing/returning status for a guest order, so guest order status can't be probed by guessing `order_id`.
+
+## Phase C — Frontend
+
+**`src/pages/Checkout.tsx`**
+- On order creation: `const rawToken = crypto.randomUUID()`, compute SHA-256 hex (Web Crypto), save the **hash** to `orders.payment_session_token_hash`, and keep the **raw** token in `sessionStorage` keyed by order id.
+- Pass the raw token to `createMyFatoorahPayment(orderId, method, rawToken)`. Never put the token in the URL.
+- Keep the method selector limited to KNET / CARD / Apple Pay.
+
+**`src/lib/payment.ts`**
+- Add optional `paymentSessionToken` to create + retry helpers; forward it in the request body (not query string).
+
+**`src/pages/PaymentCallback.tsx`**
+- Read the raw token from `sessionStorage` for guest "Retry payment" so it works without login.
+
+## Technical notes
+- A shared SHA-256 hex helper is used on both the client (Web Crypto `crypto.subtle.digest`) and edge functions so hashes match.
+- All RLS/grant/column changes delivered via the migration tool **and** as a copy-paste SQL script for self-hosted Supabase.
+- After edits: typecheck, then verify guest + logged-in flows — guest create/verify without a valid token must return 403; admin can still read payment tables; a customer `orders` row no longer contains raw payloads.
