@@ -494,3 +494,24 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
     </div>
   );
 }
+
+function PayRow({ label, value, copyable }: { label: string; value?: string | null; copyable?: boolean }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 py-0.5">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-1.5 font-medium truncate max-w-[60%] text-right">
+        <span className="truncate">{value}</span>
+        {copyable && (
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground shrink-0"
+            onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}
+          >
+            <Copy className="h-3 w-3" />
+          </button>
+        )}
+      </span>
+    </div>
+  );
+}
