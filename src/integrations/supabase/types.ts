@@ -448,13 +448,32 @@ export type Database = {
           customer_name: string
           customer_phone: string
           discount_amount: number
+          failed_at: string | null
           governorate: string
           id: string
+          myfatoorah_card_brand: string | null
+          myfatoorah_card_last4: string | null
+          myfatoorah_invoice_id: string | null
+          myfatoorah_payment_id: string | null
+          myfatoorah_payment_url: string | null
+          myfatoorah_reference_id: string | null
+          myfatoorah_track_id: string | null
+          myfatoorah_transaction_id: string | null
           notes: string
           order_number: string
           order_status: Database["public"]["Enums"]["order_status"]
+          paid_at: string | null
+          paid_notification_sent_at: string | null
+          payment_amount: number | null
+          payment_currency: string
+          payment_error_code: string | null
+          payment_error_message: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          payment_online_method: string | null
+          payment_provider: string
+          payment_raw_response: Json | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at: string | null
           street: string
           subtotal: number
           total: number
@@ -475,13 +494,32 @@ export type Database = {
           customer_name: string
           customer_phone: string
           discount_amount?: number
+          failed_at?: string | null
           governorate?: string
           id?: string
+          myfatoorah_card_brand?: string | null
+          myfatoorah_card_last4?: string | null
+          myfatoorah_invoice_id?: string | null
+          myfatoorah_payment_id?: string | null
+          myfatoorah_payment_url?: string | null
+          myfatoorah_reference_id?: string | null
+          myfatoorah_track_id?: string | null
+          myfatoorah_transaction_id?: string | null
           notes?: string
           order_number?: string
           order_status?: Database["public"]["Enums"]["order_status"]
+          paid_at?: string | null
+          paid_notification_sent_at?: string | null
+          payment_amount?: number | null
+          payment_currency?: string
+          payment_error_code?: string | null
+          payment_error_message?: string | null
           payment_method: Database["public"]["Enums"]["payment_method"]
+          payment_online_method?: string | null
+          payment_provider?: string
+          payment_raw_response?: Json | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at?: string | null
           street?: string
           subtotal?: number
           total?: number
@@ -502,13 +540,32 @@ export type Database = {
           customer_name?: string
           customer_phone?: string
           discount_amount?: number
+          failed_at?: string | null
           governorate?: string
           id?: string
+          myfatoorah_card_brand?: string | null
+          myfatoorah_card_last4?: string | null
+          myfatoorah_invoice_id?: string | null
+          myfatoorah_payment_id?: string | null
+          myfatoorah_payment_url?: string | null
+          myfatoorah_reference_id?: string | null
+          myfatoorah_track_id?: string | null
+          myfatoorah_transaction_id?: string | null
           notes?: string
           order_number?: string
           order_status?: Database["public"]["Enums"]["order_status"]
+          paid_at?: string | null
+          paid_notification_sent_at?: string | null
+          payment_amount?: number | null
+          payment_currency?: string
+          payment_error_code?: string | null
+          payment_error_message?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          payment_online_method?: string | null
+          payment_provider?: string
+          payment_raw_response?: Json | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at?: string | null
           street?: string
           subtotal?: number
           total?: number
@@ -516,6 +573,136 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      payment_attempts: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          error_message: string | null
+          id: string
+          idempotency_key: string
+          invoice_id: string | null
+          order_id: string | null
+          payment_id: string | null
+          payment_method: string | null
+          payment_url: string | null
+          provider: string
+          request_payload: Json | null
+          response_payload: Json | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          error_message?: string | null
+          id?: string
+          idempotency_key: string
+          invoice_id?: string | null
+          order_id?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_url?: string | null
+          provider?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string
+          invoice_id?: string | null
+          order_id?: string | null
+          payment_id?: string | null
+          payment_method?: string | null
+          payment_url?: string | null
+          provider?: string
+          request_payload?: Json | null
+          response_payload?: Json | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_attempts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_events: {
+        Row: {
+          created_at: string
+          event_reference: string | null
+          event_source: string
+          event_type: string | null
+          id: string
+          invoice_id: string | null
+          is_success: boolean | null
+          order_id: string | null
+          payment_id: string | null
+          processed: boolean | null
+          processing_error: string | null
+          provider: string
+          raw_payload: Json | null
+          signature_valid: boolean | null
+          status: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_reference?: string | null
+          event_source: string
+          event_type?: string | null
+          id?: string
+          invoice_id?: string | null
+          is_success?: boolean | null
+          order_id?: string | null
+          payment_id?: string | null
+          processed?: boolean | null
+          processing_error?: string | null
+          provider?: string
+          raw_payload?: Json | null
+          signature_valid?: boolean | null
+          status?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_reference?: string | null
+          event_source?: string
+          event_type?: string | null
+          id?: string
+          invoice_id?: string | null
+          is_success?: boolean | null
+          order_id?: string | null
+          payment_id?: string | null
+          processed?: boolean | null
+          processing_error?: string | null
+          provider?: string
+          raw_payload?: Json | null
+          signature_valid?: boolean | null
+          status?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_categories: {
         Row: {
@@ -996,7 +1183,17 @@ export type Database = {
         | "delivered"
         | "cancelled"
       payment_method: "pay_by_link" | "cod"
-      payment_status: "pending" | "paid" | "failed" | "refunded"
+      payment_status:
+        | "pending"
+        | "paid"
+        | "failed"
+        | "refunded"
+        | "pending_payment"
+        | "payment_failed"
+        | "payment_cancelled"
+        | "payment_expired"
+        | "pending_status_update"
+        | "partially_refunded"
       stock_status: "in_stock" | "low_stock" | "out_of_stock"
     }
     CompositeTypes: {
@@ -1147,7 +1344,18 @@ export const Constants = {
         "cancelled",
       ],
       payment_method: ["pay_by_link", "cod"],
-      payment_status: ["pending", "paid", "failed", "refunded"],
+      payment_status: [
+        "pending",
+        "paid",
+        "failed",
+        "refunded",
+        "pending_payment",
+        "payment_failed",
+        "payment_cancelled",
+        "payment_expired",
+        "pending_status_update",
+        "partially_refunded",
+      ],
       stock_status: ["in_stock", "low_stock", "out_of_stock"],
     },
   },
