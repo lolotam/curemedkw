@@ -472,6 +472,7 @@ export type Database = {
           payment_online_method: string | null
           payment_provider: string
           payment_raw_response: Json | null
+          payment_session_token_hash: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
           payment_verified_at: string | null
           street: string
@@ -518,6 +519,7 @@ export type Database = {
           payment_online_method?: string | null
           payment_provider?: string
           payment_raw_response?: Json | null
+          payment_session_token_hash?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           payment_verified_at?: string | null
           street?: string
@@ -564,6 +566,7 @@ export type Database = {
           payment_online_method?: string | null
           payment_provider?: string
           payment_raw_response?: Json | null
+          payment_session_token_hash?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
           payment_verified_at?: string | null
           street?: string
