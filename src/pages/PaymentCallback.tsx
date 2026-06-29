@@ -54,12 +54,11 @@ export default function PaymentCallback() {
         <div className="container max-w-lg">
           <Reveal>
             <GlowCard variant={config.variant} className="p-8 md:p-10 text-center">
-              <div className="flex justify-center">
+              <div className={cn("flex justify-center", state === "verifying" && "animate-spin")}>
                 <Icon3D
                   icon={config.icon}
                   variant={config.variant}
                   size="lg"
-                  className={state === "verifying" ? "animate-spin" : undefined}
                 />
               </div>
               <h1 className="mt-6 text-2xl md:text-3xl font-bold tracking-tight">
