@@ -703,3 +703,31 @@ function PaymentOption({
     </button>
   );
 }
+
+function OnlineMethodOption({
+  selected,
+  onSelect,
+  icon: Icon,
+  title,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  icon: LucideIcon;
+  title: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "group flex items-center gap-2.5 rounded-xl border-2 px-3 py-3 text-sm font-semibold transition-all duration-300",
+        selected
+          ? "border-transparent bg-gradient-to-br from-sky-500/15 via-violet-500/15 to-pink-500/15 shadow-md shadow-violet-500/20"
+          : "border-border bg-card/60 hover:border-brand/40 hover:-translate-y-0.5",
+      )}
+    >
+      <Icon className={cn("h-4 w-4 shrink-0", selected ? "text-violet-500" : "text-muted-foreground")} />
+      <span className="truncate">{title}</span>
+    </button>
+  );
+}
