@@ -59,6 +59,18 @@ function saveCoupon(c: AppliedCoupon | null) {
   else sessionStorage.removeItem(COUPON_KEY);
 }
 
+interface PaymentMethodItem {
+  method: OnlinePaymentMethod;
+  labelKey: string;
+  logo: string;
+}
+
+// KNET + Visa/MasterCard are always offered; device wallets are appended at runtime.
+const BASE_METHODS: PaymentMethodItem[] = [
+  { method: "KNET", labelKey: "checkout.method.knet", logo: knetLogo },
+  { method: "CARD", labelKey: "checkout.method.card", logo: cardLogo },
+];
+
 export default function Checkout() {
   const { items, subtotal, clear, setQuantity, remove } = useCart();
   const { t, lang } = useI18n();
