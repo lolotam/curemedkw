@@ -80,10 +80,24 @@ export default function Checkout() {
     addressLine: "",
     notes: "",
   });
-  const [payMode, setPayMode] = useState<"cod" | "online">("cod");
   const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
   const [redirecting, setRedirecting] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+
+  // Available payment methods: KNET + Visa/MasterCard always; wallets only on
+  // supported devices. Built once on mount to avoid SSR/hydration mismatches.
+  const [methods, setMethods] = useState<PaymentMethodItem[]>(BASE_METHODS);
+  useEffect(() => {
+    const list = [...BASE_METHODS];
+    if (canUseApplePay()) {
+      list.push({ method: "APPLE_PAY", labelKey: "checkout.method.applePay", logo: applePayLogo });
+    }
+    if (canUseGooglePay()) {
+      list.push({ method: "GOOGLE_PAY", labelKey: "checkout.method.googlePay", logo: googlePayLogo });
+    }
+    setMethods(list);
+  }, []);
+
 
   useEffect(() => { setApplied(loadCoupon()); }, []);
   useEffect(() => {
