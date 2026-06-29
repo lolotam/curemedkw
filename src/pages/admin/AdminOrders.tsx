@@ -402,7 +402,7 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
                 >
                   <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(["pending", "paid", "failed", "refunded"] as PaymentStatus[]).map((s) => (
+                    {(["pending", "pending_payment", "paid", "failed", "payment_failed", "payment_cancelled", "payment_expired", "pending_status_update", "refunded", "partially_refunded"] as PaymentStatus[]).map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
