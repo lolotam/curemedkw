@@ -83,9 +83,14 @@ export async function createMyFatoorahPayment(
 export async function verifyMyFatoorahPayment(
   paymentId: string,
   orderId?: string | null,
+  paymentSessionToken?: string | null,
 ): Promise<VerifyPaymentResult> {
   const { data, error } = await supabase.functions.invoke("verify-myfatoorah-payment", {
-    body: { payment_id: paymentId, order_id: orderId ?? undefined },
+    body: {
+      payment_id: paymentId,
+      order_id: orderId ?? undefined,
+      ...(paymentSessionToken ? { payment_session_token: paymentSessionToken } : {}),
+    },
   });
   if (error) {
     return {
