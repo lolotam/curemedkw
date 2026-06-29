@@ -614,7 +614,7 @@ export default function Checkout() {
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={createOrder.isPending}
+                  disabled={createOrder.isPending || redirecting}
                   className={cn(
                     "mt-6 w-full rounded-full font-semibold text-white",
                     "bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500",
@@ -622,11 +622,15 @@ export default function Checkout() {
                     "transition-all duration-300 hover:scale-[1.02]",
                   )}
                 >
-                  {createOrder.isPending && (
+                  {(createOrder.isPending || redirecting) && (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   )}
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {t("checkout.placeOrder")}
+                  {!createOrder.isPending && !redirecting && <Sparkles className="h-4 w-4 mr-2" />}
+                  {redirecting
+                    ? t("checkout.redirecting")
+                    : createOrder.isPending && payMode === "online"
+                      ? t("checkout.creatingPayment")
+                      : t("checkout.placeOrder")}
                 </Button>
               </GlowCard>
             </Reveal>
