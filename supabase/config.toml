@@ -2,3 +2,12 @@ project_id = "lgcuwsjlxkntwzlgjtzp"
 
 [functions.migrate-storage-copy]
 verify_jwt = false
+
+[functions.myfatoorah-webhook]
+verify_jwt = false
+
+[functions.create-myfatoorah-payment]
+verify_jwt = false
+
+[functions.verify-myfatoorah-payment]
+verify_jwt = false
