@@ -59,6 +59,60 @@ function saveCoupon(c: AppliedCoupon | null) {
   else sessionStorage.removeItem(COUPON_KEY);
 }
 
+interface CheckoutForm {
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  country: string;
+  governorate: string;
+  area: string;
+  block: string;
+  street: string;
+  building: string;
+  addressLine: string;
+  notes: string;
+}
+
+const DEFAULT_FORM: CheckoutForm = {
+  customerName: "",
+  customerEmail: "",
+  customerPhone: "",
+  country: "Kuwait",
+  governorate: "",
+  area: "",
+  block: "",
+  street: "",
+  building: "",
+  addressLine: "",
+  notes: "",
+};
+
+// Persist the checkout form locally so a returning shopper (guest or signed-in)
+// sees their previously entered details. Survives reloads and sessions.
+const FORM_KEY = "curemed.checkout.form.v1";
+function loadForm(): CheckoutForm {
+  try {
+    const raw = localStorage.getItem(FORM_KEY);
+    if (!raw) return { ...DEFAULT_FORM };
+    const parsed = JSON.parse(raw) as Partial<CheckoutForm>;
+    return { ...DEFAULT_FORM, ...parsed };
+  } catch {
+    return { ...DEFAULT_FORM };
+  }
+}
+function saveForm(form: CheckoutForm) {
+  try {
+    localStorage.setItem(FORM_KEY, JSON.stringify(form));
+  } catch { /* ignore quota/SSR */ }
+}
+
+const METHOD_KEY = "curemed.checkout.method.v1";
+function loadMethod(): OnlinePaymentMethod | null {
+  try {
+    return (localStorage.getItem(METHOD_KEY) as OnlinePaymentMethod) || null;
+  } catch { return null; }
+}
+
 interface PaymentMethodItem {
   method: OnlinePaymentMethod;
   labelKey: string;
@@ -71,6 +125,7 @@ const BASE_METHODS: PaymentMethodItem[] = [
   { method: "CARD", labelKey: "checkout.method.card", logo: cardLogo },
 ];
 
+
 export default function Checkout() {
   const { items, subtotal, clear, setQuantity, remove } = useCart();
   const { t, lang } = useI18n();
@@ -79,22 +134,19 @@ export default function Checkout() {
   const { user } = useAuth();
   const { data: profile } = useProfile(user?.id);
 
-  const [form, setForm] = useState({
-    customerName: "",
-    customerEmail: "",
-    customerPhone: "",
-    country: "Kuwait",
-    governorate: "",
-    area: "",
-    block: "",
-    street: "",
-    building: "",
-    addressLine: "",
-    notes: "",
-  });
-  const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
+  const [form, setForm] = useState<CheckoutForm>(() => loadForm());
+  const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>(
+    () => loadMethod() ?? "KNET",
+  );
   const [redirecting, setRedirecting] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+
+  // Persist the form + selected method as the shopper edits them.
+  useEffect(() => { saveForm(form); }, [form]);
+  useEffect(() => {
+    try { localStorage.setItem(METHOD_KEY, onlineMethod); } catch { /* ignore */ }
+  }, [onlineMethod]);
+
 
   // Available payment methods: KNET + Visa/MasterCard always; wallets only on
   // supported devices. Built once on mount to avoid SSR/hydration mismatches.
@@ -124,13 +176,14 @@ export default function Checkout() {
 
   useEffect(() => {
     if (!profile) return;
+    // Saved/typed values always win; profile only fills fields left empty.
     setForm((f) => ({
       ...f,
       customerName: f.customerName || profile.fullName,
       customerEmail: f.customerEmail || user?.email || "",
       customerPhone: f.customerPhone || profile.phone,
-      country: profile.country || f.country,
-      governorate: profile.governorate || f.governorate,
+      country: f.country || profile.country,
+      governorate: f.governorate || profile.governorate,
       area: f.area || profile.area,
       block: f.block || profile.block,
       street: f.street || profile.street,
@@ -138,6 +191,7 @@ export default function Checkout() {
       addressLine: f.addressLine || profile.addressLine,
     }));
   }, [profile, user]);
+
 
   const set = <K extends keyof typeof form>(k: K, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -458,9 +512,13 @@ export default function Checkout() {
                 </div>
               </SectionCard>
             </Reveal>
+          </div>
 
+
+          {/* Payment + Summary share one vertical column in the right rail */}
+          <aside className="h-fit lg:sticky lg:top-28 space-y-7">
             {/* Payment */}
-            <Reveal delay={200}>
+            <Reveal>
               <SectionCard
                 icon={Wallet}
                 variant="amber"
@@ -484,11 +542,9 @@ export default function Checkout() {
               </SectionCard>
             </Reveal>
 
-          </div>
-
-          {/* Summary */}
-          <aside className="h-fit lg:sticky lg:top-28">
+            {/* Summary */}
             <Reveal delay={150}>
+
               <GlowCard variant="violet" className="p-6 md:p-7">
                 <div className="flex items-center gap-3 mb-5">
                   <Icon3D icon={ReceiptText} variant="violet" size="sm" />
