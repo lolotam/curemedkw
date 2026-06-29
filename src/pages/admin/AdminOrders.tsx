@@ -291,7 +291,68 @@ function OrderDetailDialog({ orderId, onClose }: { orderId: string | null; onClo
               </div>
             </Section>
 
-            <div className="grid sm:grid-cols-2 gap-4">
+            {(order.paymentProvider && order.paymentProvider !== "none") && (
+              <Section title="Payment details">
+                <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                  <PayRow label="Provider" value={order.paymentProvider} />
+                  <PayRow label="Method" value={order.paymentOnlineMethod || order.paymentMethod} />
+                  <PayRow
+                    label="Amount"
+                    value={order.paymentAmount != null ? `${order.paymentCurrency || "KWD"} ${order.paymentAmount.toFixed(3)}` : null}
+                  />
+                  <PayRow label="Status" value={order.paymentStatus} />
+                  <PayRow label="Invoice ID" value={order.myfatoorahInvoiceId} copyable />
+                  <PayRow label="Payment ID" value={order.myfatoorahPaymentId} copyable />
+                  <PayRow label="Transaction ID" value={order.myfatoorahTransactionId} copyable />
+                  <PayRow label="Reference ID" value={order.myfatoorahReferenceId} copyable />
+                  <PayRow label="Track ID" value={order.myfatoorahTrackId} copyable />
+                  <PayRow
+                    label="Card"
+                    value={order.myfatoorahCardBrand || order.myfatoorahCardLast4
+                      ? `${order.myfatoorahCardBrand || ""} ${order.myfatoorahCardLast4 ? `•••• ${order.myfatoorahCardLast4}` : ""}`.trim()
+                      : null}
+                  />
+                  <PayRow label="Paid at" value={order.paidAt ? new Date(order.paidAt).toLocaleString() : null} />
+                  <PayRow label="Failed at" value={order.failedAt ? new Date(order.failedAt).toLocaleString() : null} />
+                  <PayRow label="Last verified" value={order.paymentVerifiedAt ? new Date(order.paymentVerifiedAt).toLocaleString() : null} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {order.myfatoorahPaymentId && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={verifying}
+                      onClick={async () => {
+                        setVerifying(true);
+                        try {
+                          const { data, error } = await supabase.functions.invoke("verify-myfatoorah-payment", {
+                            body: { payment_id: order.myfatoorahPaymentId, order_id: order.id },
+                          });
+                          if (error) throw error;
+                          toast.success(`Payment status: ${data?.payment_status ?? "updated"}`);
+                        } catch (e: any) {
+                          toast.error(e?.message || "Verification failed");
+                        } finally {
+                          setVerifying(false);
+                        }
+                      }}
+                    >
+                      {verifying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                      Verify payment now
+                    </Button>
+                  )}
+                  {order.myfatoorahPaymentUrl && order.paymentStatus !== "paid" && (
+                    <Button asChild size="sm" variant="outline" className="gap-1.5">
+                      <a href={order.myfatoorahPaymentUrl} target="_blank" rel="noreferrer">
+                        Open payment URL →
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </Section>
+            )}
+
               <div>
                 <label className="text-xs uppercase font-semibold text-muted-foreground">Order status</label>
                 <Select
