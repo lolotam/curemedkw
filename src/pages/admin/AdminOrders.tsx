@@ -39,9 +39,15 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 
 const PAY_COLORS: Record<PaymentStatus, string> = {
   pending: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  pending_payment: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  pending_status_update: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
   paid: "bg-green-500/10 text-green-700 dark:text-green-300",
   failed: "bg-red-500/10 text-red-700 dark:text-red-300",
+  payment_failed: "bg-red-500/10 text-red-700 dark:text-red-300",
+  payment_cancelled: "bg-red-500/10 text-red-700 dark:text-red-300",
+  payment_expired: "bg-red-500/10 text-red-700 dark:text-red-300",
   refunded: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
+  partially_refunded: "bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
 };
 
 export default function AdminOrders() {
