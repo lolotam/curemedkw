@@ -72,13 +72,17 @@ export async function applyPaymentToOrder(
     payment_status: mapped.paymentStatus,
     payment_verified_at: new Date().toISOString(),
     myfatoorah_invoice_id: details.invoiceId ?? undefined,
+    myfatoorah_invoice_reference: details.invoiceReference ?? undefined,
     myfatoorah_payment_id: details.paymentId ?? undefined,
     myfatoorah_transaction_id: details.transactionId ?? undefined,
     myfatoorah_reference_id: details.referenceId ?? undefined,
     myfatoorah_track_id: details.trackId ?? undefined,
+    // Actual method used per the provider response (source of truth over the requested one).
+    payment_online_method: details.paymentMethod ?? undefined,
     myfatoorah_card_brand: details.cardBrand ?? undefined,
     myfatoorah_card_last4: details.cardLast4 ?? undefined,
   };
+
 
   if (mapped.isSuccess) {
     patch.paid_at = new Date().toISOString();
