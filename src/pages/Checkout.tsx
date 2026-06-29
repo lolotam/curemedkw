@@ -279,10 +279,20 @@ export default function Checkout() {
         return;
       }
       setRedirecting(false);
-      toast.error(res.error || t("checkout.paymentFailed"));
-    } catch (err: any) {
+      if (res.error_code === "payment_gateway_unreachable") {
+        toast.error(t("checkout.payment.gatewayUnreachable"), {
+          description: t("checkout.payment.gatewayUnreachableDesc"),
+        });
+      } else {
+        toast.error(res.error || t("checkout.paymentFailed"));
+      }
+    } catch (err: unknown) {
       setRedirecting(false);
-      toast.error(err?.message || t("checkout.error.generic"));
+      const message =
+        typeof err === "object" && err !== null && "message" in err && typeof err.message === "string"
+          ? err.message
+          : undefined;
+      toast.error(message || t("checkout.error.generic"));
     }
   };
 
