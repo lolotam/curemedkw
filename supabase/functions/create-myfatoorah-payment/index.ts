@@ -1,6 +1,5 @@
 // Create a MyFatoorah Hosted Payment Page (v3) request for an order.
 // Returns a PaymentURL the frontend redirects the customer to.
-import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
@@ -43,13 +42,11 @@ Deno.serve(async (req) => {
     let callerId: string | null = null;
     const authHeader = req.headers.get("Authorization");
     if (authHeader?.startsWith("Bearer ")) {
-      const anon = createClient(
-        Deno.env.get("SUPABASE_URL")!,
-        Deno.env.get("SUPABASE_ANON_KEY")!,
-        { global: { headers: { Authorization: authHeader } } },
-      );
-      const { data } = await anon.auth.getClaims(authHeader.replace("Bearer ", ""));
-      callerId = (data?.claims?.sub as string) ?? null;
+      const token = authHeader.replace("Bearer ", "");
+      const { data: userRes, error: userErr } = await admin.auth.getUser(token);
+      if (!userErr && userRes?.user) {
+        callerId = userRes.user.id;
+      }
     }
 
     // Load order.

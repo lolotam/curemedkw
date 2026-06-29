@@ -1,6 +1,6 @@
 // Frontend helper for MyFatoorah online payments. All sensitive work happens
 // server-side in edge functions — this only invokes them and redirects.
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 
 export type OnlinePaymentMethod =
   | "KNET"
