@@ -1577,6 +1577,7 @@ export function useCreateOrder() {
           total,
           coupon_code: input.couponCode ?? null,
           payment_method: input.paymentMethod,
+          payment_session_token_hash: input.paymentSessionTokenHash ?? null,
         } as any)
         .select("*")
         .single();
