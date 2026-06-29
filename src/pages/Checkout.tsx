@@ -24,7 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { useCart } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
-import { useCreateOrder, useProfile, type PaymentMethod } from "@/lib/db";
+import { useCreateOrder, useProfile } from "@/lib/db";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
 import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
