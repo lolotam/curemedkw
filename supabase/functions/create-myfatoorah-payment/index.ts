@@ -61,11 +61,17 @@ Deno.serve(async (req) => {
     if (orderErr) throw orderErr;
     if (!order) return json({ error: "Order not found" }, 404);
 
-    // Ownership: logged-in user must own the order; guest orders must have no owner.
+    // Ownership: logged-in user must own the order; guest orders require a valid token.
     if (order.user_id) {
       if (!callerId || callerId !== order.user_id) {
         return json({ error: "Not authorized for this order" }, 403);
       }
+    } else {
+      const tokenError = await verifyGuestToken(
+        order.payment_session_token_hash,
+        payment_session_token,
+      );
+      if (tokenError) return json({ error: tokenError }, 403);
     }
 
     if (order.payment_status === "paid") {
