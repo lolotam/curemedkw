@@ -95,7 +95,24 @@ Deno.serve(async (req) => {
       0,
     );
     const discount = Number(order.discount_amount ?? 0);
-    const amount = Math.max(0, Math.round((subtotal - discount) * 1000) / 1000);
+    // Include any future delivery/tax columns when present so the charge always
+    // equals the stored order total.
+    const deliveryFee = Number((order as Record<string, unknown>).delivery_fee ?? 0);
+    const tax = Number((order as Record<string, unknown>).tax_amount ?? 0);
+    const computed = Math.max(
+      0,
+      Math.round((subtotal + deliveryFee + tax - discount) * 1000) / 1000,
+    );
+    const storedTotal = Math.round(Number(order.total ?? 0) * 1000) / 1000;
+
+    // Source of truth is the stored order total; recomputed amount must match it.
+    if (Math.abs(computed - storedTotal) > 0.001) {
+      console.error(
+        `amount_mismatch order=${order_id} computed=${computed} stored=${storedTotal}`,
+      );
+      return json({ error: "amount_mismatch", success: false }, 400);
+    }
+    const amount = storedTotal;
     if (amount <= 0) return json({ error: "Invalid order amount" }, 400);
 
     const config = getMyFatoorahConfig();
