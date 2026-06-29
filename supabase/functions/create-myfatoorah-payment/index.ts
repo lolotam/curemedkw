@@ -172,21 +172,23 @@ Deno.serve(async (req) => {
       ? `${config.appPublicUrl}/payment/callback?order_id=${order_id}`
       : `${new URL(req.url).origin}/payment/callback?order_id=${order_id}`;
 
-    const requestBody = {
+    const customer: Record<string, string> = {};
+    if (order.customer_name) customer.Name = order.customer_name;
+    if (order.customer_email) customer.Email = order.customer_email;
+    const mobile = String(order.customer_phone ?? "").replace(/[\s-]/g, "");
+    if (/^\+?\d{8,15}$/.test(mobile)) customer.Mobile = mobile;
+
+    const requestBody: Record<string, unknown> = {
       PaymentMethod: payment_method,
       Order: {
         Amount: Number(amount.toFixed(3)),
         Currency: currency,
         ExternalIdentifier: order.id,
       },
-      Customer: {
-        Name: order.customer_name || "Customer",
-        Mobile: order.customer_phone || undefined,
-        Email: order.customer_email || undefined,
-      },
       IntegrationUrls: { Redirection: redirection },
       UserDefinedField: order.id,
     };
+    if (Object.keys(customer).length > 0) requestBody.Customer = customer;
 
     // Insert attempt row (status created) before calling provider.
     const { data: attempt, error: attemptErr } = await admin
