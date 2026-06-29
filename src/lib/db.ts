@@ -1396,7 +1396,17 @@ export function useDeleteReview() {
 
 export type OrderStatus = "new" | "confirmed" | "processing" | "shipped" | "delivered" | "cancelled";
 export type PaymentMethod = "pay_by_link" | "cod";
-export type PaymentStatus = "pending" | "paid" | "failed" | "refunded";
+export type PaymentStatus =
+  | "pending"
+  | "paid"
+  | "failed"
+  | "refunded"
+  | "pending_payment"
+  | "payment_failed"
+  | "payment_cancelled"
+  | "payment_expired"
+  | "pending_status_update"
+  | "partially_refunded";
 
 export interface OrderItem {
   id: string;
