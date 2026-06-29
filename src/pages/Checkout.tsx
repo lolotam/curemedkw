@@ -59,6 +59,60 @@ function saveCoupon(c: AppliedCoupon | null) {
   else sessionStorage.removeItem(COUPON_KEY);
 }
 
+interface CheckoutForm {
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  country: string;
+  governorate: string;
+  area: string;
+  block: string;
+  street: string;
+  building: string;
+  addressLine: string;
+  notes: string;
+}
+
+const DEFAULT_FORM: CheckoutForm = {
+  customerName: "",
+  customerEmail: "",
+  customerPhone: "",
+  country: "Kuwait",
+  governorate: "",
+  area: "",
+  block: "",
+  street: "",
+  building: "",
+  addressLine: "",
+  notes: "",
+};
+
+// Persist the checkout form locally so a returning shopper (guest or signed-in)
+// sees their previously entered details. Survives reloads and sessions.
+const FORM_KEY = "curemed.checkout.form.v1";
+function loadForm(): CheckoutForm {
+  try {
+    const raw = localStorage.getItem(FORM_KEY);
+    if (!raw) return { ...DEFAULT_FORM };
+    const parsed = JSON.parse(raw) as Partial<CheckoutForm>;
+    return { ...DEFAULT_FORM, ...parsed };
+  } catch {
+    return { ...DEFAULT_FORM };
+  }
+}
+function saveForm(form: CheckoutForm) {
+  try {
+    localStorage.setItem(FORM_KEY, JSON.stringify(form));
+  } catch { /* ignore quota/SSR */ }
+}
+
+const METHOD_KEY = "curemed.checkout.method.v1";
+function loadMethod(): OnlinePaymentMethod | null {
+  try {
+    return (localStorage.getItem(METHOD_KEY) as OnlinePaymentMethod) || null;
+  } catch { return null; }
+}
+
 interface PaymentMethodItem {
   method: OnlinePaymentMethod;
   labelKey: string;
@@ -70,6 +124,7 @@ const BASE_METHODS: PaymentMethodItem[] = [
   { method: "KNET", labelKey: "checkout.method.knet", logo: knetLogo },
   { method: "CARD", labelKey: "checkout.method.card", logo: cardLogo },
 ];
+
 
 export default function Checkout() {
   const { items, subtotal, clear, setQuantity, remove } = useCart();
