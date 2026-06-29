@@ -512,33 +512,8 @@ export default function Checkout() {
                 </div>
               </SectionCard>
             </Reveal>
-
-            {/* Payment */}
-            <Reveal delay={200}>
-              <SectionCard
-                icon={Wallet}
-                variant="amber"
-                title={t("checkout.payment")}
-              >
-                <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-                  {t("checkout.paymentDesc")}
-                </p>
-                <div className="space-y-3">
-                  {methods.map((m) => (
-                    <MethodRow
-                      key={m.method}
-                      selected={onlineMethod === m.method}
-                      onSelect={() => setOnlineMethod(m.method)}
-                      logo={m.logo}
-                      title={t(m.labelKey)}
-                      currency={t("checkout.currency")}
-                    />
-                  ))}
-                </div>
-              </SectionCard>
-            </Reveal>
-
           </div>
+
 
           {/* Summary */}
           <aside className="h-fit lg:sticky lg:top-28">
