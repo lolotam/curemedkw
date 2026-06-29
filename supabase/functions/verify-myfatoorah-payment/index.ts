@@ -28,10 +28,23 @@ Deno.serve(async (req) => {
   try {
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
-    const { payment_id, order_id } = parsed.data;
+    const { payment_id, order_id, payment_session_token } = parsed.data;
 
     const admin = getAdminClient();
     const config = getMyFatoorahConfig();
+
+    // Resolve caller identity (optional — supports guest orders).
+    let callerId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const anon = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data } = await anon.auth.getClaims(authHeader.replace("Bearer ", ""));
+      callerId = (data?.claims?.sub as string) ?? null;
+    }
 
     // GET payment details with retry (3x / 5s, 30s timeout each).
     let details: PaymentDetails | null = null;
