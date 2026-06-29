@@ -29,7 +29,8 @@ export default function PaymentCallback() {
         setState("failed");
         return;
       }
-      const res = await verifyMyFatoorahPayment(paymentId, orderId);
+      const guestToken = orderId ? getGuestToken(orderId) : null;
+      const res = await verifyMyFatoorahPayment(paymentId, orderId, guestToken);
       setResult(res);
       if (res.payment_status === "paid") setState("success");
       else if (res.payment_status === "pending_status_update" || res.payment_status === "pending_payment")
