@@ -57,12 +57,14 @@ export default function AdminOrders() {
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "all">("all");
+  const [payFilter, setPayFilter] = useState<PaymentStatus | "all">("all");
   const [openId, setOpenId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return orders.filter((o) => {
       if (statusFilter !== "all" && o.orderStatus !== statusFilter) return false;
+      if (payFilter !== "all" && o.paymentStatus !== payFilter) return false;
       if (!q) return true;
       return (
         o.orderNumber.toLowerCase().includes(q) ||
@@ -71,7 +73,7 @@ export default function AdminOrders() {
         o.customerEmail.toLowerCase().includes(q)
       );
     });
-  }, [orders, search, statusFilter]);
+  }, [orders, search, statusFilter, payFilter]);
 
   return (
     <div className="p-6 md:p-10 w-full max-w-none space-y-6">
