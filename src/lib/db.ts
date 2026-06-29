@@ -1536,6 +1536,8 @@ export interface CreateOrderInput {
   paymentMethod: PaymentMethod;
   couponCode?: string | null;
   discountAmount?: number;
+  /** SHA-256 hash of the guest payment session token (online payments only). */
+  paymentSessionTokenHash?: string | null;
   items: Array<{
     productId: string;
     productName: string;
@@ -1575,6 +1577,7 @@ export function useCreateOrder() {
           total,
           coupon_code: input.couponCode ?? null,
           payment_method: input.paymentMethod,
+          payment_session_token_hash: input.paymentSessionTokenHash ?? null,
         } as any)
         .select("*")
         .single();

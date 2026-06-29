@@ -4,7 +4,7 @@ import { Loader2, CheckCircle2, XCircle, Clock, ShoppingBag, RefreshCw } from "l
 import { Button } from "@/components/ui/button";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { useI18n } from "@/lib/i18n";
-import { verifyMyFatoorahPayment, type VerifyPaymentResult } from "@/lib/payment";
+import { verifyMyFatoorahPayment, getGuestToken, type VerifyPaymentResult } from "@/lib/payment";
 import { ColorfulHeroBg, GlowCard, Icon3D, Reveal } from "@/components/site/ColorfulFx";
 import { cn } from "@/lib/utils";
 
@@ -29,7 +29,8 @@ export default function PaymentCallback() {
         setState("failed");
         return;
       }
-      const res = await verifyMyFatoorahPayment(paymentId, orderId);
+      const guestToken = orderId ? getGuestToken(orderId) : null;
+      const res = await verifyMyFatoorahPayment(paymentId, orderId, guestToken);
       setResult(res);
       if (res.payment_status === "paid") setState("success");
       else if (res.payment_status === "pending_status_update" || res.payment_status === "pending_payment")

@@ -41,7 +41,7 @@ import {
   type GradientKey,
 } from "@/components/site/ColorfulFx";
 import type { LucideIcon } from "lucide-react";
-import { createMyFatoorahPayment, type OnlinePaymentMethod } from "@/lib/payment";
+import { createMyFatoorahPayment, sha256Hex, saveGuestToken, type OnlinePaymentMethod } from "@/lib/payment";
 import { Smartphone } from "lucide-react";
 
 const COUPON_KEY = "curemed.appliedCoupon";
@@ -173,6 +173,11 @@ export default function Checkout() {
       return;
     }
     const online = payMode === "online";
+    // For online payments we authorize the (possibly guest) payment with a
+    // one-time token. Only the SHA-256 hash is stored on the order; the raw
+    // token stays in sessionStorage and never touches the URL.
+    const rawPaymentToken = online ? crypto.randomUUID() : null;
+    const paymentTokenHash = rawPaymentToken ? await sha256Hex(rawPaymentToken) : null;
     try {
       logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, pay_mode: payMode } });
       const order = await createOrder.mutateAsync({
@@ -192,6 +197,7 @@ export default function Checkout() {
         paymentMethod: online ? "pay_by_link" : "cod",
         couponCode: applied?.coupon.code ?? null,
         discountAmount: discount,
+        paymentSessionTokenHash: paymentTokenHash,
         items: items.map((i) => ({
           productId: i.productId,
           productName: i.name,
@@ -205,7 +211,8 @@ export default function Checkout() {
       // ---------- Online payment via MyFatoorah ----------
       if (online) {
         setRedirecting(true);
-        const res = await createMyFatoorahPayment(order.id, onlineMethod);
+        if (rawPaymentToken) saveGuestToken(order.id, rawPaymentToken);
+        const res = await createMyFatoorahPayment(order.id, onlineMethod, rawPaymentToken);
         if (res.success && res.payment_url) {
           clear();
           saveCoupon(null);

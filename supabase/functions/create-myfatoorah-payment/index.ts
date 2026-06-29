@@ -9,12 +9,14 @@ import {
   myfatoorahRequest,
   MyFatoorahError,
 } from "../_shared/myfatoorah.ts";
+import { verifyGuestToken } from "../_shared/hash.ts";
 
 const BodySchema = z.object({
   order_id: z.string().uuid(),
   payment_method: z
-    .enum(["KNET", "CARD", "APPLE_PAY", "GOOGLE_PAY", "BENEFIT", "STC_PAY"])
+    .enum(["KNET", "CARD", "APPLE_PAY", "GOOGLE_PAY"])
     .default("CARD"),
+  payment_session_token: z.string().min(8).max(200).optional(),
 });
 
 interface CreatePaymentData {
@@ -33,7 +35,7 @@ Deno.serve(async (req) => {
     if (!parsed.success) {
       return json({ error: parsed.error.flatten().fieldErrors }, 400);
     }
-    const { order_id, payment_method } = parsed.data;
+    const { order_id, payment_method, payment_session_token } = parsed.data;
 
     const admin = getAdminClient();
 
@@ -59,11 +61,17 @@ Deno.serve(async (req) => {
     if (orderErr) throw orderErr;
     if (!order) return json({ error: "Order not found" }, 404);
 
-    // Ownership: logged-in user must own the order; guest orders must have no owner.
+    // Ownership: logged-in user must own the order; guest orders require a valid token.
     if (order.user_id) {
       if (!callerId || callerId !== order.user_id) {
         return json({ error: "Not authorized for this order" }, 403);
       }
+    } else {
+      const tokenError = await verifyGuestToken(
+        order.payment_session_token_hash,
+        payment_session_token,
+      );
+      if (tokenError) return json({ error: tokenError }, 403);
     }
 
     if (order.payment_status === "paid") {
@@ -87,7 +95,24 @@ Deno.serve(async (req) => {
       0,
     );
     const discount = Number(order.discount_amount ?? 0);
-    const amount = Math.max(0, Math.round((subtotal - discount) * 1000) / 1000);
+    // Include any future delivery/tax columns when present so the charge always
+    // equals the stored order total.
+    const deliveryFee = Number((order as Record<string, unknown>).delivery_fee ?? 0);
+    const tax = Number((order as Record<string, unknown>).tax_amount ?? 0);
+    const computed = Math.max(
+      0,
+      Math.round((subtotal + deliveryFee + tax - discount) * 1000) / 1000,
+    );
+    const storedTotal = Math.round(Number(order.total ?? 0) * 1000) / 1000;
+
+    // Source of truth is the stored order total; recomputed amount must match it.
+    if (Math.abs(computed - storedTotal) > 0.001) {
+      console.error(
+        `amount_mismatch order=${order_id} computed=${computed} stored=${storedTotal}`,
+      );
+      return json({ error: "amount_mismatch", success: false }, 400);
+    }
+    const amount = storedTotal;
     if (amount <= 0) return json({ error: "Invalid order amount" }, 400);
 
     const config = getMyFatoorahConfig();

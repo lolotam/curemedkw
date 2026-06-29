@@ -1,14 +1,17 @@
 // Verify a MyFatoorah payment after redirect (callback). Calls Get Payment
 // Details, updates the order with downgrade protection, logs a payment_event.
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { getMyFatoorahConfig, myfatoorahRequest, MyFatoorahError } from "../_shared/myfatoorah.ts";
 import { applyPaymentToOrder, extractDetails, findOrder } from "../_shared/apply-payment.ts";
+import { verifyGuestToken } from "../_shared/hash.ts";
 
 const BodySchema = z.object({
   payment_id: z.string().min(3).max(100),
   order_id: z.string().uuid().optional(),
+  payment_session_token: z.string().min(8).max(200).optional(),
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -25,10 +28,23 @@ Deno.serve(async (req) => {
   try {
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) return json({ error: parsed.error.flatten().fieldErrors }, 400);
-    const { payment_id, order_id } = parsed.data;
+    const { payment_id, order_id, payment_session_token } = parsed.data;
 
     const admin = getAdminClient();
     const config = getMyFatoorahConfig();
+
+    // Resolve caller identity (optional — supports guest orders).
+    let callerId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const anon = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_ANON_KEY")!,
+        { global: { headers: { Authorization: authHeader } } },
+      );
+      const { data } = await anon.auth.getClaims(authHeader.replace("Bearer ", ""));
+      callerId = (data?.claims?.sub as string) ?? null;
+    }
 
     // GET payment details with retry (3x / 5s, 30s timeout each).
     let details: PaymentDetails | null = null;
@@ -56,6 +72,22 @@ Deno.serve(async (req) => {
       externalId: ext,
       orderId: order_id ?? null,
     });
+
+    // Authorize access to this order before exposing any status.
+    if (order) {
+      if (order.user_id) {
+        if (!callerId || callerId !== order.user_id) {
+          return json({ error: "Not authorized for this order" }, 403);
+        }
+      } else {
+        const tokenError = await verifyGuestToken(
+          order.payment_session_token_hash,
+          payment_session_token,
+        );
+        if (tokenError) return json({ error: tokenError }, 403);
+      }
+    }
+
 
     // Provider unreachable -> pending_status_update.
     if (!details) {
