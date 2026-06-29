@@ -77,7 +77,6 @@ export default function Checkout() {
     addressLine: "",
     notes: "",
   });
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [payMode, setPayMode] = useState<"cod" | "online">("cod");
   const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
   const [redirecting, setRedirecting] = useState(false);
