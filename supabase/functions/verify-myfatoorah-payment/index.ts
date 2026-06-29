@@ -1,14 +1,17 @@
 // Verify a MyFatoorah payment after redirect (callback). Calls Get Payment
 // Details, updates the order with downgrade protection, logs a payment_event.
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { corsHeaders, json } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { getMyFatoorahConfig, myfatoorahRequest, MyFatoorahError } from "../_shared/myfatoorah.ts";
 import { applyPaymentToOrder, extractDetails, findOrder } from "../_shared/apply-payment.ts";
+import { verifyGuestToken } from "../_shared/hash.ts";
 
 const BodySchema = z.object({
   payment_id: z.string().min(3).max(100),
   order_id: z.string().uuid().optional(),
+  payment_session_token: z.string().min(8).max(200).optional(),
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
