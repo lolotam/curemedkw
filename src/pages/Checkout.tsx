@@ -134,22 +134,19 @@ export default function Checkout() {
   const { user } = useAuth();
   const { data: profile } = useProfile(user?.id);
 
-  const [form, setForm] = useState({
-    customerName: "",
-    customerEmail: "",
-    customerPhone: "",
-    country: "Kuwait",
-    governorate: "",
-    area: "",
-    block: "",
-    street: "",
-    building: "",
-    addressLine: "",
-    notes: "",
-  });
-  const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>("KNET");
+  const [form, setForm] = useState<CheckoutForm>(() => loadForm());
+  const [onlineMethod, setOnlineMethod] = useState<OnlinePaymentMethod>(
+    () => loadMethod() ?? "KNET",
+  );
   const [redirecting, setRedirecting] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
+
+  // Persist the form + selected method as the shopper edits them.
+  useEffect(() => { saveForm(form); }, [form]);
+  useEffect(() => {
+    try { localStorage.setItem(METHOD_KEY, onlineMethod); } catch { /* ignore */ }
+  }, [onlineMethod]);
+
 
   // Available payment methods: KNET + Visa/MasterCard always; wallets only on
   // supported devices. Built once on mount to avoid SSR/hydration mismatches.
