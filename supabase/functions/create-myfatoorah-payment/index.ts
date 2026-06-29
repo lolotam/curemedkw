@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     if (!parsed.success) {
       return json({ error: parsed.error.flatten().fieldErrors }, 400);
     }
-    const { order_id, payment_method } = parsed.data;
+    const { order_id, payment_method, payment_session_token } = parsed.data;
 
     const admin = getAdminClient();
 
