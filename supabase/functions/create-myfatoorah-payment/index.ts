@@ -179,8 +179,6 @@ Deno.serve(async (req) => {
     const customer: Record<string, string> = {};
     if (order.customer_name) customer.Name = order.customer_name;
     if (order.customer_email) customer.Email = order.customer_email;
-    const mobile = String(order.customer_phone ?? "").replace(/[\s-]/g, "");
-    if (/^\+?\d{8,15}$/.test(mobile)) customer.Mobile = mobile;
 
     const requestBody: Record<string, unknown> = {
       PaymentMethod: payment_method,
