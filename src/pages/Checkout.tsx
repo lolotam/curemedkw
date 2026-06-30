@@ -290,37 +290,10 @@ export default function Checkout() {
         })),
       });
 
-      // Notify admins of the new order (best-effort, never blocks checkout).
-      void (async () => {
-        try {
-          const { data: settingRow } = await supabase
-            .from("site_settings")
-            .select("value")
-            .eq("key", "whatsapp_integration")
-            .maybeSingle();
-          const settings: any = settingRow?.value ?? {};
-          const adminNumbers: string[] = Array.isArray(settings.admin_numbers) ? settings.admin_numbers : [];
-          const itemsSummary = items.map((i) => `• ${i.name} ×${i.quantity}`).join("\n");
-          if (adminNumbers.length > 0) {
-            void supabase.functions.invoke("send-whatsapp", {
-              body: {
-                event: "admin.new_order",
-                to: adminNumbers,
-                order_id: order.id,
-                data: {
-                  order_number: order.orderNumber,
-                  customer_name: form.customerName,
-                  customer_phone: form.customerPhone,
-                  total: order.total.toFixed(2),
-                  items_summary: itemsSummary,
-                },
-              },
-            });
-          }
-        } catch (e) {
-          console.warn("WhatsApp notify failed (non-blocking):", e);
-        }
-      })();
+      // Order notifications (email + WhatsApp to buyer & company) are now sent
+      // server-side once payment is confirmed — see _shared/apply-payment.ts.
+
+
 
       // Create the MyFatoorah hosted payment and redirect.
       setRedirecting(true);
