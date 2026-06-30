@@ -461,6 +461,7 @@ export type Database = {
           myfatoorah_track_id: string | null
           myfatoorah_transaction_id: string | null
           notes: string
+          order_notified_at: string | null
           order_number: string
           order_status: Database["public"]["Enums"]["order_status"]
           paid_at: string | null
@@ -509,6 +510,7 @@ export type Database = {
           myfatoorah_track_id?: string | null
           myfatoorah_transaction_id?: string | null
           notes?: string
+          order_notified_at?: string | null
           order_number?: string
           order_status?: Database["public"]["Enums"]["order_status"]
           paid_at?: string | null
@@ -557,6 +559,7 @@ export type Database = {
           myfatoorah_track_id?: string | null
           myfatoorah_transaction_id?: string | null
           notes?: string
+          order_notified_at?: string | null
           order_number?: string
           order_status?: Database["public"]["Enums"]["order_status"]
           paid_at?: string | null

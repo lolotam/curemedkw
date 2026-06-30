@@ -101,8 +101,117 @@ export async function applyPaymentToOrder(
   }
 
   await admin.from("orders").update(patch).eq("id", orderRow.id);
+
+  // On first successful payment, fire order notifications (email + WhatsApp).
+  if (mapped.isSuccess) {
+    await dispatchOrderNotifications(admin, orderRow.id);
+  }
+
   return { mapped, orderId: orderRow.id, alreadyPaid: false, changed: true };
 }
+
+/**
+ * Best-effort order notifications, dispatched exactly once per order.
+ * Idempotency is guaranteed by claiming `order_notified_at` with a conditional
+ * update — only the winning caller proceeds to send messages.
+ */
+export async function dispatchOrderNotifications(
+  admin: SupabaseClient,
+  orderId: string,
+): Promise<void> {
+  try {
+    // Atomically claim the notification slot (NULL -> now()).
+    const claimedAt = new Date().toISOString();
+    const { data: claimed } = await admin
+      .from("orders")
+      .update({ order_notified_at: claimedAt })
+      .eq("id", orderId)
+      .is("order_notified_at", null)
+      .select("id")
+      .maybeSingle();
+    if (!claimed) return; // already notified or column missing
+
+    const { data: order } = await admin.from("orders").select("*").eq("id", orderId).maybeSingle();
+    if (!order) return;
+    const { data: items } = await admin.from("order_items").select("*").eq("order_id", orderId);
+
+    const itemsSummary = (items ?? [])
+      .map((i: any) => `• ${i.product_name} ×${i.quantity}`)
+      .join("\n");
+    const total = Number(order.total ?? 0).toFixed(3);
+
+    // WhatsApp settings (admin numbers + storefront url).
+    const { data: waRow } = await admin
+      .from("site_settings")
+      .select("value")
+      .eq("key", "whatsapp_integration")
+      .maybeSingle();
+    const wa = (waRow?.value as any) ?? {};
+    const adminNumbers: string[] = Array.isArray(wa.admin_numbers) ? wa.admin_numbers : [];
+
+    const { data: emailRow } = await admin
+      .from("site_settings")
+      .select("value")
+      .eq("key", "order_email")
+      .maybeSingle();
+    const emailCfg = (emailRow?.value as any) ?? {};
+    const storefront = (emailCfg.storefront_url ?? "").replace(/\/$/, "");
+    const invoiceUrl = storefront ? `${storefront}/order/${order.order_number}` : "";
+
+    const tasks: Promise<unknown>[] = [];
+
+    // 1) Order confirmation email to admin recipients (To + CC).
+    tasks.push(
+      admin.functions.invoke("send-order-email", {
+        body: { mode: "order", order_id: orderId },
+      }),
+    );
+
+    // 2) Customer order confirmation (order.paid).
+    if (order.customer_phone) {
+      tasks.push(
+        admin.functions.invoke("send-whatsapp", {
+          body: {
+            event: "order.paid",
+            to: [order.customer_phone],
+            order_id: orderId,
+            data: {
+              customer_name: order.customer_name,
+              order_number: order.order_number,
+              total,
+              invoice_url: invoiceUrl,
+            },
+          },
+        }),
+      );
+    }
+
+    // 3) Admin new-order alert to company numbers.
+    if (adminNumbers.length > 0) {
+      tasks.push(
+        admin.functions.invoke("send-whatsapp", {
+          body: {
+            event: "admin.new_order",
+            to: adminNumbers,
+            order_id: orderId,
+            data: {
+              order_number: order.order_number,
+              customer_name: order.customer_name,
+              customer_phone: order.customer_phone,
+              total,
+              items_summary: itemsSummary,
+            },
+          },
+        }),
+      );
+    }
+
+    await Promise.allSettled(tasks);
+  } catch (err) {
+    console.error("dispatchOrderNotifications error:", (err as Error).message);
+  }
+}
+
 
 /** Find an order by any of the known MyFatoorah references. */
 export async function findOrder(

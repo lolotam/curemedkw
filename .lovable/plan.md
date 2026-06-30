@@ -1,46 +1,67 @@
-# Checkout: Layout Restructure + Form Persistence
+# Order Notification Workflow
 
-Two changes to `/checkout`, both confined to `src/pages/Checkout.tsx`.
+When a customer's payment is confirmed by MyFatoorah, the system fires three notifications exactly once:
 
-## Part 1 — Layout restructure
+1. **Email** to a main recipient + CC list — full order details/invoice.
+2. **WhatsApp to the buyer** — order confirmation.
+3. **WhatsApp to your company numbers** — new-order alert.
 
-Keep the two-column layout. Move **Select Payment Method** into the right rail (where Order Summary is now), and stack **Order Summary** directly beneath it. Contact Information and Delivery Address stay exactly where they are.
+All triggered server-side on **payment success** (not at checkout), so abandoned/unpaid orders never generate notifications.
 
 ```text
-        LEFT COLUMN                 RIGHT RAIL (sticky)
-┌────────────────────────┐   ┌──────────────────────────┐
-│ Contact Information      │   │ Select Payment Method     │  ← moved here
-│  (unchanged)            │   │  • KNET / Card / wallets  │
-├────────────────────────┤   ├──────────────────────────┤
-│ Delivery Address        │   │ Order Summary             │  ← under payment
-│  (unchanged)            │   │  • cart items + qty/remove│
-│                         │   │  • promo code             │
-│                         │   │  • subtotal/discount/total│
-│                         │   │  [ Pay Now · KD total ]   │
-└────────────────────────┘   └──────────────────────────┘
+Customer pays ──▶ MyFatoorah confirms
+                      │
+        verify-myfatoorah-payment  /  myfatoorah-webhook
+                      │
+              apply-payment (success, first time only)
+            ┌─────────┼───────────────┐
+        Email(SMTP)  WhatsApp buyer  WhatsApp company
 ```
 
-- Remove the Payment `SectionCard` from the left column and place it at the top of the right `<aside>`, above the existing Order Summary `GlowCard`. Both cards share one vertical column and keep the sticky behavior.
-- Everything inside each card stays the same (payment methods, device-wallet gating, cart edit, coupon, totals, Pay Now button + states).
+## What changes
 
-## Part 2 — Persist the checkout form
+### 1. Trigger point (single source of truth)
+- Hook the dispatch into `supabase/functions/_shared/apply-payment.ts`, right after a payment is marked **paid for the first time** (`isSuccess && changed && order_notified_at is null`).
+- Covers both the redirect callback (`verify-myfatoorah-payment`) and the `myfatoorah-webhook`, with de-duplication so notifications never double-fire.
+- **Remove** the current checkout-time WhatsApp block in `src/pages/Checkout.tsx` (it fires before payment).
 
-Save what the shopper types so it's restored on their next visit (works for guests too, not just logged-in users).
+### 2. Email sending (self-host friendly, fully admin-configured)
+- New edge function `supabase/functions/send-order-email/index.ts` using an SMTP client (denomailer) — portable to your self-hosted backend.
+- **All SMTP settings come from the admin dashboard** (stored in DB, read by the function via service role) — no secrets required:
+  - Host, Port, Secure (TLS on/off)
+  - Username (email) + Password
+  - From name + From address
+- Builds an HTML order email (order number, customer, items, totals, delivery address, payment method, order link) and sends with **To = main recipient** and **CC = the CC list**.
+- `apply-payment` calls this function (and `send-whatsapp`) via internal `fetch` to `${SUPABASE_URL}/functions/v1/...` with the service-role key — identical on Lovable Cloud and self-hosted.
 
-- Add a localStorage key `curemed.checkout.form.v1` holding all address/contact fields: `customerName, customerEmail, customerPhone, country, governorate, area, block, street, building, addressLine, notes`. Also persist the selected payment method.
-- On every form change, write the current values to localStorage (debounced via a `useEffect` on the `form` state — same pattern the cart already uses in `src/lib/cart.tsx`).
-- On mount, hydrate `form` from localStorage first. Then keep the existing profile prefill, but only fill fields the saved data left empty (saved values win, so a returning user sees their last entries).
-- Restore order respects the country → governorate → area cascade so the dependent selects show the saved values correctly.
-- Persisted data survives across sessions and page reloads; it is not cleared after an order, so the next visit shows the previous details. (Cart contents continue to clear on successful payment as today.)
+### 3. WhatsApp to the buyer
+- The `order.paid` template already exists in `send-whatsapp` but was never wired. Now sent to `order.customer_phone` on payment success.
+- The company alert (`admin.new_order`) is sent to your saved admin numbers at the same moment.
 
-## What stays the same
-- All validation, order creation, WhatsApp admin notify, MyFatoorah payment + guest-token flow, redirect.
-- Coupon apply/remove, cart quantity/remove, totals.
-- Arabic RTL, responsiveness, empty-cart state, and the existing visual language (GlowCards, Icon3D chips, gradient headings, rounded-2xl inputs).
+### 4. Admin settings UI (`/admin/whatsapp`)
+Add an **Order Email** card with:
+- Enable/disable toggle
+- **SMTP connection**: host, port, secure toggle, username (email), password (masked, edit-on-demand like the Postora key)
+- **Sender**: from name + from address
+- **Recipients**: main "To" address + a CC list (add/remove multiple)
+- A "Send test email" button
+
+Stored in `site_settings` under a new key `order_email` — admin-only via existing RLS, **not** in the public read allowlist, so credentials are never exposed to the storefront.
+
+### 5. Single-send guarantee
+- Add `order_notified_at timestamptz` to `orders`. Notifications fire only when null, then it's stamped — preventing duplicates if both callback and webhook resolve the same payment.
+
+## Security note
+Because you want everything admin-editable, the SMTP password is stored in the database (in the admin-only `order_email` settings row, unreadable by the public/storefront and never sent to the browser except masked). This is the tradeoff for full dashboard control vs. server-only secrets — acceptable since the row is protected by admin RLS and only the edge function reads the raw value.
+
+## Self-hosted SQL (run on your Supabase)
+```sql
+ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_notified_at timestamptz;
+```
+Then deploy the new/updated edge functions (`send-order-email`, `verify-myfatoorah-payment`, `myfatoorah-webhook`, `send-whatsapp`) with your existing deploy script.
 
 ## Technical notes
-- One file: `src/pages/Checkout.tsx`.
-- Add small `loadForm()` / `saveForm()` helpers (mirroring the existing `loadCoupon`/`saveCoupon` pattern) wrapped in try/catch for SSR/quota safety.
-- Hydrate via lazy `useState(() => loadForm())` merged with current defaults; a `useEffect([form])` persists changes.
-- Profile prefill `useEffect` updated to only set fields that are still empty after hydration.
-- No backend, schema, or edge-function changes. No database migration required.
+- Email/WhatsApp are best-effort and logged; failures never block payment confirmation.
+- `send-order-email` validates input with Zod and is only meaningfully callable with the service-role key from `apply-payment`.
+- WhatsApp respects the existing `whatsapp_integration` enable/event toggles.
+- No customer-facing payment/RLS behavior changes.
