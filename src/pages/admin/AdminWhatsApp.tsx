@@ -382,7 +382,123 @@ export default function AdminWhatsApp() {
         </Button>
       </div>
 
-      {/* Send test */}
+      {/* ============ Order Email (SMTP) ============ */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <Label className="text-base">Order email (SMTP)</Label>
+              <p className="text-xs text-muted-foreground">Sends an order confirmation email when payment succeeds. All credentials are editable here.</p>
+            </div>
+          </div>
+          <Switch checked={em.enabled} onCheckedChange={(v) => setEm({ ...em, enabled: v })} />
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-4">
+          <div>
+            <Label className="text-sm">SMTP host</Label>
+            <Input className="mt-1.5" placeholder="smtp.gmail.com" value={em.smtp_host} onChange={(e) => setEm({ ...em, smtp_host: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm">Port</Label>
+              <Input className="mt-1.5" type="number" placeholder="587" value={em.smtp_port} onChange={(e) => setEm({ ...em, smtp_port: Number(e.target.value) })} />
+            </div>
+            <div className="flex items-end pb-1">
+              <label className="flex items-center gap-2 text-sm">
+                <Switch checked={em.smtp_secure} onCheckedChange={(v) => setEm({ ...em, smtp_secure: v })} />
+                SSL/TLS
+              </label>
+            </div>
+          </div>
+          <div>
+            <Label className="text-sm">SMTP username</Label>
+            <Input className="mt-1.5" placeholder="user@domain.com" value={em.smtp_user} onChange={(e) => setEm({ ...em, smtp_user: e.target.value })} autoComplete="off" />
+          </div>
+          <div>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">SMTP password / secret</Label>
+              <Badge variant={em.smtp_pass ? "default" : "secondary"} className="text-[10px]">
+                {em.smtp_pass ? "Set ••••" : "Not set"}
+              </Badge>
+            </div>
+            {emPassEditing ? (
+              <div className="relative mt-1.5">
+                <Input
+                  type={showEmPass ? "text" : "password"}
+                  placeholder="Enter SMTP password"
+                  value={emPass}
+                  onChange={(e) => setEmPass(e.target.value)}
+                  autoComplete="new-password"
+                  className="pr-10"
+                />
+                <button type="button" onClick={() => setShowEmPass((v) => !v)} className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="toggle">
+                  {showEmPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            ) : (
+              <Button type="button" variant="outline" className="mt-1.5" onClick={() => setEmPassEditing(true)}>
+                {em.smtp_pass ? "Replace password" : "Add password"}
+              </Button>
+            )}
+          </div>
+          <div>
+            <Label className="text-sm">From email</Label>
+            <Input className="mt-1.5" placeholder="orders@curemed.com" value={em.from_email} onChange={(e) => setEm({ ...em, from_email: e.target.value })} />
+          </div>
+          <div>
+            <Label className="text-sm">From name</Label>
+            <Input className="mt-1.5" placeholder="Curemed" value={em.from_name} onChange={(e) => setEm({ ...em, from_name: e.target.value })} />
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-sm">Main recipient (To)</Label>
+          <Input className="mt-1.5" placeholder="admin@curemed.com" value={em.to} onChange={(e) => setEm({ ...em, to: e.target.value })} />
+          <p className="text-xs text-muted-foreground mt-1">Where new-order emails are sent.</p>
+        </div>
+
+        <div>
+          <Label className="text-sm">CC recipients</Label>
+          <div className="flex gap-2 mt-1.5">
+            <Input placeholder="manager@curemed.com" value={newCc} onChange={(e) => setNewCc(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addCc())} />
+            <Button type="button" onClick={addCc}><Plus className="h-4 w-4" /></Button>
+          </div>
+          <div className="flex flex-wrap gap-2 pt-2">
+            {em.cc.length === 0 && <p className="text-xs text-muted-foreground">No CC recipients.</p>}
+            {em.cc.map((c) => (
+              <Badge key={c} variant="secondary" className="gap-1.5">
+                {c}
+                <button onClick={() => setEm({ ...em, cc: em.cc.filter((x) => x !== c) })}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <Label className="text-sm">Storefront URL (for order links)</Label>
+          <Input className="mt-1.5" placeholder="https://curemedkw.com" value={em.storefront_url} onChange={(e) => setEm({ ...em, storefront_url: e.target.value })} />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <Button onClick={saveEmail} disabled={savingEmail} className="bg-brand hover:bg-brand/90 text-white">
+            {savingEmail && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Save email settings
+          </Button>
+          <div className="flex gap-2">
+            <Input className="w-56" placeholder="test@inbox.com (optional)" value={emTestTo} onChange={(e) => setEmTestTo(e.target.value)} />
+            <Button onClick={sendEmailTest} disabled={sendingEmailTest} variant="outline">
+              {sendingEmailTest ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span className="ml-2">Send test email</span>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+
       <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
         <Label className="text-base">Send a test message</Label>
         <div className="flex gap-2">
