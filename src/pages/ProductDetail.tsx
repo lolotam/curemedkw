@@ -13,6 +13,11 @@ import { ProductReviews } from "@/components/site/ProductReviews";
 import { AddToCartButton } from "@/components/site/AddToCartButton";
 import { useAdminSession } from "@/lib/admin";
 import { ImageZoom } from "@/components/site/ImageZoom";
+import { ProductLanding } from "@/components/site/ProductLanding";
+
+// Products that render as a full conversion-optimised landing page instead of
+// the default two-column detail layout. Match by slug (case-insensitive).
+const LANDING_SLUGS = ["kapiva-shilajit-gold-30-capsules"];
 
 
 export default function ProductDetail() {
@@ -20,11 +25,12 @@ export default function ProductDetail() {
   const { t, lang } = useI18n();
   const [activeImg, setActiveImg] = useState(0);
   const brandKey = brandSlug ? slugToBrand(brandSlug) : null;
-  if (!brandKey) return <Navigate to="/curemed" replace />;
+  const queryBrandKey = brandKey ?? "kapiva";
   const { data: product, isLoading } = useProduct(slug);
-  const { data: brandList = [] } = useProductsByBrand(brandKey);
+  const { data: brandList = [] } = useProductsByBrand(queryBrandKey);
   const { data: visibility } = usePriceVisibility();
   const { isAdmin } = useAdminSession();
+  if (!brandKey) return <Navigate to="/curemed" replace />;
   if (isLoading) return null;
   if (!product || product.brand !== brandKey) return <Navigate to={`/${brandSlug}`} replace />;
   // Canonicalize legacy UUID URLs → slug URL
@@ -38,11 +44,58 @@ export default function ProductDetail() {
   const images = [product.mainImage, ...product.gallery.filter((g) => g !== product.mainImage)];
   const isAr = lang === "ar";
   const name = isAr && product.nameAr ? product.nameAr : product.name;
-  const category = isAr && product.categoryAr ? product.categoryAr : product.category;
   const shortDesc =
     isAr && product.shortDescriptionAr ? product.shortDescriptionAr : product.shortDescription;
   const longDesc =
     isAr && product.longDescriptionAr ? product.longDescriptionAr : product.longDescription;
+
+  // Premium landing-page layout for select flagship products.
+  if (product.slug && LANDING_SLUGS.includes(product.slug.toLowerCase())) {
+    return (
+      <SiteLayout brand={meta.themeAttr}>
+        <Seo
+          title={`${name} — ${meta.name} | Curemed Kuwait`}
+          description={(shortDesc || longDesc || `${name} by ${meta.name}, available at Curemed Kuwait.`).toString().replace(/\s+/g, " ").slice(0, 160)}
+          path={`/${meta.slug}/product/${product.slug}`}
+          image={product.mainImage}
+          ogType="product"
+          jsonLd={{
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name,
+            image: images,
+            description: (shortDesc || longDesc || "").toString().slice(0, 500),
+            brand: { "@type": "Brand", name: meta.name },
+            ...(priceHidden
+              ? {}
+              : {
+                  offers: {
+                    "@type": "Offer",
+                    price: product.price,
+                    priceCurrency: "KWD",
+                    availability:
+                      product.stockStatus === "out_of_stock"
+                        ? "https://schema.org/OutOfStock"
+                        : "https://schema.org/InStock",
+                    url: `https://curemedkw.lovable.app/${meta.slug}/product/${product.slug}`,
+                  },
+                }),
+          }}
+        />
+        <div className="pb-28 lg:pb-0">
+          <ProductLanding
+            product={product}
+            meta={meta}
+            images={images}
+            priceHidden={priceHidden}
+            related={related}
+          />
+        </div>
+      </SiteLayout>
+    );
+  }
+
+  const category = isAr && product.categoryAr ? product.categoryAr : product.category;
   const usage = isAr && product.usageAr ? product.usageAr : product.usage;
   const benefits = (
     isAr && product.benefitsAr && product.benefitsAr.length ? product.benefitsAr : product.benefits
