@@ -4,6 +4,7 @@ import { getAdminClient } from "../_shared/supabase-admin.ts";
 const HEALTH_ENV_KEYS = [
   "MYFATOORAH_TOKEN",
   "MYFATOORAH_BASE_URL",
+  "MYFATOORAH_WEBHOOK_SECRET",
   "APP_PUBLIC_URL",
 ] as const;
 
