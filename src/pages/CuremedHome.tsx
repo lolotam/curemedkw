@@ -406,74 +406,82 @@ function FeaturedGlassCard({
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
       onBlur={() => setHovered(false)}
-      className="group/card relative shrink-0 w-72 md:w-80 h-96 mr-5 rounded-3xl overflow-hidden bg-brand-soft border border-border transition-all hover:-translate-y-1 hover:shadow-2xl"
+      className="group/card relative shrink-0 w-72 md:w-80 h-[26rem] mr-5 rounded-[2.5rem] overflow-hidden bg-card border border-border shadow-xl transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl"
     >
-      {/* Full-bleed image(s) */}
-      {hoverCfg.mode === "loop" && images.length > 1 ? (
-        images.map((src, i) => (
-          <img
-            key={src + i}
-            src={src}
-            alt={name}
-            width={800}
-            height={800}
-            loading="lazy"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 group-hover/card:scale-105 ${i === (hovered ? loopIdx : 0) ? "opacity-100" : "opacity-0"}`}
-          />
-        ))
-      ) : (
-        <>
-          <img
-            src={images[0] || product.mainImage}
-            alt={name}
-            width={800}
-            height={800}
-            loading="lazy"
-            className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover/card:scale-105 ${secondImage ? "group-hover/card:opacity-0" : ""}`}
-          />
-          {secondImage && (
+      {/* Image zone — contained product image over a soft brand-tinted gradient */}
+      <div className="relative h-64 md:h-72 w-full overflow-hidden rounded-t-[2.5rem]">
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-tr from-brand-soft via-transparent to-brand-soft/40"
+        />
+        {hoverCfg.mode === "loop" && images.length > 1 ? (
+          images.map((src, i) => (
             <img
-              src={secondImage}
+              key={src + i}
+              src={src}
               alt={name}
               width={800}
               height={800}
               loading="lazy"
-              className="absolute inset-0 w-full h-full object-cover opacity-0 transition-all duration-700 group-hover/card:opacity-100 group-hover/card:scale-105"
+              className={`absolute inset-0 w-full h-full object-contain p-7 transition-all duration-500 group-hover/card:scale-110 ${i === (hovered ? loopIdx : 0) ? "opacity-100" : "opacity-0"}`}
             />
-          )}
-        </>
-      )}
+          ))
+        ) : (
+          <>
+            <img
+              src={images[0] || product.mainImage}
+              alt={name}
+              width={800}
+              height={800}
+              loading="lazy"
+              className={`absolute inset-0 w-full h-full object-contain p-7 transition-all duration-700 group-hover/card:scale-110 ${secondImage ? "group-hover/card:opacity-0" : ""}`}
+            />
+            {secondImage && (
+              <img
+                src={secondImage}
+                alt={name}
+                width={800}
+                height={800}
+                loading="lazy"
+                className="absolute inset-0 w-full h-full object-contain p-7 opacity-0 transition-all duration-700 group-hover/card:opacity-100 group-hover/card:scale-110"
+              />
+            )}
+          </>
+        )}
 
-      {/* Top gradient for legibility of the discount badge */}
-      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/30 to-transparent pointer-events-none" />
-
-      {/* Discount badge */}
-      {hasDiscount && (
-        <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-brand text-brand-foreground text-xs font-semibold shadow-md">
-          -{Math.round(((original! - price) / original!) * 100)}%
-        </div>
-      )}
+        {/* Discount badge — soft branded pill (RTL-aware) */}
+        {hasDiscount && (
+          <div className="absolute top-4 right-4 rtl:right-auto rtl:left-4 px-3 py-1 rounded-full bg-brand-soft text-brand text-[11px] font-bold tracking-wide shadow-sm">
+            -{Math.round(((original! - price) / original!) * 100)}%
+          </div>
+        )}
+      </div>
 
       {/* Frosted glass info strip — bg layer is opacity-controlled, text stays fully opaque */}
-      <div className="absolute inset-x-3 bottom-3 rounded-2xl overflow-hidden border border-white/40 dark:border-white/10 shadow-lg transition-all duration-300">
+      <div className="absolute inset-x-3 bottom-3 rounded-[1.75rem] overflow-hidden border border-white/50 dark:border-white/10 shadow-lg transition-all duration-500 group-hover/card:bottom-4">
         <div
           aria-hidden="true"
           className="absolute inset-0 backdrop-blur-md bg-white dark:bg-black transition-opacity duration-300"
           style={{ opacity }}
         />
-        <div className="relative p-4">
-          <h3 className="text-base font-bold text-foreground line-clamp-2 leading-snug">{name}</h3>
+        <div className="relative p-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand">
+            {brand.name}
+          </p>
+          <h3 className="mt-1 text-base font-bold text-foreground line-clamp-1 leading-snug">
+            {name}
+          </h3>
 
-          <div className="mt-1.5 flex items-end justify-between gap-2">
-            <div className="flex items-baseline gap-2 min-w-0">
-              <span className="text-lg font-bold text-brand tabular-nums">
-                {price.toFixed(3)} <span className="text-xs font-medium opacity-80">KD</span>
-              </span>
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <div className="flex flex-col min-w-0">
               {hasDiscount && (
                 <span className="text-xs text-muted-foreground line-through tabular-nums">
-                  {original!.toFixed(3)}
+                  {original!.toFixed(3)} KD
                 </span>
               )}
+              <span className="text-xl font-bold text-brand tabular-nums leading-none">
+                {price.toFixed(3)} <span className="text-xs font-medium opacity-80">KD</span>
+              </span>
             </div>
 
             {/* Hidden while ordering is on hold; the tile still links through to
@@ -483,19 +491,11 @@ function FeaturedGlassCard({
                 type="button"
                 onClick={handleAdd}
                 aria-label={t("common.addToCart") || "Add to cart"}
-                className="shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full bg-brand text-brand-foreground shadow-md hover:scale-110 active:scale-95 transition-transform"
+                className="shrink-0 inline-flex items-center justify-center h-12 w-12 rounded-full bg-brand text-brand-foreground shadow-lg hover:scale-110 active:scale-95 transition-transform"
               >
-                <ShoppingBag className="h-4 w-4" />
+                <ShoppingBag className="h-5 w-5" />
               </button>
             )}
-          </div>
-
-          {/* Reveal-on-hover discover link */}
-          <div className="mt-0 max-h-0 opacity-0 overflow-hidden group-hover/card:max-h-10 group-hover/card:opacity-100 group-hover/card:mt-2 transition-all duration-300">
-            <p className="text-xs font-semibold text-brand inline-flex items-center gap-1">
-              {t("common.discover")}
-              <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
-            </p>
           </div>
         </div>
       </div>
