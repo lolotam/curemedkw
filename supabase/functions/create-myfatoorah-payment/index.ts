@@ -1,7 +1,7 @@
 // Create a MyFatoorah Hosted Payment Page (v3) request for an order.
 // Returns a PaymentURL the frontend redirects the customer to.
 import { z } from "npm:zod@3";
-import { corsHeaders, json, jsonError } from "../_shared/cors.ts";
+import { handleOptions, jsonError, jsonResponse } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import {
   getMyFatoorahConfig,
@@ -26,17 +26,19 @@ interface CreatePaymentData {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") {
-    console.error("create-myfatoorah-payment: method_not_allowed");
-    return jsonError("method_not_allowed", "Method not allowed.", 405);
-  }
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
 
   try {
+    if (req.method !== "POST") {
+      console.error("create-myfatoorah-payment: method_not_allowed");
+      return jsonError(req, "method_not_allowed", "Method not allowed.", 405);
+    }
+
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) {
       console.error("create-myfatoorah-payment: invalid_request_body");
-      return jsonError("invalid_request_body", "Invalid request body.", 400);
+      return jsonError(req, "invalid_request_body", "Invalid request body.", 400);
     }
     const { order_id, payment_method, payment_session_token } = parsed.data;
 
@@ -62,7 +64,7 @@ Deno.serve(async (req) => {
     if (orderErr) throw orderErr;
     if (!order) {
       console.error(`create-myfatoorah-payment: order_not_found order=${order_id}`);
-      return jsonError("order_not_found", "Order not found.", 404);
+      return jsonError(req, "order_not_found", "Order not found.", 404);
     }
 
     // Ownership: logged-in user must own the order; guest orders require a valid token.
@@ -70,6 +72,7 @@ Deno.serve(async (req) => {
       if (!callerId || callerId !== order.user_id) {
         console.error(`create-myfatoorah-payment: unauthorized_order order=${order_id}`);
         return jsonError(
+          req,
           "unauthorized_order",
           "You are not authorized to pay for this order.",
           403,
@@ -85,6 +88,7 @@ Deno.serve(async (req) => {
           `create-myfatoorah-payment: invalid_guest_payment_token order=${order_id}`,
         );
         return jsonError(
+          req,
           "invalid_guest_payment_token",
           tokenError ?? "Invalid payment session token.",
           403,
@@ -93,10 +97,10 @@ Deno.serve(async (req) => {
     }
 
     if (order.payment_status === "paid") {
-      return jsonError("order_already_paid", "This order has already been paid.", 409);
+      return jsonError(req, "order_already_paid", "This order has already been paid.", 409);
     }
     if (order.order_status === "cancelled") {
-      return jsonError("order_cancelled", "This order has been cancelled.", 409);
+      return jsonError(req, "order_cancelled", "This order has been cancelled.", 409);
     }
 
     // Recompute amount server-side from order_items + discount (never trust client).
@@ -107,7 +111,7 @@ Deno.serve(async (req) => {
     if (itemsErr) throw itemsErr;
     if (!items || items.length === 0) {
       console.error(`create-myfatoorah-payment: order_has_no_items order=${order_id}`);
-      return jsonError("order_has_no_items", "Order has no items.", 400);
+      return jsonError(req, "order_has_no_items", "Order has no items.", 400);
     }
     const subtotal = items.reduce(
       (s, i) => s + Number(i.unit_price) * Number(i.quantity),
@@ -129,14 +133,14 @@ Deno.serve(async (req) => {
       console.error(
         `create-myfatoorah-payment: amount_mismatch order=${order_id} computed=${computed} stored=${storedTotal}`,
       );
-      return jsonError("amount_mismatch", "Order amount could not be verified.", 400);
+      return jsonError(req, "amount_mismatch", "Order amount could not be verified.", 400);
     }
     const amount = storedTotal;
     if (amount <= 0) {
       console.error(
         `create-myfatoorah-payment: invalid_amount order=${order_id} amount=${amount}`,
       );
-      return jsonError("invalid_amount", "Invalid order amount.", 400);
+      return jsonError(req, "invalid_amount", "Invalid order amount.", 400);
     }
 
     let config;
@@ -146,7 +150,7 @@ Deno.serve(async (req) => {
       console.error(
         "create-myfatoorah-payment: missing_secret — MYFATOORAH_TOKEN not set",
       );
-      return jsonError("missing_secret", "Payment provider is not configured.", 500);
+      return jsonError(req, "missing_secret", "Payment provider is not configured.", 500);
     }
     const currency = config.currency;
     const idempotencyKey =
@@ -159,7 +163,7 @@ Deno.serve(async (req) => {
       .eq("idempotency_key", idempotencyKey)
       .maybeSingle();
     if (existing && existing.status === "created" && existing.payment_url) {
-      return json({
+      return jsonResponse(req, {
         success: true,
         order_id,
         invoice_id: existing.invoice_id,
@@ -175,8 +179,6 @@ Deno.serve(async (req) => {
     const customer: Record<string, string> = {};
     if (order.customer_name) customer.Name = order.customer_name;
     if (order.customer_email) customer.Email = order.customer_email;
-    const mobile = String(order.customer_phone ?? "").replace(/[\s-]/g, "");
-    if (/^\+?\d{8,15}$/.test(mobile)) customer.Mobile = mobile;
 
     const requestBody: Record<string, unknown> = {
       PaymentMethod: payment_method,
@@ -243,7 +245,7 @@ Deno.serve(async (req) => {
         })
         .eq("id", order_id);
 
-      return json({
+      return jsonResponse(req, {
         success: true,
         order_id,
         invoice_id: d.InvoiceId,
@@ -259,10 +261,13 @@ Deno.serve(async (req) => {
       console.error(
         `create-myfatoorah-payment: myfatoorah_api_error order=${order_id} msg=${message}`,
       );
-      return jsonError("myfatoorah_api_error", message, 502);
+      return jsonError(req, "myfatoorah_api_error", message, 502);
     }
-  } catch (err) {
-    console.error("create-myfatoorah-payment: internal_error:", (err as Error).message);
-    return jsonError("internal_error", "Failed to create payment.", 500);
+  } catch (error) {
+    console.error(
+      "create-myfatoorah-payment: unhandled_error:",
+      error instanceof Error ? error.message : String(error),
+    );
+    return jsonError(req, "unhandled_error", "Unexpected server error.", 500);
   }
 });

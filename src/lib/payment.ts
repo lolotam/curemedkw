@@ -15,6 +15,7 @@ export interface CreatePaymentResult {
   payment_url?: string;
   payment_status?: string;
   error?: string;
+  error_code?: string;
 }
 
 export interface VerifyPaymentResult {
@@ -24,6 +25,60 @@ export interface VerifyPaymentResult {
   payment_status: string;
   order_status?: string;
   message: string;
+  error_code?: string;
+}
+
+type SupabaseFunctionsError = {
+  name?: string;
+  message?: string;
+  context?: { json?: () => Promise<unknown> } | null;
+};
+
+function classifyFunctionsError(error: SupabaseFunctionsError): { code: string; message: string } {
+  const msg = (error?.message ?? "").toLowerCase();
+  // Network / CORS / relay-level failures: invoke never reached a JSON error body.
+  const looksLikeNetwork =
+    !!error &&
+    (
+      error.name === "FunctionsRelayError" ||
+      error.name === "FunctionsHttpError" ||
+      /failed to send a request|failed to fetch|networkerror|load failed|cors/i.test(msg)
+    );
+  if (looksLikeNetwork) {
+    return {
+      code: "payment_gateway_unreachable",
+      message: "Payment gateway is unreachable. Admin: check the Supabase post-deploy manifest logs.",
+    };
+  }
+  return { code: "payment_error", message: error?.message ?? "Payment failed." };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function getFunctionsErrorDetails(
+  error: SupabaseFunctionsError,
+): Promise<{ code: string; message: string }> {
+  try {
+    const body = await error.context?.json?.();
+    if (isRecord(body)) {
+      const serverError = body.error;
+      if (isRecord(serverError)) {
+        const code = typeof serverError.code === "string" ? serverError.code : undefined;
+        const message = typeof serverError.message === "string" ? serverError.message : undefined;
+        if (code || message) {
+          return {
+            code: code ?? "payment_error",
+            message: message ?? error.message ?? "Payment failed.",
+          };
+        }
+      }
+      if (typeof body.message === "string") return { code: "payment_error", message: body.message };
+      if (typeof serverError === "string") return { code: "payment_error", message: serverError };
+    }
+  } catch { /* Fall through to local classification when the response body is unavailable. */ }
+  return classifyFunctionsError(error);
 }
 
 /** SHA-256 hex digest — matches the edge function's sha256Hex implementation. */
@@ -65,17 +120,13 @@ export async function createMyFatoorahPayment(
     },
   });
   if (error) {
-    // Try to surface the function's JSON error body.
-    let message = error.message;
-    try {
-      const ctx = (error as { context?: Response }).context;
-      if (ctx && typeof ctx.json === "function") {
-        const body = await ctx.json();
-        if (body?.message && typeof body.message === "string") message = body.message;
-        else if (body?.error && typeof body.error === "string") message = body.error;
-      }
-    } catch { /* ignore */ }
-    return { success: false, order_id: orderId, error: message };
+    const classifiedError = await getFunctionsErrorDetails(error as SupabaseFunctionsError);
+    return {
+      success: false,
+      order_id: orderId,
+      error: classifiedError.message,
+      error_code: classifiedError.code,
+    };
   }
   return data as CreatePaymentResult;
 }
@@ -94,11 +145,13 @@ export async function verifyMyFatoorahPayment(
     },
   });
   if (error) {
+    const classifiedError = await getFunctionsErrorDetails(error as SupabaseFunctionsError);
     return {
       success: false,
       order_id: orderId ?? null,
       payment_status: "pending_status_update",
-      message: error.message,
+      message: classifiedError.message,
+      error_code: classifiedError.code,
     };
   }
   return data as VerifyPaymentResult;

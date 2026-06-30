@@ -1,7 +1,7 @@
 // Verify a MyFatoorah payment after redirect (callback). Calls Get Payment
 // Details, updates the order with downgrade protection, logs a payment_event.
 import { z } from "npm:zod@3";
-import { corsHeaders, json, jsonError } from "../_shared/cors.ts";
+import { handleOptions, jsonError, jsonResponse } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { getMyFatoorahConfig, myfatoorahRequest, MyFatoorahError } from "../_shared/myfatoorah.ts";
 import { applyPaymentToOrder, extractDetails, findOrder } from "../_shared/apply-payment.ts";
@@ -21,17 +21,19 @@ interface PaymentDetails {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") {
-    console.error("verify-myfatoorah-payment: method_not_allowed");
-    return jsonError("method_not_allowed", "Method not allowed.", 405);
-  }
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
 
   try {
+    if (req.method !== "POST") {
+      console.error("verify-myfatoorah-payment: method_not_allowed");
+      return jsonError(req, "method_not_allowed", "Method not allowed.", 405);
+    }
+
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) {
       console.error("verify-myfatoorah-payment: invalid_request_body");
-      return jsonError("invalid_request_body", "Invalid request body.", 400);
+      return jsonError(req, "invalid_request_body", "Invalid request body.", 400);
     }
     const { payment_id, order_id, payment_session_token } = parsed.data;
 
@@ -43,7 +45,7 @@ Deno.serve(async (req) => {
       console.error(
         "verify-myfatoorah-payment: missing_secret — MYFATOORAH_TOKEN not set",
       );
-      return jsonError("missing_secret", "Payment provider is not configured.", 500);
+      return jsonError(req, "missing_secret", "Payment provider is not configured.", 500);
     }
 
     // Resolve caller identity (optional — supports guest orders).
@@ -92,6 +94,7 @@ Deno.serve(async (req) => {
             `verify-myfatoorah-payment: unauthorized_order payment_id=${payment_id}`,
           );
           return jsonError(
+            req,
             "unauthorized_order",
             "You are not authorized for this order.",
             403,
@@ -107,6 +110,7 @@ Deno.serve(async (req) => {
             `verify-myfatoorah-payment: invalid_guest_payment_token payment_id=${payment_id}`,
           );
           return jsonError(
+            req,
             "invalid_guest_payment_token",
             tokenError ?? "Invalid payment session token.",
             403,
@@ -121,7 +125,7 @@ Deno.serve(async (req) => {
       if (order && order.payment_status !== "paid") {
         await admin.from("orders").update({ payment_status: "pending_status_update" }).eq("id", order.id);
       }
-      return json({
+      return jsonResponse(req, {
         success: false,
         order_id: order?.id ?? order_id ?? null,
         payment_status: "pending_status_update",
@@ -133,7 +137,7 @@ Deno.serve(async (req) => {
       console.error(
         `verify-myfatoorah-payment: order_not_found payment_id=${payment_id}`,
       );
-      return jsonError("order_not_found", "Order not found for this payment.", 404);
+      return jsonError(req, "order_not_found", "Order not found for this payment.", 404);
     }
 
     const d = extractDetails(details);
@@ -157,7 +161,7 @@ Deno.serve(async (req) => {
 
     const finalStatus = result.alreadyPaid ? "paid" : result.mapped.paymentStatus;
     const isPaid = finalStatus === "paid";
-    return json({
+    return jsonResponse(req, {
       success: isPaid,
       order_id: order.id,
       order_number: order.order_number,
@@ -169,8 +173,11 @@ Deno.serve(async (req) => {
           ? "Payment was not completed."
           : "Payment status is still pending. We will update your order shortly.",
     });
-  } catch (err) {
-    console.error("verify-myfatoorah-payment: internal_error:", (err as Error).message);
-    return jsonError("internal_error", "Failed to verify payment.", 500);
+  } catch (error) {
+    console.error(
+      "verify-myfatoorah-payment: unhandled_error:",
+      error instanceof Error ? error.message : String(error),
+    );
+    return jsonError(req, "unhandled_error", "Unexpected server error.", 500);
   }
 });
