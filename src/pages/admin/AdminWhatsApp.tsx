@@ -66,6 +66,70 @@ export default function AdminWhatsApp() {
   const [keyEditing, setKeyEditing] = useState(false);
   const [showKey, setShowKey] = useState(false);
 
+  // ---- Order Email (SMTP) ----
+  const [em, setEm] = useState<EmailSettings>(EMAIL_DEFAULT);
+  const [emPass, setEmPass] = useState("");
+  const [emPassEditing, setEmPassEditing] = useState(false);
+  const [showEmPass, setShowEmPass] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [newCc, setNewCc] = useState("");
+  const [emTestTo, setEmTestTo] = useState("");
+  const [sendingEmailTest, setSendingEmailTest] = useState(false);
+
+  const emailQ = useQuery({
+    queryKey: ["order_email_settings"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("site_settings")
+        .select("value")
+        .eq("key", "order_email")
+        .maybeSingle();
+      return (data?.value as any as EmailSettings) ?? null;
+    },
+  });
+
+  useEffect(() => {
+    if (emailQ.data) setEm({ ...EMAIL_DEFAULT, ...emailQ.data, cc: emailQ.data.cc ?? [] });
+  }, [emailQ.data]);
+
+  const saveEmail = async () => {
+    setSavingEmail(true);
+    const nextPass = emPassEditing && emPass.trim() ? emPass.trim() : em.smtp_pass;
+    const payload: EmailSettings = { ...em, smtp_pass: nextPass, smtp_port: Number(em.smtp_port) || 587 };
+    const { error } = await supabase
+      .from("site_settings")
+      .upsert({ key: "order_email", value: payload as any }, { onConflict: "key" });
+    setSavingEmail(false);
+    if (error) return toast.error(error.message);
+    setEm(payload);
+    setEmPass("");
+    setEmPassEditing(false);
+    setShowEmPass(false);
+    toast.success("Order email settings saved");
+    qc.invalidateQueries({ queryKey: ["order_email_settings"] });
+  };
+
+  const addCc = () => {
+    const v = newCc.trim();
+    if (!v.includes("@")) return toast.error("Enter a valid email");
+    if (em.cc.includes(v)) return;
+    setEm({ ...em, cc: [...em.cc, v] });
+    setNewCc("");
+  };
+
+  const sendEmailTest = async () => {
+    setSendingEmailTest(true);
+    const { data, error } = await supabase.functions.invoke("send-order-email", {
+      body: { mode: "test", test_to: emTestTo || undefined },
+    });
+    setSendingEmailTest(false);
+    if (error) return toast.error(error.message);
+    if ((data as any)?.skipped) toast.message(`Skipped: ${(data as any).reason}`);
+    else if ((data as any)?.error) toast.error((data as any).error);
+    else toast.success("Test email sent — check the inbox");
+  };
+
+
   const settingsQ = useQuery({
     queryKey: ["wa_settings"],
     queryFn: async () => {
