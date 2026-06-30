@@ -55,6 +55,36 @@ const TEMPLATE_FIELDS: { eventKey: string; placeholders: string }[] = [
   { eventKey: "order_shipped", placeholders: "{{order_number}} {{customer_name}}" },
 ];
 
+interface EmailSettings {
+  enabled: boolean;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_secure: boolean;
+  smtp_user: string;
+  smtp_pass: string;
+  from_email: string;
+  from_name: string;
+  to: string;
+  cc: string[];
+  storefront_url: string;
+}
+
+const EMAIL_DEFAULT: EmailSettings = {
+  enabled: true,
+  smtp_host: "",
+  smtp_port: 587,
+  smtp_secure: false,
+  smtp_user: "",
+  smtp_pass: "",
+  from_email: "",
+  from_name: "Curemed",
+  to: "",
+  cc: [],
+  storefront_url: "",
+};
+
+
+
 export default function AdminWhatsApp() {
   const qc = useQueryClient();
   const [s, setS] = useState<WaSettings>(DEFAULT);
