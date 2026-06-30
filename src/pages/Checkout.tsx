@@ -48,6 +48,17 @@ import googlePayLogo from "@/assets/payment/google-pay.png";
 
 
 const COUPON_KEY = "curemed.appliedCoupon";
+const KUWAIT_DIAL_CODE = "+965";
+
+function getKuwaitLocalPhone(value: string | null | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  return digits.startsWith("965") ? digits.slice(3, 11) : digits.slice(0, 8);
+}
+
+function formatKuwaitPhone(localPhone: string) {
+  return `${KUWAIT_DIAL_CODE}${getKuwaitLocalPhone(localPhone)}`;
+}
+
 function loadCoupon(): AppliedCoupon | null {
   try {
     const raw = sessionStorage.getItem(COUPON_KEY);
@@ -181,7 +192,7 @@ export default function Checkout() {
       ...f,
       customerName: f.customerName || profile.fullName,
       customerEmail: f.customerEmail || user?.email || "",
-      customerPhone: f.customerPhone || profile.phone,
+      customerPhone: f.customerPhone || getKuwaitLocalPhone(profile.phone),
       country: f.country || profile.country,
       governorate: f.governorate || profile.governorate,
       area: f.area || profile.area,
@@ -247,6 +258,11 @@ export default function Checkout() {
       toast.error(t("checkout.error.required"));
       return;
     }
+    const customerPhone = formatKuwaitPhone(form.customerPhone);
+    if (getKuwaitLocalPhone(form.customerPhone).length !== 8) {
+      toast.error(t("checkout.error.required"));
+      return;
+    }
     if (!form.country || !form.governorate) {
       toast.error(t("checkout.error.country"));
       return;
@@ -265,7 +281,7 @@ export default function Checkout() {
       const order = await createOrder.mutateAsync({
         customerName: form.customerName,
         customerEmail: form.customerEmail,
-        customerPhone: form.customerPhone,
+        customerPhone,
         country: form.country,
         governorate: form.governorate,
         // Keep `city` populated for backwards-compatible admin views.
@@ -293,23 +309,30 @@ export default function Checkout() {
       // Order notifications (email + WhatsApp to buyer & company) are now sent
       // server-side once payment is confirmed — see _shared/apply-payment.ts.
 
-
-
       // Create the MyFatoorah hosted payment and redirect.
       setRedirecting(true);
       saveGuestToken(order.id, rawPaymentToken);
       const res = await createMyFatoorahPayment(order.id, onlineMethod, rawPaymentToken);
       if (res.success && res.payment_url) {
-        clear();
         saveCoupon(null);
         window.location.href = res.payment_url;
         return;
       }
       setRedirecting(false);
-      toast.error(res.error || t("checkout.paymentFailed"));
-    } catch (err: any) {
+      if (res.error_code === "payment_gateway_unreachable") {
+        toast.error(t("checkout.payment.gatewayUnreachable"), {
+          description: t("checkout.payment.gatewayUnreachableDesc"),
+        });
+      } else {
+        toast.error(res.error || t("checkout.paymentFailed"));
+      }
+    } catch (err: unknown) {
       setRedirecting(false);
-      toast.error(err?.message || t("checkout.error.generic"));
+      const message =
+        typeof err === "object" && err !== null && "message" in err && typeof err.message === "string"
+          ? err.message
+          : undefined;
+      toast.error(message || t("checkout.error.generic"));
     }
   };
 
@@ -368,13 +391,21 @@ export default function Checkout() {
                   </div>
                   <div>
                     <Label>{t("checkout.phone")} *</Label>
-                    <Input
-                      type="tel"
-                      value={form.customerPhone}
-                      onChange={(e) => set("customerPhone", e.target.value)}
-                      required
-                      className="mt-1.5 h-11 rounded-xl bg-background/70 backdrop-blur focus-visible:ring-sky-500"
-                    />
+                    <div className="mt-1.5 flex h-11 overflow-hidden rounded-xl border border-input bg-background/70 backdrop-blur focus-within:ring-2 focus-within:ring-sky-500 focus-within:ring-offset-2">
+                      <span className="flex items-center border-r border-border bg-muted/60 px-3 text-sm font-semibold text-muted-foreground">
+                        {KUWAIT_DIAL_CODE}
+                      </span>
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        maxLength={8}
+                        pattern="[0-9]{8}"
+                        value={form.customerPhone}
+                        onChange={(e) => set("customerPhone", getKuwaitLocalPhone(e.target.value))}
+                        required
+                        className="h-full rounded-none border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+                      />
+                    </div>
                   </div>
                 </div>
               </SectionCard>

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "project": "curemed",
+  "environment": "production",
+  "supabase": {
+    "publicUrl": "https://supabase.curemedkw.com",
+    "functionsBaseUrl": "https://supabase.curemedkw.com/functions/v1"
+  },
+  "app": {
+    "publicUrl": "https://curemedkw.com",
+    "allowedOrigins": [
+      "https://curemedkw.com",
+      "https://www.curemedkw.com",
+      "https://curemedkw.lovable.app",
+      "http://localhost:8080",
+      "http://localhost:5173"
+    ]
+  },
+  "edgeFunctions": [
+    { "name": "create-myfatoorah-payment", "verifyJwt": false, "methods": ["POST","OPTIONS"],
+      "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","APP_PUBLIC_URL"] },
+    { "name": "verify-myfatoorah-payment", "verifyJwt": false, "methods": ["POST","OPTIONS"],
+      "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","APP_PUBLIC_URL"] },
+    { "name": "myfatoorah-webhook", "verifyJwt": false, "methods": ["POST","OPTIONS"],
+      "requiredSecrets": ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_WEBHOOK_SECRET"] }
+  ],
+  "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","MYFATOORAH_WEBHOOK_SECRET","APP_PUBLIC_URL"],
+  "defaults": {
+    "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",
+    "MYFATOORAH_CURRENCY": "KWD",
+    "MYFATOORAH_COUNTRY_ISO": "KWT",
+    "MYFATOORAH_MODE": "live",
+    "APP_PUBLIC_URL": "https://curemedkw.com"
+  },
+  "smokeTests": [
+    { "name": "create payment preflight", "method": "OPTIONS", "url": "https://supabase.curemedkw.com/functions/v1/create-myfatoorah-payment", "origin": "https://curemedkw.com",
+      "expectHeaders": ["access-control-allow-origin","access-control-allow-headers","access-control-allow-methods"] },
+    { "name": "verify payment preflight", "method": "OPTIONS", "url": "https://supabase.curemedkw.com/functions/v1/verify-myfatoorah-payment", "origin": "https://curemedkw.com",
+      "expectHeaders": ["access-control-allow-origin","access-control-allow-headers","access-control-allow-methods"] },
+    { "name": "webhook preflight", "method": "OPTIONS", "url": "https://supabase.curemedkw.com/functions/v1/myfatoorah-webhook", "origin": "https://curemedkw.com",
+      "expectHeaders": ["access-control-allow-origin","access-control-allow-headers","access-control-allow-methods"] }
+  ]
+}

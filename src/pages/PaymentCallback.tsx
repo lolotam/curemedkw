@@ -7,6 +7,7 @@ import { useI18n } from "@/lib/i18n";
 import { verifyMyFatoorahPayment, getGuestToken, type VerifyPaymentResult } from "@/lib/payment";
 import { ColorfulHeroBg, GlowCard, Icon3D, Reveal } from "@/components/site/ColorfulFx";
 import { cn } from "@/lib/utils";
+import { useCart } from "@/lib/cart";
 
 type State = "verifying" | "success" | "failed" | "pending";
 
@@ -14,6 +15,7 @@ export default function PaymentCallback() {
   const { t } = useI18n();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const { clear } = useCart();
   const [state, setState] = useState<State>("verifying");
   const [result, setResult] = useState<VerifyPaymentResult | null>(null);
   const ran = useRef(false);
@@ -32,12 +34,14 @@ export default function PaymentCallback() {
       const guestToken = orderId ? getGuestToken(orderId) : null;
       const res = await verifyMyFatoorahPayment(paymentId, orderId, guestToken);
       setResult(res);
-      if (res.payment_status === "paid") setState("success");
-      else if (res.payment_status === "pending_status_update" || res.payment_status === "pending_payment")
+      if (res.payment_status === "paid") {
+        clear();
+        setState("success");
+      } else if (res.payment_status === "pending_status_update" || res.payment_status === "pending_payment")
         setState("pending");
       else setState("failed");
     })();
-  }, [paymentId, orderId]);
+  }, [clear, paymentId, orderId]);
 
   const config = {
     verifying: { icon: Loader2, variant: "sky" as const, title: t("payment.verifying"), desc: "" },

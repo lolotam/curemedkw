@@ -78,6 +78,8 @@ export const TRANSLATIONS: Dict = {
   "checkout.creatingPayment": { en: "Creating payment…", ar: "جارٍ إنشاء الدفع…" },
   "checkout.redirecting": { en: "Redirecting to payment page…", ar: "جارٍ التحويل إلى صفحة الدفع…" },
   "checkout.paymentFailed": { en: "Could not start payment. Please try again.", ar: "تعذّر بدء الدفع. حاول مرة أخرى." },
+  "checkout.payment.gatewayUnreachable": { en: "Payment gateway unreachable", ar: "بوابة الدفع غير متاحة" },
+  "checkout.payment.gatewayUnreachableDesc": { en: "We couldn't reach the payment provider. If the problem persists, our team has been notified — please try again shortly.", ar: "تعذّر الوصول إلى مزوّد الدفع. تم إبلاغ فريقنا — يرجى المحاولة مرة أخرى بعد قليل." },
 
   
   "payment.verifying": { en: "Verifying your payment…", ar: "جارٍ التحقق من الدفع…" },
