@@ -49,9 +49,9 @@ export function FAQ({ items = DEFAULT_FAQ }: { items?: FaqItem[] }) {
               className="group border border-border rounded-2xl bg-card/60 backdrop-blur-sm px-6 md:px-8 transition-all hover:border-brand/40 hover:shadow-lg data-[state=open]:border-brand/60 data-[state=open]:shadow-xl data-[state=open]:bg-card animate-fade-in-up"
               style={{ animationDelay: `${i * 60}ms` }}
             >
-              <AccordionTrigger className="text-start text-lg md:text-2xl font-semibold py-6 md:py-8 hover:no-underline group-data-[state=open]:text-brand">
-                <span className="flex items-start gap-4 md:gap-5">
-                  <span className="flex-shrink-0 mt-1 inline-flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-brand-soft text-brand text-sm md:text-base font-bold">
+              <AccordionTrigger className="text-start text-base md:text-xl font-semibold py-3 md:py-4 hover:no-underline group-data-[state=open]:text-brand">
+                <span className="flex items-center gap-3 md:gap-4">
+                  <span className="flex-shrink-0 inline-flex h-7 w-7 md:h-8 md:w-8 items-center justify-center rounded-full bg-brand-soft text-brand text-xs md:text-sm font-bold">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <span>{it.q[lang]}</span>
