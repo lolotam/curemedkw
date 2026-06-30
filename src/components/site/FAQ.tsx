@@ -57,7 +57,7 @@ export function FAQ({ items = DEFAULT_FAQ }: { items?: FaqItem[] }) {
                   <span>{it.q[lang]}</span>
                 </span>
               </AccordionTrigger>
-              <AccordionContent className="text-base md:text-lg text-muted-foreground leading-relaxed pb-6 md:pb-8 ps-12 md:ps-[60px]">
+              <AccordionContent className="text-sm md:text-base text-muted-foreground leading-relaxed pb-4 md:pb-5 ps-10 md:ps-12">
                 {it.a[lang]}
               </AccordionContent>
             </AccordionItem>
