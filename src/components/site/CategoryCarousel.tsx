@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useCategories, useProducts, useSiteSetting } from "@/lib/db";
 import { cn } from "@/lib/utils";
-import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
+
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
 const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
@@ -91,7 +91,7 @@ export function CategoryCarousel() {
       </div>
 
       <div
-        className="group relative"
+        className="group relative overflow-hidden"
         style={{
           maskImage:
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
@@ -99,7 +99,16 @@ export function CategoryCarousel() {
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
         }}
       >
-        <AutoScrollMarquee autoScroll={categoriesAutoscroll} speed={55} innerClassName="py-2">
+        {/* CSS-animation marquee (reliable on mobile). When auto-scroll is
+            disabled by the admin flag, fall back to a manually swipeable row. */}
+        <div
+          className={cn(
+            "flex w-max py-2",
+            categoriesAutoscroll
+              ? "cat-marquee group-hover:[animation-play-state:paused]"
+              : "overflow-x-auto no-scrollbar",
+          )}
+        >
           {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
@@ -180,7 +189,7 @@ export function CategoryCarousel() {
               </div>
             );
           })}
-        </AutoScrollMarquee>
+        </div>
       </div>
     </section>
   );
