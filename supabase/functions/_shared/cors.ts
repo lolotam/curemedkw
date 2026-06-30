@@ -12,3 +12,7 @@ export function json(body: unknown, status = 200, extra: Record<string, string> 
     headers: { ...corsHeaders, "Content-Type": "application/json", ...extra },
   });
 }
+
+export function jsonError(code: string, message: string, status: number) {
+  return json({ success: false, error: code, message }, status);
+}
