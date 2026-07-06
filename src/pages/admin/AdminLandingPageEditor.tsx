@@ -13,6 +13,7 @@ import { BRANDS } from "@/lib/brands";
 import curemedBadge from "@/assets/curemed-c-badge.png";
 import { SlideStylePanel } from "@/components/admin/SlideStylePanel";
 import { SlideLivePreview } from "@/components/admin/SlideLivePreview";
+import { HeroLayoutModeCard } from "@/components/admin/HeroLayoutModeCard";
 import { HeroIntervalCard } from "@/components/admin/HeroIntervalCard";
 import { useBrandingBrandCardLogo, useBrandingFavicon, type BrandKey } from "@/lib/db";
 import { cn } from "@/lib/utils";
@@ -335,6 +336,7 @@ export default function AdminLandingPageEditor() {
         </Card>
       ) : (
         <div className="space-y-4">
+          <HeroLayoutModeCard />
           <HeroIntervalCard pageKey={meta.key as HeroPageKey} />
           {slides.map((s, i) => (
             <Card key={s.id} className={cn("p-5 transition-colors", s._dirty && "ring-2 ring-amber-400/60 border-amber-300")}>
