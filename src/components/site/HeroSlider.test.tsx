@@ -4,6 +4,7 @@ import { HeroSlider } from "./HeroSlider";
 
 const mocks = vi.hoisted(() => ({
   listSlidesForPage: vi.fn(),
+  heroLayoutMode: undefined as "fit_viewport" | "aspect_ratio" | undefined,
 }));
 
 vi.mock("@/lib/heroSlides", () => ({
@@ -11,7 +12,9 @@ vi.mock("@/lib/heroSlides", () => ({
 }));
 
 vi.mock("@/lib/db", () => ({
-  useSiteSetting: () => ({ data: {} }),
+  useSiteSetting: (key: string, fallback: unknown) => ({
+    data: key === "hero_layout_mode" ? mocks.heroLayoutMode ?? fallback : fallback,
+  }),
 }));
 
 const heroSlides: HeroSlide[] = [
@@ -67,6 +70,7 @@ function createHeroSlide(patch: Partial<HeroSlide>): HeroSlide {
 describe("HeroSlider", () => {
   beforeEach(() => {
     mocks.listSlidesForPage.mockResolvedValue(heroSlides);
+    mocks.heroLayoutMode = undefined;
   });
 
   it("fits the hero in the visible viewport and shows full slide images", async () => {
@@ -84,5 +88,22 @@ describe("HeroSlider", () => {
 
     const firstDot = screen.getByRole("button", { name: "Go to slide 1" });
     expect(firstDot.closest("section")).toBe(carousel);
+  });
+
+  it("uses the previous aspect-ratio layout when selected globally", async () => {
+    mocks.heroLayoutMode = "aspect_ratio";
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    await screen.findByAltText("Hero one");
+    const carousel = container.querySelector('section[aria-roledescription="carousel"]');
+    expect(carousel).toBeInTheDocument();
+    expect(carousel).toHaveClass("relative", "w-full", "overflow-hidden");
+    expect(carousel).not.toHaveClass("h-[calc(100dvh-4rem)]", "min-h-[480px]");
+
+    expect(screen.getByAltText("Hero one")).toHaveClass("object-cover");
+
+    const firstDot = screen.getByRole("button", { name: "Go to slide 1" });
+    expect(firstDot.closest("section")).not.toBe(carousel);
   });
 });

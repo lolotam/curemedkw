@@ -15,6 +15,7 @@ export interface SlidePreviewProps {
   preview?: boolean;
   /** Optional scaling factor for text — used in admin mini preview. 1 = full size. */
   scale?: number;
+  mediaFit?: "cover" | "contain";
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export function SlidePreview({
   playKey,
   preview = false,
   scale = 1,
+  mediaFit = "contain",
   className = "",
 }: SlidePreviewProps) {
   const dir = lang === "ar" ? "rtl" : "ltr";
@@ -60,7 +62,7 @@ export function SlidePreview({
         s.media_type === "video" ? (
           <video
             src={s.media_url}
-            className="absolute inset-0 w-full h-full object-contain"
+            className={`absolute inset-0 w-full h-full ${mediaFit === "cover" ? "object-cover" : "object-contain"}`}
             autoPlay
             muted
             loop
@@ -72,7 +74,7 @@ export function SlidePreview({
             alt={title || "Hero slide"}
             width={1920}
             height={800}
-            className="absolute inset-0 w-full h-full object-contain"
+            className={`absolute inset-0 w-full h-full ${mediaFit === "cover" ? "object-cover" : "object-contain"}`}
             loading="lazy"
           />
         )
