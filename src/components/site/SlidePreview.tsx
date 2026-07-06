@@ -60,7 +60,7 @@ export function SlidePreview({
         s.media_type === "video" ? (
           <video
             src={s.media_url}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain"
             autoPlay
             muted
             loop
@@ -72,7 +72,7 @@ export function SlidePreview({
             alt={title || "Hero slide"}
             width={1920}
             height={800}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain"
             loading="lazy"
           />
         )
