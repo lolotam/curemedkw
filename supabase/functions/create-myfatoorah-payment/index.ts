@@ -44,6 +44,26 @@ Deno.serve(async (req) => {
 
     const admin = getAdminClient();
 
+    // A ministry hold has to stop money moving, not just hide the storefront.
+    // The RLS gate on `orders` blocks new orders, but rows already sitting in
+    // pending_payment would otherwise stay payable through a stale link.
+    // Mirrors public.ecommerce_ordering_enabled(): only an explicit false closes it.
+    const { data: modeRow } = await admin
+      .from("site_settings")
+      .select("value")
+      .eq("key", "ecommerce_mode")
+      .maybeSingle();
+    const ecommerceMode = (modeRow?.value ?? {}) as Record<string, unknown>;
+    if (ecommerceMode.shoppingEnabled === false || ecommerceMode.checkoutEnabled === false) {
+      console.error(`create-myfatoorah-payment: ordering_disabled order=${order_id}`);
+      return jsonError(
+        req,
+        "ordering_disabled",
+        "Online ordering is temporarily unavailable.",
+        503,
+      );
+    }
+
     // Resolve caller identity (optional — supports guest orders).
     let callerId: string | null = null;
     const authHeader = req.headers.get("Authorization");

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images, PlayCircle, Flag } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Eye, EyeOff, Loader2, Save, MoveHorizontal, Sparkles, Images, PlayCircle, Flag, ShieldAlert, ShoppingCart, CreditCard, Store } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,12 @@ import {
   type ProductCardHover,
   type PriceVisibility,
 } from "@/lib/db";
+import {
+  ECOMMERCE_MODE_KEY,
+  DEFAULT_HOLD_NOTICE,
+  resolveEcommerceMode,
+  type EcommerceMode,
+} from "@/lib/ecommerceMode";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import type { BrandKey } from "@/lib/db";
 import {
@@ -31,6 +38,7 @@ import {
   type HomeCarouselAutoscroll,
 } from "./AdminLandingPages";
 import { ImageCompressionCard } from "@/components/admin/ImageCompressionCard";
+import { cn } from "@/lib/utils";
 
 
 export default function AdminFlags() {
@@ -73,7 +81,7 @@ export default function AdminFlags() {
         eyebrow="Flags"
         eyebrowIcon={Flag}
         title="Site flags"
-        subtitle="Site-wide toggles: home page carousel auto-scroll, image compression on upload, and price visibility."
+        subtitle="Site-wide toggles: e-commerce availability, home page carousel auto-scroll, image compression on upload, and price visibility."
         gradient="emerald-teal-cyan"
         actions={
           <>
@@ -98,6 +106,8 @@ export default function AdminFlags() {
         }
       />
 
+
+      <EcommerceModeCard />
 
       <HomeCarouselAutoscrollCard />
 
@@ -155,6 +165,152 @@ export default function AdminFlags() {
         })}
       </div>
     </div>
+  );
+}
+
+/**
+ * E-commerce availability — the "ministry hold" switch.
+ *
+ * The whole `ecommerce_mode` key is edited as ONE draft behind ONE Save button.
+ * `upsert` replaces `value` wholesale, so a second save button writing a partial
+ * object would silently drop the other flags.
+ */
+function EcommerceModeCard() {
+  const { data, isLoading } = useSiteSetting<unknown>(ECOMMERCE_MODE_KEY, null);
+  const saved = useMemo(() => resolveEcommerceMode(data).mode, [data]);
+  const update = useUpdateSiteSetting();
+  const [draft, setDraft] = useState<EcommerceMode | null>(null);
+
+  // Seed the draft only once the saved value has actually arrived, so the admin
+  // is never shown "everything enabled" over a shop that is really on hold.
+  useEffect(() => {
+    if (!isLoading && !draft) setDraft(saved);
+  }, [isLoading, saved, draft]);
+
+  if (!draft) {
+    return (
+      <Card className="p-5 mb-6 flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading e-commerce settings…
+      </Card>
+    );
+  }
+
+  const dirty = JSON.stringify(saved) !== JSON.stringify(draft);
+  const set = <K extends keyof EcommerceMode>(key: K, value: EcommerceMode[K]) =>
+    setDraft({ ...draft, [key]: value });
+
+  const save = () => {
+    update.mutate(
+      { key: ECOMMERCE_MODE_KEY, value: draft },
+      {
+        onSuccess: () => toast.success("E-commerce settings saved"),
+        onError: (e: Error) => toast.error(e.message || "Failed to save"),
+      },
+    );
+  };
+
+  const onHold = !draft.shoppingEnabled || !draft.addToCartEnabled || !draft.checkoutEnabled;
+
+  return (
+    <Card className={cn("p-5 mb-6", onHold ? "border-amber-400/70 bg-amber-50/60 dark:bg-amber-950/20" : "border-brand/30")}>
+      <div className="flex items-start gap-4 mb-4">
+        <div
+          className={cn(
+            "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
+            onHold ? "bg-amber-500/15 text-amber-600" : "bg-brand/10 text-brand",
+          )}
+        >
+          <ShieldAlert className="h-5 w-5" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">E-commerce availability</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Close the buying path while waiting on Ministry of Health approval. The catalogue stays
+            online — visitors keep browsing products and are pointed to Contact us instead.
+          </p>
+          <p className="text-xs text-muted-foreground mt-2">
+            Enforced in the database as well as the storefront, so orders cannot be placed by any
+            route. Admins can still create orders from the dashboard.
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <FlagRow
+          icon={<Store className="h-5 w-5" />}
+          title="Selling enabled (master)"
+          description="Off closes everything at once: no Add to cart, no cart icon, no checkout page."
+          value={draft.shoppingEnabled}
+          onChange={(v) => set("shoppingEnabled", v)}
+        />
+        <div className="border-t border-border/60 pt-3" />
+        <FlagRow
+          icon={<ShoppingCart className="h-5 w-5" />}
+          title="Add to cart buttons"
+          description="Off replaces every Add to cart button with a Contact us enquiry button."
+          value={draft.shoppingEnabled && draft.addToCartEnabled}
+          disabled={!draft.shoppingEnabled}
+          onChange={(v) => set("addToCartEnabled", v)}
+        />
+        <FlagRow
+          icon={<CreditCard className="h-5 w-5" />}
+          title="Checkout and payment"
+          description="Off lets shoppers keep a cart but blocks placing and paying for an order."
+          value={draft.shoppingEnabled && draft.checkoutEnabled}
+          disabled={!draft.shoppingEnabled}
+          onChange={(v) => set("checkoutEnabled", v)}
+        />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 mt-5">
+        <div>
+          <Label htmlFor="hold-notice-en" className="text-xs">Notice shown to shoppers (English)</Label>
+          <Textarea
+            id="hold-notice-en"
+            rows={3}
+            className="mt-1.5 text-sm"
+            placeholder={DEFAULT_HOLD_NOTICE.en}
+            value={draft.noticeEn}
+            onChange={(e) => set("noticeEn", e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="hold-notice-ar" className="text-xs">Notice shown to shoppers (Arabic)</Label>
+          <Textarea
+            id="hold-notice-ar"
+            rows={3}
+            dir="rtl"
+            className="mt-1.5 text-sm"
+            placeholder={DEFAULT_HOLD_NOTICE.ar}
+            value={draft.noticeAr}
+            onChange={(e) => set("noticeAr", e.target.value)}
+          />
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground mt-1.5">
+        Leave blank to use the built-in wording shown as placeholder text.
+      </p>
+
+      <div className="flex items-center justify-end gap-2 mt-4">
+        {dirty && (
+          <Button variant="ghost" onClick={() => setDraft(saved)} disabled={update.isPending}>
+            Discard
+          </Button>
+        )}
+        <Button
+          onClick={save}
+          disabled={!dirty || update.isPending}
+          className="bg-brand hover:bg-brand/90 text-white"
+        >
+          {update.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Save className="h-4 w-4 mr-2" />
+          )}
+          Save e-commerce settings
+        </Button>
+      </div>
+    </Card>
   );
 }
 
@@ -388,15 +544,17 @@ function FlagRow({
   description,
   value,
   onChange,
+  disabled,
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   value: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-4">
+    <div className={cn("flex items-start gap-4", disabled && "opacity-60")}>
       <div className="h-10 w-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0">
         {icon}
       </div>
@@ -404,7 +562,7 @@ function FlagRow({
         <p className="font-semibold">{title}</p>
         <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
       </div>
-      <Switch checked={value} onCheckedChange={(v) => onChange(!!v)} />
+      <Switch checked={value} onCheckedChange={(v) => onChange(!!v)} disabled={disabled} />
     </div>
   );
 }

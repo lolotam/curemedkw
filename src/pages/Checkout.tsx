@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Loader2,
@@ -22,7 +22,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { useCart } from "@/lib/cart";
 import { useI18n } from "@/lib/i18n";
-import { useCreateOrder, useProfile } from "@/lib/db";
+import { useCreateOrder, useProfile, useEcommerceGates } from "@/lib/db";
+import { holdNotice } from "@/lib/ecommerceMode";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
 import { CouponInput, type AppliedCoupon } from "@/components/site/CouponInput";
@@ -140,6 +141,7 @@ const BASE_METHODS: PaymentMethodItem[] = [
 export default function Checkout() {
   const { items, subtotal, clear, setQuantity, remove } = useCart();
   const { t, lang } = useI18n();
+  const { showCart, canCheckout, mode } = useEcommerceGates();
   const navigate = useNavigate();
   const createOrder = useCreateOrder();
   const { user } = useAuth();
@@ -220,6 +222,10 @@ export default function Checkout() {
   const onGovChange = (val: string) =>
     setForm((f) => ({ ...f, governorate: val, area: "" }));
 
+  // Shopping closed entirely: the cart icon is hidden, so this page is only
+  // reachable by a stale link or a bookmark. Send the visitor to the catalogue.
+  if (!showCart) return <Navigate to="/curemed" replace />;
+
   if (items.length === 0) {
     return (
       <SiteLayout>
@@ -254,6 +260,12 @@ export default function Checkout() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The RLS policy on `orders` is what actually enforces the hold; this keeps
+    // the shopper from filling in a form that the database will reject.
+    if (!canCheckout) {
+      toast.error(t("shop.hold.checkoutClosed"));
+      return;
+    }
     if (!form.customerName.trim() || !form.customerEmail.trim() || !form.customerPhone.trim()) {
       toast.error(t("checkout.error.required"));
       return;
@@ -656,10 +668,16 @@ export default function Checkout() {
                   </div>
                 </div>
 
+                {!canCheckout && (
+                  <p className="mt-4 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-100">
+                    {holdNotice(mode, lang)}
+                  </p>
+                )}
+
                 <Button
                   type="submit"
                   size="lg"
-                  disabled={createOrder.isPending || redirecting}
+                  disabled={!canCheckout || createOrder.isPending || redirecting}
                   className={cn(
                     "mt-6 w-full rounded-full font-semibold text-white",
                     "bg-gradient-to-r from-sky-500 via-violet-500 to-pink-500",

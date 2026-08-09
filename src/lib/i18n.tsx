@@ -46,6 +46,13 @@ export const TRANSLATIONS: Dict = {
   "cart.empty.body": { en: "Browse our products and add items to your cart.", ar: "تصفح منتجاتنا وأضف العناصر إلى سلتك." },
   "cart.empty.cta": { en: "Browse products", ar: "تصفح المنتجات" },
 
+  "shop.hold.title": { en: "Online ordering paused", ar: "الطلب عبر الموقع متوقف" },
+  "shop.hold.enquire": { en: "Enquire", ar: "استفسر" },
+  "shop.hold.checkoutClosed": {
+    en: "Orders cannot be placed right now.",
+    ar: "لا يمكن إتمام الطلبات في الوقت الحالي.",
+  },
+
   "checkout.title": { en: "Checkout", ar: "إتمام الشراء" },
   "checkout.contact": { en: "Contact information", ar: "معلومات التواصل" },
   "checkout.fullName": { en: "Full name", ar: "الاسم الكامل" },

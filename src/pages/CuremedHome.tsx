@@ -13,7 +13,7 @@ import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 import { useI18n } from "@/lib/i18n";
 import { BRAND_LIST, BRANDS } from "@/lib/brands";
 import { Seo } from "@/components/site/Seo";
-import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, useProductCardHover, DEFAULT_PRODUCT_CARD_HOVER, type Product } from "@/lib/db";
+import { useFeaturedProducts, useBrandingBrandCardLogo, useFeaturedGlassOpacity, useSiteSetting, useProductCardHover, useEcommerceGates, DEFAULT_PRODUCT_CARD_HOVER, type Product } from "@/lib/db";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
@@ -348,6 +348,7 @@ function FeaturedGlassCard({
 }) {
   const { lang, t } = useI18n();
   const { add } = useCart();
+  const { canAddToCart } = useEcommerceGates();
   const { data: glassOpacity = 70 } = useFeaturedGlassOpacity();
   const { data: hoverCfg = DEFAULT_PRODUCT_CARD_HOVER } = useProductCardHover();
   const opacity = Math.max(0, Math.min(100, Number(glassOpacity) || 0)) / 100;
@@ -475,14 +476,18 @@ function FeaturedGlassCard({
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={handleAdd}
-              aria-label={t("common.addToCart") || "Add to cart"}
-              className="shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full bg-brand text-brand-foreground shadow-md hover:scale-110 active:scale-95 transition-transform"
-            >
-              <ShoppingBag className="h-4 w-4" />
-            </button>
+            {/* Hidden while ordering is on hold; the tile still links through to
+                the product page, which offers the enquiry CTA instead. */}
+            {canAddToCart && (
+              <button
+                type="button"
+                onClick={handleAdd}
+                aria-label={t("common.addToCart") || "Add to cart"}
+                className="shrink-0 inline-flex items-center justify-center h-9 w-9 rounded-full bg-brand text-brand-foreground shadow-md hover:scale-110 active:scale-95 transition-transform"
+              >
+                <ShoppingBag className="h-4 w-4" />
+              </button>
+            )}
           </div>
 
           {/* Reveal-on-hover discover link */}

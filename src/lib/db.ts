@@ -2,6 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { convertToWebP } from "@/lib/imageConvert";
 import { logOperation } from "@/lib/logs";
+import {
+  ECOMMERCE_MODE_KEY,
+  resolveEcommerceMode,
+  type EcommerceGates,
+} from "@/lib/ecommerceMode";
 
 export type BrandKey =
   | "flexitol"
@@ -1216,6 +1221,19 @@ export function useLoaderVideoUrl() {
 export const LOADER_PAGE_ENABLED_KEY = "loader_page_enabled";
 export function useLoaderPageEnabled() {
   return useSiteSetting<boolean>(LOADER_PAGE_ENABLED_KEY, true);
+}
+
+/**
+ * Resolved e-commerce availability gates (the "ministry hold" switch).
+ *
+ * While the setting is still loading the gates resolve to "open", matching the
+ * price-visibility hook: the storefront renders its normal self first rather
+ * than flashing a closed shop on every page load. The authoritative hold is the
+ * RLS policy on `orders`, so an early click cannot actually place an order.
+ */
+export function useEcommerceGates(): EcommerceGates {
+  const { data } = useSiteSetting<unknown>(ECOMMERCE_MODE_KEY, null);
+  return resolveEcommerceMode(data);
 }
 
 /** Uploads a video to the public `hero-media` bucket under `branding/` and returns the public URL. */

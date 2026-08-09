@@ -8,7 +8,7 @@ import { BRAND_LIST, slugToBrand } from "@/lib/brands";
 import { cn } from "@/lib/utils";
 import defaultLogo from "@/assets/curemed-logo.png";
 import { useAdminSession } from "@/lib/admin";
-import { useMessages, useUnreadMessageCount, useBrandingLogo, useBrandingLogoRemoveBg, useBrandingBrandLogo } from "@/lib/db";
+import { useMessages, useUnreadMessageCount, useBrandingLogo, useBrandingLogoRemoveBg, useBrandingBrandLogo, useEcommerceGates } from "@/lib/db";
 import { CartIcon } from "@/components/site/CartIcon";
 import { useAuth } from "@/lib/auth";
 import { UserNotificationBell } from "@/components/site/UserNotificationBell";
@@ -32,6 +32,7 @@ export function SiteHeader() {
   const [hidden, setHidden] = useState(false);
   const lastScrollY = useRef(0);
   const { isAdmin } = useAdminSession();
+  const { showCart } = useEcommerceGates();
   const { data: brandingLogo } = useBrandingLogo();
   const { data: removeBg } = useBrandingLogoRemoveBg();
   // Detect a brand-specific page from the URL (e.g. /flexitol or /australian-bodycare/...)
@@ -103,7 +104,7 @@ export function SiteHeader() {
         <div className="flex items-center gap-0.5 sm:gap-1">
           {isAdmin && <AdminBell />}
           <UserNotificationBell />
-          <CartIcon />
+          {showCart && <CartIcon />}
           <div className="hidden sm:flex items-center gap-0.5">
             <UserMenu />
             <Button
