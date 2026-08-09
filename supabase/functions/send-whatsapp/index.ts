@@ -3,6 +3,7 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
+import { isAdminCaller, isTrustedSender } from "../_shared/caller-auth.ts";
 
 // Postora moved from a hosted Supabase project to self-hosted Kong at
 // api.postora.cloud. The old URL was hardcoded here, so every send failed for
@@ -155,26 +156,6 @@ async function postToPostora(
 }
 
 /**
- * This function runs with verify_jwt = false so the payment path can invoke it,
- * so anything that reports configuration state must gate itself. Mirrors the
- * check in ai-test-connection/index.ts.
- */
-async function isAdminCaller(req: Request, admin: SupabaseClient): Promise<boolean> {
-  const auth = req.headers.get("Authorization");
-  if (!auth) return false;
-  const token = auth.replace(/^Bearer\s+/i, "");
-  const { data: userRes, error } = await admin.auth.getUser(token);
-  if (error || !userRes?.user) return false;
-  const { data: role } = await admin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", userRes.user.id)
-    .eq("role", "admin")
-    .maybeSingle();
-  return !!role;
-}
-
-/**
  * Postora's GET endpoint reports API-key validity and whether a WhatsApp
  * account is connected, without sending a message. It separates the three
  * failure modes — unreachable host, rejected key, no connected account —
@@ -237,6 +218,14 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { error: parsed.error.flatten() }, 400);
     }
     const { event, to, data, order_id } = parsed.data;
+
+    // Sending costs money and reaches real phones, so the caller must be either
+    // server-side dispatch or an admin — verify_jwt = false leaves this open
+    // otherwise, and `to` accepts arbitrary numbers.
+    if (!(await isTrustedSender(req, admin))) {
+      console.error("send-whatsapp: untrusted_caller_rejected");
+      return jsonResponse(req, { error: "Unauthorized" }, 401);
+    }
 
     const eventKey = event.replace(".", "_"); // order.paid -> order_paid
     const skipReason = !cfg.apiKey

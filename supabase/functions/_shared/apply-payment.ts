@@ -173,11 +173,21 @@ export async function dispatchOrderNotifications(
     const storefront = (emailCfg.storefront_url ?? "").replace(/\/$/, "");
     const invoiceUrl = storefront ? `${storefront}/order/${order.order_number}` : "";
 
+    // send-order-email and send-whatsapp authorize their callers, and this is
+    // the caller. Present the service-role credential explicitly rather than
+    // relying on supabase-js defaulting the Authorization header to the client
+    // key — that default is an implementation detail, and these notifications
+    // are dispatched fire-and-forget, so a 401 here would be invisible.
+    const invokeHeaders = {
+      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+    };
+
     const tasks: Promise<unknown>[] = [];
 
     // 1) Order confirmation email to admin recipients (To + CC).
     tasks.push(
       admin.functions.invoke("send-order-email", {
+        headers: invokeHeaders,
         body: { mode: "order", order_id: orderId },
       }),
     );
@@ -186,6 +196,7 @@ export async function dispatchOrderNotifications(
     if (order.customer_phone) {
       tasks.push(
         admin.functions.invoke("send-whatsapp", {
+          headers: invokeHeaders,
           body: {
             event: "order.paid",
             to: [order.customer_phone],
@@ -205,6 +216,7 @@ export async function dispatchOrderNotifications(
     if (adminNumbers.length > 0) {
       tasks.push(
         admin.functions.invoke("send-whatsapp", {
+          headers: invokeHeaders,
           body: {
             event: "admin.new_order",
             to: adminNumbers,

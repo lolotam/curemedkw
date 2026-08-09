@@ -18,6 +18,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 import { handleOptions, jsonError, jsonResponse } from "../_shared/cors.ts";
+import { isTrustedSender } from "../_shared/caller-auth.ts";
 import {
   buildOrderTokens,
   buildPlainText,
@@ -155,6 +156,14 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       { auth: { persistSession: false } },
     );
+
+    // verify_jwt = false so the payment path can invoke this. Without a caller
+    // check, anyone could render a real order — customer name, address, phone —
+    // to an address of their choosing via mode:"test" + test_to.
+    if (!(await isTrustedSender(req, admin))) {
+      console.error("send-order-email: untrusted_caller_rejected");
+      return jsonError(req, "unauthorized", "Unauthorized.", 401);
+    }
 
     const { data: settingRow } = await admin
       .from("site_settings")
