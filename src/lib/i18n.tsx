@@ -47,7 +47,7 @@ export const TRANSLATIONS: Dict = {
   "cart.empty.cta": { en: "Browse products", ar: "تصفح المنتجات" },
 
   "shop.hold.title": { en: "Online ordering paused", ar: "الطلب عبر الموقع متوقف" },
-  "shop.hold.enquire": { en: "Enquire", ar: "استفسر" },
+  "shop.hold.enquiryTitle": { en: "Ordering by enquiry", ar: "الطلب عبر التواصل" },
   "shop.hold.checkoutClosed": {
     en: "Orders cannot be placed right now.",
     ar: "لا يمكن إتمام الطلبات في الوقت الحالي.",

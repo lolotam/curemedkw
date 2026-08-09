@@ -11,10 +11,14 @@ import { useI18n } from "@/lib/i18n";
  * assuming the site is broken.
  */
 export function EcommerceHoldNotice() {
-  const { isOnHold, mode } = useEcommerceGates();
+  const { isOnHold, canCheckout, mode } = useEcommerceGates();
   const { t, lang } = useI18n();
 
   if (!isOnHold) return null;
+
+  // With only "Add to cart" closed, orders still complete — announcing paused
+  // ordering there would be untrue. That configuration is an enquiry shop.
+  const title = canCheckout ? t("shop.hold.enquiryTitle") : t("shop.hold.title");
 
   return (
     <div
@@ -24,7 +28,7 @@ export function EcommerceHoldNotice() {
       <div className="container flex items-start gap-3 py-2.5 text-sm">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
         <p className="min-w-0">
-          <span className="font-semibold">{t("shop.hold.title")}</span>
+          <span className="font-semibold">{title}</span>
           <span className="mx-1.5 opacity-50">—</span>
           <span>{holdNotice(mode, lang)}</span>
         </p>
