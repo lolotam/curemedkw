@@ -10,6 +10,7 @@ import { AutoCarousel } from "@/components/site/AutoCarousel";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useEcommerceGates } from "@/lib/db";
 import type { LandingAssets } from "@/lib/landingThemes";
 import type { Product } from "@/lib/db";
 import type { BrandMeta } from "@/lib/brands";
@@ -55,6 +56,10 @@ export function ProductLanding({
   const { t, lang } = useI18n();
   const [activeImg, setActiveImg] = useState(0);
   const rootRef = useScrollReveal<HTMLDivElement>(true);
+  // The nav button only scrolls to the buy block, so it has to carry the same
+  // label as the button waiting there — otherwise a ministry hold leaves an
+  // "Add to cart" prompt above a page that cannot add anything to a cart.
+  const { canAddToCart } = useEcommerceGates();
 
   const isAr = lang === "ar";
   const name = isAr && product.nameAr ? product.nameAr : product.name;
@@ -130,7 +135,7 @@ export function ProductLanding({
                 size="sm"
                 className="bg-brand-secondary hover:bg-brand-secondary/90 text-white shadow-sm"
               >
-                <a href="#buy">{t("cart.addToCart")}</a>
+                <a href="#buy">{canAddToCart ? t("cart.addToCart") : t("price.contactUs")}</a>
               </Button>
             )}
           </div>
