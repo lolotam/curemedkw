@@ -136,7 +136,7 @@ export async function dispatchOrderNotifications(
     const { data: items } = await admin.from("order_items").select("*").eq("order_id", orderId);
 
     const itemsSummary = (items ?? [])
-      .map((i: any) => `• ${i.product_name} ×${i.quantity}`)
+      .map((i: any) => `• ${i.product_name_snapshot} ×${i.quantity}`)
       .join("\n");
     const total = Number(order.total ?? 0).toFixed(3);
 

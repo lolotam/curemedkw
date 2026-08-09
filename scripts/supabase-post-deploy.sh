@@ -427,13 +427,27 @@ directory_checksum() {
 }
 
 deploy_functions() {
-  local -a function_dirs=(
-    "_shared"
-    "create-myfatoorah-payment"
-    "verify-myfatoorah-payment"
-    "myfatoorah-webhook"
-    "payment-health"
-  )
+  # Read the deploy list from the manifest, falling back to the historical
+  # hardcoded set so an older manifest still deploys the payment stack.
+  #
+  # NEVER add "main" here. The server's main/index.ts is hand-patched and has
+  # diverged from the repo copy; it is the router for EVERY edge function, so
+  # overwriting it takes down payments, upscale and notifications at once.
+  local -a function_dirs=()
+  mapfile -t function_dirs < <(jq -r '.deployFunctions[]? // empty' "$MANIFEST")
+  if [ "${#function_dirs[@]}" -eq 0 ]; then
+    function_dirs=(
+      "_shared"
+      "create-myfatoorah-payment"
+      "verify-myfatoorah-payment"
+      "myfatoorah-webhook"
+      "payment-health"
+    )
+  fi
+  case " ${function_dirs[*]} " in
+    *" main "*) die "refusing to deploy 'main': the server router is hand-patched" ;;
+  esac
+
   mkdir -p "$FUNC_VOL"
   [ "$FUNC_VOL" != "/" ] || die "refusing to use root as functions volume"
 

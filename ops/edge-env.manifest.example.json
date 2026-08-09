@@ -25,6 +25,18 @@
       "requiredSecrets": ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_WEBHOOK_SECRET"] }
   ],
   "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","MYFATOORAH_WEBHOOK_SECRET","APP_PUBLIC_URL"],
+
+  "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' — the server's router is hand-patched and diverged from this repo.",
+  "deployFunctions": [
+    "_shared",
+    "create-myfatoorah-payment",
+    "verify-myfatoorah-payment",
+    "myfatoorah-webhook",
+    "payment-health",
+    "send-order-email",
+    "send-whatsapp"
+  ],
+
   "defaults": {
     "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",
     "MYFATOORAH_CURRENCY": "KWD",
