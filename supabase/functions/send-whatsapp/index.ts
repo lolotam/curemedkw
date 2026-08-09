@@ -1,8 +1,8 @@
 // Send WhatsApp notifications via Postora.
 // Public endpoint (verify_jwt = false) — gated server-side via site_settings.
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 import { z } from "npm:zod@3";
+import { handleOptions, jsonResponse } from "../_shared/cors.ts";
 
 const POSTORA_ENDPOINT =
   "https://efruibswazzuuupgyzmf.supabase.co/functions/v1/ecommerce-whatsapp-api";
@@ -58,15 +58,13 @@ function normalizePhone(raw: string): string {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
 
   try {
     const parsed = BodySchema.safeParse(await req.json());
     if (!parsed.success) {
-      return new Response(
-        JSON.stringify({ error: parsed.error.flatten() }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, { error: parsed.error.flatten() }, 400);
     }
     const { event, to, data, order_id } = parsed.data;
 
@@ -95,10 +93,10 @@ Deno.serve(async (req) => {
       "";
 
     if (!apiKey || !enabled || !eventEnabled) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: !apiKey ? "no_api_key" : !enabled ? "disabled" : "event_off" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return jsonResponse(req, {
+        skipped: true,
+        reason: !apiKey ? "no_api_key" : !enabled ? "disabled" : "event_off",
+      });
     }
 
     const tplOverride =
@@ -153,15 +151,9 @@ Deno.serve(async (req) => {
       results.push({ to: phone, status, error: errMsg });
     }
 
-    return new Response(JSON.stringify({ ok: true, results }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(req, { ok: true, results });
   } catch (err) {
-    console.error("send-whatsapp error:", err);
-    return new Response(
-      JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    console.error("send-whatsapp: unhandled_error:", (err as Error).message);
+    return jsonResponse(req, { error: (err as Error).message }, 500);
   }
 });

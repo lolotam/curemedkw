@@ -1,28 +1,43 @@
-// Send order confirmation email via admin-configured SMTP (denomailer).
+// Send order-confirmation email via admin-configured SMTP (denomailer).
+//
 // Public endpoint (verify_jwt = false) — gated server-side via site_settings
-// ("order_email"). All SMTP credentials live in the database and are editable
-// from /admin/whatsapp, so no email secrets are needed in the environment.
-import { createClient } from "npm:@supabase/supabase-js@2";
+// ("order_email"), which is admin-RLS protected and editable from
+// /admin/order-email. SMTP credentials live in the database so they can be
+// rotated without a deploy; ORDER_EMAIL_SMTP_* env vars act as a fallback.
+//
+// Two independent legs are sent per order:
+//   customer -> the address on the order, never cc'd (that would disclose
+//               internal admin addresses to the customer)
+//   admin    -> settings.admin_emails, first as To and the rest as Cc
+//
+// The dispatcher (_shared/apply-payment.ts) invokes this fire-and-forget under
+// Promise.allSettled, so an HTTP status it never reads carries no information.
+// Per-leg outcomes are therefore returned in `results` and persisted to
+// order_email_logs, and a partial failure still responds 200.
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+import { handleOptions, jsonError, jsonResponse } from "../_shared/cors.ts";
+import {
+  buildOrderTokens,
+  buildPlainText,
+  DEFAULT_SUBJECTS,
+  DEFAULT_TEMPLATES,
+  renderTemplate,
+  SAMPLE_ITEMS,
+  SAMPLE_ORDER,
+  type EmailAudience,
+  type EmailLang,
+  type OrderItemLike,
+  type OrderLike,
+  type TemplateKey,
+} from "../_shared/order-email-template.ts";
 
 const BodySchema = z.object({
-  // "test" sends a sample to the configured recipients; "order" needs an order_id.
   mode: z.enum(["order", "test"]).default("order"),
   order_id: z.string().uuid().optional(),
-  // Optional override for the test recipient.
+  audience: z.enum(["customer", "admin", "both"]).default("both"),
+  lang: z.enum(["ar", "en"]).optional(),
   test_to: z.string().email().optional(),
 });
 
@@ -35,89 +50,103 @@ interface OrderEmailSettings {
   smtp_pass?: string;
   from_email?: string;
   from_name?: string;
-  to?: string; // primary recipient
-  cc?: string[]; // carbon copies
+  reply_to?: string;
   storefront_url?: string;
+  /** Legacy single recipient — still honoured when admin_emails is empty. */
+  to?: string;
+  /** Legacy carbon copies — still honoured when admin_emails is empty. */
+  cc?: string[];
+  admin_emails?: string[];
+  notify_customer?: boolean;
+  notify_admins?: boolean;
+  customer_language?: EmailLang;
+  admin_language?: EmailLang;
+  subjects?: Partial<Record<TemplateKey, string>>;
+  templates?: Partial<Record<TemplateKey, string>>;
 }
 
-function esc(v: unknown): string {
-  return String(v ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+interface LegResult {
+  audience: EmailAudience;
+  lang: EmailLang;
+  to: string;
+  cc: string[];
+  status: "sent" | "failed" | "skipped";
+  error: string | null;
+  reason?: string;
 }
 
-function money(n: unknown): string {
-  const num = Number(n ?? 0);
-  return Number.isFinite(num) ? num.toFixed(3) : "0.000";
+/** One email to actually send: an audience, a language and an envelope. */
+interface Leg {
+  audience: EmailAudience;
+  lang: EmailLang;
+  to: string[];
+  cc: string[];
 }
 
-function buildHtml(order: any, items: any[]): string {
-  const rows = items
-    .map(
-      (it) => `
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;">${esc(it.product_name)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center;">${esc(it.quantity)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">KD ${money(it.unit_price)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right;">KD ${money(Number(it.unit_price) * Number(it.quantity))}</td>
-      </tr>`,
-    )
-    .join("");
+interface SmtpConfig {
+  host: string;
+  user: string;
+  pass: string;
+  port: number;
+  fromEmail: string;
+  /** Doubles as the From display name and the {{store_name}} token. */
+  storeName: string;
+  replyTo?: string;
+}
 
-  return `<!doctype html><html><body style="margin:0;background:#f6f7fb;font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;">
-  <div style="max-width:620px;margin:0 auto;padding:24px;">
-    <div style="background:#fff;border-radius:16px;overflow:hidden;border:1px solid #eaeaea;">
-      <div style="background:linear-gradient(135deg,#0ea5e9,#8b5cf6,#ec4899);padding:24px 28px;color:#fff;">
-        <h1 style="margin:0;font-size:22px;">New paid order</h1>
-        <p style="margin:6px 0 0;opacity:.9;font-size:13px;">Order #${esc(order.order_number)}</p>
-      </div>
-      <div style="padding:24px 28px;">
-        <table style="width:100%;font-size:14px;border-collapse:collapse;margin-bottom:18px;">
-          <tr><td style="padding:4px 0;color:#666;">Customer</td><td style="padding:4px 0;text-align:right;font-weight:600;">${esc(order.customer_name)}</td></tr>
-          <tr><td style="padding:4px 0;color:#666;">Phone</td><td style="padding:4px 0;text-align:right;">${esc(order.customer_phone)}</td></tr>
-          <tr><td style="padding:4px 0;color:#666;">Email</td><td style="padding:4px 0;text-align:right;">${esc(order.customer_email || "—")}</td></tr>
-          <tr><td style="padding:4px 0;color:#666;">Payment</td><td style="padding:4px 0;text-align:right;">${esc(order.payment_online_method || order.payment_method || "—")}</td></tr>
-        </table>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead>
-            <tr style="background:#f6f7fb;">
-              <th style="padding:8px 12px;text-align:left;">Product</th>
-              <th style="padding:8px 12px;text-align:center;">Qty</th>
-              <th style="padding:8px 12px;text-align:right;">Price</th>
-              <th style="padding:8px 12px;text-align:right;">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <div style="text-align:right;margin-top:16px;font-size:16px;font-weight:700;">
-          Total: KD ${money(order.total)}
-        </div>
-        ${
-          order.address_line || order.street
-            ? `<div style="margin-top:18px;padding:14px 16px;background:#f6f7fb;border-radius:10px;font-size:13px;color:#444;">
-                <strong>Delivery</strong><br/>
-                ${esc([order.governorate, order.area, order.block && "Block " + order.block, order.street, order.building, order.address_line].filter(Boolean).join(", "))}
-                ${order.notes ? `<br/><em>Notes: ${esc(order.notes)}</em>` : ""}
-              </div>`
-            : ""
-        }
-      </div>
-    </div>
-    <p style="text-align:center;color:#999;font-size:11px;margin-top:16px;">Sent automatically on payment confirmation.</p>
-  </div>
-  </body></html>`;
+interface OrderContext {
+  order: OrderLike;
+  items: OrderItemLike[];
+}
+
+interface RenderedEmail {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+interface PlanLegsInput {
+  cfg: OrderEmailSettings;
+  mode: "order" | "test";
+  audience: "customer" | "admin" | "both";
+  langOverride?: EmailLang;
+  testTo?: string;
+  customerEmail: string;
+}
+
+function cleanEmails(values: unknown[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of values) {
+    const value = String(raw ?? "").trim().toLowerCase();
+    if (value.includes("@")) seen.add(value);
+  }
+  return [...seen];
+}
+
+/** admin_emails is canonical; fall back to the legacy to/cc pair. */
+function resolveAdminEmails(cfg: OrderEmailSettings): string[] {
+  if (Array.isArray(cfg.admin_emails) && cfg.admin_emails.length > 0) {
+    return cleanEmails(cfg.admin_emails);
+  }
+  return cleanEmails([cfg.to ?? "", ...(Array.isArray(cfg.cc) ? cfg.cc : [])]);
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const preflight = handleOptions(req);
+  if (preflight) return preflight;
+
+  if (req.method !== "POST") {
+    console.error("send-order-email: method_not_allowed");
+    return jsonError(req, "method_not_allowed", "Method not allowed.", 405);
+  }
 
   try {
-    const parsed = BodySchema.safeParse(await req.json());
-    if (!parsed.success) return json({ error: parsed.error.flatten() }, 400);
-    const { mode, order_id, test_to } = parsed.data;
+    const parsed = BodySchema.safeParse(await req.json().catch(() => ({})));
+    if (!parsed.success) {
+      console.error("send-order-email: invalid_request_body");
+      return jsonError(req, "invalid_request_body", "Invalid request body.", 400);
+    }
+    const { mode, order_id, audience, lang: langOverride, test_to } = parsed.data;
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -133,67 +162,214 @@ Deno.serve(async (req) => {
     const cfg = (settingRow?.value as OrderEmailSettings) ?? {};
 
     if (cfg.enabled === false) {
-      return json({ skipped: true, reason: "disabled" });
+      return jsonResponse(req, { success: true, skipped: true, reason: "disabled" });
     }
 
-    const host = (cfg.smtp_host ?? "").trim();
-    const user = (cfg.smtp_user ?? "").trim();
-    const pass = (cfg.smtp_pass ?? "").trim();
-    const port = Number(cfg.smtp_port ?? 587) || 587;
-    const fromEmail = (cfg.from_email ?? user).trim();
-    if (!host || !user || !pass || !fromEmail) {
-      return json({ skipped: true, reason: "smtp_not_configured" });
+    const smtp = resolveSmtp(cfg);
+    if (!smtp) {
+      return jsonResponse(req, { success: true, skipped: true, reason: "smtp_not_configured" });
     }
 
-    // Recipients
-    const to = (cfg.to ?? "").trim();
-    const cc = Array.isArray(cfg.cc) ? cfg.cc.filter((x) => x && x.includes("@")) : [];
-    const primary = mode === "test" ? (test_to || to) : to;
-    if (!primary) return json({ skipped: true, reason: "no_recipient" });
+    const context = await loadOrderContext(admin, order_id, mode);
+    if (!context) {
+      const code = order_id ? "order_not_found" : "order_id_required";
+      console.error(`send-order-email: ${code}`);
+      return jsonError(req, code, order_id ? "Order not found." : "order_id is required.", order_id ? 404 : 400);
+    }
 
-    let subject = "";
-    let html = "";
-    if (mode === "test") {
-      subject = "✅ Curemed test email";
-      html = `<div style="font-family:Arial;padding:24px;">
-        <h2>SMTP is working 🎉</h2>
-        <p>This is a test message from your Curemed admin dashboard.</p>
-      </div>`;
-    } else {
-      if (!order_id) return json({ error: "order_id required" }, 400);
-      const { data: order } = await admin.from("orders").select("*").eq("id", order_id).maybeSingle();
-      if (!order) return json({ error: "Order not found" }, 404);
-      const { data: items } = await admin
-        .from("order_items")
-        .select("*")
-        .eq("order_id", order_id);
-      subject = `New paid order #${order.order_number} — KD ${money(order.total)}`;
-      html = buildHtml(order, items ?? []);
+    const { legs, skipped } = planLegs({
+      cfg,
+      mode,
+      audience,
+      langOverride,
+      testTo: test_to,
+      customerEmail: String(context.order.customer_email ?? "").trim().toLowerCase(),
+    });
+    const results: LegResult[] = [...skipped];
+
+    if (legs.length === 0) {
+      return jsonResponse(req, { success: true, skipped: true, reason: "no_recipient", results });
     }
 
     const client = new SMTPClient({
       connection: {
-        hostname: host,
-        port,
-        tls: cfg.smtp_secure === true || port === 465,
-        auth: { username: user, password: pass },
+        hostname: smtp.host,
+        port: smtp.port,
+        tls: cfg.smtp_secure === true || smtp.port === 465,
+        auth: { username: smtp.user, password: smtp.pass },
       },
     });
 
-    const fromName = (cfg.from_name ?? "Curemed").trim();
-    await client.send({
-      from: `${fromName} <${fromEmail}>`,
-      to: primary,
-      cc: cc.length ? cc : undefined,
-      subject,
-      content: "auto",
-      html,
-    });
-    await client.close();
+    try {
+      for (const leg of legs) {
+        const rendered = renderLeg(leg, context, cfg, smtp.storeName);
+        const result = await sendLeg(client, leg, rendered, smtp);
+        results.push(result);
+        await logSend(admin, { orderId: order_id ?? null, leg, subject: rendered.subject, result });
+      }
+    } finally {
+      // close() is typed `void | Promise<void>`; awaiting it inside its own
+      // try keeps a teardown error from masking an otherwise successful send.
+      try {
+        await client.close();
+      } catch (err) {
+        console.error("send-order-email: smtp_close_failed:", (err as Error).message);
+      }
+    }
 
-    return json({ ok: true, to: primary, cc });
+    return jsonResponse(req, {
+      success: true,
+      mode,
+      order_id: order_id ?? null,
+      skipped: false,
+      results,
+    });
   } catch (err) {
-    console.error("send-order-email error:", (err as Error).message);
-    return json({ error: (err as Error).message }, 500);
+    console.error("send-order-email: unhandled_error:", (err as Error).message);
+    return jsonError(req, "unhandled_error", "Unexpected server error.", 500);
   }
 });
+
+/** Database config wins; env vars are the fallback for a fresh install. */
+function resolveSmtp(cfg: OrderEmailSettings): SmtpConfig | null {
+  const host = (cfg.smtp_host || Deno.env.get("ORDER_EMAIL_SMTP_HOST") || "").trim();
+  const user = (cfg.smtp_user || Deno.env.get("ORDER_EMAIL_SMTP_USER") || "").trim();
+  const pass = (cfg.smtp_pass || Deno.env.get("ORDER_EMAIL_SMTP_PASS") || "").trim();
+  const port = Number(cfg.smtp_port ?? Deno.env.get("ORDER_EMAIL_SMTP_PORT") ?? 587) || 587;
+  const fromEmail = (cfg.from_email || user).trim();
+  if (!host || !user || !pass || !fromEmail) return null;
+  return {
+    host,
+    user,
+    pass,
+    port,
+    fromEmail,
+    storeName: (cfg.from_name || "Curemed").trim(),
+    replyTo: cfg.reply_to?.trim() || undefined,
+  };
+}
+
+/**
+ * A test send may name a real order — the cheapest way to prove the template
+ * handles real line items — and falls back to the shared sample order.
+ * Returns null when the order is required but unavailable.
+ */
+async function loadOrderContext(
+  // deno-lint-ignore no-explicit-any
+  admin: SupabaseClient<any, any, any>,
+  orderId: string | undefined,
+  mode: "order" | "test",
+): Promise<OrderContext | null> {
+  if (!orderId) {
+    return mode === "test" ? { order: SAMPLE_ORDER, items: SAMPLE_ITEMS } : null;
+  }
+  const { data: orderRow } = await admin
+    .from("orders").select("*").eq("id", orderId).maybeSingle();
+  if (!orderRow) return null;
+  const { data: itemRows } = await admin
+    .from("order_items").select("*").eq("order_id", orderId)
+    .order("created_at", { ascending: true });
+  return { order: orderRow as OrderLike, items: (itemRows ?? []) as OrderItemLike[] };
+}
+
+/**
+ * Decide which emails to actually send. Everything not sent is returned as a
+ * `skipped` result with a reason, so the caller can always explain itself.
+ */
+function planLegs(input: PlanLegsInput): { legs: Leg[]; skipped: LegResult[] } {
+  const { cfg, mode, audience, langOverride, testTo, customerEmail } = input;
+  const legs: Leg[] = [];
+  const skipped: LegResult[] = [];
+  const skip = (a: EmailAudience, lang: EmailLang, reason: string) =>
+    skipped.push({ audience: a, lang, to: "", cc: [], status: "skipped", error: null, reason });
+
+  if (audience === "customer" || audience === "both") {
+    const lang = langOverride ?? cfg.customer_language ?? "ar";
+    // In test mode the customer leg is redirected to testTo and skipped
+    // entirely without one — a test must never reach a real customer.
+    const recipient = mode === "test" ? String(testTo ?? "").trim() : customerEmail;
+    if (cfg.notify_customer === false) skip("customer", lang, "notify_customer_disabled");
+    else if (!recipient.includes("@")) {
+      skip("customer", lang, mode === "test" ? "test_to_required" : "no_customer_email");
+    } else legs.push({ audience: "customer", lang, to: [recipient], cc: [] });
+  }
+
+  if (audience === "admin" || audience === "both") {
+    const lang = langOverride ?? cfg.admin_language ?? "en";
+    const recipients = mode === "test" && testTo ? cleanEmails([testTo]) : resolveAdminEmails(cfg);
+    if (cfg.notify_admins === false) skip("admin", lang, "notify_admins_disabled");
+    else if (recipients.length === 0) skip("admin", lang, "no_admin_recipient");
+    else legs.push({ audience: "admin", lang, to: [recipients[0]], cc: recipients.slice(1) });
+  }
+
+  return { legs, skipped };
+}
+
+function renderLeg(
+  leg: Leg,
+  context: OrderContext,
+  cfg: OrderEmailSettings,
+  storeName: string,
+): RenderedEmail {
+  const key = `${leg.audience}_${leg.lang}` as TemplateKey;
+  const tokens = buildOrderTokens(context.order, context.items, {
+    lang: leg.lang,
+    storefrontUrl: String(cfg.storefront_url ?? "").trim(),
+    storeName,
+  });
+  return {
+    subject: renderTemplate(cfg.subjects?.[key] || DEFAULT_SUBJECTS[key], tokens),
+    html: renderTemplate(cfg.templates?.[key] || DEFAULT_TEMPLATES[key], tokens),
+    text: buildPlainText(tokens, leg.lang),
+  };
+}
+
+/** Sends one leg. A failure is returned, never thrown — the other leg must still go. */
+async function sendLeg(
+  client: SMTPClient,
+  leg: Leg,
+  rendered: RenderedEmail,
+  smtp: SmtpConfig,
+): Promise<LegResult> {
+  const shape = { audience: leg.audience, lang: leg.lang, to: leg.to.join(", "), cc: leg.cc };
+  try {
+    await client.send({
+      from: `${smtp.storeName} <${smtp.fromEmail}>`,
+      to: leg.to,
+      cc: leg.cc.length ? leg.cc : undefined,
+      replyTo: smtp.replyTo,
+      subject: rendered.subject,
+      content: rendered.text,
+      html: rendered.html,
+    });
+    return { ...shape, status: "sent", error: null };
+  } catch (err) {
+    const message = (err as Error).message ?? String(err);
+    console.error(`send-order-email: send_failed audience=${leg.audience} ${message}`);
+    return { ...shape, status: "failed", error: message };
+  }
+}
+
+/** Best-effort audit row. Never let logging break a successful send. */
+async function logSend(
+  // deno-lint-ignore no-explicit-any
+  admin: SupabaseClient<any, any, any>,
+  entry: { orderId: string | null; leg: Leg; subject: string; result: LegResult },
+): Promise<void> {
+  const { orderId, leg, subject, result } = entry;
+  try {
+    // order_email_logs post-dates the generated types, so the row shape is
+    // asserted here rather than inferred.
+    await admin.from("order_email_logs").insert({
+      order_id: orderId,
+      audience: leg.audience,
+      lang: leg.lang,
+      recipient: [...leg.to, ...leg.cc].join(", "),
+      subject,
+      status: result.status,
+      error_message: result.error,
+    } as never);
+  } catch (err) {
+    console.error("send-order-email: log_insert_failed:", (err as Error).message);
+  }
+}

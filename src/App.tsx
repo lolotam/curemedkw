@@ -53,6 +53,7 @@ const AdminNotificationTemplates = lazy(() => import("./pages/admin/AdminNotific
 const AdminBranding = lazy(() => import("./pages/admin/AdminBranding"));
 const AdminLogs = lazy(() => import("./pages/admin/AdminLogs"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/AdminWhatsApp"));
+const AdminOrderEmail = lazy(() => import("./pages/admin/AdminOrderEmail"));
 
 const PageFallback = () => (
   <div className="flex items-center justify-center min-h-screen">
@@ -125,6 +126,7 @@ const App = () => {
                   <Route path="branding" element={<AdminBranding />} />
                   <Route path="logs" element={<AdminLogs />} />
                   <Route path="whatsapp" element={<AdminWhatsApp />} />
+                  <Route path="order-email" element={<AdminOrderEmail />} />
                 </Route>
                 <Route path="/categories/:slug" element={<CategoryPage />} />
                 <Route path="/category/:slug" element={<CategoryPage />} />
