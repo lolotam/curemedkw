@@ -271,7 +271,9 @@ export default function AdminWhatsApp() {
             onChange={(e) => setS({ ...s, endpoint: e.target.value })}
           />
           <p className="text-xs text-muted-foreground mt-1.5">
-            Leave blank to use the built-in default. Change this only if Postora moves host.
+            Leave blank to use the built-in default. Only <code>api.postora.cloud</code> and{" "}
+            <code>postora.cloud</code> over HTTPS are accepted — any other host is ignored and
+            the default is used, so this field cannot redirect your API key elsewhere.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

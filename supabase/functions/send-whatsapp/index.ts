@@ -11,6 +11,29 @@ import { handleOptions, jsonResponse } from "../_shared/cors.ts";
 const DEFAULT_POSTORA_ENDPOINT =
   "https://api.postora.cloud/functions/v1/ecommerce-whatsapp-api";
 
+// A settings-driven URL is an SSRF sink: whatever host it names is handed the
+// Postora API key in x-api-key, and this container can reach the internal
+// Docker network (db, kong, storage) that is unreachable from outside. The
+// override therefore selects among Postora hosts over TLS rather than naming
+// an arbitrary one; anything else is refused and the default stands.
+const ALLOWED_ENDPOINT_HOSTS = new Set(["api.postora.cloud", "postora.cloud"]);
+
+function safeEndpoint(raw: unknown): string {
+  if (typeof raw !== "string" || !raw.trim()) return DEFAULT_POSTORA_ENDPOINT;
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    console.error("send-whatsapp: endpoint_rejected reason=unparseable");
+    return DEFAULT_POSTORA_ENDPOINT;
+  }
+  if (url.protocol !== "https:" || !ALLOWED_ENDPOINT_HOSTS.has(url.hostname)) {
+    console.error(`send-whatsapp: endpoint_rejected host=${url.hostname} proto=${url.protocol}`);
+    return DEFAULT_POSTORA_ENDPOINT;
+  }
+  return url.toString();
+}
+
 const SendSchema = z.object({
   event: z.enum([
     "order.paid",
@@ -78,7 +101,7 @@ async function loadConfig(admin: SupabaseClient): Promise<PostoraConfig> {
     .maybeSingle();
   const s = (row?.value as any) ?? {};
   return {
-    endpoint: (typeof s.endpoint === "string" && s.endpoint.trim()) || DEFAULT_POSTORA_ENDPOINT,
+    endpoint: safeEndpoint(s.endpoint),
     // Prefer the key saved via /admin/whatsapp UI; fall back to env var.
     apiKey:
       (typeof s.api_key === "string" && s.api_key.trim()) ||
@@ -132,6 +155,26 @@ async function postToPostora(
 }
 
 /**
+ * This function runs with verify_jwt = false so the payment path can invoke it,
+ * so anything that reports configuration state must gate itself. Mirrors the
+ * check in ai-test-connection/index.ts.
+ */
+async function isAdminCaller(req: Request, admin: SupabaseClient): Promise<boolean> {
+  const auth = req.headers.get("Authorization");
+  if (!auth) return false;
+  const token = auth.replace(/^Bearer\s+/i, "");
+  const { data: userRes, error } = await admin.auth.getUser(token);
+  if (error || !userRes?.user) return false;
+  const { data: role } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userRes.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  return !!role;
+}
+
+/**
  * Postora's GET endpoint reports API-key validity and whether a WhatsApp
  * account is connected, without sending a message. It separates the three
  * failure modes — unreachable host, rejected key, no connected account —
@@ -180,7 +223,14 @@ Deno.serve(async (req) => {
     );
     const cfg = await loadConfig(admin);
 
-    if ((rawBody as any)?.action === "diagnose") return await runDiagnostic(req, cfg);
+    // Diagnose reveals the configured endpoint, key validity and the connected
+    // business phone number, so it is admin-only even though sending is not.
+    if ((rawBody as any)?.action === "diagnose") {
+      if (!(await isAdminCaller(req, admin))) {
+        return jsonResponse(req, { error: "Admin only" }, 403);
+      }
+      return await runDiagnostic(req, cfg);
+    }
 
     const parsed = SendSchema.safeParse(rawBody);
     if (!parsed.success) {
