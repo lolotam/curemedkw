@@ -88,6 +88,8 @@ interface SmtpConfig {
   user: string;
   pass: string;
   port: number;
+  /** True only when the port expects TLS from the first byte (implicit TLS). */
+  implicitTls: boolean;
   fromEmail: string;
   /** Doubles as the From display name and the {{store_name}} token. */
   storeName: string;
@@ -195,7 +197,7 @@ Deno.serve(async (req) => {
       connection: {
         hostname: smtp.host,
         port: smtp.port,
-        tls: cfg.smtp_secure === true || smtp.port === 465,
+        tls: smtp.implicitTls,
         auth: { username: smtp.user, password: smtp.pass },
       },
     });
@@ -238,11 +240,21 @@ function resolveSmtp(cfg: OrderEmailSettings): SmtpConfig | null {
   const port = Number(cfg.smtp_port ?? Deno.env.get("ORDER_EMAIL_SMTP_PORT") ?? 587) || 587;
   const fromEmail = (cfg.from_email || user).trim();
   if (!host || !user || !pass || !fromEmail) return null;
+  // Implicit TLS is a property of the PORT, never a free-standing flag. Sending
+  // a TLS ClientHello to 587 (a STARTTLS port) makes the server reply with its
+  // plaintext "220" greeting, which the TLS layer reports as the misleading
+  // "received corrupt message of type InvalidContentType". Deriving it here
+  // means a bad smtp_secure value in settings can no longer break delivery.
+  const implicitTls = port === 465 ? true : port === 587 ? false : cfg.smtp_secure === true;
+  if (cfg.smtp_secure === true && port !== 465) {
+    console.error(`send-order-email: smtp_secure_ignored port=${port} (implicit TLS only on 465)`);
+  }
   return {
     host,
     user,
     pass,
     port,
+    implicitTls,
     fromEmail,
     storeName: (cfg.from_name || "Curemed").trim(),
     replyTo: cfg.reply_to?.trim() || undefined,

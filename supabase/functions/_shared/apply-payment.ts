@@ -100,7 +100,22 @@ export async function applyPaymentToOrder(
     if (patch[k] === undefined) delete patch[k];
   }
 
-  await admin.from("orders").update(patch).eq("id", orderRow.id);
+  // The result MUST be inspected. A rejected PATCH — e.g. PGRST204 when a
+  // column in `patch` is missing because a migration never applied — otherwise
+  // fails completely silently: the provider is recorded as SUCCESS, the event
+  // row is marked processed, and the order simply never leaves pending_payment.
+  // That is exactly what happened between 2026-06-29 and 2026-08-09.
+  const { error: updateError } = await admin
+    .from("orders")
+    .update(patch)
+    .eq("id", orderRow.id);
+
+  if (updateError) {
+    console.error(
+      `apply-payment: order_update_failed order=${orderRow.id} code=${updateError.code} ${updateError.message}`,
+    );
+    throw new Error(`Failed to apply payment to order ${orderRow.id}: ${updateError.message}`);
+  }
 
   // On first successful payment, fire order notifications (email + WhatsApp).
   if (mapped.isSuccess) {

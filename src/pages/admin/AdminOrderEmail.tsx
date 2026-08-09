@@ -351,8 +351,32 @@ export default function AdminOrderEmail() {
           <Field label="Host">
             <Input value={draft.smtp_host} onChange={(e) => setDraft({ ...draft, smtp_host: e.target.value })} placeholder="smtp.example.com" />
           </Field>
-          <Field label="Port">
-            <Input type="number" value={draft.smtp_port} onChange={(e) => setDraft({ ...draft, smtp_port: Number(e.target.value) })} />
+          <Field label="Encryption">
+            {/*
+              Port and TLS are bound together deliberately. Setting implicit TLS
+              on 587 makes the client send a TLS ClientHello to a STARTTLS port;
+              the server answers with its plaintext "220" greeting and the TLS
+              layer reports "received corrupt message of type InvalidContentType".
+              Exposing the two as free fields let that combination be saved.
+            */}
+            <Select
+              value={draft.smtp_port === 465 ? "ssl" : "starttls"}
+              onValueChange={(v) =>
+                setDraft({
+                  ...draft,
+                  smtp_port: v === "ssl" ? 465 : 587,
+                  smtp_secure: v === "ssl",
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ssl">SSL/TLS — port 465 (recommended)</SelectItem>
+                <SelectItem value="starttls">STARTTLS — port 587</SelectItem>
+              </SelectContent>
+            </Select>
           </Field>
           <Field label="Username">
             <Input value={draft.smtp_user} onChange={(e) => setDraft({ ...draft, smtp_user: e.target.value })} autoComplete="off" />
@@ -388,13 +412,12 @@ export default function AdminOrderEmail() {
             <Input value={draft.storefront_url} onChange={(e) => setDraft({ ...draft, storefront_url: e.target.value })} placeholder="https://curemedkw.com" />
           </Field>
         </div>
-        <div className="flex items-center justify-between gap-4 pt-2">
-          <div>
-            <Label>Force TLS</Label>
-            <p className="text-xs text-muted-foreground">Enable for port 465. Port 587 usually upgrades automatically.</p>
-          </div>
-          <Switch checked={draft.smtp_secure} onCheckedChange={(v) => setDraft({ ...draft, smtp_secure: v })} />
-        </div>
+        {draft.smtp_port !== 465 && (
+          <p className="text-xs text-amber-600 dark:text-amber-500 pt-1">
+            Gmail requires SSL/TLS on port 465 — STARTTLS on 587 is not negotiated by the mail
+            library this function uses, and sends will fail.
+          </p>
+        )}
       </SectionCard>
 
       <div className="grid gap-6 lg:grid-cols-2 items-start">
