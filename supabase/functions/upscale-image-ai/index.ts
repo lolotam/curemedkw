@@ -30,13 +30,21 @@ const DEFAULT_IMAGE_CHAIN: Slot[] = [
 //   quality=low,  230KB PNG, size=1536x1536 → HTTP 200 in 46s
 //   quality=medium, 378KB PNG, size=auto    → >80s (timed out)
 // Moderation alone is ~17s. Medium quality + larger payload pushes past 80s.
-// 90s slot timeout fits the observed ceiling with margin; OpenRouter then
-// gets TOTAL_BUDGET_MS-90-2 = 8s, enough for the typical 5-10s Gemini call.
-const PROVIDER_TIMEOUT_MS = 90_000;
+// 35s slot timeout deliberately fails fast instead of betting the whole request
+// on one slow provider. Note the consequence: 35s is BELOW every measured
+// gpt-image-2 latency above, so the OpenAI slots can no longer win — they burn
+// one 35s timeout, then `timedOutProviders` skips the remaining OpenAI slots and
+// OpenRouter serves the request. That is the intended trade: a guaranteed Gemini
+// answer beats an OpenAI answer the proxy may kill before it reaches the client.
+// Every slot is capped by Math.min(PROVIDER_TIMEOUT_MS, remaining - 2s), so no
+// slot ever exceeds 35s regardless of how much budget is left.
+const PROVIDER_TIMEOUT_MS = 35_000;
 // Hard overall budget for the whole function. Cloudflare proxy in front of
 // self-hosted Supabase cuts at ~100s, so this is the ceiling we can use.
-// 100s = 90s OpenAI slot + 2s buffer + 8s OpenRouter fallback ≈ 100s wall.
-const TOTAL_BUDGET_MS = 100_000;
+// Worst case is 35s (OpenAI times out) + 35s (OpenRouter) = 70s, leaving ~15s
+// under the 85s budget for the storage upload and the JSON response — and ~30s
+// under Cloudflare's cut, so the client always gets a real CORS response.
+const TOTAL_BUDGET_MS = 85_000;
 const TARGET_SIZES = new Set([1024, 1536, 2048]);
 const DEFAULT_TARGET_SIZE = 1536;
 
