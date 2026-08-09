@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircle, Plus, X, Send, Loader2, Eye, EyeOff, KeyRound } from "lucide-react";
+import {
+  MessageCircle, Plus, X, Send, Loader2, Eye, EyeOff, KeyRound,
+  Wifi, CheckCircle2, AlertTriangle, ExternalLink,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,6 +18,8 @@ interface WaSettings {
   enabled: boolean;
   language: "ar" | "en";
   api_key: string;
+  /** Blank = use the edge function's built-in Postora URL. */
+  endpoint: string;
   admin_numbers: string[];
   events: {
     order_paid: boolean;
@@ -26,10 +31,24 @@ interface WaSettings {
   templates: Record<string, string>;
 }
 
+/** Shape returned by send-whatsapp's `{ action: "diagnose" }` probe. */
+interface WaHealth {
+  ok: boolean;
+  endpoint: string;
+  http_status?: number;
+  api_key_valid?: boolean;
+  whatsapp_connected?: boolean;
+  account?: { username?: string; display_name?: string | null } | null;
+  connect_url?: string | null;
+  reason?: string;
+  message?: string | null;
+}
+
 const DEFAULT: WaSettings = {
   enabled: true,
   language: "ar",
   api_key: "",
+  endpoint: "",
   admin_numbers: [],
   events: {
     order_paid: true,
@@ -65,6 +84,8 @@ export default function AdminWhatsApp() {
   const [keyInput, setKeyInput] = useState("");
   const [keyEditing, setKeyEditing] = useState(false);
   const [showKey, setShowKey] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [health, setHealth] = useState<WaHealth | null>(null);
 
   const settingsQ = useQuery({
     queryKey: ["wa_settings"],
@@ -119,6 +140,20 @@ export default function AdminWhatsApp() {
     if (s.admin_numbers.includes(n)) return;
     setS({ ...s, admin_numbers: [...s.admin_numbers, n] });
     setNewNum("");
+  };
+
+  // Reads the SAVED settings server-side, so an unsaved key edit is not tested.
+  const testConnection = async () => {
+    setChecking(true);
+    const { data, error } = await supabase.functions.invoke("send-whatsapp", {
+      body: { action: "diagnose" },
+    });
+    setChecking(false);
+    if (error) return toast.error(error.message);
+    const h = data as WaHealth;
+    setHealth(h);
+    if (h.ok) toast.success(`Connected as ${h.account?.username ?? "WhatsApp account"}`);
+    else toast.error(h.message ?? "Not connected — see details below");
   };
 
   const sendTest = async () => {
@@ -221,6 +256,69 @@ export default function AdminWhatsApp() {
         )}
       </div>
 
+      {/* Connection */}
+      <div className="rounded-2xl border border-border bg-card p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Wifi className="h-4 w-4 text-muted-foreground" />
+          <Label className="text-base">Connection</Label>
+        </div>
+        <div>
+          <Label className="text-sm">Postora endpoint</Label>
+          <Input
+            className="mt-1.5 font-mono text-xs"
+            placeholder="https://api.postora.cloud/functions/v1/ecommerce-whatsapp-api"
+            value={s.endpoint}
+            onChange={(e) => setS({ ...s, endpoint: e.target.value })}
+          />
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Leave blank to use the built-in default. Change this only if Postora moves host.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button type="button" variant="outline" onClick={testConnection} disabled={checking}>
+            {checking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wifi className="h-4 w-4" />}
+            <span className="ml-2">Test connection</span>
+          </Button>
+          <p className="text-xs text-muted-foreground flex-1 min-w-[16rem]">
+            Checks the <b>saved</b> key without sending a message — save first if you just edited it.
+          </p>
+        </div>
+
+        {health && (
+          <div
+            className={`rounded-xl border p-3 space-y-2 ${
+              health.ok ? "border-emerald-500/40 bg-emerald-500/5" : "border-destructive/40 bg-destructive/5"
+            }`}
+          >
+            <div className="flex items-center gap-2 font-medium text-sm">
+              {health.ok
+                ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                : <AlertTriangle className="h-4 w-4 text-destructive" />}
+              {health.ok ? "Ready to send" : "Not ready"}
+            </div>
+            <ul className="text-xs text-muted-foreground space-y-1">
+              <li>Endpoint reachable: <b>{health.reason === "unreachable" ? "no" : "yes"}</b></li>
+              <li>API key valid: <b>{health.api_key_valid ? "yes" : "no"}</b></li>
+              <li>
+                WhatsApp account connected:{" "}
+                <b>{health.whatsapp_connected ? `yes — ${health.account?.username ?? ""}` : "no"}</b>
+              </li>
+              {health.message && <li className="text-destructive break-words">{health.message}</li>}
+            </ul>
+            {health.connect_url && (
+              <a
+                href={health.connect_url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-brand hover:underline"
+              >
+                Connect WhatsApp in Postora <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Admin numbers */}
       <div className="rounded-2xl border border-border bg-card p-5 space-y-3">
         <Label className="text-base">Admin WhatsApp numbers</Label>
@@ -235,7 +333,13 @@ export default function AdminWhatsApp() {
           <Button type="button" onClick={addNumber}><Plus className="h-4 w-4" /></Button>
         </div>
         <div className="flex flex-wrap gap-2 pt-2">
-          {s.admin_numbers.length === 0 && <p className="text-xs text-muted-foreground">No admin numbers yet.</p>}
+          {s.admin_numbers.length === 0 && (
+            <p className={`text-xs ${s.events.admin_new_order ? "text-destructive" : "text-muted-foreground"}`}>
+              {s.events.admin_new_order
+                ? "No admin numbers — the new-order alert is on but has nowhere to send."
+                : "No admin numbers yet."}
+            </p>
+          )}
           {s.admin_numbers.map((n) => (
             <Badge key={n} variant="secondary" className="gap-1.5">
               {n}

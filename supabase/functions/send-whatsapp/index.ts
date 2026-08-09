@@ -1,13 +1,17 @@
 // Send WhatsApp notifications via Postora.
 // Public endpoint (verify_jwt = false) — gated server-side via site_settings.
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { z } from "npm:zod@3";
 import { handleOptions, jsonResponse } from "../_shared/cors.ts";
 
-const POSTORA_ENDPOINT =
-  "https://efruibswazzuuupgyzmf.supabase.co/functions/v1/ecommerce-whatsapp-api";
+// Postora moved from a hosted Supabase project to self-hosted Kong at
+// api.postora.cloud. The old URL was hardcoded here, so every send failed for
+// months with no way to correct it short of a redeploy. The endpoint is now
+// settings-driven and this constant is only the fallback.
+const DEFAULT_POSTORA_ENDPOINT =
+  "https://api.postora.cloud/functions/v1/ecommerce-whatsapp-api";
 
-const BodySchema = z.object({
+const SendSchema = z.object({
   event: z.enum([
     "order.paid",
     "order.shipped",
@@ -57,98 +61,163 @@ function normalizePhone(raw: string): string {
   return digits;
 }
 
+interface PostoraConfig {
+  endpoint: string;
+  apiKey: string;
+  enabled: boolean;
+  lang: "ar" | "en";
+  events: Record<string, unknown>;
+  templates: Record<string, any>;
+}
+
+async function loadConfig(admin: SupabaseClient): Promise<PostoraConfig> {
+  const { data: row } = await admin
+    .from("site_settings")
+    .select("value")
+    .eq("key", "whatsapp_integration")
+    .maybeSingle();
+  const s = (row?.value as any) ?? {};
+  return {
+    endpoint: (typeof s.endpoint === "string" && s.endpoint.trim()) || DEFAULT_POSTORA_ENDPOINT,
+    // Prefer the key saved via /admin/whatsapp UI; fall back to env var.
+    apiKey:
+      (typeof s.api_key === "string" && s.api_key.trim()) ||
+      Deno.env.get("POSTORA_WHATSAPP_API_KEY") ||
+      "",
+    enabled: s.enabled !== false, // default on if key exists
+    lang: s.language === "en" ? "en" : "ar",
+    events: s.events ?? {},
+    templates: s.templates ?? {},
+  };
+}
+
+interface SendOutcome {
+  payload: Record<string, unknown>;
+  body: any;
+  status: "sent" | "failed";
+  error: string | null;
+}
+
+async function postToPostora(
+  cfg: PostoraConfig,
+  phone: string,
+  text: string,
+): Promise<SendOutcome> {
+  // Postora reads `action` from the JSON body only; the old `?action=` query
+  // string was never consumed. `text` is the sole field send_text reads.
+  const payload = { action: "send_text", to: phone, text };
+  try {
+    const r = await fetch(cfg.endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": cfg.apiKey },
+      body: JSON.stringify(payload),
+    });
+    const raw = await r.text();
+    let body: any;
+    try { body = JSON.parse(raw); } catch { body = { raw } }
+    if (!r.ok) {
+      return { payload, body, status: "failed", error: `HTTP ${r.status}: ${raw.slice(0, 300)}` };
+    }
+    // Postora answers HTTP 200 with success:false for connection and delivery
+    // problems, tagging them with error_code (WHATSAPP_NOT_CONNECTED,
+    // WHATSAPP_SEND_FAILED, ...). Checking only r.ok records those as sent.
+    if (body?.success === false) {
+      const code = body.error_code ? `${body.error_code}: ` : "";
+      return { payload, body, status: "failed", error: `${code}${body.error ?? raw.slice(0, 300)}` };
+    }
+    return { payload, body, status: "sent", error: null };
+  } catch (e) {
+    return { payload, body: null, status: "failed", error: (e as Error).message };
+  }
+}
+
+/**
+ * Postora's GET endpoint reports API-key validity and whether a WhatsApp
+ * account is connected, without sending a message. It separates the three
+ * failure modes — unreachable host, rejected key, no connected account —
+ * that otherwise all surface as an identical "send failed" log row.
+ */
+async function runDiagnostic(req: Request, cfg: PostoraConfig): Promise<Response> {
+  if (!cfg.apiKey) {
+    return jsonResponse(req, {
+      ok: false, endpoint: cfg.endpoint, reason: "no_api_key",
+      message: "No Postora API key saved.",
+    });
+  }
+  try {
+    const r = await fetch(cfg.endpoint, { method: "GET", headers: { "x-api-key": cfg.apiKey } });
+    const raw = await r.text();
+    let body: any;
+    try { body = JSON.parse(raw); } catch { body = {} }
+    return jsonResponse(req, {
+      ok: r.ok && body?.success === true && body?.whatsapp_connected === true,
+      http_status: r.status,
+      endpoint: cfg.endpoint,
+      api_key_valid: body?.api_key_valid === true,
+      whatsapp_connected: body?.whatsapp_connected === true,
+      account: body?.account ?? null,
+      connect_url: body?.connect_url ?? null,
+      message: body?.error ?? null,
+    });
+  } catch (e) {
+    return jsonResponse(req, {
+      ok: false, endpoint: cfg.endpoint, reason: "unreachable",
+      message: (e as Error).message,
+    });
+  }
+}
+
 Deno.serve(async (req) => {
   const preflight = handleOptions(req);
   if (preflight) return preflight;
 
   try {
-    const parsed = BodySchema.safeParse(await req.json());
+    const rawBody = await req.json().catch(() => ({}));
+    const admin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { persistSession: false } },
+    );
+    const cfg = await loadConfig(admin);
+
+    if ((rawBody as any)?.action === "diagnose") return await runDiagnostic(req, cfg);
+
+    const parsed = SendSchema.safeParse(rawBody);
     if (!parsed.success) {
       return jsonResponse(req, { error: parsed.error.flatten() }, 400);
     }
     const { event, to, data, order_id } = parsed.data;
 
-    // apiKey is resolved below from site_settings (preferred) with env-var fallback.
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-
-    // Load settings
-    const { data: settingRow } = await admin
-      .from("site_settings")
-      .select("value")
-      .eq("key", "whatsapp_integration")
-      .maybeSingle();
-    const settings = (settingRow?.value as any) ?? {};
-    const enabled = settings.enabled !== false; // default on if key exists
-    const lang: "ar" | "en" = settings.language === "en" ? "en" : "ar";
-    const eventsCfg = settings.events ?? {};
     const eventKey = event.replace(".", "_"); // order.paid -> order_paid
-    const eventEnabled = eventsCfg[eventKey] !== false;
+    const skipReason = !cfg.apiKey
+      ? "no_api_key"
+      : !cfg.enabled
+        ? "disabled"
+        : cfg.events[eventKey] === false
+          ? "event_off"
+          : null;
+    if (skipReason) return jsonResponse(req, { skipped: true, reason: skipReason });
 
-    // Prefer the key saved via /admin/whatsapp UI; fall back to env var.
-    const apiKey =
-      (typeof settings.api_key === "string" && settings.api_key.trim()) ||
-      Deno.env.get("POSTORA_WHATSAPP_API_KEY") ||
-      "";
-
-    if (!apiKey || !enabled || !eventEnabled) {
-      return jsonResponse(req, {
-        skipped: true,
-        reason: !apiKey ? "no_api_key" : !enabled ? "disabled" : "event_off",
-      });
-    }
-
-    const tplOverride =
-      settings.templates?.[`${eventKey}_${lang}`] ??
-      settings.templates?.[eventKey]?.[lang];
-    const tpl = tplOverride || DEFAULT_TEMPLATES[event][lang];
-    const message = render(tpl, data);
+    const override =
+      cfg.templates?.[`${eventKey}_${cfg.lang}`] ?? cfg.templates?.[eventKey]?.[cfg.lang];
+    const message = render(override || DEFAULT_TEMPLATES[event][cfg.lang], data);
 
     const results: any[] = [];
     for (const rawPhone of to) {
       const phone = normalizePhone(rawPhone);
       if (!phone) continue;
 
-      const payload = { action: "send_text", to: phone, text: message, message };
-      const url = `${POSTORA_ENDPOINT}?action=send_text`;
-      let status = "sent";
-      let respJson: any = null;
-      let errMsg: string | null = null;
-      try {
-        const r = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-          },
-          body: JSON.stringify(payload),
-        });
-        const text = await r.text();
-        try { respJson = JSON.parse(text); } catch { respJson = { raw: text }; }
-        if (!r.ok) {
-          status = "failed";
-          errMsg = `HTTP ${r.status}: ${text.slice(0, 300)}`;
-        } else if (respJson && respJson.success === false) {
-          status = "failed";
-          errMsg = `Postora rejected: ${respJson.error ?? text.slice(0, 300)}`;
-        }
-      } catch (e) {
-        status = "failed";
-        errMsg = (e as Error).message;
-      }
-
+      const out = await postToPostora(cfg, phone, message);
       await admin.from("whatsapp_send_logs").insert({
         event,
         recipient: phone,
-        status,
-        request_payload: payload,
-        response_payload: respJson ?? {},
-        error_message: errMsg,
+        status: out.status,
+        request_payload: out.payload,
+        response_payload: out.body ?? {},
+        error_message: out.error,
         order_id: order_id ?? null,
       });
-
-      results.push({ to: phone, status, error: errMsg });
+      results.push({ to: phone, status: out.status, error: out.error });
     }
 
     return jsonResponse(req, { ok: true, results });
