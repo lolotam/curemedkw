@@ -12,6 +12,9 @@
 #   - openrouter-models    (lists OpenRouter models for admin UI)
 #   - openai-models        (lists OpenAI models for admin UI)
 #   - google-models        (lists Google Gemini models for admin UI)
+#   - anthropic-models     (lists Anthropic models for admin UI)
+#   - atlascloud-models     (lists Atlas Cloud chat/image models for admin UI)
+#   - ai-test-connection   (admin connection test for each provider)
 #   - upscale-image        (Picsart AI upscale, admin-only, used by product editor)
 #   - upscale-image-ai     (OpenAI/Gemini AI upscale, admin-only, used by product editor)
 #   - migrate-storage-copy (one-shot ops helper, not invoked by the app)
@@ -28,7 +31,7 @@
 #   3. Function secrets already set on the self-hosted stack:
 #        SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_ANON_KEY,
 #        LOVABLE_API_KEY, FIRECRAWL_API_KEY, OPENROUTER_API_KEY, PICSART_API_KEY,
-#        OPENAI_API_KEY, GOOGLE_API_KEY
+#        OPENAI_API_KEY, GOOGLE_API_KEY, ANTHROPIC_API_KEY, ATLASCLOUD_API_KEY
 #
 # Usage from the Dokploy server (typical):
 #   cd /etc/dokploy/applications/curemedkw-curemedkw-fnsxxa/code

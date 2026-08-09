@@ -11,7 +11,7 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-type Provider = "openrouter" | "openai" | "google" | "anthropic";
+type Provider = "openrouter" | "openai" | "google" | "anthropic" | "atlascloud";
 type Kind = "chat" | "image";
 
 // Some upstream providers (e.g. Azure-hosted GPT-5.x via OpenRouter) require
@@ -102,6 +102,43 @@ async function pingOpenRouterImage(model: string, key: string) {
   return new Response("{}", { status: 200 });
 }
 
+async function pingAtlasCloudChat(model: string, key: string) {
+  return fetch("https://api.atlascloud.ai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      "User-Agent": "curemedkw-edge/1.0",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: PING_MAX_TOKENS,
+      messages: [{ role: "user", content: "ping" }],
+    }),
+  });
+}
+
+async function pingAtlasCloudImage(model: string, key: string) {
+  // Do not generate an image (costly). Verify the model id exists in the catalog.
+  const r = await fetch("https://api.atlascloud.ai/api/v1/models", {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "User-Agent": "curemedkw-edge/1.0",
+    },
+  });
+  if (!r.ok) return r;
+  const payload = await r.json().catch(() => ({}));
+  const items: any[] = Array.isArray(payload?.data) ? payload.data : [];
+  const found = items.some((m) => String(m?.model ?? m?.id ?? "") === model);
+  if (!found) {
+    return new Response(
+      JSON.stringify({ error: { message: `Model "${model}" not found on Atlas Cloud` } }),
+      { status: 404 },
+    );
+  }
+  return new Response("{}", { status: 200 });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -128,7 +165,11 @@ Deno.serve(async (req) => {
       openai: "OPENAI_API_KEY",
       google: "GOOGLE_API_KEY",
       anthropic: "ANTHROPIC_API_KEY",
+      atlascloud: "ATLASCLOUD_API_KEY",
     };
+    if (!(provider in keyName)) {
+      return json({ ok: false, error: `Unknown provider: ${provider}` }, 200);
+    }
     const key = Deno.env.get(keyName[provider]);
     if (!key) return json({ ok: false, error: `${keyName[provider]} is not configured` }, 200);
 
@@ -143,12 +184,14 @@ Deno.serve(async (req) => {
         if (provider === "openai") r = await pingOpenAIImage(model, key);
         else if (provider === "google") r = await pingGoogleImage(model, key);
         else if (provider === "openrouter") r = await pingOpenRouterImage(model, key);
+        else if (provider === "atlascloud") r = await pingAtlasCloudImage(model, key);
         else return json({ ok: false, error: `Unknown provider: ${provider}` }, 200);
       } else {
         if (provider === "openrouter") r = await pingOpenRouterChat(model, key);
         else if (provider === "openai") r = await pingOpenAIChat(model, key);
         else if (provider === "google") r = await pingGoogleChat(model, key);
         else if (provider === "anthropic") r = await pingAnthropicChat(model, key);
+        else if (provider === "atlascloud") r = await pingAtlasCloudChat(model, key);
         else return json({ ok: false, error: `Unknown provider: ${provider}` }, 200);
       }
     } catch (e) {

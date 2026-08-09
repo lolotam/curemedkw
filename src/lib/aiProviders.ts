@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 
-export type Provider = "openrouter" | "openai" | "google" | "anthropic";
+export type Provider = "openrouter" | "openai" | "google" | "anthropic" | "atlascloud";
 export type ModelKind = "chat" | "image";
 
 export interface ProviderModel {
@@ -17,15 +17,19 @@ export const PROVIDER_LABELS: Record<Provider, string> = {
   openai: "OpenAI",
   google: "Google",
   anthropic: "Anthropic",
+  atlascloud: "Atlas Cloud",
 };
 
-export const PROVIDERS: Provider[] = ["openrouter", "openai", "google", "anthropic"];
+export const PROVIDERS: Provider[] = ["openrouter", "openai", "google", "anthropic", "atlascloud"];
+
+export const PROVIDER_IDS: readonly Provider[] = PROVIDERS;
 
 const FN_BY_PROVIDER: Record<Provider, string> = {
   openrouter: "openrouter-models",
   openai: "openai-models",
   google: "google-models",
   anthropic: "anthropic-models",
+  atlascloud: "atlascloud-models",
 };
 
 export function useProviderModels(provider: Provider) {

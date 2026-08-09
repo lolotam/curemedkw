@@ -87,8 +87,10 @@ Deno.serve(async (req) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     const googleKey = Deno.env.get("GOOGLE_API_KEY");
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const atlasKey = Deno.env.get("ATLASCLOUD_API_KEY");
 
-    type Provider = "openrouter" | "openai" | "google" | "anthropic";
+    type Provider = "openrouter" | "openai" | "google" | "anthropic" | "atlascloud";
+    const VALID_PROVIDERS = new Set<Provider>(["openrouter", "openai", "google", "anthropic", "atlascloud"]);
     interface Slot { provider: Provider; model: string }
 
     const DEFAULT_CHAIN: Slot[] = [
@@ -109,9 +111,7 @@ Deno.serve(async (req) => {
       if (v && typeof v === "object" && Array.isArray((v as any).chat)) {
         dbChain = ((v as any).chat as any[])
           .map((s) => ({
-            provider: (["openrouter", "openai", "google", "anthropic"].includes(s?.provider)
-              ? s.provider
-              : "openrouter") as Provider,
+            provider: (VALID_PROVIDERS.has(s?.provider) ? s.provider : "openrouter") as Provider,
             model: String(s?.model ?? "").trim(),
           }))
           .filter((s) => s.model.length > 0);
@@ -227,10 +227,32 @@ Deno.serve(async (req) => {
       return validateRewriteText(text);
     }
 
+    async function callAtlasCloud(model: string): Promise<{ ok: boolean; text?: string; error?: string }> {
+      if (!atlasKey) return { ok: false, error: "ATLASCLOUD_API_KEY missing" };
+      const r = await fetch("https://api.atlascloud.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${atlasKey}`,
+          "Content-Type": "application/json",
+          "User-Agent": "curemedkw-edge/1.0",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content }],
+          temperature: 0.4,
+          max_tokens: 4096,
+        }),
+      });
+      if (!r.ok) return { ok: false, error: `HTTP ${r.status}: ${await r.text().catch(() => "")}` };
+      const payload = await r.json().catch(() => null);
+      return validateRewriteText(payload?.choices?.[0]?.message?.content);
+    }
+
     const dispatch = (slot: Slot) => {
       if (slot.provider === "openai") return callOpenAI(slot.model);
       if (slot.provider === "google") return callGoogle(slot.model);
       if (slot.provider === "anthropic") return callAnthropic(slot.model);
+      if (slot.provider === "atlascloud") return callAtlasCloud(slot.model);
       return callOpenRouter(slot.model);
     };
 

@@ -11,15 +11,18 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 
-type Provider = "openrouter" | "openai" | "google";
+type Provider = "openrouter" | "openai" | "google" | "atlascloud";
 interface Slot { provider: Provider; model: string }
+
+const VALID_IMAGE_PROVIDERS = new Set<Provider>(["openrouter", "openai", "google", "atlascloud"]);
 
 const DEFAULT_PROMPT =
   "Upscale this product image to a higher resolution. Preserve every product detail exactly: shape, colors, packaging text, logos, branding, materials, lighting and background. Do NOT add, remove, restyle or reinterpret anything. Output a clean, sharp, photorealistic version of the same image at a larger size.";
 
 const DEFAULT_IMAGE_CHAIN: Slot[] = [
-  { provider: "openai",     model: "gpt-image-2" },
+  { provider: "atlascloud", model: "openai/gpt-image-2/edit" },
   { provider: "openrouter", model: "google/gemini-3-pro-image-preview" },
+  { provider: "google", model: "gemini-3.1-flash-image-preview" },
 ];
 
 // Cloudflare in front of self-hosted Supabase has a hard ~100s timeout.
@@ -276,6 +279,185 @@ async function callOpenRouter(model: string, prompt: string, imgDataUrl: string,
   return { ok: false, error: "openrouter: no image in response" };
 }
 
+async function uploadAtlasMedia(
+  bytes: Uint8Array,
+  mime: string,
+  filename: string,
+  key: string,
+  timeoutMs: number,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const fd = new FormData();
+  fd.append("file", new Blob([bytes], { type: mime || "image/png" }), filename);
+  const resp = await fetchWithTimeout(
+    "https://api.atlascloud.ai/api/v1/model/uploadMedia",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "User-Agent": "curemedkw-edge/1.0",
+      },
+      body: fd,
+    },
+    timeoutMs,
+    "atlascloud:uploadMedia",
+  );
+  if (!resp.ok) {
+    const t = await resp.text();
+    return { ok: false, error: `atlascloud upload ${resp.status}: ${t.slice(0, 300)}` };
+  }
+  const data = await resp.json().catch(() => null);
+  const url = data?.data?.download_url ?? data?.data?.url ?? data?.download_url;
+  if (!url || typeof url !== "string") {
+    return { ok: false, error: "atlascloud upload: missing download_url" };
+  }
+  return { ok: true, url };
+}
+
+async function pollAtlasPrediction(
+  predictionId: string,
+  key: string,
+  deadlineMs: number,
+): Promise<AiResult> {
+  const pollUrl = `https://api.atlascloud.ai/api/v1/model/prediction/${encodeURIComponent(predictionId)}`;
+  while (Date.now() < deadlineMs) {
+    const remaining = deadlineMs - Date.now();
+    if (remaining < 500) break;
+    const resp = await fetchWithTimeout(
+      pollUrl,
+      {
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "User-Agent": "curemedkw-edge/1.0",
+        },
+      },
+      Math.min(15_000, remaining),
+      `atlascloud:poll:${predictionId}`,
+    );
+    if (!resp.ok) {
+      const t = await resp.text();
+      return { ok: false, error: `atlascloud poll ${resp.status}: ${t.slice(0, 300)}` };
+    }
+    const result = await resp.json().catch(() => null);
+    const status = String(result?.data?.status ?? result?.status ?? "").toLowerCase();
+    if (status === "completed" || status === "succeeded" || status === "success") {
+      const outputs = result?.data?.outputs ?? result?.outputs ?? [];
+      const out0 = Array.isArray(outputs) ? outputs[0] : null;
+      const outUrl = typeof out0 === "string"
+        ? out0
+        : (out0?.url ?? out0?.image_url ?? out0?.download_url ?? null);
+      if (!outUrl || typeof outUrl !== "string") {
+        // base64 payload support
+        const b64 = result?.data?.output_base64 ?? out0?.b64_json ?? out0?.base64;
+        if (typeof b64 === "string" && b64) {
+          return { ok: true, bytes: base64ToBytes(b64.replace(/^data:[^,]+,/, "")), contentType: "image/png" };
+        }
+        return { ok: false, error: "atlascloud: completed but no output URL" };
+      }
+      if (outUrl.startsWith("data:")) {
+        const m = outUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (m) return { ok: true, bytes: base64ToBytes(m[2]), contentType: m[1] };
+      }
+      const imgResp = await fetchWithTimeout(outUrl, {}, Math.min(20_000, Math.max(1_000, deadlineMs - Date.now())), "atlascloud:download");
+      if (!imgResp.ok) {
+        return { ok: false, error: `atlascloud download ${imgResp.status}` };
+      }
+      const ct = imgResp.headers.get("content-type") || "image/png";
+      return { ok: true, bytes: new Uint8Array(await imgResp.arrayBuffer()), contentType: ct };
+    }
+    if (status === "failed" || status === "error" || status === "canceled" || status === "cancelled") {
+      const err = result?.data?.error ?? result?.error ?? status;
+      return { ok: false, error: `atlascloud failed: ${typeof err === "string" ? err : JSON.stringify(err).slice(0, 200)}` };
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return { ok: false, error: `atlascloud timed out waiting for prediction ${predictionId}` };
+}
+
+async function callAtlasCloud(
+  model: string,
+  prompt: string,
+  sourceImageUrl: string | null,
+  srcBytes: Uint8Array,
+  srcMime: string,
+  key: string,
+  timeoutMs: number,
+  quality: "low" | "medium" | "high",
+): Promise<AiResult> {
+  const deadline = Date.now() + timeoutMs;
+  let imageUrl = sourceImageUrl && /^https?:\/\//i.test(sourceImageUrl) ? sourceImageUrl : null;
+
+  // Edit models need a hosted URL. Upload when the source is not already public http(s).
+  if (!imageUrl) {
+    const uploadBudget = Math.min(20_000, Math.max(5_000, Math.floor(timeoutMs * 0.25)));
+    const isJpeg = srcMime.includes("jpeg") || srcMime.includes("jpg");
+    const filename = isJpeg ? "source.jpg" : "source.png";
+    const uploaded = await uploadAtlasMedia(srcBytes, srcMime || "image/png", filename, key, uploadBudget);
+    if (!uploaded.ok) return { ok: false, error: uploaded.error };
+    imageUrl = uploaded.url;
+  }
+
+  const remainingAfterUpload = deadline - Date.now();
+  if (remainingAfterUpload < 5_000) {
+    return { ok: false, error: "atlascloud: out of time after upload" };
+  }
+
+  // Prefer edit-style payload when model path looks like an edit model.
+  const isEdit = /\/edit\b|image-to-image|remix|inpaint/i.test(model);
+  const body: Record<string, unknown> = {
+    model,
+    prompt,
+    enable_base64_output: false,
+    enable_sync_mode: false,
+    output_format: "png",
+    quality,
+    moderation: "low",
+  };
+  if (isEdit) {
+    body.images = [imageUrl];
+  } else {
+    // Text-to-image models may still accept a reference image; include when available.
+    body.images = [imageUrl];
+  }
+
+  console.log(`[upscale-image-ai] atlascloud request model=${model} quality=${quality} timeout=${timeoutMs}ms`);
+  const t0 = Date.now();
+  const genResp = await fetchWithTimeout(
+    "https://api.atlascloud.ai/api/v1/model/generateImage",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "User-Agent": "curemedkw-edge/1.0",
+      },
+      body: JSON.stringify(body),
+    },
+    Math.min(30_000, remainingAfterUpload),
+    `atlascloud:generate:${model}`,
+  );
+  if (!genResp.ok) {
+    const t = await genResp.text();
+    console.warn(`[upscale-image-ai] atlascloud generate model=${model} status=${genResp.status} elapsed=${Date.now() - t0}ms body=${t.slice(0, 200)}`);
+    return { ok: false, error: `atlascloud generate ${genResp.status}: ${t.slice(0, 400)}` };
+  }
+  const genJson = await genResp.json().catch(() => null);
+  const predictionId = genJson?.data?.id ?? genJson?.id;
+  if (!predictionId) {
+    // Some sync responses may return outputs immediately
+    const outputs = genJson?.data?.outputs ?? genJson?.outputs;
+    const out0 = Array.isArray(outputs) ? outputs[0] : null;
+    if (typeof out0 === "string" && out0.startsWith("http")) {
+      const imgResp = await fetch(out0);
+      if (imgResp.ok) {
+        return { ok: true, bytes: new Uint8Array(await imgResp.arrayBuffer()), contentType: imgResp.headers.get("content-type") || "image/png" };
+      }
+    }
+    return { ok: false, error: "atlascloud: missing prediction id" };
+  }
+
+  return await pollAtlasPrediction(String(predictionId), key, deadline);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -330,7 +512,9 @@ Deno.serve(async (req) => {
     if (imageSlots.length) {
       chain = imageSlots
         .map((s) => ({
-          provider: (isRecord(s) && ["openrouter", "openai", "google"].includes(String(s.provider)) ? s.provider : "google") as Provider,
+          provider: (isRecord(s) && VALID_IMAGE_PROVIDERS.has(String(s.provider) as Provider)
+            ? String(s.provider)
+            : "google") as Provider,
           model: String(isRecord(s) ? s.model ?? "" : "").trim(),
         }))
         .filter((s) => s.model.length > 0);
@@ -379,6 +563,7 @@ Deno.serve(async (req) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
     const googleKey = Deno.env.get("GOOGLE_API_KEY");
     const openrouterKey = Deno.env.get("OPENROUTER_API_KEY");
+    const atlasKey = Deno.env.get("ATLASCLOUD_API_KEY");
 
     const errors: string[] = [];
     let success: { result: AiResult; slot: Slot } | null = null;
@@ -388,6 +573,7 @@ Deno.serve(async (req) => {
     // the source is WebP/AVIF so Google/OpenRouter are reached immediately
     // instead of burning the entire timeout budget on a certain rejection.
     const srcNeedsConversion = srcMime === "image/webp" || srcMime === "image/avif";
+    const publicSourceUrl = !imageBase64 && /^https?:\/\//i.test(imageUrl) ? imageUrl : null;
 
     for (const slot of chain) {
       if (timedOutProviders.has(slot.provider)) {
@@ -399,7 +585,9 @@ Deno.serve(async (req) => {
         errors.push(`skipped ${slot.provider}:${slot.model} -> out of time budget`);
         break;
       }
-      const slotTimeout = Math.min(PROVIDER_TIMEOUT_MS, remaining - 2_000);
+      // Atlas Cloud is async (submit + poll). Give it a longer slot when budget allows.
+      const providerCap = slot.provider === "atlascloud" ? 70_000 : PROVIDER_TIMEOUT_MS;
+      const slotTimeout = Math.min(providerCap, remaining - 2_000);
       if (srcNeedsConversion && slot.provider === "openai") {
         errors.push(`skipped ${slot.provider}:${slot.model} -> source format ${srcMime} requires PNG/JPEG`);
         continue;
@@ -412,6 +600,18 @@ Deno.serve(async (req) => {
         } else if (slot.provider === "openai") {
           if (!openaiKey) { errors.push(`${slot.provider}:${slot.model} -> OPENAI_API_KEY missing`); continue; }
           res = await callOpenAI(slot.model, fullPrompt, openAiBlob, openAiName, openaiKey, slotTimeout, outputSize, outputQuality);
+        } else if (slot.provider === "atlascloud") {
+          if (!atlasKey) { errors.push(`${slot.provider}:${slot.model} -> ATLASCLOUD_API_KEY missing`); continue; }
+          res = await callAtlasCloud(
+            slot.model,
+            fullPrompt,
+            publicSourceUrl,
+            srcBytes,
+            srcMime,
+            atlasKey,
+            slotTimeout,
+            outputQuality,
+          );
         } else {
           if (!openrouterKey) { errors.push(`${slot.provider}:${slot.model} -> OPENROUTER_API_KEY missing`); continue; }
           res = await callOpenRouter(slot.model, fullPrompt, srcDataUrl, openrouterKey, slotTimeout);

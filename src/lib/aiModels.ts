@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { toast } from "sonner";
 import type { Provider, ModelKind } from "./aiProviders";
+import { PROVIDER_IDS } from "./aiProviders";
 
 // Stored in `site_settings.ai_import_models` as:
 //   { chat: Slot[], image: Slot[] }   (each array length 3)
@@ -24,7 +25,7 @@ export const DEFAULT_SLOTS: SlotsByKind = {
     { provider: "openrouter", model: "anthropic/claude-3.5-haiku" },
   ],
   image: [
-    { provider: "openai", model: "gpt-image-1" },
+    { provider: "atlascloud", model: "openai/gpt-image-2/edit" },
     { provider: "openrouter", model: "google/gemini-3-pro-image-preview" },
     { provider: "google", model: "gemini-3.1-flash-image-preview" },
   ],
@@ -51,7 +52,7 @@ function clone(s: SlotsByKind): SlotsByKind {
 function normalizeSlot(value: unknown, fallback: Slot): Slot {
   if (value && typeof value === "object") {
     const v = value as any;
-    const provider = (["openrouter", "openai", "google", "anthropic"].includes(v.provider) ? v.provider : fallback.provider) as Provider;
+    const provider = (PROVIDER_IDS.includes(v.provider) ? v.provider : fallback.provider) as Provider;
     const model = typeof v.model === "string" && v.model ? v.model : fallback.model;
     return { provider, model };
   }

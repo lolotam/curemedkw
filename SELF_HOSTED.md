@@ -198,8 +198,13 @@ Required env names:
 
 ```
 OPENROUTER_API_KEY=...
+OPENAI_API_KEY=...
+GOOGLE_API_KEY=...
+ANTHROPIC_API_KEY=...
+ATLASCLOUD_API_KEY=...
 FIRECRAWL_API_KEY=...
 LOVABLE_API_KEY=...
+PICSART_API_KEY=...
 ```
 
 ### 2. Pass them into the `functions` service in `docker-compose.yml`
@@ -212,9 +217,14 @@ above) must forward these variables into the `functions` service's
 services:
   functions:
     environment:
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY}
-      LOVABLE_API_KEY: ${LOVABLE_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ATLASCLOUD_API_KEY: ${ATLASCLOUD_API_KEY:-}
+      FIRECRAWL_API_KEY: ${FIRECRAWL_API_KEY:-}
+      LOVABLE_API_KEY: ${LOVABLE_API_KEY:-}
+      PICSART_API_KEY: ${PICSART_API_KEY:-}
 ```
 
 Without this passthrough the keys exist in `.env` but

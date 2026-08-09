@@ -91,7 +91,7 @@ export default function AdminModels() {
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            OpenRouter, OpenAI, and Google. Each provider uses its own configured API key secret.
+            OpenRouter, OpenAI, Google, Anthropic, and Atlas Cloud. Each provider uses its own configured API key secret.
           </p>
         </div>
       </Card>
