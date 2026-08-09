@@ -1,24 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Zap,
-  Flame,
-  HeartPulse,
-  Shield,
-  Dumbbell,
-  Sparkles,
-  Star,
-  Check,
-  MessageCircle,
-  ArrowRight,
-} from "lucide-react";
+import { Star, Check, MessageCircle, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { ImageZoom } from "@/components/site/ImageZoom";
 import { AddToCartButton } from "@/components/site/AddToCartButton";
 import { ProductReviews } from "@/components/site/ProductReviews";
@@ -27,6 +10,7 @@ import { AutoCarousel } from "@/components/site/AutoCarousel";
 import { useScrollReveal } from "@/hooks/useScrollReveal";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import type { LandingAssets } from "@/lib/landingThemes";
 import type { Product } from "@/lib/db";
 import type { BrandMeta } from "@/lib/brands";
 
@@ -36,6 +20,8 @@ interface Props {
   images: string[];
   priceHidden: boolean;
   related: Product[];
+  /** Section images uploaded for this product, already resolved and capped. */
+  assets: LandingAssets;
 }
 
 const STOCK_BADGE: Record<
@@ -56,124 +42,47 @@ const STOCK_BADGE: Record<
   },
 };
 
-const SHOWCASE = [
-  { icon: Sparkles, tKey: "sg.showcase.shilajit.t", dKey: "sg.showcase.shilajit.d" },
-  { icon: Star, tKey: "sg.showcase.gold.t", dKey: "sg.showcase.gold.d" },
-  { icon: HeartPulse, tKey: "sg.showcase.kesar.t", dKey: "sg.showcase.kesar.d" },
-] as const;
-
-const ASSET_BASE = "/landing/kapiva-shilajit-gold";
 const LANDING_FONT = "'Cairo', system-ui, sans-serif";
 
-const BENEFITS = [
-  {
-    id: "recovery",
-    icon: HeartPulse,
-    tKey: "sg.benefits.recovery.t",
-    dKey: "sg.benefits.recovery.d",
-    image: `${ASSET_BASE}/benefit-faster-recovery.png`,
-  },
-  {
-    id: "immunity",
-    icon: Shield,
-    tKey: "sg.benefits.immunity.t",
-    dKey: "sg.benefits.immunity.d",
-    image: `${ASSET_BASE}/benefit-immune-support.png`,
-  },
-  {
-    id: "vitality",
-    icon: Flame,
-    tKey: "sg.benefits.vitality.t",
-    dKey: "sg.benefits.vitality.d",
-    image: `${ASSET_BASE}/benefit-vitality-drive.png`,
-  },
-  {
-    id: "stamina-run",
-    icon: Dumbbell,
-    tKey: "sg.benefits.stamina.t",
-    dKey: "sg.benefits.stamina.d",
-    image: `${ASSET_BASE}/benefit-stamina-endurance-run.png`,
-  },
-  {
-    id: "stamina-gym",
-    icon: Dumbbell,
-    tKey: "sg.benefits.stamina.t",
-    dKey: "sg.benefits.stamina.d",
-    image: `${ASSET_BASE}/benefit-stamina-endurance-gym.png`,
-  },
-  {
-    id: "energy",
-    icon: Zap,
-    tKey: "sg.benefits.energy.t",
-    dKey: "sg.benefits.energy.d",
-    image: `${ASSET_BASE}/benefit-sustained-energy.png`,
-  },
-] as const;
-
-const USER_SHOWCASES = [
-  {
-    image: `${ASSET_BASE}/showcase-drinking-water.png`,
-    titleKey: "sg.reviewShowcase.water.t",
-    quoteKey: "sg.reviewShowcase.water.q",
-  },
-  {
-    image: `${ASSET_BASE}/showcase-recommending.png`,
-    titleKey: "sg.reviewShowcase.recommend.t",
-    quoteKey: "sg.reviewShowcase.recommend.q",
-  },
-  {
-    image: `${ASSET_BASE}/showcase-gym-bag.png`,
-    titleKey: "sg.reviewShowcase.gym.t",
-    quoteKey: "sg.reviewShowcase.gym.q",
-  },
-  {
-    image: `${ASSET_BASE}/showcase-office-routine.png`,
-    titleKey: "sg.reviewShowcase.office.t",
-    quoteKey: "sg.reviewShowcase.office.q",
-  },
-  {
-    image: `${ASSET_BASE}/showcase-family-breakfast.png`,
-    titleKey: "sg.reviewShowcase.family.t",
-    quoteKey: "sg.reviewShowcase.family.q",
-  },
-  {
-    image: `${ASSET_BASE}/showcase-majlis-couple.png`,
-    titleKey: "sg.reviewShowcase.majlis.t",
-    quoteKey: "sg.reviewShowcase.majlis.q",
-  },
-] as const;
-
-const FAQS = [
-  { q: "sg.faq.q1", a: "sg.faq.a1" },
-  { q: "sg.faq.q2", a: "sg.faq.a2" },
-  { q: "sg.faq.q3", a: "sg.faq.a3" },
-  { q: "sg.faq.q4", a: "sg.faq.a4" },
-  { q: "sg.faq.q5", a: "sg.faq.a5" },
-  { q: "sg.faq.q6", a: "sg.faq.a6" },
-] as const;
-
-const STEPS = [
-  { t: "sg.howto.s1.t", d: "sg.howto.s1.d", image: `${ASSET_BASE}/howto-take-one-capsule.png` },
-  { t: "sg.howto.s2.t", d: "sg.howto.s2.d", image: `${ASSET_BASE}/howto-with-milk-or-water.png` },
-  { t: "sg.howto.s3.t", d: "sg.howto.s3.d", image: `${ASSET_BASE}/howto-after-meal.png` },
-] as const;
-
-const TRUST = ["sg.trust.pure", "sg.trust.labTested", "sg.trust.ayurvedic", "sg.trust.kuwait"] as const;
-
-export function ProductLanding({ product, meta, images, priceHidden, related }: Props) {
+export function ProductLanding({
+  product,
+  meta,
+  images,
+  priceHidden,
+  related,
+  assets,
+}: Props) {
   const { t, lang } = useI18n();
   const [activeImg, setActiveImg] = useState(0);
   const rootRef = useScrollReveal<HTMLDivElement>(true);
 
   const isAr = lang === "ar";
   const name = isAr && product.nameAr ? product.nameAr : product.name;
+  const category = isAr && product.categoryAr ? product.categoryAr : product.category;
   const shortDesc = isAr && product.shortDescriptionAr ? product.shortDescriptionAr : product.shortDescription;
+  const usage = isAr && product.usageAr ? product.usageAr : product.usage;
   const benefits = (
     isAr && product.benefitsAr && product.benefitsAr.length ? product.benefitsAr : product.benefits
   ).filter(Boolean);
   const ingredients = (
     isAr && product.ingredientsAr && product.ingredientsAr.length ? product.ingredientsAr : product.ingredients
   ).filter(Boolean);
+
+  const highlightBanner = assets.highlights?.[0] ?? "";
+  const ingredientBanner = assets.ingredients?.[0] ?? "";
+  const benefitImages = assets.benefits ?? [];
+  const stepImages = assets.howToUse ?? [];
+  const reviewImages = assets.reviews ?? [];
+
+  // Benefit cards are captioned by the product's own benefits list. Any benefit
+  // past the last uploaded image still has to reach the shopper, so it falls
+  // through to the plain list underneath instead of being dropped.
+  const listedBenefits = benefits.slice(benefitImages.length);
+
+  const showBenefits = benefitImages.length > 0 || benefits.length > 0;
+  const showIngredients = ingredientBanner !== "" || ingredients.length > 0;
+  const showSteps = stepImages.length > 0 || usage.trim() !== "";
+  const showReviewImages = reviewImages.length > 0;
 
   const stock = STOCK_BADGE[product.stockStatus];
   const soldOut = product.stockStatus === "out_of_stock";
@@ -185,16 +94,6 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
   const pct = hasDiscount
     ? Math.round((1 - product.price / (product.originalPrice as number)) * 100)
     : 0;
-
-  const NavCta = (
-    <Button
-      asChild
-      size="sm"
-      className="bg-brand-secondary hover:bg-brand-secondary/90 text-white shadow-sm"
-    >
-      <a href="#buy">{t("cart.addToCart")}</a>
-    </Button>
-  );
 
   return (
     <div ref={rootRef} style={{ fontFamily: LANDING_FONT }}>
@@ -210,11 +109,14 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
             />
           </Link>
           <nav className="hidden md:flex items-center gap-5 text-sm font-medium text-muted-foreground">
-            <a href="#overview" className="hover:text-brand transition-colors">{t("sg.nav.overview")}</a>
-            <a href="#benefits" className="hover:text-brand transition-colors">{t("sg.nav.benefits")}</a>
-            <a href="#ingredients" className="hover:text-brand transition-colors">{t("sg.nav.ingredients")}</a>
-            <a href="#reviews" className="hover:text-brand transition-colors">{t("sg.nav.reviews")}</a>
-            <a href="#faq" className="hover:text-brand transition-colors">{t("sg.nav.faq")}</a>
+            <a href="#overview" className="hover:text-brand transition-colors">{t("landing.nav.overview")}</a>
+            {showBenefits && (
+              <a href="#benefits" className="hover:text-brand transition-colors">{t("landing.nav.benefits")}</a>
+            )}
+            {showIngredients && (
+              <a href="#ingredients" className="hover:text-brand transition-colors">{t("landing.nav.ingredients")}</a>
+            )}
+            <a href="#reviews" className="hover:text-brand transition-colors">{t("landing.nav.reviews")}</a>
           </nav>
           <div className="ml-auto flex items-center gap-3">
             {!priceHidden && !soldOut && (
@@ -222,14 +124,22 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
                 KD {product.price.toFixed(2)}
               </span>
             )}
-            {!priceHidden && !soldOut && NavCta}
+            {!priceHidden && !soldOut && (
+              <Button
+                asChild
+                size="sm"
+                className="bg-brand-secondary hover:bg-brand-secondary/90 text-white shadow-sm"
+              >
+                <a href="#buy">{t("cart.addToCart")}</a>
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
       {/* ============ HERO ============ */}
       <section id="overview" className="relative overflow-hidden bg-brand-soft">
-        {/* decorative gold halo */}
+        {/* decorative halo */}
         <div
           aria-hidden
           className="pointer-events-none absolute -top-32 ltr:right-[-10%] rtl:left-[-10%] h-[28rem] w-[28rem] rounded-full opacity-40 blur-3xl animate-glow-pulse"
@@ -247,9 +157,11 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
               <div className="relative aspect-square rounded-[1.75rem] overflow-hidden bg-background border border-border shadow-xl">
                 <ImageZoom src={images[activeImg]} alt={name} />
               </div>
-              <span className="absolute top-4 ltr:left-4 rtl:right-4 inline-flex items-center gap-1.5 rounded-full bg-brand-secondary px-3 py-1 text-xs font-bold text-white shadow-md">
-                <Sparkles className="h-3.5 w-3.5" /> {t("sg.goldTier")}
-              </span>
+              {product.featured && (
+                <span className="absolute top-4 ltr:left-4 rtl:right-4 inline-flex items-center gap-1.5 rounded-full bg-brand-secondary px-3 py-1 text-xs font-bold text-white shadow-md">
+                  <Star className="h-3.5 w-3.5 fill-current" /> {t("common.featured")}
+                </span>
+              )}
             </div>
             {images.length > 1 && (
               <div className="mt-4 flex gap-2.5 overflow-x-auto no-scrollbar">
@@ -273,27 +185,19 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
           {/* copy */}
           <div className="reveal reveal-right order-1 lg:order-2">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-              {t("sg.hero.eyebrow")}
+              {meta.name}{category ? ` · ${category}` : ""}
             </p>
             <h1
               className="mt-3 text-3xl sm:text-4xl md:text-5xl font-bold leading-[1.1] tracking-tight"
               style={{ fontFamily: LANDING_FONT }}
             >
-              {t("sg.hero.title")}
+              {name}
             </h1>
-            <p className="mt-4 text-base sm:text-lg text-foreground/75 max-w-prose" style={{ fontFamily: LANDING_FONT }}>
-              {t("sg.hero.subtitle")}
-            </p>
-
-            {/* rating row (uses product reviews) */}
-            <div className="mt-5 flex items-center gap-3">
-              <div className="flex items-center gap-0.5" aria-hidden>
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <Star key={i} className="h-4 w-4 fill-brand-secondary text-brand-secondary" />
-                ))}
-              </div>
-              <span className="text-sm text-muted-foreground">4.8 · {t("sg.nav.reviews")}</span>
-            </div>
+            {shortDesc && (
+              <p className="mt-4 text-base sm:text-lg text-foreground/75 max-w-prose" style={{ fontFamily: LANDING_FONT }}>
+                {shortDesc}
+              </p>
+            )}
 
             {/* price + CTA */}
             <div id="buy" className="mt-7 scroll-mt-24">
@@ -338,298 +242,223 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
                 </div>
               )}
             </div>
-
-            {/* trust strip */}
-            <ul className="mt-7 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              {TRUST.map((k) => (
-                <li key={k} className="flex items-center gap-1.5 text-xs font-medium text-foreground/70">
-                  <Check className="h-3.5 w-3.5 text-brand-secondary shrink-0" />
-                  {t(k)}
-                </li>
-              ))}
-            </ul>
-            {shortDesc && (
-              <p className="mt-6 text-sm text-foreground/70 leading-relaxed">{shortDesc}</p>
-            )}
           </div>
         </div>
       </section>
 
-      {/* ============ SHOWCASE — "What makes it Gold" ============ */}
-      <section className="relative overflow-hidden bg-brand text-white">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 ltr:left-[-15%] rtl:right-[-15%] h-72 w-72 -translate-y-1/2 rounded-full opacity-25 blur-3xl animate-blob-drift"
-          style={{ background: "hsl(var(--brand-secondary))" }}
-        />
-        <div className="container relative py-16 md:py-24">
-          <div className="reveal max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-              {t("sg.showcase.eyebrow")}
-            </p>
-            <h2
-              className="mt-3 text-2xl sm:text-3xl md:text-4xl font-bold leading-tight"
-              style={{ fontFamily: LANDING_FONT }}
-            >
-              {t("sg.showcase.title")}
-            </h2>
-          </div>
-          <div className="mt-12 grid gap-8 md:gap-10 md:grid-cols-3">
-            {SHOWCASE.map((item, i) => (
-              <div
-                key={item.tKey}
-                className="reveal group rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-sm transition-colors hover:bg-white/10"
-                style={{ transitionDelay: `${i * 80}ms` }}
-              >
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand-secondary text-white shadow-md transition-transform group-hover:scale-105">
-                  <item.icon className="h-6 w-6" />
-                </div>
-                <h3
-                  className="mt-4 text-lg font-semibold"
-                  style={{ fontFamily: LANDING_FONT }}
-                >
-                  {t(item.tKey)}
-                </h3>
-                <p className="mt-2 text-sm text-white/75 leading-relaxed">{t(item.dKey)}</p>
-              </div>
-            ))}
-          </div>
-          <div className="reveal mt-12 overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20">
-            <img
-              src={`${ASSET_BASE}/ingredients-banner-clean.png`}
-              alt={t("sg.showcase.title")}
-              className="aspect-video w-full object-cover"
-              loading="lazy"
-              width={2688}
-              height={1520}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* ============ BENEFITS GRID ============ */}
-      <section id="benefits" className="bg-brand-soft scroll-mt-16">
-        <div className="container py-16 md:py-24">
-          <div className="reveal max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-              {t("sg.benefits.eyebrow")}
-            </p>
-            <h2
-              className="mt-3 text-2xl sm:text-3xl md:text-4xl font-bold leading-tight text-brand"
-              style={{ fontFamily: LANDING_FONT }}
-            >
-              {t("sg.benefits.title")}
-            </h2>
-          </div>
-          <div className="reveal mt-12">
-            <AutoCarousel itemBasis="basis-[84%] sm:basis-1/2 lg:basis-1/3" intervalMs={3200}>
-              {BENEFITS.map((b) => (
-                <div
-                  key={b.id}
-                  className="group h-full overflow-hidden rounded-2xl border border-border bg-background shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-brand-soft">
-                    <img
-                      src={b.image}
-                      alt={t(b.tKey)}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      width={2048}
-                      height={2048}
-                    />
-                    <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-brand/75 to-transparent" />
-                    <div className="absolute bottom-4 ltr:left-4 rtl:right-4 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white/90 text-brand-secondary shadow-md backdrop-blur">
-                      <b.icon className="h-5 w-5" />
-                    </div>
-                  </div>
-                  <div className="p-5">
-                    <h3 className="font-semibold text-brand">{t(b.tKey)}</h3>
-                    <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">{t(b.dKey)}</p>
-                  </div>
-                </div>
-              ))}
-            </AutoCarousel>
-          </div>
-
-          {/* inline product benefits (from DB) */}
-          {benefits.length > 0 && (
-            <ul className="reveal mt-8 grid gap-2.5 sm:grid-cols-2">
-              {benefits.map((b, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
-                  <Check className="h-4 w-4 text-brand-secondary mt-0.5 shrink-0" />
-                  <span>{b}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </section>
-
-      {/* ============ INGREDIENTS ============ */}
-      {ingredients.length > 0 && (
-        <section id="ingredients" className="scroll-mt-16">
-          <div className="container py-16 md:py-20">
+      {/* ============ HIGHLIGHT BANNER ============ */}
+      {highlightBanner && (
+        <section className="relative overflow-hidden bg-brand text-white">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 ltr:left-[-15%] rtl:right-[-15%] h-72 w-72 -translate-y-1/2 rounded-full opacity-25 blur-3xl animate-blob-drift"
+            style={{ background: "hsl(var(--brand-secondary))" }}
+          />
+          <div className="container relative py-16 md:py-24">
             <div className="reveal max-w-2xl">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-                {t("product.ingredients")}
+                {t("landing.highlights.eyebrow")}
               </p>
               <h2
-                className="mt-3 text-2xl sm:text-3xl font-bold text-brand"
+                className="mt-3 text-2xl sm:text-3xl md:text-4xl font-bold leading-tight"
                 style={{ fontFamily: LANDING_FONT }}
               >
-                {t("sg.showcase.title")}
+                {t("landing.highlights.title")}
               </h2>
             </div>
-            <div className="reveal mt-8 overflow-hidden rounded-[2rem] border border-border bg-brand-soft shadow-xl">
+            <div className="reveal mt-10 overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20">
               <img
-                src={`${ASSET_BASE}/ingredients-banner-text.png`}
-                alt={t("sg.showcase.title")}
+                src={highlightBanner}
+                alt={t("landing.highlights.title")}
                 className="aspect-video w-full object-cover"
                 loading="lazy"
-                width={2688}
-                height={1520}
               />
-            </div>
-            <div className="reveal mt-6 flex flex-wrap gap-2.5">
-              {ingredients.map((ing, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brand-soft px-3.5 py-1.5 text-sm font-medium text-brand"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary" />
-                  {ing}
-                </span>
-              ))}
             </div>
           </div>
         </section>
       )}
 
-      {/* ============ HOW TO USE ============ */}
-      <section className="bg-brand-soft">
-        <div className="container py-16 md:py-20">
-          <div className="reveal max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-              {t("sg.howto.eyebrow")}
-            </p>
-            <h2
-              className="mt-3 text-2xl sm:text-3xl font-bold text-brand"
-              style={{ fontFamily: LANDING_FONT }}
-            >
-              {t("sg.howto.title")}
-            </h2>
-          </div>
-          <div className="mt-10 grid gap-6 sm:grid-cols-3">
-            {STEPS.map((s, i) => (
-              <div
-                key={s.t}
-                className="reveal overflow-hidden rounded-2xl border border-border bg-background shadow-sm"
-                style={{ transitionDelay: `${i * 70}ms` }}
+      {/* ============ BENEFITS ============ */}
+      {showBenefits && (
+        <section id="benefits" className="bg-brand-soft scroll-mt-16">
+          <div className="container py-16 md:py-24">
+            <div className="reveal max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
+                {t("landing.benefits.eyebrow")}
+              </p>
+              <h2
+                className="mt-3 text-2xl sm:text-3xl md:text-4xl font-bold leading-tight text-brand"
+                style={{ fontFamily: LANDING_FONT }}
               >
-                <div className="relative aspect-square overflow-hidden bg-brand-soft">
-                  <img
-                    src={s.image}
-                    alt={t(s.t)}
-                    className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                    loading="lazy"
-                    width={2048}
-                    height={2048}
-                  />
-                  <div className="absolute top-4 ltr:left-4 rtl:right-4 flex h-10 w-10 items-center justify-center rounded-full bg-brand text-white font-bold text-sm shadow-md">
-                    {i + 1}
-                  </div>
-                </div>
-                <div className="p-5">
-                  <h3 className="font-semibold text-brand">{t(s.t)}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{t(s.d)}</p>
-                </div>
+                {t("landing.benefits.title")}
+              </h2>
+            </div>
+            {benefitImages.length > 0 && (
+              <div className="reveal mt-12">
+                <AutoCarousel itemBasis="basis-[84%] sm:basis-1/2 lg:basis-1/3" intervalMs={3200}>
+                  {benefitImages.map((src, i) => (
+                    <div
+                      key={src}
+                      className="group h-full overflow-hidden rounded-2xl border border-border bg-background shadow-sm transition-all hover:-translate-y-1 hover:shadow-md"
+                    >
+                      <div className="relative aspect-square overflow-hidden bg-brand-soft">
+                        <img
+                          src={src}
+                          alt={benefits[i] ?? ""}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-brand/75 to-transparent" />
+                      </div>
+                      {benefits[i] && (
+                        <div className="p-5">
+                          <h3 className="font-semibold text-brand">{benefits[i]}</h3>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </AutoCarousel>
               </div>
-            ))}
+            )}
+
+            {listedBenefits.length > 0 && (
+              <ul className="reveal mt-8 grid gap-2.5 sm:grid-cols-2">
+                {listedBenefits.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-foreground/80">
+                    <Check className="h-4 w-4 text-brand-secondary mt-0.5 shrink-0" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
+      )}
+
+      {/* ============ INGREDIENTS ============ */}
+      {showIngredients && (
+        <section id="ingredients" className="scroll-mt-16">
+          <div className="container py-16 md:py-20">
+            <div className="reveal max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
+                {t("landing.ingredients.eyebrow")}
+              </p>
+              <h2
+                className="mt-3 text-2xl sm:text-3xl font-bold text-brand"
+                style={{ fontFamily: LANDING_FONT }}
+              >
+                {t("product.ingredients")}
+              </h2>
+            </div>
+            {ingredientBanner && (
+              <div className="reveal mt-8 overflow-hidden rounded-[2rem] border border-border bg-brand-soft shadow-xl">
+                <img
+                  src={ingredientBanner}
+                  alt={t("product.ingredients")}
+                  className="aspect-video w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            )}
+            {ingredients.length > 0 && (
+              <div className="reveal mt-6 flex flex-wrap gap-2.5">
+                {ingredients.map((ing, i) => (
+                  <span
+                    key={i}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-brand/20 bg-brand-soft px-3.5 py-1.5 text-sm font-medium text-brand"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary" />
+                    {ing}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* ============ HOW TO USE ============ */}
+      {showSteps && (
+        <section className="bg-brand-soft">
+          <div className="container py-16 md:py-20">
+            <div className="reveal max-w-2xl">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
+                {t("landing.howto.eyebrow")}
+              </p>
+              <h2
+                className="mt-3 text-2xl sm:text-3xl font-bold text-brand"
+                style={{ fontFamily: LANDING_FONT }}
+              >
+                {t("product.usage")}
+              </h2>
+              {usage && (
+                <p className="mt-4 text-base text-foreground/75 leading-relaxed whitespace-pre-line">
+                  {usage}
+                </p>
+              )}
+            </div>
+            {stepImages.length > 0 && (
+              <div className="mt-10 grid gap-6 sm:grid-cols-3">
+                {stepImages.map((src, i) => (
+                  <div
+                    key={src}
+                    className="reveal overflow-hidden rounded-2xl border border-border bg-background shadow-sm"
+                    style={{ transitionDelay: `${i * 70}ms` }}
+                  >
+                    <div className="relative aspect-square overflow-hidden bg-brand-soft">
+                      <img
+                        src={src}
+                        alt=""
+                        className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                        loading="lazy"
+                      />
+                      <div className="absolute top-4 ltr:left-4 rtl:right-4 flex h-10 w-10 items-center justify-center rounded-full bg-brand text-white font-bold text-sm shadow-md">
+                        {i + 1}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ============ REVIEWS ============ */}
       <section id="reviews" className="scroll-mt-16">
         <div className="container py-16 md:py-20">
           <div className="reveal max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-              {t("sg.reviewShowcase.eyebrow")}
+              {t("landing.reviews.eyebrow")}
             </p>
             <h2
               className="mt-3 text-2xl sm:text-3xl font-bold text-brand"
               style={{ fontFamily: LANDING_FONT }}
             >
-              {t("sg.nav.reviews")}
+              {t("landing.nav.reviews")}
             </h2>
           </div>
-          <div className="reveal mt-10">
-            <AutoCarousel itemBasis="basis-[86%] sm:basis-1/2 lg:basis-1/3" intervalMs={3800}>
-              {USER_SHOWCASES.map((item) => (
-                <article
-                  key={item.image}
-                  className="h-full overflow-hidden rounded-2xl border border-border bg-background shadow-sm"
-                >
-                  <img
-                    src={item.image}
-                    alt={t(item.titleKey)}
-                    className="aspect-[4/3] w-full object-cover"
-                    loading="lazy"
-                    width={2336}
-                    height={1744}
-                  />
-                  <div className="p-5">
-                    <div className="flex items-center gap-0.5 text-brand-secondary" aria-hidden>
-                      {[0, 1, 2, 3, 4].map((star) => (
-                        <Star key={star} className="h-3.5 w-3.5 fill-current" />
-                      ))}
-                    </div>
-                    <h3 className="mt-3 font-semibold text-brand">
-                      {t(item.titleKey)}
-                    </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground" dir="rtl" lang="ar">
-                      {t(item.quoteKey)}
-                    </p>
+          {showReviewImages && (
+            <div className="reveal mt-10">
+              <AutoCarousel itemBasis="basis-[86%] sm:basis-1/2 lg:basis-1/3" intervalMs={3800}>
+                {reviewImages.map((src) => (
+                  <div
+                    key={src}
+                    className="h-full overflow-hidden rounded-2xl border border-border bg-background shadow-sm"
+                  >
+                    <img
+                      src={src}
+                      alt=""
+                      className="aspect-square w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
-                </article>
-              ))}
-            </AutoCarousel>
-          </div>
+                ))}
+              </AutoCarousel>
+            </div>
+          )}
           <div className="reveal mt-8">
             <ProductReviews productId={product.id} />
-          </div>
-        </div>
-      </section>
-
-      {/* ============ FAQ ============ */}
-      <section id="faq" className="bg-brand-soft scroll-mt-16">
-        <div className="container py-16 md:py-24">
-          <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
-            <div className="reveal">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-secondary">
-                {t("sg.faq.eyebrow")}
-              </p>
-              <h2
-                className="mt-3 text-2xl sm:text-3xl md:text-4xl font-bold text-brand leading-tight"
-                style={{ fontFamily: LANDING_FONT }}
-              >
-                {t("sg.faq.title")}
-              </h2>
-            </div>
-            <div className="reveal reveal-right">
-              <Accordion type="single" collapsible className="rounded-2xl border border-border bg-background px-5">
-                {FAQS.map((f, i) => (
-                  <AccordionItem key={f.q} value={`item-${i}`} className={cn(i === FAQS.length - 1 && "border-b-0")}>
-                    <AccordionTrigger className="text-left font-semibold text-brand hover:no-underline">
-                      {t(f.q)}
-                    </AccordionTrigger>
-                    <AccordionContent className="text-muted-foreground leading-relaxed">
-                      {t(f.a)}
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            </div>
           </div>
         </div>
       </section>
@@ -651,9 +480,9 @@ export function ProductLanding({ product, meta, images, priceHidden, related }: 
                 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight"
                 style={{ fontFamily: LANDING_FONT }}
               >
-                {t("sg.cta.title")}
+                {t("landing.cta.title")}
               </h2>
-              <p className="mt-3 text-white/80">{t("sg.cta.subtitle")}</p>
+              <p className="mt-3 text-white/80">{t("landing.cta.subtitle")}</p>
               <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">
                 {!priceHidden && (
                   <span className="text-2xl font-bold" style={{ fontVariantNumeric: "tabular-nums" }}>

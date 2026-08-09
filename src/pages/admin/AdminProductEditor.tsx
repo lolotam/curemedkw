@@ -28,6 +28,7 @@ import BulkImageUpscaleDialog from "@/components/admin/BulkImageUpscaleDialog";
 import LongDescriptionRewriteDialog from "@/components/admin/LongDescriptionRewriteDialog";
 import { logOperation } from "@/lib/logs";
 import { convertAndUploadImage } from "@/lib/imageConvert";
+import { LandingThemeCard } from "@/components/admin/LandingThemeCard";
 
 const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "slug" | "createdAt" | "updatedAt"> => ({
   brand,
@@ -57,6 +58,8 @@ const BLANK = (brand: BrandKey = "flexitol"): Omit<Product, "id" | "slug" | "cre
   usageAr: "",
   benefitsAr: [],
   ingredientsAr: [],
+  landingTheme: "",
+  landingAssets: {},
 });
 
 const DRAFT_KEY = (id: string) => `lov:product-draft:${id}`;
@@ -68,7 +71,9 @@ function loadDraft(id: string): FormState | null {
     const raw = localStorage.getItem(DRAFT_KEY(id));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") return parsed as FormState;
+    // Drafts are serialised before the current field set existed, so merge over
+    // a blank form: a stale draft must not leave newer fields undefined.
+    if (parsed && typeof parsed === "object") return { ...BLANK(), ...parsed } as FormState;
   } catch {
     // ignore
   }
@@ -963,6 +968,15 @@ export default function AdminProductEditor() {
               </Field>
             </div>
           </Card>
+
+          <LandingThemeCard
+            theme={form.landingTheme}
+            assets={form.landingAssets}
+            brand={form.brand}
+            productSlug={productSlug}
+            onThemeChange={(theme) => update("landingTheme", theme)}
+            onAssetsChange={(assets) => update("landingAssets", assets)}
+          />
         </div>
 
         {/* Side: meta + preview */}

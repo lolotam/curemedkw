@@ -14,11 +14,7 @@ import { AddToCartButton } from "@/components/site/AddToCartButton";
 import { useAdminSession } from "@/lib/admin";
 import { ImageZoom } from "@/components/site/ImageZoom";
 import { ProductLanding } from "@/components/site/ProductLanding";
-
-// Products that render as a full conversion-optimised landing page instead of
-// the default two-column detail layout. Match by slug (case-insensitive).
-const LANDING_SLUGS = ["kapiva-shilajit-gold-30-capsules"];
-
+import { findLandingTheme, resolveLandingAssets } from "@/lib/landingThemes";
 
 export default function ProductDetail() {
   const { brand: brandSlug, slug } = useParams<{ brand: string; slug: string }>();
@@ -49,8 +45,9 @@ export default function ProductDetail() {
   const longDesc =
     isAr && product.longDescriptionAr ? product.longDescriptionAr : product.longDescription;
 
-  // Premium landing-page layout for select flagship products.
-  if (product.slug && LANDING_SLUGS.includes(product.slug.toLowerCase())) {
+  // Long-form landing layout, chosen per product in the admin product editor.
+  const landingTheme = findLandingTheme(product.landingTheme);
+  if (landingTheme) {
     return (
       <SiteLayout brand={meta.themeAttr}>
         <Seo
@@ -89,6 +86,7 @@ export default function ProductDetail() {
             images={images}
             priceHidden={priceHidden}
             related={related}
+            assets={resolveLandingAssets(landingTheme, product.landingAssets)}
           />
         </div>
       </SiteLayout>

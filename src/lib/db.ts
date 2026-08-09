@@ -7,6 +7,7 @@ import {
   resolveEcommerceMode,
   type EcommerceGates,
 } from "@/lib/ecommerceMode";
+import type { LandingAssets } from "@/lib/landingThemes";
 
 export type BrandKey =
   | "flexitol"
@@ -57,6 +58,9 @@ export interface Product {
   usageAr: string;
   benefitsAr: string[];
   ingredientsAr: string[];
+  // Landing-page theme (empty = default product detail layout)
+  landingTheme: string;
+  landingAssets: LandingAssets;
 }
 
 export interface Message {
@@ -93,6 +97,8 @@ type ProductRow = {
   usage_ar: string;
   benefits_ar: string[];
   ingredients_ar: string[];
+  landing_theme: string;
+  landing_assets: LandingAssets;
 };
 
 const rowToProduct = (r: ProductRow): Product => ({
@@ -128,6 +134,8 @@ const rowToProduct = (r: ProductRow): Product => ({
   usageAr: r.usage_ar ?? "",
   benefitsAr: r.benefits_ar ?? [],
   ingredientsAr: r.ingredients_ar ?? [],
+  landingTheme: r.landing_theme ?? "",
+  landingAssets: r.landing_assets ?? {},
 });
 
 export type ProductInput = Omit<Product, "id" | "slug" | "createdAt" | "updatedAt"> & { slug?: string };
@@ -160,6 +168,8 @@ const productToRow = (p: Partial<ProductInput>): Partial<ProductRow> => {
   if (p.usageAr !== undefined) out.usage_ar = p.usageAr;
   if (p.benefitsAr !== undefined) out.benefits_ar = p.benefitsAr;
   if (p.ingredientsAr !== undefined) out.ingredients_ar = p.ingredientsAr;
+  if (p.landingTheme !== undefined) out.landing_theme = p.landingTheme;
+  if (p.landingAssets !== undefined) out.landing_assets = p.landingAssets;
   return out;
 };
 
@@ -474,8 +484,12 @@ function sanitizeSegment(s: string | undefined | null): string {
 export type ProductImageContext = {
   brand?: string;
   productSlug?: string;
-  /** Subfolder. Defaults to "original" for direct uploads. */
-  subfolder?: "original" | "upscaled" | "upscaled-ai";
+  /**
+   * Subfolder. Defaults to "original" for direct uploads. Landing-theme
+   * section images are kept out of the gallery folders so they are not mistaken
+   * for product photography.
+   */
+  subfolder?: "original" | "upscaled" | "upscaled-ai" | `landing/${string}`;
 };
 
 export async function uploadProductImage(file: File, ctx?: ProductImageContext): Promise<string> {

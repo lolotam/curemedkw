@@ -474,132 +474,29 @@ TRANSLATIONS["category.productPlural"] = { en: "products", ar: "منتجات" };
 // ============= Product detail =============
 TRANSLATIONS["product.viewArrow"] = { en: "View →", ar: "عرض ←" };
 
-// ============= Shilajit Gold landing page =============
-TRANSLATIONS["sg.nav.overview"] = { en: "Overview", ar: "نظرة عامة" };
-TRANSLATIONS["sg.nav.benefits"] = { en: "Benefits", ar: "الفوائد" };
-TRANSLATIONS["sg.nav.ingredients"] = { en: "Ingredients", ar: "المكونات" };
-TRANSLATIONS["sg.nav.reviews"] = { en: "Reviews", ar: "المراجعات" };
-TRANSLATIONS["sg.nav.faq"] = { en: "FAQ", ar: "الأسئلة الشائعة" };
+// ============= Landing-page themes (src/lib/landingThemes.ts) =============
+// Section chrome only. Every substantive claim on a landing page comes from the
+// product row, so one theme can be applied to any product without asserting
+// something that is only true of another.
+TRANSLATIONS["landing.nav.overview"] = { en: "Overview", ar: "نظرة عامة" };
+TRANSLATIONS["landing.nav.benefits"] = { en: "Benefits", ar: "الفوائد" };
+TRANSLATIONS["landing.nav.ingredients"] = { en: "Ingredients", ar: "المكونات" };
+TRANSLATIONS["landing.nav.reviews"] = { en: "Reviews", ar: "المراجعات" };
 
-TRANSLATIONS["sg.goldTier"] = { en: "Gold Tier", ar: "الفئة الذهبية" };
-TRANSLATIONS["sg.hero.eyebrow"] = { en: "Ayurveda · Men's Wellness", ar: "الأيورفيدا · عافية الرجل" };
-TRANSLATIONS["sg.hero.title"] = { en: "Ancient Shilajit, Gold-Enhanced", ar: "الشيلاجيت القديم، معزّز بالذهب" };
-TRANSLATIONS["sg.hero.subtitle"] = {
-  en: "Purified Himalayan Shilajit enriched with Swarna Bhasma, Kesar and time-tested Ayurvedic herbs — for energy, stamina and vitality.",
-  ar: "شيلاجيت هيمالايا المُنقّى، مُعزّز بـ سوارنا بهاسما والزعفران وأعشاب أيورفيدا عريقة — للطاقة والقدرة والحيوية.",
-};
-TRANSLATIONS["sg.trust.pure"] = { en: "Pure & Purified", ar: "نقي ومُنقّى" };
-TRANSLATIONS["sg.trust.labTested"] = { en: "Lab-Tested", ar: "مُختبَر مخبرياً" };
-TRANSLATIONS["sg.trust.ayurvedic"] = { en: "Ayurvedic", ar: "أيورفيدي" };
-TRANSLATIONS["sg.trust.kuwait"] = { en: "Ships in Kuwait", ar: "يُشحن في الكويت" };
+TRANSLATIONS["landing.highlights.eyebrow"] = { en: "Why it stands out", ar: "لماذا يتميّز" };
+TRANSLATIONS["landing.highlights.title"] = { en: "Key highlights", ar: "أبرز المميزات" };
 
-TRANSLATIONS["sg.showcase.eyebrow"] = { en: "What makes it Gold", ar: "ما الذي يجعله ذهبياً" };
-TRANSLATIONS["sg.showcase.title"] = { en: "Three pillars of the Gold formula", ar: "ثلاثة أركان لتركيبة جولد" };
-TRANSLATIONS["sg.showcase.shilajit.t"] = { en: "Purified Shilajit", ar: "الشيلاجيت المُنقّى" };
-TRANSLATIONS["sg.showcase.shilajit.d"] = {
-  en: "Harvested from high-altitude Himalayan rock, this mineral-rich resin is the cornerstone of Ayurvedic vitality — naturally abundant in fulvic acid.",
-  ar: "يُستخرج من صخور جبال الهيمالايا المرتفعة، وهو راتنج غني بالمعادن يُعدّ ركيزة الحيوية في الأيورفيدا — وغنيٌ بطبيعة الحال بحمض الفولفيك.",
-};
-TRANSLATIONS["sg.showcase.gold.t"] = { en: "Swarna Bhasma (Gold)", ar: "سوارنا بهاسما (الذهب)" };
-TRANSLATIONS["sg.showcase.gold.d"] = {
-  en: "Ayurvedically processed gold ash, traditionally used to enhance rejuvenation, vigour and the uptake of companion herbs.",
-  ar: "رماد ذهب مُعالَج بأيورفيدا، يُستخدم تقليدياً لتعزيز التجدد والحيوية وامتصاص الأعشاب المرافقة.",
-};
-TRANSLATIONS["sg.showcase.kesar.t"] = { en: "Kesar (Saffron)", ar: "الكيسار (الزعفران)" };
-TRANSLATIONS["sg.showcase.kesar.d"] = {
-  en: "Premium saffron threads prized in Ayurveda for their uplifting, restorative and antioxidant properties.",
-  ar: "خيوط زعفران فاخرة تُعدّ في الأيورفيدا لخصائصها المنشّطة والمُجدِّدة ومضادات الأكسدة.",
-};
+TRANSLATIONS["landing.benefits.eyebrow"] = { en: "Why customers choose it", ar: "لماذا يختاره العملاء" };
+TRANSLATIONS["landing.benefits.title"] = { en: "Benefits that build over time", ar: "فوائد تتراكم مع الوقت" };
 
-TRANSLATIONS["sg.benefits.eyebrow"] = { en: "Why you'll feel the difference", ar: "لماذا ستشعر بالفرق" };
-TRANSLATIONS["sg.benefits.title"] = { en: "Benefits that build over time", ar: "فوائد تتراكم مع الوقت" };
-TRANSLATIONS["sg.benefits.energy.t"] = { en: "Sustained Energy", ar: "طاقة مستدامة" };
-TRANSLATIONS["sg.benefits.energy.d"] = { en: "Power through your day without the crash.", ar: "أنشط يومك دون هبوط." };
-TRANSLATIONS["sg.benefits.stamina.t"] = { en: "Stamina & Endurance", ar: "القدرة والتحمّل" };
-TRANSLATIONS["sg.benefits.stamina.d"] = { en: "Build physical resilience for workouts and daily demands.", ar: "ابنِ قدرة بدنية للتمارين ومتطلبات اليوم." };
-TRANSLATIONS["sg.benefits.vitality.t"] = { en: "Vitality & Drive", ar: "الحيوية والنشاط" };
-TRANSLATIONS["sg.benefits.vitality.d"] = { en: "Supports overall male vitality and confidence.", ar: "يدعم حيوية الرجل وثقته بشكل عام." };
-TRANSLATIONS["sg.benefits.immunity.t"] = { en: "Immune Support", ar: "دعم المناعة" };
-TRANSLATIONS["sg.benefits.immunity.d"] = { en: "Mineral-rich herbs help reinforce natural defences.", ar: "أعشاب غنية بالمعادن تساعد على تعزيز الدفاعات الطبيعية." };
-TRANSLATIONS["sg.benefits.recovery.t"] = { en: "Faster Recovery", ar: "تعافٍ أسرع" };
-TRANSLATIONS["sg.benefits.recovery.d"] = { en: "Replenish and bounce back after exertion.", ar: "عوّض وتعافَ بعد المجهود." };
+TRANSLATIONS["landing.ingredients.eyebrow"] = { en: "What's inside", ar: "ماذا يحتوي" };
 
-TRANSLATIONS["sg.howto.eyebrow"] = { en: "Simple daily ritual", ar: "طقس يومي بسيط" };
-TRANSLATIONS["sg.howto.title"] = { en: "How to use", ar: "طريقة الاستخدام" };
-TRANSLATIONS["sg.howto.s1.t"] = { en: "Take 1 capsule", ar: "تناول كبسولة واحدة" };
-TRANSLATIONS["sg.howto.s1.d"] = { en: "Once a day, ideally in the morning.", ar: "مرة يومياً، يُفضّل صباحاً." };
-TRANSLATIONS["sg.howto.s2.t"] = { en: "With milk or water", ar: "مع الحليب أو الماء" };
-TRANSLATIONS["sg.howto.s2.d"] = { en: "Preferably lukewarm milk for absorption.", ar: "يُفضّل الحليب الدافئ لامتصاص أفضل." };
-TRANSLATIONS["sg.howto.s3.t"] = { en: "After a meal", ar: "بعد الوجبة" };
-TRANSLATIONS["sg.howto.s3.d"] = { en: "Consistency for 4–8 weeks delivers best results.", ar: "الانتظام لمدة ٤-٨ أسابيع يمنح أفضل النتائج." };
+TRANSLATIONS["landing.howto.eyebrow"] = { en: "Getting started", ar: "كيف تبدأ" };
 
-TRANSLATIONS["sg.reviewShowcase.eyebrow"] = { en: "Real Kuwait routines", ar: "قصص من الكويت" };
-TRANSLATIONS["sg.reviewShowcase.water.t"] = { en: "Morning water routine", ar: "روتين الصبح مع الماي" };
-TRANSLATIONS["sg.reviewShowcase.water.q"] = {
-  en: "أخذه الصبح مع الماي، حسّيت روتيني صار أرتب وأسهل.",
-  ar: "أخذه الصبح مع الماي، حسّيت روتيني صار أرتب وأسهل.",
-};
-TRANSLATIONS["sg.reviewShowcase.recommend.t"] = { en: "Recommended at home", ar: "توصية بين الأهل" };
-TRANSLATIONS["sg.reviewShowcase.recommend.q"] = {
-  en: "قلت حق خواتي عنه، عجبني إنه بسيط وما ياخذ وقت.",
-  ar: "قلت حق خواتي عنه، عجبني إنه بسيط وما ياخذ وقت.",
-};
-TRANSLATIONS["sg.reviewShowcase.gym.t"] = { en: "Gym bag essential", ar: "أساسي مع جنطة النادي" };
-TRANSLATIONS["sg.reviewShowcase.gym.q"] = {
-  en: "مع النادي والدوام، حلو يكون عندي شي ثابت بروتيني اليومي.",
-  ar: "مع النادي والدوام، حلو يكون عندي شي ثابت بروتيني اليومي.",
-};
-TRANSLATIONS["sg.reviewShowcase.office.t"] = { en: "Desk-side consistency", ar: "ثابت يم المكتب" };
-TRANSLATIONS["sg.reviewShowcase.office.q"] = {
-  en: "أحطه يم اللابتوب عشان ما أنساه، كبسولة وحدة وخلاص.",
-  ar: "أحطه يم اللابتوب عشان ما أنساه، كبسولة وحدة وخلاص.",
-};
-TRANSLATIONS["sg.reviewShowcase.family.t"] = { en: "Breakfast habit", ar: "عادة بعد الريوق" };
-TRANSLATIONS["sg.reviewShowcase.family.q"] = {
-  en: "دخلته بروتين الصبح، خصوصاً بعد الريوق، سهل ومريح.",
-  ar: "دخلته بروتين الصبح، خصوصاً بعد الريوق، سهل ومريح.",
-};
-TRANSLATIONS["sg.reviewShowcase.majlis.t"] = { en: "Shared daily habit", ar: "عادة يومية مشتركة" };
-TRANSLATIONS["sg.reviewShowcase.majlis.q"] = {
-  en: "صار عندنا عادة يومية بسيطة، وكل واحد يذكّر الثاني فيها.",
-  ar: "صار عندنا عادة يومية بسيطة، وكل واحد يذكّر الثاني فيها.",
-};
+TRANSLATIONS["landing.reviews.eyebrow"] = { en: "From our customers", ar: "من عملائنا" };
 
-TRANSLATIONS["sg.cta.title"] = { en: "Ready to feel the Gold difference?", ar: "جاهز لتشعر بفرق جولد؟" };
-TRANSLATIONS["sg.cta.subtitle"] = { en: "Authentic Kapiva Shilajit Gold, delivered across Kuwait.", ar: "كابيفا شيلاجيت جولد الأصلي، يُوصل لجميع أنحاء الكويت." };
-
-TRANSLATIONS["sg.faq.eyebrow"] = { en: "Good to know", ar: "معلومات مفيدة" };
-TRANSLATIONS["sg.faq.title"] = { en: "Frequently asked questions", ar: "الأسئلة الشائعة" };
-TRANSLATIONS["sg.faq.q1"] = { en: "What is Shilajit Gold?", ar: "ما هو شيلاجيت جولد؟" };
-TRANSLATIONS["sg.faq.a1"] = {
-  en: "It's a premium Ayurvedic formula combining purified Himalayan Shilajit with Swarna Bhasma (gold), Kesar (saffron) and supporting herbs like Ashwagandha and Safed Musli, designed to support energy, stamina and male vitality.",
-  ar: "تركيبة أيورفيدا فاخرة تجمع الشيلاجيت الهيمالايا المُنقّى مع سوارنا بهاسما (الذهب) والكيسار (الزعفران) وأعشاب داعمة مثل الأشواغاندا والصفد مصلي، مصممة لدعم الطاقة والقدرة وحيوية الرجل.",
-};
-TRANSLATIONS["sg.faq.q2"] = { en: "How long until I see results?", ar: "متى تظهر النتائج؟" };
-TRANSLATIONS["sg.faq.a2"] = {
-  en: "Most people notice subtle energy changes within 1–2 weeks. For stamina and vitality benefits, consistent daily use for 4–8 weeks is recommended.",
-  ar: "يلاحظ معظم الناس تغيّراً في الطاقة خلال ١-٢ أسبوعاً. للحصول على فوائد القدرة والحيوية يُنصح بالاستخدام اليومي المنتظم لمدة ٤-٨ أسابيع.",
-};
-TRANSLATIONS["sg.faq.q3"] = { en: "Is it safe? Any side effects?", ar: "هل هو آمن؟ هل له آثار جانبية؟" };
-TRANSLATIONS["sg.faq.a3"] = {
-  en: "When taken at the recommended dose it is generally well tolerated. If you have a medical condition, take medication, or are pregnant/nursing, consult your doctor before use.",
-  ar: "عند تناول الجرعة الموصى بها يُتحمَّل عموماً بشكل جيد. إذا كان لديك حالة طبية أو تتناول أدوية، أو حامل/مرضعة، استشر طبيبك قبل الاستخدام.",
-};
-TRANSLATIONS["sg.faq.q4"] = { en: "Can women take it?", ar: "هل يمكن للنساء تناوله؟" };
-TRANSLATIONS["sg.faq.a4"] = {
-  en: "Shilajit Gold is formulated with men's wellness in mind. Women who are interested in Shilajit should choose a women-specific formula and consult a healthcare professional.",
-  ar: "شيلاجيت جولد مصمم لعافية الرجل. النساء الراغبات بالشيلاجيت عليهن اختيار تركيبة مخصصة للنساء واستشارة مختص.",
-};
-TRANSLATIONS["sg.faq.q5"] = { en: "How should I store it?", ar: "كيف أُخزّنه؟" };
-TRANSLATIONS["sg.faq.a5"] = {
-  en: "Store in a cool, dry place away from direct sunlight and moisture. Keep out of reach of children.",
-  ar: "يُخزّن في مكان بارد وجاف بعيداً عن أشعة الشمس المباشرة والرطوبة. يُحفظ بعيداً عن متناول الأطفال.",
-};
-TRANSLATIONS["sg.faq.q6"] = { en: "Is this the authentic product?", ar: "هل هذا المنتج أصلي؟" };
-TRANSLATIONS["sg.faq.a6"] = {
-  en: "Yes. Curemed is an authorised distributor for Kapiva in Kuwait — every pack is genuine and sourced directly from the brand.",
-  ar: "نعم. كيورميد هي الموزّع المعتمد لكابيفا في الكويت — كل عبوة أصلية ومصدرها مباشر من العلامة.",
-};
+TRANSLATIONS["landing.cta.title"] = { en: "Ready to order?", ar: "جاهز للطلب؟" };
+TRANSLATIONS["landing.cta.subtitle"] = { en: "Delivered across Kuwait.", ar: "توصيل لجميع مناطق الكويت." };
 
 interface Ctx {
   lang: Lang;
