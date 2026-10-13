@@ -20,9 +20,33 @@ type StockFilter = "all" | "in_stock" | "low_stock" | "out_of_stock";
 
 const STOCK_ORDER: Record<string, number> = { in_stock: 0, low_stock: 1, out_of_stock: 2 };
 
+/* Search, filters and sort survive leaving the table (editing a product, switching admin pages, reloading). */
+const FILTERS_KEY = "admin.products.filters";
+
+interface StoredFilters {
+  q: string;
+  brand: string;
+  cats: string[];
+  priceMin: string;
+  priceMax: string;
+  featured: FeaturedFilter;
+  stock: StockFilter;
+  sort: { key: SortKey; dir: SortDir } | null;
+}
+
+function readStoredFilters(): Partial<StoredFilters> {
+  try {
+    const raw = localStorage.getItem(FILTERS_KEY);
+    return raw ? (JSON.parse(raw) as Partial<StoredFilters>) : {};
+  } catch {
+    return {};
+  }
+}
+
 export default function AdminProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [q, setQ] = useState("");
+  const [stored] = useState(readStoredFilters);
+  const [q, setQ] = useState(stored.q ?? "");
   const { data: allProducts = [] } = useProducts();
   const { data: categories = [] } = useCategories();
   const del = useDeleteProduct();
@@ -31,12 +55,30 @@ export default function AdminProducts() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const brandFilter = searchParams.get("brand") || "all";
 
-  const [catFilter, setCatFilter] = useState<Set<string>>(new Set());
-  const [priceMin, setPriceMin] = useState<string>("");
-  const [priceMax, setPriceMax] = useState<string>("");
-  const [featuredFilter, setFeaturedFilter] = useState<FeaturedFilter>("all");
-  const [stockFilter, setStockFilter] = useState<StockFilter>("all");
-  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(null);
+  const [catFilter, setCatFilter] = useState<Set<string>>(() => new Set(stored.cats ?? []));
+  const [priceMin, setPriceMin] = useState<string>(stored.priceMin ?? "");
+  const [priceMax, setPriceMax] = useState<string>(stored.priceMax ?? "");
+  const [featuredFilter, setFeaturedFilter] = useState<FeaturedFilter>(stored.featured ?? "all");
+  const [stockFilter, setStockFilter] = useState<StockFilter>(stored.stock ?? "all");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir } | null>(stored.sort ?? null);
+
+  // The sidebar link drops ?brand=, so restore the last brand when the URL has none.
+  useEffect(() => {
+    if (!searchParams.get("brand") && stored.brand && stored.brand !== "all") {
+      const next = new URLSearchParams(searchParams);
+      next.set("brand", stored.brand);
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const data: StoredFilters = {
+      q, brand: brandFilter, cats: Array.from(catFilter), priceMin, priceMax,
+      featured: featuredFilter, stock: stockFilter, sort,
+    };
+    try { localStorage.setItem(FILTERS_KEY, JSON.stringify(data)); } catch { /* storage unavailable */ }
+  }, [q, brandFilter, catFilter, priceMin, priceMax, featuredFilter, stockFilter, sort]);
 
   // Products narrowed by brand only — used to compute category counts
   const brandScoped = useMemo(
