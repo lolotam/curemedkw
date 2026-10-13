@@ -20,6 +20,28 @@ export function useAdminSession(): AdminSession {
 
   useEffect(() => {
     let active = true;
+    // The user whose admin role has been (or is being) checked. Supabase fires
+    // auth events on tab focus, token refresh and when another tab signs in —
+    // re-checking (and flipping back to "loading") for the same user would
+    // unmount every admin page and wipe its state, so only a new user triggers it.
+    let checkedUid: string | null = null;
+
+    const applyUser = (u: User | null) => {
+      if (!active) return;
+      // Keep the previous object when only the token changed, so consumers don't re-render.
+      setUser((prev) => (prev?.id === u?.id ? prev : u));
+      if (!u) {
+        checkedUid = null;
+        setIsAdmin(false);
+        setRoleLoading(false);
+        return;
+      }
+      if (u.id === checkedUid) return;
+      checkedUid = u.id;
+      setRoleLoading(true);
+      // Defer the role lookup so the auth listener can return synchronously
+      setTimeout(() => { void checkRole(u.id); }, 0);
+    };
 
     const checkRole = async (uid: string) => {
       const { data } = await supabase
@@ -28,36 +50,20 @@ export function useAdminSession(): AdminSession {
         .eq("user_id", uid)
         .eq("role", "admin")
         .maybeSingle();
-      if (!active) return;
+      if (!active || uid !== checkedUid) return;
       setIsAdmin(!!data);
       setRoleLoading(false);
     };
 
     // Subscribe FIRST, then fetch the initial session (avoids race conditions)
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const u = session?.user ?? null;
-      setUser(u);
-      if (u) {
-        setRoleLoading(true);
-        // Defer the role lookup so the auth listener can return synchronously
-        setTimeout(() => { void checkRole(u.id); }, 0);
-      } else {
-        setIsAdmin(false);
-        setRoleLoading(false);
-      }
+      applyUser(session?.user ?? null);
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      const u = session?.user ?? null;
       if (!active) return;
-      setUser(u);
+      applyUser(session?.user ?? null);
       setSessionLoading(false);
-      if (u) {
-        setRoleLoading(true);
-        void checkRole(u.id);
-      } else {
-        setRoleLoading(false);
-      }
     });
 
     return () => {
