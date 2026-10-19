@@ -32,8 +32,8 @@ In `src/components/site/FAQ.tsx`, halve the collapsed question row height by red
 
 ## Verification
 - Build passes.
-- Playwright check at mobile (390px) confirms the category row's scroll position advances over time.
-- Visual screenshots of the Featured row (desktop + mobile) and the FAQ list confirm the new look and the reduced row height.
+- Pending: Playwright check at mobile (390px) confirms the category row's scroll position advances over time.
+- Pending: Visual screenshots of the Featured row (desktop + mobile) and the FAQ list confirm the new look and the reduced row height.
 
 ## Technical notes
 - No backend/database/migration changes — this is frontend/presentation only.

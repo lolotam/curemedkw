@@ -412,7 +412,7 @@ function FeaturedGlassCard({
       <div className="relative h-64 md:h-72 w-full overflow-hidden rounded-t-[2.5rem]">
         <div
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-tr from-brand-soft via-transparent to-brand-soft/40"
+          className="absolute inset-0 bg-gradient-to-tr from-[hsl(var(--brand-bg))] via-transparent to-[hsl(var(--brand-bg)/0.4)]"
         />
         {hoverCfg.mode === "loop" && images.length > 1 ? (
           images.map((src, i) => (

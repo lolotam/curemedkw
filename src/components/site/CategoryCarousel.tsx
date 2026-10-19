@@ -81,6 +81,8 @@ export function CategoryCarousel() {
 
   if (active.length === 0) return null;
 
+  const items = categoriesAutoscroll ? [...active, ...active] : active;
+
   return (
     <section className="bg-muted/30 py-14 md:py-20">
       <div className="container">
@@ -91,7 +93,7 @@ export function CategoryCarousel() {
       </div>
 
       <div
-        className="group relative overflow-hidden"
+        className="group relative overflow-hidden motion-reduce:overflow-x-auto"
         style={{
           maskImage:
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
@@ -103,16 +105,16 @@ export function CategoryCarousel() {
             disabled by the admin flag, fall back to a manually swipeable row. */}
         <div
           className={cn(
-            "flex w-max py-2",
+            "flex py-2",
             categoriesAutoscroll
-              ? "cat-marquee group-hover:[animation-play-state:paused]"
-              : "overflow-x-auto no-scrollbar",
+              ? "w-max cat-marquee group-hover:[animation-play-state:paused]"
+              : "w-full overflow-x-auto no-scrollbar",
           )}
         >
-          {[...active, ...active].map((c, i) => {
+          {items.map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
-            const isClone = i >= active.length;
+            const isClone = categoriesAutoscroll && i >= active.length;
             return (
               <div
                 key={`${c.id}-${i}`}

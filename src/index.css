@@ -402,6 +402,9 @@ All colors MUST be HSL.
 
   /* Respect users who prefer reduced motion — reveal instantly, no transform */
   @media (prefers-reduced-motion: reduce) {
+    .cat-marquee, [dir="rtl"] .cat-marquee {
+      animation: none !important;
+    }
     .reveal {
       opacity: 1 !important;
       transform: none !important;
