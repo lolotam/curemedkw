@@ -90,6 +90,57 @@ describe("HeroSlider", () => {
     expect(firstDot.closest("section")).toBe(carousel);
   });
 
+  it("sizes an image-only hero by the image ratio on phones and keeps the viewport height from md up", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: null })),
+    );
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    await screen.findAllByAltText("Hero slide");
+    const carousel = container.querySelector('section[aria-roledescription="carousel"]');
+    expect(carousel).toHaveClass(
+      "aspect-[var(--hero-aspect)]",
+      "md:aspect-auto",
+      "md:h-[calc(100dvh-4rem)]",
+      "md:min-h-[480px]",
+    );
+    expect(carousel).not.toHaveClass("h-[calc(100dvh-4rem)]", "min-h-[480px]");
+    expect(carousel).toHaveAttribute("style", expect.stringContaining("--hero-aspect"));
+
+    const [overlayDot, belowDot] = screen.getAllByRole("button", { name: "Go to slide 1" });
+    expect(overlayDot.closest("section")).toBe(carousel);
+    expect(overlayDot.closest(".hidden.md\\:block")).not.toBeNull();
+    expect(belowDot.closest("section")).toBeNull();
+    expect(belowDot.closest(".md\\:hidden")).not.toBeNull();
+  });
+
+  it("keeps the full viewport height on every screen when a slide has overlay text", async () => {
+    mocks.listSlidesForPage.mockResolvedValue([
+      { ...heroSlides[0], title_en: null },
+      heroSlides[1],
+    ]);
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    await screen.findByAltText("Hero two");
+    const carousel = container.querySelector('section[aria-roledescription="carousel"]');
+    expect(carousel).toHaveClass("h-[calc(100dvh-4rem)]", "min-h-[480px]");
+    expect(carousel).not.toHaveClass("aspect-[var(--hero-aspect)]");
+  });
+
+  it("ignores overlay text written only for the other language", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: "  ", title_ar: "شريحة جديدة" })),
+    );
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    await screen.findAllByRole("img", { hidden: true });
+    const carousel = container.querySelector('section[aria-roledescription="carousel"]');
+    expect(carousel).toHaveClass("aspect-[var(--hero-aspect)]");
+  });
+
   it("uses the previous aspect-ratio layout when selected globally", async () => {
     mocks.heroLayoutMode = "aspect_ratio";
 
