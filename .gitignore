@@ -28,3 +28,6 @@ edge-secrets*.json
 *.secrets.json
 .env.production.local
 /etc/curemed/
+
+# Handover checklist with live credentials — keep outside the repo, never commit
+curemed.md
