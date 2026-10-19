@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useCategories, useProducts, useSiteSetting } from "@/lib/db";
 import { cn } from "@/lib/utils";
-
+import { AutoScrollMarquee } from "@/components/site/AutoScrollMarquee";
 
 type HomeCarouselAutoscroll = { brands: boolean; categories: boolean };
 const AUTOSCROLL_DEFAULT: HomeCarouselAutoscroll = { brands: true, categories: true };
@@ -81,8 +81,6 @@ export function CategoryCarousel() {
 
   if (active.length === 0) return null;
 
-  const items = categoriesAutoscroll ? [...active, ...active] : active;
-
   return (
     <section className="bg-muted/30 py-14 md:py-20">
       <div className="container">
@@ -93,7 +91,7 @@ export function CategoryCarousel() {
       </div>
 
       <div
-        className="group relative overflow-hidden motion-reduce:overflow-x-auto"
+        className="group relative"
         style={{
           maskImage:
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
@@ -101,20 +99,11 @@ export function CategoryCarousel() {
             "linear-gradient(to right, transparent, black 6%, black 94%, transparent)",
         }}
       >
-        {/* CSS-animation marquee (reliable on mobile). When auto-scroll is
-            disabled by the admin flag, fall back to a manually swipeable row. */}
-        <div
-          className={cn(
-            "flex py-2",
-            categoriesAutoscroll
-              ? "w-max cat-marquee group-hover:[animation-play-state:paused]"
-              : "w-full overflow-x-auto no-scrollbar",
-          )}
-        >
-          {items.map((c, i) => {
+        <AutoScrollMarquee autoScroll={categoriesAutoscroll} speed={55} innerClassName="py-2">
+          {[...active, ...active].map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
-            const isClone = categoriesAutoscroll && i >= active.length;
+            const isClone = i >= active.length;
             return (
               <div
                 key={`${c.id}-${i}`}
@@ -191,7 +180,7 @@ export function CategoryCarousel() {
               </div>
             );
           })}
-        </div>
+        </AutoScrollMarquee>
       </div>
     </section>
   );
