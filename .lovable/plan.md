@@ -1,67 +1,40 @@
-# Order Notification Workflow
+# Home page polish — 3 tasks
 
-When a customer's payment is confirmed by MyFatoorah, the system fires three notifications exactly once:
+## 1. Restyle "Featured products" cards (Prismatic Glass Editorial)
 
-1. **Email** to a main recipient + CC list — full order details/invoice.
-2. **WhatsApp to the buyer** — order confirmation.
-3. **WhatsApp to your company numbers** — new-order alert.
+Rework `FeaturedGlassCard` in `src/pages/CuremedHome.tsx` to match the selected direction. The marquee auto-scroll motion is untouched — only the card visuals change.
 
-All triggered server-side on **payment success** (not at checkout), so abandoned/unpaid orders never generate notifications.
+New card anatomy:
+- Rounded `2.5rem` card on a solid `bg-card` surface with a thin `border-border` and a soft elevated shadow (lifts further on hover, `-translate-y-2`).
+- **Image zone** (top ~300px): product image *contained* (not full-bleed) over a subtle diagonal brand-tint gradient, with the existing hover zoom and the existing loop/swap hover image behaviour preserved.
+- **Glass info strip** (bottom, inset, rounded `2rem`, frosted blur): keeps the admin-controlled glass opacity. Contains:
+  - brand eyebrow label (small, uppercase, brand color)
+  - product name (1 line, `line-clamp-1`)
+  - price in KD with optional struck-through original price
+  - round add-to-cart button
+- Discount badge moves to the top corner as a soft pill (RTL-aware placement).
 
-```text
-Customer pays ──▶ MyFatoorah confirms
-                      │
-        verify-myfatoorah-payment  /  myfatoorah-webhook
-                      │
-              apply-payment (success, first time only)
-            ┌─────────┼───────────────┐
-        Email(SMTP)  WhatsApp buyer  WhatsApp company
-```
+Colors use semantic tokens (`bg-card`, `text-foreground`, `border-border`, `text-brand`, `bg-brand`) so it respects light/dark mode, RTL, and each brand's theme — not the literal teal/violet from the preview. Card footprint (~`w-72 md:w-80`) stays so the marquee layout is unchanged.
 
-## What changes
+## 2. Fix "Shop by Category" auto-scroll on mobile
 
-### 1. Trigger point (single source of truth)
-- Hook the dispatch into `supabase/functions/_shared/apply-payment.ts`, right after a payment is marked **paid for the first time** (`isSuccess && changed && order_notified_at is null`).
-- Covers both the redirect callback (`verify-myfatoorah-payment`) and the `myfatoorah-webhook`, with de-duplication so notifications never double-fire.
-- **Remove** the current checkout-time WhatsApp block in `src/pages/Checkout.tsx` (it fires before payment).
+Root cause: the category row uses the JS-driven `AutoScrollMarquee` (writes `scrollLeft` every frame). On mobile it ends up frozen — no auto-scroll and no swipe — whereas the Featured row, which uses a pure CSS-animation marquee, scrolls fine on the same device.
 
-### 2. Email sending (self-host friendly, fully admin-configured)
-- New edge function `supabase/functions/send-order-email/index.ts` using an SMTP client (denomailer) — portable to your self-hosted backend.
-- **All SMTP settings come from the admin dashboard** (stored in DB, read by the function via service role) — no secrets required:
-  - Host, Port, Secure (TLS on/off)
-  - Username (email) + Password
-  - From name + From address
-- Builds an HTML order email (order number, customer, items, totals, delivery address, payment method, order link) and sends with **To = main recipient** and **CC = the CC list**.
-- `apply-payment` calls this function (and `send-whatsapp`) via internal `fetch` to `${SUPABASE_URL}/functions/v1/...` with the service-role key — identical on Lovable Cloud and self-hosted.
+Fix: switch `CategoryCarousel` (`src/components/site/CategoryCarousel.tsx`) to the same proven CSS-transform marquee approach the Featured row uses (the `.cat-marquee` keyframes already exist in `src/index.css`):
+- When auto-scroll is enabled (admin flag): render the doubled track inside an `overflow-hidden` wrapper animated with the CSS `cat-marquee` animation, paused on hover. This works reliably on mobile.
+- When the admin flag disables auto-scroll: render a plain horizontally-scrollable row (`overflow-x-auto`) so it can still be swiped.
 
-### 3. WhatsApp to the buyer
-- The `order.paid` template already exists in `send-whatsapp` but was never wired. Now sent to `order.customer_phone` on payment success.
-- The company alert (`admin.new_order`) is sent to your saved admin numbers at the same moment.
+This keeps the existing edge fade mask, palette tints, count badges, and the admin autoscroll toggle behavior intact.
 
-### 4. Admin settings UI (`/admin/whatsapp`)
-Add an **Order Email** card with:
-- Enable/disable toggle
-- **SMTP connection**: host, port, secure toggle, username (email), password (masked, edit-on-demand like the Postora key)
-- **Sender**: from name + from address
-- **Recipients**: main "To" address + a CC list (add/remove multiple)
-- A "Send test email" button
+## 3. Shorten FAQ question rows
 
-Stored in `site_settings` under a new key `order_email` — admin-only via existing RLS, **not** in the public read allowlist, so credentials are never exposed to the storefront.
+In `src/components/site/FAQ.tsx`, halve the collapsed question row height by reducing the `AccordionTrigger` vertical padding from `py-6 md:py-8` to roughly half (`py-3 md:py-4`) and trimming the number-badge/heading scale slightly so each closed question takes about half its current height. Open-state answer spacing stays readable.
 
-### 5. Single-send guarantee
-- Add `order_notified_at timestamptz` to `orders`. Notifications fire only when null, then it's stamped — preventing duplicates if both callback and webhook resolve the same payment.
-
-## Security note
-Because you want everything admin-editable, the SMTP password is stored in the database (in the admin-only `order_email` settings row, unreadable by the public/storefront and never sent to the browser except masked). This is the tradeoff for full dashboard control vs. server-only secrets — acceptable since the row is protected by admin RLS and only the edge function reads the raw value.
-
-## Self-hosted SQL (run on your Supabase)
-```sql
-ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS order_notified_at timestamptz;
-```
-Then deploy the new/updated edge functions (`send-order-email`, `verify-myfatoorah-payment`, `myfatoorah-webhook`, `send-whatsapp`) with your existing deploy script.
+## Verification
+- Build passes.
+- Pending: Playwright check at mobile (390px) confirms the category row's scroll position advances over time.
+- Pending: Visual screenshots of the Featured row (desktop + mobile) and the FAQ list confirm the new look and the reduced row height.
 
 ## Technical notes
-- Email/WhatsApp are best-effort and logged; failures never block payment confirmation.
-- `send-order-email` validates input with Zod and is only meaningfully callable with the service-role key from `apply-payment`.
-- WhatsApp respects the existing `whatsapp_integration` enable/event toggles.
-- No customer-facing payment/RLS behavior changes.
+- No backend/database/migration changes — this is frontend/presentation only.
+- Files touched: `src/pages/CuremedHome.tsx`, `src/components/site/CategoryCarousel.tsx`, `src/components/site/FAQ.tsx` (and `src/index.css` only if the marquee keyframe needs a minor tweak).
