@@ -37,6 +37,8 @@ interface MarqueeLoop {
 interface MarqueeInteraction {
   hovering: boolean;
   touching: boolean;
+  /** A finger is on the screen, even while the browser scrolls the row. */
+  touchActive: boolean;
   pointerDown: boolean;
   focused: boolean;
   /** Timestamp until which the animation stays paused. */
@@ -114,8 +116,8 @@ interface InteractionBindings {
   scroller: HTMLElement;
   interaction: MarqueeInteraction;
   resumeDelay: number;
-  /** Called when the keyboard focus leaves the row. */
-  onFocusLeave: () => void;
+  /** Called when the row may settle into its middle range again. */
+  onSettle: () => void;
 }
 
 /**
@@ -123,7 +125,7 @@ interface InteractionBindings {
  * user is interacting with it. Returns the cleanup for those listeners.
  */
 function bindInteractions(bindings: InteractionBindings): () => void {
-  const { scroller, interaction, resumeDelay, onFocusLeave } = bindings;
+  const { scroller, interaction, resumeDelay, onSettle } = bindings;
   let resumeTimer = 0;
 
   const onPointerEnter = (event: PointerEvent) => {
@@ -149,15 +151,20 @@ function bindInteractions(bindings: InteractionBindings): () => void {
 
   const onTouchStart = () => {
     interaction.touching = true;
+    interaction.touchActive = true;
     window.clearTimeout(resumeTimer);
   };
 
   const onTouchEnd = () => {
+    // A native pan cancels the pointer, but the finger is still on the row.
+    interaction.touchActive = false;
     interaction.pausedUntil = performance.now() + resumeDelay;
     window.clearTimeout(resumeTimer);
     resumeTimer = window.setTimeout(() => {
       interaction.touching = false;
     }, resumeDelay);
+    // The gesture is over: the row may settle again.
+    onSettle();
   };
 
   const onFocusIn = (event: FocusEvent) => {
@@ -171,7 +178,12 @@ function bindInteractions(bindings: InteractionBindings): () => void {
     } catch {
       keyboardVisible = false;
     }
-    if (keyboardVisible) interaction.focused = true;
+    const wasFocused = interaction.focused;
+    interaction.focused = keyboardVisible;
+    if (wasFocused && !keyboardVisible) {
+      // The row no longer holds a keyboard focus.
+      onSettle();
+    }
   };
 
   const onFocusOut = (event: FocusEvent) => {
@@ -180,7 +192,7 @@ function bindInteractions(bindings: InteractionBindings): () => void {
     interaction.focused = false;
     interaction.pausedUntil = performance.now() + resumeDelay;
     // The row may now move the focused link out of the way.
-    onFocusLeave();
+    onSettle();
   };
 
   scroller.addEventListener("pointerenter", onPointerEnter);
@@ -244,6 +256,7 @@ export function AutoScrollMarquee({
   const interactionRef = useRef<MarqueeInteraction>({
     hovering: false,
     touching: false,
+    touchActive: false,
     pointerDown: false,
     focused: false,
     pausedUntil: 0,
@@ -305,6 +318,16 @@ export function AutoScrollMarquee({
     // A row that does not animate is a plain strip: leave it where it is.
     if (!loop.animating) return;
 
+    const scroller = scrollerRef.current;
+
+    if (previousPeriod > 0 && interactionRef.current.focused) {
+      // Keyboard focus is inside the row: the focused link must stay where it
+      // is, so the offset is taken from the element and nothing is written.
+      // The settle normalises it once the focus leaves.
+      if (scroller) loop.position = toLogical(scroller.scrollLeft, loop.isRtl);
+      return;
+    }
+
     if (previousPeriod <= 0) {
       // First measurement: start in the middle of the track.
       loop.position = copyWidth;
@@ -313,7 +336,6 @@ export function AutoScrollMarquee({
       loop.position = copyWidth * (1 + placeInCopy(loop.position, previousPeriod));
     }
 
-    const scroller = scrollerRef.current;
     if (scroller) writePosition(scroller, loop, loop.position);
   }, [copyWidth]);
 
@@ -330,6 +352,8 @@ export function AutoScrollMarquee({
     const settlePosition = () => {
       // Never normalise while a pointer is down: the row is still being dragged.
       if (interaction.pointerDown) return;
+      // A finger may still be on the screen while the browser scrolls the row.
+      if (interaction.touchActive) return;
       // A keyboard focus inside the row must stay visible, so the offset is
       // left alone until the focus leaves.
       if (interaction.focused) return;
@@ -410,11 +434,15 @@ export function AutoScrollMarquee({
       scroller,
       interaction: interactionRef.current,
       resumeDelay,
-      onFocusLeave: () => scheduleSettleRef.current(),
+      onSettle: () => scheduleSettleRef.current(),
     });
   }, [resumeDelay]);
 
   const copies = copiesNeeded(clientWidth, copyWidth, animating);
+  // An animating row shows the middle of the track, so the copy sitting there
+  // is the real one; the others repeat it for the wrap. A row that does not
+  // animate has a single copy, which is the real one.
+  const realCopyIndex = copies > 1 ? 1 : 0;
 
   return (
     <div
@@ -435,10 +463,10 @@ export function AutoScrollMarquee({
             key={index}
             ref={index === 0 ? copyRef : undefined}
             data-marquee-copy={index}
-            aria-hidden={index > 0 ? "true" : undefined}
+            aria-hidden={index === realCopyIndex ? undefined : "true"}
             className="flex shrink-0"
           >
-            {children({ index, isClone: index > 0 })}
+            {children({ index, isClone: index !== realCopyIndex })}
           </div>
         ))}
       </div>
