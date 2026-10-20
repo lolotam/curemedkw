@@ -26,31 +26,40 @@ function wrapIntoRange(value: number, period: number): number {
 }
 
 /**
- * Moves a logical position by `delta` and wraps it back into [0, period).
- * The position stays a float so sub-pixel steps are not lost.
+ * Advances a logical position by `delta` and keeps it inside the middle range
+ * [period, 2 * period). Living in the middle leaves a full copy of room before
+ * either physical edge, so a swipe never runs into one of them. The position
+ * stays a float so sub-pixel steps are not lost.
  */
 export function advance(position: number, delta: number, period: number): number {
   if (period <= 0) return position;
-  return wrapIntoRange(position + delta, period);
+  return period + wrapIntoRange(position - period + delta, period);
 }
 
 /**
- * Maps a position that came from the element back onto the track: the start
- * edge moves on to the period (the same pixels, so the user can keep scrolling
- * backwards) and anything past the period wraps forward.
+ * Maps a position onto the middle range [period, 2 * period): one below the
+ * range moves up by whole periods, one above it moves down. The result shows
+ * the same pixels, because the copies repeat every period.
  */
-export function wrapManual(position: number, period: number): number {
+export function normalizeToMiddle(position: number, period: number): number {
   if (period <= 0) return position;
-  if (position <= 0) return period;
-  return wrapIntoRange(position, period);
+  if (position < period) {
+    const periods = Math.ceil((period - position) / period);
+    return position + periods * period;
+  }
+  if (position >= 2 * period) {
+    const periods = Math.floor((position - period) / period);
+    return position - periods * period;
+  }
+  return position;
 }
 
 /**
  * Number of copies the marquee has to render: enough to fill the viewport and
- * still leave one full copy of travel, so the wrap never shows a gap.
+ * to keep the middle range reachable, so the wrap never shows a gap.
  */
 export function copiesNeeded(clientWidth: number, copyWidth: number, enabled: boolean): number {
   if (!enabled) return 1;
-  if (copyWidth <= 0) return 2;
-  return Math.max(2, Math.ceil(clientWidth / copyWidth) + 1);
+  if (copyWidth <= 0) return 3;
+  return Math.max(3, Math.ceil(clientWidth / copyWidth) + 2);
 }

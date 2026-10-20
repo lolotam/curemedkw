@@ -3,9 +3,9 @@ import { cn } from "@/lib/utils";
 import {
   advance,
   copiesNeeded,
+  normalizeToMiddle,
   toLogical,
   toPhysical,
-  wrapManual,
 } from "./autoScrollMath";
 
 /** Longest frame delta honoured, so a backgrounded tab does not jump the row. */
@@ -14,9 +14,12 @@ const MAX_FRAME_SECONDS = 0.1;
 /** Scroll drift (px) that is still attributed to the marquee's own write. */
 const OWN_WRITE_TOLERANCE = 2;
 
+/** Delay (ms) after the last scroll event that marks a user scroll as settled. */
+const SETTLE_DELAY_MS = 150;
+
 /** Mutable state of the animation loop. */
 interface MarqueeLoop {
-  /** Logical float position; the source of truth while animating. */
+  /** Logical offset of the row; kept inside [period, 2 * period) while animating. */
   position: number;
   /** Logical value the loop wrote last, used to recognise user scrolls. */
   lastWritten: number;
@@ -24,6 +27,8 @@ interface MarqueeLoop {
   period: number;
   /** Whether the scroller currently scrolls right-to-left. */
   isRtl: boolean;
+  /** Set when the writing direction changed, so the row can restart. */
+  directionChanged: boolean;
   /** Whether the row may animate at all. */
   animating: boolean;
 }
@@ -81,6 +86,29 @@ function readDirection(el: HTMLElement): boolean {
   return window.getComputedStyle(el).direction === "rtl";
 }
 
+/**
+ * Reads the scroller's writing direction and remembers it, so every later
+ * read and write uses the same direction. Reports whether it changed.
+ */
+function syncDirection(scroller: HTMLElement, loop: MarqueeLoop): boolean {
+  const isRtl = readDirection(scroller);
+  if (isRtl === loop.isRtl) return false;
+  loop.isRtl = isRtl;
+  loop.directionChanged = true;
+  return true;
+}
+
+/** The place inside a copy, as a fraction of the copy's width. */
+function placeInCopy(position: number, period: number): number {
+  return (((position % period) + period) % period) / period;
+}
+
+/** Writes a logical offset to the scroller and remembers it as our own write. */
+function writePosition(scroller: HTMLElement, loop: MarqueeLoop, logical: number): void {
+  scroller.scrollLeft = toPhysical(logical, loop.isRtl);
+  loop.lastWritten = logical;
+}
+
 /** What {@link bindInteractions} needs to wire the pause behaviour. */
 interface InteractionBindings {
   scroller: HTMLElement;
@@ -130,8 +158,18 @@ function bindInteractions(bindings: InteractionBindings): () => void {
     }, resumeDelay);
   };
 
-  const onFocusIn = () => {
-    interaction.focused = true;
+  const onFocusIn = (event: FocusEvent) => {
+    // A mouse press focuses a link as well, and the link keeps the focus
+    // afterwards; only a keyboard focus may pause the row.
+    const target = event.target as Element | null;
+    if (!target) return;
+    let keyboardVisible = false;
+    try {
+      keyboardVisible = target.matches(":focus-visible");
+    } catch {
+      keyboardVisible = false;
+    }
+    if (keyboardVisible) interaction.focused = true;
   };
 
   const onFocusOut = (event: FocusEvent) => {
@@ -195,6 +233,7 @@ export function AutoScrollMarquee({
     lastWritten: 0,
     period: 0,
     isRtl: false,
+    directionChanged: false,
     animating,
   });
 
@@ -207,12 +246,22 @@ export function AutoScrollMarquee({
   });
 
   useEffect(() => {
-    loopRef.current.animating = animating;
-  }, [animating]);
+    const loop = loopRef.current;
+    loop.animating = animating;
 
-  useEffect(() => {
-    loopRef.current.period = copyWidth;
-  }, [copyWidth]);
+    const scroller = scrollerRef.current;
+    if (!scroller || loop.period <= 0) return;
+
+    if (!animating) {
+      // The row is a plain strip now: show the remaining copy from its start.
+      loop.position = 0;
+      writePosition(scroller, loop, 0);
+      return;
+    }
+    // The row starts animating: place it in the middle of the track.
+    loop.position = loop.period * (1 + placeInCopy(loop.position, loop.period));
+    writePosition(scroller, loop, loop.position);
+  }, [animating]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -240,6 +289,27 @@ export function AutoScrollMarquee({
   }, []);
 
   useEffect(() => {
+    const loop = loopRef.current;
+    const previousPeriod = loop.period;
+    loop.period = copyWidth;
+    if (copyWidth <= 0) return;
+
+    // A row that does not animate is a plain strip: leave it where it is.
+    if (!loop.animating) return;
+
+    if (previousPeriod <= 0) {
+      // First measurement: start in the middle of the track.
+      loop.position = copyWidth;
+    } else {
+      // Keep the same place inside the copy, so a resize does not jump the row.
+      loop.position = copyWidth * (1 + placeInCopy(loop.position, previousPeriod));
+    }
+
+    const scroller = scrollerRef.current;
+    if (scroller) writePosition(scroller, loop, loop.position);
+  }, [copyWidth]);
+
+  useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
 
@@ -247,11 +317,22 @@ export function AutoScrollMarquee({
 
     let lastFrame = performance.now();
     let frameId = 0;
+    let settleTimer = 0;
 
-    const writePosition = (logical: number) => {
+    const settlePosition = () => {
+      // Never normalise while a pointer is down: the row is still being dragged.
+      if (interaction.pointerDown) return;
       const loop = loopRef.current;
-      scroller.scrollLeft = toPhysical(logical, loop.isRtl);
-      loop.lastWritten = logical;
+      if (!loop.animating || loop.period <= 0) return;
+      const settled = normalizeToMiddle(loop.position, loop.period);
+      if (settled === loop.position) return;
+      loop.position = settled;
+      writePosition(scroller, loop, settled);
+    };
+
+    const scheduleSettle = () => {
+      window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(settlePosition, SETTLE_DELAY_MS);
     };
 
     const tick = (now: number) => {
@@ -259,18 +340,17 @@ export function AutoScrollMarquee({
       lastFrame = now;
 
       const loop = loopRef.current;
-      const isRtl = readDirection(scroller);
-      if (isRtl !== loop.isRtl) {
-        // The document changed language: restart from the start edge.
-        loop.isRtl = isRtl;
-        loop.position = 0;
-        writePosition(0);
-      }
-
       if (loop.animating && loop.period > 0 && !isPaused(interaction, now)) {
+        // The direction is only read on frames where the row actually advances.
+        syncDirection(scroller, loop);
+        if (loop.directionChanged) {
+          // The document changed language: restart at the start of the range.
+          loop.directionChanged = false;
+          loop.position = loop.period;
+        }
         const travel = direction === "ltr" ? speed : -speed;
         loop.position = advance(loop.position, travel * dt, loop.period);
-        writePosition(loop.position);
+        writePosition(scroller, loop, loop.position);
       }
 
       frameId = requestAnimationFrame(tick);
@@ -280,27 +360,33 @@ export function AutoScrollMarquee({
 
     const onScroll = () => {
       const loop = loopRef.current;
+      // The direction is read before converting, so the offset is right even
+      // right after the document switched language.
+      syncDirection(scroller, loop);
       const logical = toLogical(scroller.scrollLeft, loop.isRtl);
       if (Math.abs(logical - loop.lastWritten) <= OWN_WRITE_TOLERANCE) return;
 
-      // The user moved the row: the element wins over the animation.
+      // The user moved the row: the element wins over the animation. Nothing
+      // is written back while the user scrolls, because a write during a fling
+      // is dropped by mobile browsers.
       loop.position = logical;
       interaction.pausedUntil = performance.now() + resumeDelay;
+      scheduleSettle();
+    };
 
-      if (!loop.animating || loop.period <= 0) return;
-      // Keep the row endless in both directions: the start edge moves on to
-      // the period, anything past the period wraps forward.
-      const wrapped = wrapManual(logical, loop.period);
-      if (wrapped === logical) return;
-      loop.position = wrapped;
-      writePosition(wrapped);
+    const onScrollEnd = () => {
+      window.clearTimeout(settleTimer);
+      settlePosition();
     };
 
     scroller.addEventListener("scroll", onScroll, { passive: true });
+    scroller.addEventListener("scrollend", onScrollEnd);
 
     return () => {
       cancelAnimationFrame(frameId);
+      window.clearTimeout(settleTimer);
       scroller.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("scrollend", onScrollEnd);
     };
   }, [speed, direction, resumeDelay]);
 
