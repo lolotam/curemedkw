@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { advance, toLogical, toPhysical } from "@/components/site/autoScrollMath";
 
 interface AutoScrollMarqueeProps {
   /** Whether auto-scroll is enabled. When false, the strip is static but still
@@ -36,6 +37,14 @@ export function AutoScrollMarquee({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
+  // Logical (content-order) position of the scroller. It lives here at
+  // sub-pixel precision because scrollLeft reads back whole pixels, so a
+  // step worth less than half a pixel would be lost on every frame.
+  const positionRef = useRef(0);
+  // The logical value the scroller is known to hold, used to tell a user
+  // scroll apart from the animation writing to scrollLeft.
+  const lastWrittenRef = useRef(0);
+
   // Mutable interaction flags so the rAF loop stays stable.
   const stateRef = useRef({
     autoScroll,
@@ -63,16 +72,17 @@ export function AutoScrollMarquee({
     // and animate toward 0 (visually moves content to the right -> left in RTL).
     const initPosition = () => {
       const half = track.scrollWidth / 2;
-      if (direction === "rtl") {
-        el.scrollLeft = half;
-      } else {
-        el.scrollLeft = 0;
-      }
+      const isRtl = getComputedStyle(el).direction === "rtl";
+      const position = direction === "rtl" ? half : 0;
+      positionRef.current = position;
+      lastWrittenRef.current = position;
+      el.scrollLeft = toPhysical(position, isRtl);
     };
     initPosition();
 
     const tick = (now: number) => {
-      const dt = (now - last) / 1000;
+      // A stalled tab must not teleport the row when the next frame lands.
+      const dt = Math.min((now - last) / 1000, 0.1);
       last = now;
       const s = stateRef.current;
       const half = track.scrollWidth / 2;
@@ -86,16 +96,14 @@ export function AutoScrollMarquee({
         half <= 0;
 
       if (!interacting) {
-        const delta = speed * dt;
-        if (direction === "rtl") {
-          let next = el.scrollLeft - delta;
-          if (next <= 0) next += half;
-          el.scrollLeft = next;
-        } else {
-          let next = el.scrollLeft + delta;
-          if (next >= half) next -= half;
-          el.scrollLeft = next;
-        }
+        const isRtl = getComputedStyle(el).direction === "rtl";
+        const travel = direction === "rtl" ? -speed : speed;
+        // The position is the source of truth: scrollLeft is written, never
+        // read back, so a sub-pixel step is not swallowed by pixel snapping.
+        const position = advance(positionRef.current, travel * dt, half);
+        positionRef.current = position;
+        lastWrittenRef.current = position;
+        el.scrollLeft = toPhysical(position, isRtl);
       }
 
       rafId = requestAnimationFrame(tick);
@@ -132,11 +140,31 @@ export function AutoScrollMarquee({
       if (s.hovering || s.touching || s.pointerDown) {
         s.userScrollingUntil = performance.now() + resumeDelay;
       }
-      // Wrap manually to keep an infinite feel even during user scroll.
+
       const half = track.scrollWidth / 2;
-      if (half > 0) {
-        if (el.scrollLeft >= half * 2 - 1) el.scrollLeft -= half;
-        else if (el.scrollLeft <= 0) el.scrollLeft += half;
+      if (half <= 0) return;
+
+      const isRtl = getComputedStyle(el).direction === "rtl";
+      const logical = toLogical(el.scrollLeft, isRtl);
+
+      // A scroll that does not match what we wrote came from the user:
+      // adopt it as the new position so the animation resumes from there.
+      if (Math.abs(logical - lastWrittenRef.current) > 2) {
+        positionRef.current = logical;
+        lastWrittenRef.current = logical;
+      }
+
+      // Wrap manually to keep an infinite feel even during user scroll.
+      // The wrap works on the logical position, so it behaves the same in
+      // RTL, where scrollLeft counts down from 0 instead of up.
+      const current = positionRef.current;
+      let next = current;
+      if (next >= half * 2 - 1) next -= half;
+      else if (next <= 0) next += half;
+      if (next !== current) {
+        el.scrollLeft = toPhysical(next, isRtl);
+        positionRef.current = next;
+        lastWrittenRef.current = next;
       }
     };
 
