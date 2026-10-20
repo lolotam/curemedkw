@@ -137,6 +137,12 @@ export function AutoScrollMarquee({
     const onScroll = () => {
       // If scroll movement comes from user (wheel/drag), defer auto-scroll.
       const s = stateRef.current;
+      const animationIdle =
+        !s.autoScroll ||
+        s.hovering ||
+        s.touching ||
+        s.pointerDown ||
+        performance.now() < s.userScrollingUntil;
       if (s.hovering || s.touching || s.pointerDown) {
         s.userScrollingUntil = performance.now() + resumeDelay;
       }
@@ -147,9 +153,9 @@ export function AutoScrollMarquee({
       const isRtl = getComputedStyle(el).direction === "rtl";
       const logical = toLogical(el.scrollLeft, isRtl);
 
-      // A scroll that does not match what we wrote came from the user:
-      // adopt it as the new position so the animation resumes from there.
-      if (Math.abs(logical - lastWrittenRef.current) > 2) {
+      // While the animation is idle every scroll comes from the user; while it
+      // animates, only a scroll that differs from what we wrote did.
+      if (animationIdle || Math.abs(logical - lastWrittenRef.current) > 2) {
         positionRef.current = logical;
         lastWrittenRef.current = logical;
       }
