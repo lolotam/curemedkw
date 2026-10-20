@@ -1,22 +1,170 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  advance,
+  copiesNeeded,
+  toLogical,
+  toPhysical,
+  wrapManual,
+} from "./autoScrollMath";
+
+/** Longest frame delta honoured, so a backgrounded tab does not jump the row. */
+const MAX_FRAME_SECONDS = 0.1;
+
+/** Scroll drift (px) that is still attributed to the marquee's own write. */
+const OWN_WRITE_TOLERANCE = 2;
+
+/** Mutable state of the animation loop. */
+interface MarqueeLoop {
+  /** Logical float position; the source of truth while animating. */
+  position: number;
+  /** Logical value the loop wrote last, used to recognise user scrolls. */
+  lastWritten: number;
+  /** Wrap period: the measured width of one copy of the items. */
+  period: number;
+  /** Whether the scroller currently scrolls right-to-left. */
+  isRtl: boolean;
+  /** Whether the row may animate at all. */
+  animating: boolean;
+}
+
+/** Interaction flags that pause the animation. */
+interface MarqueeInteraction {
+  hovering: boolean;
+  touching: boolean;
+  pointerDown: boolean;
+  focused: boolean;
+  /** Timestamp until which the animation stays paused. */
+  pausedUntil: number;
+}
+
+/** Props of one rendered copy of the row's items. */
+interface MarqueeCopy {
+  /** Zero-based index of the copy. */
+  index: number;
+  /** True for every copy after the first one. */
+  isClone: boolean;
+}
 
 interface AutoScrollMarqueeProps {
-  /** Whether auto-scroll is enabled. When false, the strip is static but still
-   *  freely scrollable manually by touch/wheel/drag. */
+  /** Whether auto-scroll is enabled. When false the row is a plain, swipeable
+   *  strip without duplicates and without a wrap. */
   autoScroll: boolean;
   /** Pixels per second. */
   speed?: number;
-  /** Direction. "rtl" scrolls visually right-to-left of the duplicated track,
-   *  matching the previous CSS marquee. */
+  /** Direction of travel along the row's logical axis: "ltr" advances the items
+   *  in the order they are rendered, "rtl" runs them backwards. It is
+   *  independent of the document's `dir`, which only decides how the browser
+   *  reports `scrollLeft`. */
   direction?: "ltr" | "rtl";
-  /** Resume delay (ms) after user finishes interacting. */
+  /** Resume delay (ms) after the user finishes interacting. */
   resumeDelay?: number;
   className?: string;
   innerClassName?: string;
-  /** Pass already-duplicated children (e.g. [...items, ...items]) so the
-   *  scroller can wrap seamlessly at the half-width boundary. */
-  children: ReactNode;
+  /** Renders one copy of the items; the marquee duplicates it as needed. */
+  children: (copy: MarqueeCopy) => ReactNode;
+}
+
+/** True when the row must not animate because the user is interacting with it. */
+function isPaused(interaction: MarqueeInteraction, now: number): boolean {
+  return (
+    interaction.hovering ||
+    interaction.touching ||
+    interaction.pointerDown ||
+    interaction.focused ||
+    now < interaction.pausedUntil
+  );
+}
+
+/** True when the scroller scrolls right-to-left. */
+function readDirection(el: HTMLElement): boolean {
+  return window.getComputedStyle(el).direction === "rtl";
+}
+
+/** What {@link bindInteractions} needs to wire the pause behaviour. */
+interface InteractionBindings {
+  scroller: HTMLElement;
+  interaction: MarqueeInteraction;
+  resumeDelay: number;
+}
+
+/**
+ * Wires the pointer, touch and focus listeners that pause the row while the
+ * user is interacting with it. Returns the cleanup for those listeners.
+ */
+function bindInteractions(bindings: InteractionBindings): () => void {
+  const { scroller, interaction, resumeDelay } = bindings;
+  let resumeTimer = 0;
+
+  const onPointerEnter = (event: PointerEvent) => {
+    // A touch pointer enters the row too; only a mouse may pause it.
+    if (event.pointerType !== "mouse") return;
+    interaction.hovering = true;
+  };
+
+  const onPointerLeave = (event: PointerEvent) => {
+    if (event.pointerType !== "mouse") return;
+    interaction.hovering = false;
+  };
+
+  const onPointerDown = () => {
+    interaction.pointerDown = true;
+  };
+
+  const onPointerRelease = () => {
+    if (!interaction.pointerDown) return;
+    interaction.pointerDown = false;
+    interaction.pausedUntil = performance.now() + resumeDelay;
+  };
+
+  const onTouchStart = () => {
+    interaction.touching = true;
+    window.clearTimeout(resumeTimer);
+  };
+
+  const onTouchEnd = () => {
+    interaction.pausedUntil = performance.now() + resumeDelay;
+    window.clearTimeout(resumeTimer);
+    resumeTimer = window.setTimeout(() => {
+      interaction.touching = false;
+    }, resumeDelay);
+  };
+
+  const onFocusIn = () => {
+    interaction.focused = true;
+  };
+
+  const onFocusOut = (event: FocusEvent) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && scroller.contains(next)) return;
+    interaction.focused = false;
+    interaction.pausedUntil = performance.now() + resumeDelay;
+  };
+
+  scroller.addEventListener("pointerenter", onPointerEnter);
+  scroller.addEventListener("pointerleave", onPointerLeave);
+  scroller.addEventListener("pointerdown", onPointerDown);
+  scroller.addEventListener("touchstart", onTouchStart, { passive: true });
+  scroller.addEventListener("touchend", onTouchEnd, { passive: true });
+  scroller.addEventListener("touchcancel", onTouchEnd, { passive: true });
+  scroller.addEventListener("focusin", onFocusIn);
+  scroller.addEventListener("focusout", onFocusOut);
+  window.addEventListener("pointerup", onPointerRelease);
+  window.addEventListener("pointercancel", onPointerRelease);
+
+  return () => {
+    window.clearTimeout(resumeTimer);
+    scroller.removeEventListener("pointerenter", onPointerEnter);
+    scroller.removeEventListener("pointerleave", onPointerLeave);
+    scroller.removeEventListener("pointerdown", onPointerDown);
+    scroller.removeEventListener("touchstart", onTouchStart);
+    scroller.removeEventListener("touchend", onTouchEnd);
+    scroller.removeEventListener("touchcancel", onTouchEnd);
+    scroller.removeEventListener("focusin", onFocusIn);
+    scroller.removeEventListener("focusout", onFocusOut);
+    window.removeEventListener("pointerup", onPointerRelease);
+    window.removeEventListener("pointercancel", onPointerRelease);
+  };
 }
 
 /**
@@ -34,134 +182,139 @@ export function AutoScrollMarquee({
   children,
 }: AutoScrollMarqueeProps) {
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
+  const copyRef = useRef<HTMLDivElement>(null);
 
-  // Mutable interaction flags so the rAF loop stays stable.
-  const stateRef = useRef({
-    autoScroll,
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [copyWidth, setCopyWidth] = useState(0);
+  const [clientWidth, setClientWidth] = useState(0);
+
+  const animating = autoScroll && !reducedMotion;
+
+  const loopRef = useRef<MarqueeLoop>({
+    position: 0,
+    lastWritten: 0,
+    period: 0,
+    isRtl: false,
+    animating,
+  });
+
+  const interactionRef = useRef<MarqueeInteraction>({
     hovering: false,
     touching: false,
     pointerDown: false,
-    userScrollingUntil: 0,
-    resumeTimer: 0 as number | 0,
+    focused: false,
+    pausedUntil: 0,
   });
 
-  // Keep the latest autoScroll prop in the ref.
   useEffect(() => {
-    stateRef.current.autoScroll = autoScroll;
-  }, [autoScroll]);
+    loopRef.current.animating = animating;
+  }, [animating]);
 
   useEffect(() => {
-    const el = scrollerRef.current;
-    const track = trackRef.current;
-    if (!el || !track) return;
+    loopRef.current.period = copyWidth;
+  }, [copyWidth]);
 
-    let rafId = 0;
-    let last = performance.now();
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReducedMotion(query.matches);
+    sync();
+    query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
 
-    // Initialize scroll position for RTL so we start at the duplicate boundary
-    // and animate toward 0 (visually moves content to the right -> left in RTL).
-    const initPosition = () => {
-      const half = track.scrollWidth / 2;
-      if (direction === "rtl") {
-        el.scrollLeft = half;
-      } else {
-        el.scrollLeft = 0;
-      }
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const copy = copyRef.current;
+    if (!scroller || !copy) return;
+
+    const measure = () => {
+      setCopyWidth(copy.getBoundingClientRect().width);
+      setClientWidth(scroller.clientWidth);
     };
-    initPosition();
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(copy);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    const interaction = interactionRef.current;
+
+    let lastFrame = performance.now();
+    let frameId = 0;
+
+    const writePosition = (logical: number) => {
+      const loop = loopRef.current;
+      scroller.scrollLeft = toPhysical(logical, loop.isRtl);
+      loop.lastWritten = logical;
+    };
 
     const tick = (now: number) => {
-      const dt = (now - last) / 1000;
-      last = now;
-      const s = stateRef.current;
-      const half = track.scrollWidth / 2;
+      const dt = Math.min(Math.max((now - lastFrame) / 1000, 0), MAX_FRAME_SECONDS);
+      lastFrame = now;
 
-      const interacting =
-        !s.autoScroll ||
-        s.hovering ||
-        s.touching ||
-        s.pointerDown ||
-        now < s.userScrollingUntil ||
-        half <= 0;
-
-      if (!interacting) {
-        const delta = speed * dt;
-        if (direction === "rtl") {
-          let next = el.scrollLeft - delta;
-          if (next <= 0) next += half;
-          el.scrollLeft = next;
-        } else {
-          let next = el.scrollLeft + delta;
-          if (next >= half) next -= half;
-          el.scrollLeft = next;
-        }
+      const loop = loopRef.current;
+      const isRtl = readDirection(scroller);
+      if (isRtl !== loop.isRtl) {
+        // The document changed language: restart from the start edge.
+        loop.isRtl = isRtl;
+        loop.position = 0;
+        writePosition(0);
       }
 
-      rafId = requestAnimationFrame(tick);
-    };
-    rafId = requestAnimationFrame(tick);
+      if (loop.animating && loop.period > 0 && !isPaused(interaction, now)) {
+        const travel = direction === "ltr" ? speed : -speed;
+        loop.position = advance(loop.position, travel * dt, loop.period);
+        writePosition(loop.position);
+      }
 
-    const onPointerEnter = () => {
-      stateRef.current.hovering = true;
+      frameId = requestAnimationFrame(tick);
     };
-    const onPointerLeave = () => {
-      stateRef.current.hovering = false;
-      stateRef.current.pointerDown = false;
-    };
-    const onPointerDown = () => {
-      stateRef.current.pointerDown = true;
-    };
-    const onPointerUp = () => {
-      stateRef.current.pointerDown = false;
-      stateRef.current.userScrollingUntil = performance.now() + resumeDelay;
-    };
-    const onTouchStart = () => {
-      stateRef.current.touching = true;
-      window.clearTimeout(stateRef.current.resumeTimer);
-    };
-    const onTouchEnd = () => {
-      window.clearTimeout(stateRef.current.resumeTimer);
-      stateRef.current.resumeTimer = window.setTimeout(() => {
-        stateRef.current.touching = false;
-      }, resumeDelay);
-    };
+
+    frameId = requestAnimationFrame(tick);
+
     const onScroll = () => {
-      // If scroll movement comes from user (wheel/drag), defer auto-scroll.
-      const s = stateRef.current;
-      if (s.hovering || s.touching || s.pointerDown) {
-        s.userScrollingUntil = performance.now() + resumeDelay;
-      }
-      // Wrap manually to keep an infinite feel even during user scroll.
-      const half = track.scrollWidth / 2;
-      if (half > 0) {
-        if (el.scrollLeft >= half * 2 - 1) el.scrollLeft -= half;
-        else if (el.scrollLeft <= 0) el.scrollLeft += half;
-      }
+      const loop = loopRef.current;
+      const logical = toLogical(scroller.scrollLeft, loop.isRtl);
+      if (Math.abs(logical - loop.lastWritten) <= OWN_WRITE_TOLERANCE) return;
+
+      // The user moved the row: the element wins over the animation.
+      loop.position = logical;
+      interaction.pausedUntil = performance.now() + resumeDelay;
+
+      if (!loop.animating || loop.period <= 0) return;
+      // Keep the row endless in both directions: the start edge moves on to
+      // the period, anything past the period wraps forward.
+      const wrapped = wrapManual(logical, loop.period);
+      if (wrapped === logical) return;
+      loop.position = wrapped;
+      writePosition(wrapped);
     };
 
-    el.addEventListener("pointerenter", onPointerEnter);
-    el.addEventListener("pointerleave", onPointerLeave);
-    el.addEventListener("pointerdown", onPointerDown);
-    el.addEventListener("pointerup", onPointerUp);
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
-    el.addEventListener("touchcancel", onTouchEnd, { passive: true });
-    el.addEventListener("scroll", onScroll, { passive: true });
+    scroller.addEventListener("scroll", onScroll, { passive: true });
 
     return () => {
-      cancelAnimationFrame(rafId);
-      window.clearTimeout(stateRef.current.resumeTimer);
-      el.removeEventListener("pointerenter", onPointerEnter);
-      el.removeEventListener("pointerleave", onPointerLeave);
-      el.removeEventListener("pointerdown", onPointerDown);
-      el.removeEventListener("pointerup", onPointerUp);
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchend", onTouchEnd);
-      el.removeEventListener("touchcancel", onTouchEnd);
-      el.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frameId);
+      scroller.removeEventListener("scroll", onScroll);
     };
   }, [speed, direction, resumeDelay]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    return bindInteractions({
+      scroller,
+      interaction: interactionRef.current,
+      resumeDelay,
+    });
+  }, [resumeDelay]);
+
+  const copies = copiesNeeded(clientWidth, copyWidth, animating);
 
   return (
     <div
@@ -176,8 +329,18 @@ export function AutoScrollMarquee({
         WebkitOverflowScrolling: "touch",
       }}
     >
-      <div ref={trackRef} className={cn("flex w-max", innerClassName)}>
-        {children}
+      <div className={cn("flex w-max", innerClassName)}>
+        {Array.from({ length: copies }, (_, index) => (
+          <div
+            key={index}
+            ref={index === 0 ? copyRef : undefined}
+            data-marquee-copy={index}
+            aria-hidden={index > 0 ? "true" : undefined}
+            className="flex shrink-0"
+          >
+            {children({ index, isClone: index > 0 })}
+          </div>
+        ))}
       </div>
     </div>
   );

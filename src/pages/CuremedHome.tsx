@@ -79,11 +79,11 @@ export default function CuremedHome() {
           }}
         >
           <AutoScrollMarquee autoScroll={brandsAutoscroll} speed={50}>
-            {[...BRAND_LIST, ...BRAND_LIST].map((b, idx) => (
+            {({ isClone }) => BRAND_LIST.map((b) => (
               <BrandTile
-                key={`${b.key}-${idx}`}
+                key={b.key}
                 brand={b}
-                isClone={idx >= BRAND_LIST.length}
+                isClone={isClone}
               />
             ))}
           </AutoScrollMarquee>

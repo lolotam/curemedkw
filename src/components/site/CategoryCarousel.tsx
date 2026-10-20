@@ -100,13 +100,12 @@ export function CategoryCarousel() {
         }}
       >
         <AutoScrollMarquee autoScroll={categoriesAutoscroll} speed={55} innerClassName="py-2">
-          {[...active, ...active].map((c, i) => {
+          {({ isClone }) => active.map((c, i) => {
             const palette = PALETTES[i % PALETTES.length];
             const count = counts.get(c.id) ?? 0;
-            const isClone = i >= active.length;
             return (
               <div
-                key={`${c.id}-${i}`}
+                key={c.id}
                 className="group/card relative shrink-0 w-44 sm:w-52 md:w-56 mr-5 md:mr-6"
                 aria-hidden={isClone || undefined}
               >
