@@ -56,10 +56,11 @@ export function normalizeToMiddle(position: number, period: number): number {
 
 /**
  * Number of copies the marquee has to render: enough to fill the viewport and
- * to keep the middle range reachable, so the wrap never shows a gap.
+ * to leave a full copy of room before either edge, so the middle range the
+ * row travels in is always reachable and the wrap never shows a gap.
  */
 export function copiesNeeded(clientWidth: number, copyWidth: number, enabled: boolean): number {
   if (!enabled) return 1;
   if (copyWidth <= 0) return 3;
-  return Math.max(3, Math.ceil(clientWidth / copyWidth) + 2);
+  return Math.max(3, Math.ceil(clientWidth / copyWidth) + 3);
 }

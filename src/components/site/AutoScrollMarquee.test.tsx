@@ -14,6 +14,13 @@ class ResizeObserverStub {
   disconnect() {}
 }
 
+/** A touch event carrying the number of fingers still on the screen. */
+function touchEvent(type: string, touches: number): Event {
+  const event = new Event(type) as Event & { touches: { length: number } };
+  event.touches = { length: touches };
+  return event;
+}
+
 describe("AutoScrollMarquee", () => {
   beforeEach(() => {
     resizeCallbacks.length = 0;
@@ -341,7 +348,7 @@ describe("AutoScrollMarquee", () => {
 
     const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
 
-    scroller.dispatchEvent(new Event("touchstart"));
+    scroller.dispatchEvent(touchEvent("touchstart", 1));
     scroller.scrollLeft = 120;
     scroller.dispatchEvent(new Event("scroll"));
 
@@ -351,10 +358,145 @@ describe("AutoScrollMarquee", () => {
     expect(scroller.scrollLeft).toBe(120);
 
     // Once the touch ends, the row settles again.
-    scroller.dispatchEvent(new Event("touchend"));
+    scroller.dispatchEvent(touchEvent("touchend", 0));
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     expect(scroller.scrollLeft).toBe(1120);
+  });
+
+  it("keeps the touch state while another finger is still down", async () => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    const { container } = render(
+      <AutoScrollMarquee autoScroll>
+        {() => <span data-testid="item">Item</span>}
+      </AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+
+    scroller.dispatchEvent(touchEvent("touchstart", 2));
+    scroller.scrollLeft = 120;
+    scroller.dispatchEvent(new Event("scroll"));
+
+    // One finger lifts while the other one is still dragging.
+    scroller.dispatchEvent(touchEvent("touchend", 1));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(scroller.scrollLeft).toBe(120);
+
+    // The last finger lifts.
+    scroller.dispatchEvent(touchEvent("touchend", 0));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(scroller.scrollLeft).toBe(1120);
+  });
+
+  it("releases a pointer that was pressed and released outside the row", async () => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    const { container } = render(
+      <AutoScrollMarquee autoScroll>
+        {() => <span data-testid="item">Item</span>}
+      </AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+
+    // The mouse is pressed on the row and released outside the window, so the
+    // page never sees the pointerup.
+    scroller.dispatchEvent(new MouseEvent("pointerdown", { buttons: 1 }));
+    scroller.scrollLeft = 120;
+    scroller.dispatchEvent(new Event("scroll"));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // The pressed pointer holds the row, so the offset is not normalised.
+    expect(scroller.scrollLeft).toBe(120);
+
+    // The pointer comes back without a button pressed.
+    scroller.dispatchEvent(new MouseEvent("pointerleave", { buttons: 0 }));
+    scroller.scrollLeft = 130;
+    scroller.dispatchEvent(new Event("scroll"));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(scroller.scrollLeft).toBe(1130);
+  });
+
+  it("releases the keyboard pause when the accessible copy is removed", async () => {
+    // jsdom has no :focus-visible heuristic, so stand in for a keyboard focus.
+    const originalMatches = Element.prototype.matches;
+    vi.spyOn(Element.prototype, "matches").mockImplementation(function (
+      this: Element,
+      selector: string,
+    ) {
+      if (selector === ":focus-visible") return true;
+      return originalMatches.call(this, selector);
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    const items = () => <button type="button">Item</button>;
+    const { container, rerender } = render(
+      <AutoScrollMarquee autoScroll>{items}</AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+    const accessibleCopy = container.querySelectorAll("[data-marquee-copy]")[1];
+    const button = accessibleCopy.querySelector("button") as HTMLElement;
+
+    // The keyboard focus is inside the accessible copy.
+    button.focus();
+
+    scroller.scrollLeft = 120;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // The focus holds the row, so the offset is not normalised.
+    expect(scroller.scrollLeft).toBe(120);
+
+    // The row stops animating, which removes the accessible copy, and starts
+    // again. The focus is gone, so the row must not stay paused.
+    rerender(<AutoScrollMarquee autoScroll={false}>{items}</AutoScrollMarquee>);
+    rerender(<AutoScrollMarquee autoScroll>{items}</AutoScrollMarquee>);
+
+    scroller.scrollLeft = 130;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(scroller.scrollLeft).toBe(1130);
   });
 
   it("stops the animation loop when it unmounts", () => {

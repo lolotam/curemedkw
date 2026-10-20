@@ -74,13 +74,22 @@ describe("copiesNeeded", () => {
     expect(copiesNeeded(0, 0, true)).toBe(3);
   });
 
-  it("keeps three copies when one copy is wider than the viewport", () => {
-    expect(copiesNeeded(390, 512, true)).toBe(3);
+  it("keeps four copies when one copy is wider than the viewport", () => {
+    expect(copiesNeeded(390, 512, true)).toBe(4);
   });
 
   it("adds a copy for every viewport the items do not fill", () => {
-    expect(copiesNeeded(390, 100, true)).toBe(6);
-    expect(copiesNeeded(400, 100, true)).toBe(6);
-    expect(copiesNeeded(401, 100, true)).toBe(7);
+    expect(copiesNeeded(390, 100, true)).toBe(7);
+    expect(copiesNeeded(400, 100, true)).toBe(7);
+    expect(copiesNeeded(401, 100, true)).toBe(8);
+  });
+
+  it("leaves a full copy of room before either edge", () => {
+    const clientWidth = 390;
+    const copyWidth = 100;
+    const copies = copiesNeeded(clientWidth, copyWidth, true);
+    // The row travels in [copyWidth, 2 * copyWidth), so the scroll range has to
+    // reach three copies to keep a full copy free at the end.
+    expect(copies * copyWidth - clientWidth).toBeGreaterThanOrEqual(3 * copyWidth);
   });
 });

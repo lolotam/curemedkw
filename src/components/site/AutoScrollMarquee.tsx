@@ -88,6 +88,17 @@ function readDirection(el: HTMLElement): boolean {
   return window.getComputedStyle(el).direction === "rtl";
 }
 
+/** True when the keyboard focus is inside the row. */
+function hasKeyboardFocus(scroller: HTMLElement): boolean {
+  const active = document.activeElement;
+  if (!active || !scroller.contains(active)) return false;
+  try {
+    return active.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Reads the scroller's writing direction and remembers it, so every later
  * read and write uses the same direction. Reports whether it changed.
@@ -129,12 +140,14 @@ function bindInteractions(bindings: InteractionBindings): () => void {
   let resumeTimer = 0;
 
   const onPointerEnter = (event: PointerEvent) => {
+    releaseIfNotPressed(event);
     // A touch pointer enters the row too; only a mouse may pause it.
     if (event.pointerType !== "mouse") return;
     interaction.hovering = true;
   };
 
   const onPointerLeave = (event: PointerEvent) => {
+    releaseIfNotPressed(event);
     if (event.pointerType !== "mouse") return;
     interaction.hovering = false;
   };
@@ -149,13 +162,25 @@ function bindInteractions(bindings: InteractionBindings): () => void {
     interaction.pausedUntil = performance.now() + resumeDelay;
   };
 
+  /**
+   * Clears a pointer that was released where the page never saw it, for
+   * example outside the browser window. A pointer that reports no button is
+   * not pressed any more.
+   */
+  const releaseIfNotPressed = (event: PointerEvent) => {
+    if (event.buttons !== 0) return;
+    onPointerRelease();
+  };
+
   const onTouchStart = () => {
     interaction.touching = true;
     interaction.touchActive = true;
     window.clearTimeout(resumeTimer);
   };
 
-  const onTouchEnd = () => {
+  const onTouchEnd = (event: TouchEvent) => {
+    // Another finger is still on the screen, so the touch is not over yet.
+    if (event.touches.length > 0) return;
     // A native pan cancels the pointer, but the finger is still on the row.
     interaction.touchActive = false;
     interaction.pausedUntil = performance.now() + resumeDelay;
@@ -205,6 +230,7 @@ function bindInteractions(bindings: InteractionBindings): () => void {
   scroller.addEventListener("focusout", onFocusOut);
   window.addEventListener("pointerup", onPointerRelease);
   window.addEventListener("pointercancel", onPointerRelease);
+  window.addEventListener("blur", onPointerRelease);
 
   return () => {
     window.clearTimeout(resumeTimer);
@@ -218,6 +244,7 @@ function bindInteractions(bindings: InteractionBindings): () => void {
     scroller.removeEventListener("focusout", onFocusOut);
     window.removeEventListener("pointerup", onPointerRelease);
     window.removeEventListener("pointercancel", onPointerRelease);
+    window.removeEventListener("blur", onPointerRelease);
   };
 }
 
@@ -271,7 +298,13 @@ export function AutoScrollMarquee({
     loop.animating = animating;
 
     const scroller = scrollerRef.current;
-    if (!scroller || loop.period <= 0) return;
+    if (!scroller) return;
+
+    // Stopping the animation removes the accessible copy, which takes the
+    // keyboard focus with it and fires no focusout.
+    interactionRef.current.focused = hasKeyboardFocus(scroller);
+
+    if (loop.period <= 0) return;
 
     if (!animating) {
       // The row is a plain strip now: show the remaining copy from its start.
