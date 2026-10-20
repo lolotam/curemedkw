@@ -115,6 +115,38 @@ describe("HeroSlider", () => {
     expect(belowDot.closest(".md\\:hidden")).not.toBeNull();
   });
 
+  it("sizes the phone hero by the tallest image without the 4:5 floor", async () => {
+    const sizes: Record<string, [number, number]> = { "/wide.webp": [1672, 941], "/tall.webp": [900, 1600] };
+    class LoadedImage {
+      naturalWidth = 0;
+      naturalHeight = 0;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(url: string) {
+        [this.naturalWidth, this.naturalHeight] = sizes[url];
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+    vi.stubGlobal("Image", LoadedImage);
+    mocks.listSlidesForPage.mockResolvedValue([
+      { ...heroSlides[0], title_en: null, media_url: "/wide.webp" },
+      { ...heroSlides[1], title_en: null, media_url: "/tall.webp" },
+    ]);
+
+    try {
+      const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+      const carousel = await vi.waitFor(() => {
+        const el = container.querySelector<HTMLElement>('section[aria-roledescription="carousel"]');
+        expect(el?.style.getPropertyValue("--hero-aspect")).toBe(`${900 / 1600}`);
+        return el;
+      });
+      expect(carousel).toHaveClass("max-h-[calc(100dvh-4rem)]", "md:max-h-none");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("keeps the full viewport height on every screen when a slide has overlay text", async () => {
     mocks.listSlidesForPage.mockResolvedValue([
       { ...heroSlides[0], title_en: null },

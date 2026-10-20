@@ -16,9 +16,9 @@ interface Props {
 type IntervalsMap = Record<string, number>;
 type HeroLayoutMode = "fit_viewport" | "aspect_ratio";
 
-/** Phone-width fit-viewport hero: sized by the image's own ratio, full viewport height from `md` up. */
+/** Phone-width fit-viewport hero: sized by the image's own ratio (capped at the viewport), full viewport height from `md` up. */
 const MOBILE_MEDIA_FIT_CLASS =
-  "aspect-[var(--hero-aspect)] md:aspect-auto md:h-[calc(100dvh-4rem)] md:min-h-[480px]";
+  "aspect-[var(--hero-aspect)] max-h-[calc(100dvh-4rem)] md:aspect-auto md:max-h-none md:h-[calc(100dvh-4rem)] md:min-h-[480px]";
 
 /** True when the slide shows a plain image with no overlay text (in the active language) that a short hero could clip. */
 function isMediaOnlySlide(s: HeroSlide, lang: string): boolean {
@@ -55,12 +55,9 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
     if (!slides || (!isAspectRatioMode && !fitMediaOnMobile)) return;
     let cancelled = false;
     const imageSlides = slides.filter((s) => s.media_type === "image" && !!s.media_url);
-    // Fit-viewport mode only needs the first image's ratio, which the active slide is already loading;
-    // measuring every slide would download the whole carousel up front.
-    const measured = isAspectRatioMode ? imageSlides : imageSlides.slice(0, 1);
-    if (measured.length === 0) return;
+    if (imageSlides.length === 0) return;
     Promise.all(
-      measured.map(
+      imageSlides.map(
         (s) =>
           new Promise<number>((resolve) => {
             const img = new Image();
@@ -71,7 +68,10 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
       )
     ).then((ratios) => {
       if (cancelled || ratios.length === 0) return;
-      setAspect(Math.max(Math.min(...ratios), 4 / 5));
+      // The tallest image sets the height so no slide is shrunk below full width. The 4:5 floor only
+      // applies to aspect_ratio mode, which crops with object-cover; the phone fit is capped by max-h instead.
+      const tallest = Math.min(...ratios);
+      setAspect(isAspectRatioMode ? Math.max(tallest, 4 / 5) : tallest);
     });
     return () => { cancelled = true; };
   }, [slides, isAspectRatioMode, fitMediaOnMobile]);
@@ -89,7 +89,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
     return isAspectRatioMode ? (
       <div className="w-full animate-pulse bg-brand-soft" style={{ aspectRatio: `${aspect}` }} />
     ) : (
-      <div className={`${MOBILE_MEDIA_FIT_CLASS} w-full animate-pulse bg-brand-soft`} style={aspectVar} />
+      <div className="h-[calc(100dvh-4rem)] min-h-[480px] w-full animate-pulse bg-brand-soft" />
     );
   }
 
