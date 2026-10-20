@@ -80,6 +80,14 @@ export function AutoScrollMarquee({
     };
     initPosition();
 
+    // Single pause rule: both the rAF tick and onScroll rely on it.
+    const isAnimationPaused = (s: typeof stateRef.current, now: number) =>
+      !s.autoScroll ||
+      s.hovering ||
+      s.touching ||
+      s.pointerDown ||
+      now < s.userScrollingUntil;
+
     const tick = (now: number) => {
       // A stalled tab must not teleport the row when the next frame lands.
       const dt = Math.min((now - last) / 1000, 0.1);
@@ -87,13 +95,7 @@ export function AutoScrollMarquee({
       const s = stateRef.current;
       const half = track.scrollWidth / 2;
 
-      const interacting =
-        !s.autoScroll ||
-        s.hovering ||
-        s.touching ||
-        s.pointerDown ||
-        now < s.userScrollingUntil ||
-        half <= 0;
+      const interacting = isAnimationPaused(s, now) || half <= 0;
 
       if (!interacting) {
         const isRtl = getComputedStyle(el).direction === "rtl";
@@ -137,12 +139,7 @@ export function AutoScrollMarquee({
     const onScroll = () => {
       // If scroll movement comes from user (wheel/drag), defer auto-scroll.
       const s = stateRef.current;
-      const animationIdle =
-        !s.autoScroll ||
-        s.hovering ||
-        s.touching ||
-        s.pointerDown ||
-        performance.now() < s.userScrollingUntil;
+      const animationIdle = isAnimationPaused(s, performance.now());
       if (s.hovering || s.touching || s.pointerDown) {
         s.userScrollingUntil = performance.now() + resumeDelay;
       }
