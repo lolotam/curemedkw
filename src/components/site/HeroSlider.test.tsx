@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { HeroSlide } from "@/lib/heroSlides";
 import { HeroSlider } from "./HeroSlider";
 
@@ -67,6 +67,13 @@ function createHeroSlide(patch: Partial<HeroSlide>): HeroSlide {
   };
 }
 
+/** Simulates the browser finishing a slide image download with the given intrinsic size. */
+function finishImageLoad(img: HTMLImageElement, width: number, height: number) {
+  Object.defineProperty(img, "naturalWidth", { configurable: true, value: width });
+  Object.defineProperty(img, "naturalHeight", { configurable: true, value: height });
+  fireEvent.load(img);
+}
+
 describe("HeroSlider", () => {
   beforeEach(() => {
     mocks.listSlidesForPage.mockResolvedValue(heroSlides);
@@ -88,6 +95,103 @@ describe("HeroSlider", () => {
 
     const firstDot = screen.getByRole("button", { name: "Go to slide 1" });
     expect(firstDot.closest("section")).toBe(carousel);
+  });
+
+  it("fits an image-only hero to a 16:9 frame on phones from the first paint, then to the loaded image", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: null })),
+    );
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    const images = await screen.findAllByAltText("Hero slide");
+    const carousel = container.querySelector<HTMLElement>('section[aria-roledescription="carousel"]');
+    expect(carousel).toHaveClass("aspect-[var(--hero-aspect)]");
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${16 / 9}`);
+
+    images.forEach((img) => finishImageLoad(img as HTMLImageElement, 1672, 941));
+
+    expect(carousel).toHaveClass(
+      "aspect-[var(--hero-aspect)]",
+      "md:aspect-auto",
+      "md:h-[calc(100dvh-4rem)]",
+      "md:min-h-[480px]",
+    );
+    expect(carousel).not.toHaveClass("h-[calc(100dvh-4rem)]", "min-h-[480px]");
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${1672 / 941}`);
+
+    const [overlayDot, belowDot] = screen.getAllByRole("button", { name: "Go to slide 1" });
+    expect(overlayDot.closest("section")).toBe(carousel);
+    expect(overlayDot.closest(".hidden.md\\:block")).not.toBeNull();
+    expect(belowDot.closest("section")).toBeNull();
+    expect(belowDot.closest(".md\\:hidden")).not.toBeNull();
+  });
+
+  it("sizes the phone hero by the tallest loaded image without the 4:5 floor", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: null })),
+    );
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    const [wide, tall] = (await screen.findAllByAltText("Hero slide")) as HTMLImageElement[];
+    const carousel = container.querySelector<HTMLElement>('section[aria-roledescription="carousel"]');
+    finishImageLoad(wide, 1672, 941);
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${1672 / 941}`);
+
+    finishImageLoad(tall, 900, 1600);
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${900 / 1600}`);
+    expect(carousel).toHaveClass("max-h-[calc(100dvh-4rem)]", "md:max-h-none");
+  });
+
+  it("forgets the previous page's image ratios when the hero switches page", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: null })),
+    );
+    const { container, rerender } = render(<HeroSlider pageKey="kapiva" />);
+    const [firstPageImage] = (await screen.findAllByAltText("Hero slide")) as HTMLImageElement[];
+    finishImageLoad(firstPageImage, 900, 1600);
+
+    mocks.listSlidesForPage.mockResolvedValue([
+      { ...heroSlides[0], id: "other-slide", title_en: null, media_url: "/other.webp" },
+    ]);
+    rerender(<HeroSlider pageKey="curemed" />);
+    const otherImage = await vi.waitFor(() => {
+      const img = container.querySelector<HTMLImageElement>('img[src="/other.webp"]');
+      expect(img).not.toBeNull();
+      return img as HTMLImageElement;
+    });
+    finishImageLoad(otherImage, 1672, 941);
+
+    const carousel = container.querySelector<HTMLElement>('section[aria-roledescription="carousel"]');
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${1672 / 941}`);
+  });
+
+  it("keeps the full viewport height on every screen when a slide has overlay text", async () => {
+    mocks.listSlidesForPage.mockResolvedValue([
+      { ...heroSlides[0], title_en: null },
+      heroSlides[1],
+    ]);
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    finishImageLoad((await screen.findByAltText("Hero two")) as HTMLImageElement, 1672, 941);
+    const carousel = container.querySelector('section[aria-roledescription="carousel"]');
+    expect(carousel).toHaveClass("h-[calc(100dvh-4rem)]", "min-h-[480px]");
+    expect(carousel).not.toHaveClass("aspect-[var(--hero-aspect)]");
+  });
+
+  it("ignores overlay text written only for the other language", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: "  ", title_ar: "شريحة جديدة" })),
+    );
+
+    const { container } = render(<HeroSlider pageKey="kapiva" />);
+
+    const images = await screen.findAllByRole("img", { hidden: true });
+    images.forEach((img) => finishImageLoad(img as HTMLImageElement, 1672, 941));
+    const carousel = container.querySelector('section[aria-roledescription="carousel"]');
+    expect(carousel).toHaveClass("aspect-[var(--hero-aspect)]");
   });
 
   it("uses the previous aspect-ratio layout when selected globally", async () => {
