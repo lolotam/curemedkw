@@ -53,10 +53,9 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   // below it, so on narrow screens an image-only hero takes the image's height instead.
   const fitMediaOnMobile = !isAspectRatioMode && !!slides && slides.every((s) => isMediaOnlySlide(s, lang));
   const loadedRatios = Object.values(mediaRatios);
-  // The tallest loaded image sets the height so no slide is shrunk below full width; until the first
-  // image reports its size the hero keeps the viewport layout instead of guessing a ratio.
-  const mobileAspect = loadedRatios.length > 0 ? Math.min(...loadedRatios) : null;
-  const fitReady = fitMediaOnMobile && mobileAspect !== null;
+  // The admin editor previews slides in a 16:9 frame, so 16:9 is the first-paint height (no layout shift
+  // for the usual upload); once slide images load, the tallest one wins so no slide shrinks below full width.
+  const mobileAspect = loadedRatios.length > 0 ? Math.min(...loadedRatios) : 16 / 9;
 
   React.useEffect(() => {
     // Start from the current slides only, so ratios from another page's hero never carry over.
@@ -136,7 +135,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   if (isAspectRatioMode) {
     sectionSizeClass = "";
     sectionStyle = { aspectRatio: `${aspect}` };
-  } else if (fitReady) {
+  } else if (fitMediaOnMobile) {
     sectionSizeClass = MOBILE_MEDIA_FIT_CLASS;
     sectionStyle = { "--hero-aspect": `${mobileAspect}` } as React.CSSProperties;
   }
@@ -186,7 +185,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
         </>
       )}
       {!isAspectRatioMode && count > 1 && (
-        <div className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background/80 to-transparent${fitReady ? " hidden md:block" : ""}`}>
+        <div className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background/80 to-transparent${fitMediaOnMobile ? " hidden md:block" : ""}`}>
           <div className="container flex justify-center gap-2 pb-4 pt-8 md:pb-5">
             {dots}
           </div>
@@ -198,8 +197,8 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   return (
     <>
       {section}
-      {(isAspectRatioMode || fitReady) && count > 1 && (
-        <div className={`w-full bg-background border-b border-border/60${fitReady ? " md:hidden" : ""}`}>
+      {(isAspectRatioMode || fitMediaOnMobile) && count > 1 && (
+        <div className={`w-full bg-background border-b border-border/60${fitMediaOnMobile ? " md:hidden" : ""}`}>
           <div className="container py-4 md:py-5 flex justify-center gap-2">
             {dots}
           </div>

@@ -97,7 +97,7 @@ describe("HeroSlider", () => {
     expect(firstDot.closest("section")).toBe(carousel);
   });
 
-  it("keeps the viewport height until an image-only hero knows its image ratio, then fits the image on phones", async () => {
+  it("fits an image-only hero to a 16:9 frame on phones from the first paint, then to the loaded image", async () => {
     mocks.listSlidesForPage.mockResolvedValue(
       heroSlides.map((s) => ({ ...s, title_en: null })),
     );
@@ -106,7 +106,8 @@ describe("HeroSlider", () => {
 
     const images = await screen.findAllByAltText("Hero slide");
     const carousel = container.querySelector<HTMLElement>('section[aria-roledescription="carousel"]');
-    expect(carousel).toHaveClass("h-[calc(100dvh-4rem)]", "min-h-[480px]");
+    expect(carousel).toHaveClass("aspect-[var(--hero-aspect)]");
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${16 / 9}`);
 
     images.forEach((img) => finishImageLoad(img as HTMLImageElement, 1672, 941));
 
