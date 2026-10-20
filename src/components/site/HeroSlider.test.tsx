@@ -143,6 +143,29 @@ describe("HeroSlider", () => {
     expect(carousel).toHaveClass("max-h-[calc(100dvh-4rem)]", "md:max-h-none");
   });
 
+  it("forgets the previous page's image ratios when the hero switches page", async () => {
+    mocks.listSlidesForPage.mockResolvedValue(
+      heroSlides.map((s) => ({ ...s, title_en: null })),
+    );
+    const { container, rerender } = render(<HeroSlider pageKey="kapiva" />);
+    const [firstPageImage] = (await screen.findAllByAltText("Hero slide")) as HTMLImageElement[];
+    finishImageLoad(firstPageImage, 900, 1600);
+
+    mocks.listSlidesForPage.mockResolvedValue([
+      { ...heroSlides[0], id: "other-slide", title_en: null, media_url: "/other.webp" },
+    ]);
+    rerender(<HeroSlider pageKey="curemed" />);
+    const otherImage = await vi.waitFor(() => {
+      const img = container.querySelector<HTMLImageElement>('img[src="/other.webp"]');
+      expect(img).not.toBeNull();
+      return img as HTMLImageElement;
+    });
+    finishImageLoad(otherImage, 1672, 941);
+
+    const carousel = container.querySelector<HTMLElement>('section[aria-roledescription="carousel"]');
+    expect(carousel?.style.getPropertyValue("--hero-aspect")).toBe(`${1672 / 941}`);
+  });
+
   it("keeps the full viewport height on every screen when a slide has overlay text", async () => {
     mocks.listSlidesForPage.mockResolvedValue([
       { ...heroSlides[0], title_en: null },

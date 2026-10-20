@@ -59,6 +59,8 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   const fitReady = fitMediaOnMobile && mobileAspect !== null;
 
   React.useEffect(() => {
+    // Start from the current slides only, so ratios from another page's hero never carry over.
+    setMediaRatios({});
     const section = sectionRef.current;
     if (!section || !fitMediaOnMobile) return;
     // Read the ratio from the slide images the carousel already renders, so no extra request is made.
