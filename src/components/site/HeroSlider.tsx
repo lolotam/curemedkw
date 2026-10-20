@@ -34,6 +34,8 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   const [index, setIndex] = React.useState(0);
   const [paused, setPaused] = React.useState(false);
   const [aspect, setAspect] = React.useState<number>(16 / 9);
+  const [mediaRatios, setMediaRatios] = React.useState<Record<string, number>>({});
+  const sectionRef = React.useRef<HTMLElement>(null);
   const { data: intervals } = useSiteSetting<IntervalsMap>("hero_intervals", {});
   const { data: layoutMode = "fit_viewport" } = useSiteSetting<HeroLayoutMode>("hero_layout_mode", "fit_viewport");
   const effectiveInterval = intervalMs ?? intervals?.[pageKey] ?? 5500;
@@ -50,9 +52,32 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   // A 16:9 image letterboxed inside a full-height phone viewport leaves large empty bands above and
   // below it, so on narrow screens an image-only hero takes the image's height instead.
   const fitMediaOnMobile = !isAspectRatioMode && !!slides && slides.every((s) => isMediaOnlySlide(s, lang));
+  const loadedRatios = Object.values(mediaRatios);
+  // The tallest loaded image sets the height so no slide is shrunk below full width; until the first
+  // image reports its size the hero keeps the viewport layout instead of guessing a ratio.
+  const mobileAspect = loadedRatios.length > 0 ? Math.min(...loadedRatios) : null;
+  const fitReady = fitMediaOnMobile && mobileAspect !== null;
 
   React.useEffect(() => {
-    if (!slides || (!isAspectRatioMode && !fitMediaOnMobile)) return;
+    const section = sectionRef.current;
+    if (!section || !fitMediaOnMobile) return;
+    // Read the ratio from the slide images the carousel already renders, so no extra request is made.
+    const record = (img: HTMLImageElement) => {
+      if (!img.naturalWidth || !img.naturalHeight) return;
+      const ratio = img.naturalWidth / img.naturalHeight;
+      setMediaRatios((prev) => (prev[img.src] === ratio ? prev : { ...prev, [img.src]: ratio }));
+    };
+    const onLoad = (event: Event) => {
+      if (event.target instanceof HTMLImageElement) record(event.target);
+    };
+    section.querySelectorAll("img").forEach((img) => { if (img.complete) record(img); });
+    // `load` does not bubble, so listen in the capture phase.
+    section.addEventListener("load", onLoad, true);
+    return () => section.removeEventListener("load", onLoad, true);
+  }, [fitMediaOnMobile, slides]);
+
+  React.useEffect(() => {
+    if (!isAspectRatioMode || !slides || slides.length === 0) return;
     let cancelled = false;
     const imageSlides = slides.filter((s) => s.media_type === "image" && !!s.media_url);
     if (imageSlides.length === 0) return;
@@ -68,16 +93,12 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
       )
     ).then((ratios) => {
       if (cancelled || ratios.length === 0) return;
-      // The tallest image sets the height so no slide is shrunk below full width. The 4:5 floor only
-      // applies to aspect_ratio mode, which crops with object-cover; the phone fit is capped by max-h instead.
-      const tallest = Math.min(...ratios);
-      setAspect(isAspectRatioMode ? Math.max(tallest, 4 / 5) : tallest);
+      setAspect(Math.max(Math.min(...ratios), 4 / 5));
     });
     return () => { cancelled = true; };
-  }, [slides, isAspectRatioMode, fitMediaOnMobile]);
+  }, [slides, isAspectRatioMode]);
 
   const count = slides?.length ?? 0;
-  const aspectVar = { "--hero-aspect": `${aspect}` } as React.CSSProperties;
 
   React.useEffect(() => {
     if (paused || count <= 1) return;
@@ -113,12 +134,13 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   if (isAspectRatioMode) {
     sectionSizeClass = "";
     sectionStyle = { aspectRatio: `${aspect}` };
-  } else if (fitMediaOnMobile) {
+  } else if (fitReady) {
     sectionSizeClass = MOBILE_MEDIA_FIT_CLASS;
-    sectionStyle = aspectVar;
+    sectionStyle = { "--hero-aspect": `${mobileAspect}` } as React.CSSProperties;
   }
   const section = (
     <section
+      ref={sectionRef}
       className={`relative ${sectionSizeClass} w-full overflow-hidden bg-brand-deep`}
       style={sectionStyle}
       onMouseEnter={() => setPaused(true)}
@@ -162,7 +184,7 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
         </>
       )}
       {!isAspectRatioMode && count > 1 && (
-        <div className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background/80 to-transparent${fitMediaOnMobile ? " hidden md:block" : ""}`}>
+        <div className={`absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-background/80 to-transparent${fitReady ? " hidden md:block" : ""}`}>
           <div className="container flex justify-center gap-2 pb-4 pt-8 md:pb-5">
             {dots}
           </div>
@@ -174,8 +196,8 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   return (
     <>
       {section}
-      {(isAspectRatioMode || fitMediaOnMobile) && count > 1 && (
-        <div className={`w-full bg-background border-b border-border/60${fitMediaOnMobile ? " md:hidden" : ""}`}>
+      {(isAspectRatioMode || fitReady) && count > 1 && (
+        <div className={`w-full bg-background border-b border-border/60${fitReady ? " md:hidden" : ""}`}>
           <div className="container py-4 md:py-5 flex justify-center gap-2">
             {dots}
           </div>
