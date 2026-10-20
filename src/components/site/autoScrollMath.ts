@@ -55,6 +55,23 @@ export function normalizeToMiddle(position: number, period: number): number {
 }
 
 /**
+ * The copy under the centre of the viewport: the one a screen reader reaches
+ * when it explores what is on screen. The index is clamped to the copies that
+ * exist, so it never points at a missing copy.
+ */
+export function accessibleCopyIndex(
+  position: number,
+  clientWidth: number,
+  period: number,
+  copies: number,
+): number {
+  if (copies <= 1 || period <= 0) return 0;
+  const centre = position + clientWidth / 2;
+  const index = Math.floor(centre / period);
+  return Math.min(Math.max(index, 0), copies - 1);
+}
+
+/**
  * Number of copies the marquee has to render: enough to fill the viewport and
  * to leave a full copy of room before either edge, so the middle range the
  * row travels in is always reachable and the wrap never shows a gap.

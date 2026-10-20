@@ -14,10 +14,15 @@ class ResizeObserverStub {
   disconnect() {}
 }
 
-/** A touch event carrying the number of fingers still on the screen. */
-function touchEvent(type: string, touches: number): Event {
-  const event = new Event(type) as Event & { touches: { length: number } };
-  event.touches = { length: touches };
+/** A touch event carrying the touches that are still on the screen. */
+function touchEvent(
+  type: string,
+  touches: { target: EventTarget | null }[],
+): Event {
+  const event = new Event(type) as Event & {
+    touches: { target: EventTarget | null }[];
+  };
+  event.touches = touches;
   return event;
 }
 
@@ -44,6 +49,18 @@ describe("AutoScrollMarquee", () => {
   });
 
   it("renders hidden clones of the items when auto-scroll is on", () => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
     const { container } = render(
       <AutoScrollMarquee autoScroll>
         {({ index, isClone }) => (
@@ -63,12 +80,60 @@ describe("AutoScrollMarquee", () => {
 
     const copies = container.querySelectorAll("[data-marquee-copy]");
     expect(copies).toHaveLength(items.length);
-    // The row shows the middle of the track, so that copy is the real one.
+    // The row sits at the start of the middle range, so the centre of the
+    // viewport is in copy 1, which is the accessible one.
     expect(copies[1]).not.toHaveAttribute("aria-hidden");
     expect(copies[0]).toHaveAttribute("aria-hidden", "true");
     expect(copies[2]).toHaveAttribute("aria-hidden", "true");
     expect(items[1].dataset.clone).toBe("false");
     expect(items[0].dataset.clone).toBe("true");
+  });
+
+  it("moves the accessible copy with the centre of the viewport", async () => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockReturnValue(300);
+
+    const { container } = render(
+      <AutoScrollMarquee autoScroll>
+        {({ index, isClone }) => (
+          <span data-testid="item" data-index={index} data-clone={String(isClone)}>
+            Item
+          </span>
+        )}
+      </AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+
+    // The row starts at the beginning of the middle range, so the centre of
+    // the viewport is in copy 1.
+    expect(container.querySelectorAll("[data-marquee-copy]")[1]).not.toHaveAttribute(
+      "aria-hidden",
+    );
+
+    // A scroll moves the centre of the viewport into the next copy.
+    await act(async () => {
+      scroller.scrollLeft = 1900;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+
+    expect(container.querySelectorAll("[data-marquee-copy]")[2]).not.toHaveAttribute(
+      "aria-hidden",
+    );
+    expect(container.querySelectorAll("[data-marquee-copy]")[1]).toHaveAttribute(
+      "aria-hidden",
+      "true",
+    );
   });
 
   it("renders a single copy when the user prefers reduced motion", () => {
@@ -348,7 +413,7 @@ describe("AutoScrollMarquee", () => {
 
     const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
 
-    scroller.dispatchEvent(touchEvent("touchstart", 1));
+    scroller.dispatchEvent(touchEvent("touchstart", [{ target: scroller }]));
     scroller.scrollLeft = 120;
     scroller.dispatchEvent(new Event("scroll"));
 
@@ -358,7 +423,7 @@ describe("AutoScrollMarquee", () => {
     expect(scroller.scrollLeft).toBe(120);
 
     // Once the touch ends, the row settles again.
-    scroller.dispatchEvent(touchEvent("touchend", 0));
+    scroller.dispatchEvent(touchEvent("touchend", []));
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     expect(scroller.scrollLeft).toBe(1120);
@@ -385,19 +450,57 @@ describe("AutoScrollMarquee", () => {
 
     const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
 
-    scroller.dispatchEvent(touchEvent("touchstart", 2));
+    scroller.dispatchEvent(
+      touchEvent("touchstart", [{ target: scroller }, { target: scroller }]),
+    );
     scroller.scrollLeft = 120;
     scroller.dispatchEvent(new Event("scroll"));
 
-    // One finger lifts while the other one is still dragging.
-    scroller.dispatchEvent(touchEvent("touchend", 1));
+    // One finger lifts while the other one is still dragging the row.
+    scroller.dispatchEvent(touchEvent("touchend", [{ target: scroller }]));
 
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     expect(scroller.scrollLeft).toBe(120);
 
     // The last finger lifts.
-    scroller.dispatchEvent(touchEvent("touchend", 0));
+    scroller.dispatchEvent(touchEvent("touchend", []));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(scroller.scrollLeft).toBe(1120);
+  });
+
+  it("settles when the finger on the row lifts and another one is outside", async () => {
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    const { container } = render(
+      <AutoScrollMarquee autoScroll>
+        {() => <span data-testid="item">Item</span>}
+      </AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+
+    // One finger drags the row, another one is held somewhere else.
+    scroller.dispatchEvent(
+      touchEvent("touchstart", [{ target: scroller }, { target: document.body }]),
+    );
+    scroller.scrollLeft = 120;
+    scroller.dispatchEvent(new Event("scroll"));
+
+    // The finger on the row lifts, the other one stays on the screen.
+    scroller.dispatchEvent(touchEvent("touchend", [{ target: document.body }]));
 
     await new Promise((resolve) => setTimeout(resolve, 300));
 

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import {
+  accessibleCopyIndex,
   advance,
   copiesNeeded,
   normalizeToMiddle,
@@ -179,8 +180,12 @@ function bindInteractions(bindings: InteractionBindings): () => void {
   };
 
   const onTouchEnd = (event: TouchEvent) => {
-    // Another finger is still on the screen, so the touch is not over yet.
-    if (event.touches.length > 0) return;
+    // Another finger is still on the row, so the touch is not over yet. A
+    // finger that belongs to another element does not matter.
+    const stillOnRow = Array.from(event.touches).some(
+      (touch) => touch.target instanceof Node && scroller.contains(touch.target),
+    );
+    if (stillOnRow) return;
     // A native pan cancels the pointer, but the finger is still on the row.
     interaction.touchActive = false;
     interaction.pausedUntil = performance.now() + resumeDelay;
@@ -268,8 +273,10 @@ export function AutoScrollMarquee({
   const [reducedMotion, setReducedMotion] = useState(false);
   const [copyWidth, setCopyWidth] = useState(0);
   const [clientWidth, setClientWidth] = useState(0);
+  const [accessibleIndex, setAccessibleIndex] = useState(0);
 
   const animating = autoScroll && !reducedMotion;
+  const copies = copiesNeeded(clientWidth, copyWidth, animating);
 
   const loopRef = useRef<MarqueeLoop>({
     position: 0,
@@ -293,6 +300,34 @@ export function AutoScrollMarquee({
   // through a ref that always points at the current scheduler.
   const scheduleSettleRef = useRef<() => void>(() => {});
 
+  const accessibleIndexRef = useRef(0);
+  const clientWidthRef = useRef(clientWidth);
+  const copiesRef = useRef(copies);
+
+  // The mirrors let the long-lived listeners read the current values.
+  useEffect(() => {
+    clientWidthRef.current = clientWidth;
+    copiesRef.current = copies;
+  }, [clientWidth, copies]);
+
+  /**
+   * Points the accessible copy at the one under the centre of the viewport,
+   * so a screen reader reaches the tiles that are on screen.
+   */
+  const updateAccessibleIndex = useCallback((position: number) => {
+    // A keyboard-focused link must not become aria-hidden.
+    if (interactionRef.current.focused) return;
+    const next = accessibleCopyIndex(
+      position,
+      clientWidthRef.current,
+      loopRef.current.period,
+      copiesRef.current,
+    );
+    if (next === accessibleIndexRef.current) return;
+    accessibleIndexRef.current = next;
+    setAccessibleIndex(next);
+  }, []);
+
   useEffect(() => {
     const loop = loopRef.current;
     loop.animating = animating;
@@ -310,12 +345,14 @@ export function AutoScrollMarquee({
       // The row is a plain strip now: show the remaining copy from its start.
       loop.position = 0;
       writePosition(scroller, loop, 0);
+      updateAccessibleIndex(0);
       return;
     }
     // The row starts animating: place it in the middle of the track.
     loop.position = loop.period * (1 + placeInCopy(loop.position, loop.period));
     writePosition(scroller, loop, loop.position);
-  }, [animating]);
+    updateAccessibleIndex(loop.position);
+  }, [animating, updateAccessibleIndex]);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -370,7 +407,8 @@ export function AutoScrollMarquee({
     }
 
     if (scroller) writePosition(scroller, loop, loop.position);
-  }, [copyWidth]);
+    updateAccessibleIndex(loop.position);
+  }, [copyWidth, updateAccessibleIndex]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -396,6 +434,7 @@ export function AutoScrollMarquee({
       if (settled === loop.position) return;
       loop.position = settled;
       writePosition(scroller, loop, settled);
+      updateAccessibleIndex(settled);
     };
 
     const scheduleSettle = () => {
@@ -421,6 +460,7 @@ export function AutoScrollMarquee({
         const travel = direction === "ltr" ? speed : -speed;
         loop.position = advance(loop.position, travel * dt, loop.period);
         writePosition(scroller, loop, loop.position);
+        updateAccessibleIndex(loop.position);
       }
 
       frameId = requestAnimationFrame(tick);
@@ -441,6 +481,7 @@ export function AutoScrollMarquee({
       // is dropped by mobile browsers.
       loop.position = logical;
       interaction.pausedUntil = performance.now() + resumeDelay;
+      updateAccessibleIndex(logical);
       scheduleSettle();
     };
 
@@ -458,7 +499,7 @@ export function AutoScrollMarquee({
       scroller.removeEventListener("scroll", onScroll);
       scroller.removeEventListener("scrollend", onScrollEnd);
     };
-  }, [speed, direction, resumeDelay]);
+  }, [speed, direction, resumeDelay, updateAccessibleIndex]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -471,11 +512,10 @@ export function AutoScrollMarquee({
     });
   }, [resumeDelay]);
 
-  const copies = copiesNeeded(clientWidth, copyWidth, animating);
-  // An animating row shows the middle of the track, so the copy sitting there
-  // is the real one; the others repeat it for the wrap. A row that does not
-  // animate has a single copy, which is the real one.
-  const realCopyIndex = copies > 1 ? 1 : 0;
+  // The accessible copy follows the centre of the viewport, so a screen
+  // reader reaches the tiles that are on screen. It never points at a copy
+  // that does not exist.
+  const accessibleCopy = Math.min(Math.max(accessibleIndex, 0), copies - 1);
 
   return (
     <div
@@ -496,10 +536,10 @@ export function AutoScrollMarquee({
             key={index}
             ref={index === 0 ? copyRef : undefined}
             data-marquee-copy={index}
-            aria-hidden={index === realCopyIndex ? undefined : "true"}
+            aria-hidden={index === accessibleCopy ? undefined : "true"}
             className="flex shrink-0"
           >
-            {children({ index, isClone: index !== realCopyIndex })}
+            {children({ index, isClone: index !== accessibleCopy })}
           </div>
         ))}
       </div>

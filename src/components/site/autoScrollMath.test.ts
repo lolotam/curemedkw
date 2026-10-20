@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  accessibleCopyIndex,
   advance,
   copiesNeeded,
   normalizeToMiddle,
@@ -62,6 +63,33 @@ describe("normalizeToMiddle", () => {
 
   it("leaves the value alone when the period is unknown", () => {
     expect(normalizeToMiddle(120, 0)).toBe(120);
+  });
+});
+
+describe("accessibleCopyIndex", () => {
+  it("finds the copy under the centre of the viewport", () => {
+    expect(accessibleCopyIndex(500, 100, 500, 4)).toBe(1);
+  });
+
+  it("moves on when the centre crosses into the next copy", () => {
+    expect(accessibleCopyIndex(900, 200, 500, 4)).toBe(2);
+  });
+
+  it("handles a viewport wider than a copy", () => {
+    expect(accessibleCopyIndex(100, 1500, 500, 4)).toBe(1);
+  });
+
+  it("falls back to the first copy while the period is unknown", () => {
+    expect(accessibleCopyIndex(120, 300, 0, 4)).toBe(0);
+  });
+
+  it("returns the first copy when there is only one", () => {
+    expect(accessibleCopyIndex(120, 300, 500, 1)).toBe(0);
+  });
+
+  it("never points at a copy that does not exist", () => {
+    expect(accessibleCopyIndex(1900, 0, 500, 3)).toBe(2);
+    expect(accessibleCopyIndex(-100, 0, 500, 3)).toBe(0);
   });
 });
 
