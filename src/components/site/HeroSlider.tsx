@@ -53,8 +53,9 @@ export function HeroSlider({ pageKey, fallback, intervalMs }: Props) {
   // below it, so on narrow screens an image-only hero takes the image's height instead.
   const fitMediaOnMobile = !isAspectRatioMode && !!slides && slides.every((s) => isMediaOnlySlide(s, lang));
   const loadedRatios = Object.values(mediaRatios);
-  // The admin editor previews slides in a 16:9 frame, so 16:9 is the first-paint height (no layout shift
-  // for the usual upload); once slide images load, the tallest one wins so no slide shrinks below full width.
+  // The admin editor previews slides in a 16:9 frame, so 16:9 is the height the slides first paint at, and a
+  // 16:9 upload does not move again when its image loads; the tallest loaded image wins so no slide shrinks
+  // below full width. The loading placeholder stays full height because the slide kind is not known yet.
   const mobileAspect = loadedRatios.length > 0 ? Math.min(...loadedRatios) : 16 / 9;
 
   React.useEffect(() => {
