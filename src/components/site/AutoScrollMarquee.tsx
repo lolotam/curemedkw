@@ -329,15 +329,20 @@ export function AutoScrollMarquee({
   }, []);
 
   useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    // Stopping the animation or narrowing the viewport can remove the copy
+    // that holds the keyboard focus, which fires no focusout. The pause must
+    // not stay latched, so the focus state is read again.
+    interactionRef.current.focused = hasKeyboardFocus(scroller);
+  }, [animating, copies]);
+
+  useEffect(() => {
     const loop = loopRef.current;
     loop.animating = animating;
 
     const scroller = scrollerRef.current;
     if (!scroller) return;
-
-    // Stopping the animation removes the accessible copy, which takes the
-    // keyboard focus with it and fires no focusout.
-    interactionRef.current.focused = hasKeyboardFocus(scroller);
 
     if (loop.period <= 0) return;
 

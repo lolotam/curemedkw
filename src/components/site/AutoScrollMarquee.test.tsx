@@ -602,6 +602,68 @@ describe("AutoScrollMarquee", () => {
     expect(scroller.scrollLeft).toBe(1130);
   });
 
+  it("releases the keyboard pause when a copy is removed by a resize", async () => {
+    // jsdom has no :focus-visible heuristic, so stand in for a keyboard focus.
+    const originalMatches = Element.prototype.matches;
+    vi.spyOn(Element.prototype, "matches").mockImplementation(function (
+      this: Element,
+      selector: string,
+    ) {
+      if (selector === ":focus-visible") return true;
+      return originalMatches.call(this, selector);
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    let viewport = 2000;
+    vi.spyOn(Element.prototype, "clientWidth", "get").mockImplementation(() => viewport);
+
+    const { container } = render(
+      <AutoScrollMarquee autoScroll>
+        {() => <button type="button">Item</button>}
+      </AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+    const copies = container.querySelectorAll("[data-marquee-copy]");
+    expect(copies).toHaveLength(5);
+
+    // The keyboard focus is inside the copy that the resize removes.
+    const button = copies[4].querySelector("button") as HTMLElement;
+    button.focus();
+
+    scroller.scrollLeft = 120;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // The focus holds the row, so the offset is not normalised.
+    expect(scroller.scrollLeft).toBe(120);
+
+    // Narrowing the viewport removes that copy.
+    viewport = 1000;
+    await act(async () => {
+      resizeCallbacks.forEach((callback) => callback([], {} as ResizeObserver));
+    });
+
+    expect(container.querySelectorAll("[data-marquee-copy]")).toHaveLength(4);
+
+    scroller.scrollLeft = 130;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // The focus is gone, so the row settles again.
+    expect(scroller.scrollLeft).toBe(1130);
+  });
+
   it("stops the animation loop when it unmounts", () => {
     const cancelAnimationFrame = vi.fn();
     vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);
