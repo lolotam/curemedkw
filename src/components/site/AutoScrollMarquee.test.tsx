@@ -153,6 +153,56 @@ describe("AutoScrollMarquee", () => {
     expect(scroller?.scrollLeft).toBe(1000);
   });
 
+  it("keeps a focused link in view and settles back when the focus leaves", async () => {
+    // jsdom has no :focus-visible heuristic, so stand in for a keyboard focus.
+    const originalMatches = Element.prototype.matches;
+    vi.spyOn(Element.prototype, "matches").mockImplementation(function (
+      this: Element,
+      selector: string,
+    ) {
+      if (selector === ":focus-visible") return true;
+      return originalMatches.call(this, selector);
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockReturnValue({
+      width: 1000,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 1000,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+
+    const { container } = render(
+      <AutoScrollMarquee autoScroll>
+        {() => <button type="button">Item</button>}
+      </AutoScrollMarquee>,
+    );
+
+    const scroller = container.querySelector(".no-scrollbar") as HTMLElement;
+    const button = container.querySelector("button") as HTMLElement;
+
+    // The browser scrolls the row back to the first copy to show the focused link.
+    scroller.scrollLeft = 120;
+    scroller.dispatchEvent(new Event("scroll"));
+    button.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // The focused link must stay where the browser put it.
+    expect(scroller.scrollLeft).toBe(120);
+
+    // Once the focus leaves the row, it returns to the middle range.
+    button.dispatchEvent(
+      new FocusEvent("focusout", { bubbles: true, relatedTarget: document.body }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(scroller.scrollLeft).toBe(1120);
+  });
+
   it("stops the animation loop when it unmounts", () => {
     const cancelAnimationFrame = vi.fn();
     vi.stubGlobal("cancelAnimationFrame", cancelAnimationFrame);

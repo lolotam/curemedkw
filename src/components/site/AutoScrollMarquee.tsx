@@ -114,6 +114,8 @@ interface InteractionBindings {
   scroller: HTMLElement;
   interaction: MarqueeInteraction;
   resumeDelay: number;
+  /** Called when the keyboard focus leaves the row. */
+  onFocusLeave: () => void;
 }
 
 /**
@@ -121,7 +123,7 @@ interface InteractionBindings {
  * user is interacting with it. Returns the cleanup for those listeners.
  */
 function bindInteractions(bindings: InteractionBindings): () => void {
-  const { scroller, interaction, resumeDelay } = bindings;
+  const { scroller, interaction, resumeDelay, onFocusLeave } = bindings;
   let resumeTimer = 0;
 
   const onPointerEnter = (event: PointerEvent) => {
@@ -177,6 +179,8 @@ function bindInteractions(bindings: InteractionBindings): () => void {
     if (next && scroller.contains(next)) return;
     interaction.focused = false;
     interaction.pausedUntil = performance.now() + resumeDelay;
+    // The row may now move the focused link out of the way.
+    onFocusLeave();
   };
 
   scroller.addEventListener("pointerenter", onPointerEnter);
@@ -244,6 +248,10 @@ export function AutoScrollMarquee({
     focused: false,
     pausedUntil: 0,
   });
+
+  // The interactions live in their own effect, so they reach the settle
+  // through a ref that always points at the current scheduler.
+  const scheduleSettleRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const loop = loopRef.current;
@@ -322,6 +330,9 @@ export function AutoScrollMarquee({
     const settlePosition = () => {
       // Never normalise while a pointer is down: the row is still being dragged.
       if (interaction.pointerDown) return;
+      // A keyboard focus inside the row must stay visible, so the offset is
+      // left alone until the focus leaves.
+      if (interaction.focused) return;
       const loop = loopRef.current;
       if (!loop.animating || loop.period <= 0) return;
       const settled = normalizeToMiddle(loop.position, loop.period);
@@ -334,6 +345,8 @@ export function AutoScrollMarquee({
       window.clearTimeout(settleTimer);
       settleTimer = window.setTimeout(settlePosition, SETTLE_DELAY_MS);
     };
+
+    scheduleSettleRef.current = scheduleSettle;
 
     const tick = (now: number) => {
       const dt = Math.min(Math.max((now - lastFrame) / 1000, 0), MAX_FRAME_SECONDS);
@@ -397,6 +410,7 @@ export function AutoScrollMarquee({
       scroller,
       interaction: interactionRef.current,
       resumeDelay,
+      onFocusLeave: () => scheduleSettleRef.current(),
     });
   }, [resumeDelay]);
 
