@@ -17,13 +17,15 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001000_shipa_settings.sql", "20261103001100_shipa_dispatch_state.sql",
     "20261103001200_shipa_integrity.sql", "20261103001300_integration_payment_owner.sql",
     "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
-    "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql"))
+    "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql",
+    "20261103001800_integration_unbound_payments.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
-        ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql")
+        ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql",
+        ROOT / "supabase/tests/shipa/unbound_payments.sql")
 
 
 def open_psql(container):
@@ -408,6 +410,53 @@ def concurrent_begin_and_credential_mutation(container, previous_preparation):
         close_processes((first, second))
 
 
+def concurrent_unbound_and_callback(container):
+    order = "83000000-0000-4000-8000-000000000052"
+    attempt = "83000000-0000-4000-8000-000000000053"
+    status = json.dumps({"invoice_id": "unbound-race-invoice", "external_identifier": order,
+        "transaction_payment_id": "unbound-race-payment", "invoice_status": "PAID", "transaction_status": "SUCCESS", "details": {}})
+    fixture.sql(container, "INSERT INTO public.orders(id,customer_name,customer_email,customer_phone,governorate,city,address_line,subtotal,total,payment_method) "
+        f"VALUES ('{order}','Synthetic','unbound-race@example.test','50000001','Hawally','Hawally','Synthetic street',20,20,'pay_by_link'); "
+        "INSERT INTO public.payment_attempts(id,order_id,amount,idempotency_key) "
+        f"VALUES ('{attempt}','{order}',20,'unbound-race-key'); "
+        "INSERT INTO public.order_items(order_id,product_id,product_name_snapshot,quantity,unit_price,line_total) "
+        f"VALUES ('{order}','83000000-0000-4000-8000-000000000015','Race item',2,10,20);", "postgres")
+    output = fixture.sql(container, f"SET ROLE service_role; SELECT public.wa_record_unbound_payment_status('{status}');", "postgres")
+    if not output.startswith("SET\n"):
+        raise RuntimeError("Unbound fixture did not observe its service-role result")
+    pending = json.loads(output.split("\n", 1)[1])["pending_id"]
+    first_seen = fixture.sql(container, f"SELECT first_seen FROM private.wa_pending_payment_verifications WHERE id='{pending}'", "postgres")
+    fixture.sql(container, f"UPDATE public.payment_attempts SET invoice_id='unbound-race-invoice' WHERE id='{attempt}'", "postgres")
+    first, second = open_psql(container), open_psql(container)
+    try:
+        write_sql(first, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL ROLE service_role; "
+            f"SELECT public.wa_bind_unbound_payment_status('{pending}');")
+        bound = json.loads(first.stdout.readline())
+        write_sql(second, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='unbound-callback-race'; "
+            f"SET LOCAL ROLE service_role; SELECT public.wa_record_provider_payment_outcome('{order}','{attempt}',"
+            f"'{status}'::jsonb||'{{\"amount_millis\":20000,\"currency\":\"KWD\"}}','verified_callback'); COMMIT;")
+        write_sql(first, "RESET ROLE; " + observe_lock("unbound-callback-race") + "COMMIT;")
+        for process in (first, second):
+            process.stdin.close()
+            process.wait(timeout=15)
+            if process.returncode:
+                raise RuntimeError("Unbound/callback race failed: " + process.stderr.read().strip())
+        replay = json.loads(second.stdout.read().strip())
+        if bound["processed"] is not True or bound["payment_result"]["changed"] is not True or replay["changed"] is not False:
+            raise RuntimeError("Mapping repair/callback did not select one payment writer")
+        if bound["payment_result"]["outcome_id"] != replay["outcome_id"]:
+            raise RuntimeError("Mapping repair/callback selected different notification owners")
+        persisted = json.loads(fixture.sql(container, f"SELECT jsonb_build_array("
+            f"(SELECT count(*) FROM private.wa_payment_outcomes WHERE order_id='{order}'),"
+            f"(SELECT count(*) FROM private.wa_pending_payment_verifications WHERE order_id='{order}'),"
+            f"(SELECT attempt_count FROM private.wa_pending_payment_verifications WHERE id='{pending}'))", "postgres"))
+        if persisted != [1, 1, 0] or fixture.sql(container,
+                f"SELECT first_seen FROM private.wa_pending_payment_verifications WHERE id='{pending}'", "postgres") != first_seen:
+            raise RuntimeError("Mapping repair duplicated/reset recovery identity or consumed a GET attempt")
+    finally:
+        close_processes((first, second))
+
+
 def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
@@ -439,6 +488,7 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     sql_payload_matches_adapter(preparation, runtime[0], runtime[1])
     concurrent_begin_submission(container, preparation)
     concurrent_begin_and_credential_mutation(container, preparation)
+    concurrent_unbound_and_callback(container)
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
@@ -447,7 +497,8 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
         "concurrent_manual_clicks_single_intent_review": True,
         "concurrent_automatic_manual_single_identity": True, "actual_sql_payload_matches_deno_adapter": True,
         "concurrent_begin_one_marker_one_authorized_worker": True,
-        "concurrent_begin_blocks_credential_mutation": True, "production_access": False}
+        "concurrent_begin_blocks_credential_mutation": True, "unbound_callback_one_owner_preserved_history": True,
+        "production_access": False}
 
 
 def main():
