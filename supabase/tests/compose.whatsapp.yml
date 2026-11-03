@@ -1,0 +1,33 @@
+services:
+  db:
+    image: supabase/postgres@sha256:0e2279598bc0224fb5960c3a61eb23270cd60119427f3a7bdec86ba282600dcc
+    environment:
+      POSTGRES_PASSWORD: ${WA_FIXTURE_DATABASE_AUTH:?synthetic fixture credential required}
+      POSTGRES_DB: postgres
+    labels:
+      com.curemed.fixture: whatsapp
+      com.curemed.fixture.marker: ${WA_FIXTURE_MARKER:?manager fixture marker required}
+    volumes:
+      - database:/var/lib/postgresql/data
+    networks:
+      - isolated
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 45
+    mem_limit: 1g
+    cpus: 1
+volumes:
+  database:
+    labels:
+      com.curemed.fixture: whatsapp
+      com.curemed.fixture.marker: ${WA_FIXTURE_MARKER:?manager fixture marker required}
+networks:
+  isolated:
+    internal: true
+    ipam:
+      config:
+        - subnet: ${WA_FIXTURE_SUBNET:?manager isolated subnet required}
+    labels:
+      com.curemed.fixture: whatsapp
