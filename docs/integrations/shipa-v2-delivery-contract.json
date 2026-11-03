@@ -1,0 +1,1144 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "version": "2",
+    "title": "Shipa Delivery API",
+    "description": "Shipa Delivery API for managing orders.",
+    "contact": {
+      "name": "Shipa Delivery",
+      "url": "http://shipadelivery.com",
+      "email": "apps@shipadelivery.com"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://sandbox-api.shipadelivery.com/v2",
+      "description": "Sandbox server (uses test data)"
+    },
+    {
+      "url": "https://api.shipadelivery.com/v2",
+      "description": "Production server (uses live data)"
+    }
+  ],
+  "paths": {
+    "/orders": {
+      "post": {
+        "operationId": "v2-post-order",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Create new delivery order",
+        "description": "Provide order to use delivery service.",
+        "parameters": [
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Order"
+              }
+            }
+          },
+          "description": "Order object",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Success processing record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateOrdersResponse"
+                }
+              }
+            }
+          },
+          "4XX": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Unexpected error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "v2-order-by-id",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Get detail information about the order",
+        "description": "Provides detail information about the order  (the orderId can be Shipa identifier or Will locate first order found by order customer reference, previously passed when created Order in field custref))",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "description": "Order ID ( can be Shipa identifier or Will locate first order found by order customer reference, previously passed when created Order in field custref)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found by orderId"
+          },
+          "5XX": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/story": {
+      "get": {
+        "operationId": "v2-order-history",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Get history for the order",
+        "description": "Provides timely sorted list of events for specific order",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "description": "Order ID ( can be Shipa identifier or Will locate first order found by order customer reference, previously passed when created Order in field custref)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseHistory"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/orders/{orderId}/tracking": {
+      "get": {
+        "operationId": "v2-order-tracking",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Track order",
+        "description": "The tracking API returns the live (current) geolocation location of the courier and the estimated arrival time during the actual pickup of an order (if type is Pickup) or during the actual delivery of an order (if type is Delivery). <br>\nPickup orders: If the Pickup process has not started yet, or it has been completed, the API returns null.<br>\nDelivery orders: If the Dropoff process has not started yet, or order has been delivered, the API returns null.\n",
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "description": "Order ID ( can be Shipa identifier or Will locate first order found by order customer reference, previously passed when created Order in field custref)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tracking"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Order not found"
+          },
+          "5XX": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/countries": {
+      "get": {
+        "operationId": "v2-countries",
+        "tags": [
+          "common"
+        ],
+        "summary": "Get list of countries available",
+        "description": "Provides list of countries where delivery services are available",
+        "parameters": [
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResponseCountries"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/countries/{iso3Code}": {
+      "get": {
+        "operationId": "v2-countries-byid",
+        "tags": [
+          "common"
+        ],
+        "summary": "Get detauils / cities for country by code",
+        "description": "Provides list of cities where delivery services are available in country",
+        "parameters": [
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "iso3Code",
+            "in": "path",
+            "description": "The ISO 3 symbols code for country identifier",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Country"
+                }
+              }
+            }
+          },
+          "5XX": {
+            "description": "Unexpected error"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "v2-health",
+        "tags": [
+          "orders"
+        ],
+        "summary": "Get Service Health Stauts",
+        "description": "Provides service availability status.",
+        "parameters": [
+          {
+            "name": "apikey",
+            "in": "query",
+            "description": "Apigee API Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealchCheckResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealchCheckResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddressCode": {
+        "type": "object",
+        "description": "Address code, optional",
+        "required": [
+          "type",
+          "code"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Code type. Allowed types is 'makani' (ARE only) | 'w3w' (all countries) | 'paci' (KWT only) | 'short-address' (KSA only)"
+          },
+          "code": {
+            "type": "string",
+            "description": "address code"
+          }
+        }
+      },
+      "City": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "country"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "City name in English"
+          },
+          "state": {
+            "type": "string",
+            "description": "State name"
+          }
+        }
+      },
+      "Country": {
+        "type": "object",
+        "required": [
+          "code",
+          "name"
+        ],
+        "properties": {
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/City"
+            }
+          },
+          "name": {
+            "type": "string",
+            "description": "Country name in English"
+          },
+          "isoAlpha3": {
+            "type": "string",
+            "description": "Country 3 symbol code supported for delivery"
+          }
+        }
+      },
+      "CreateOrdersResponse": {
+        "type": "object",
+        "properties": {
+          "shipaRef": {
+            "type": "string",
+            "description": "Company Order id (should be used when calling /order)"
+          },
+          "orderStatus": {
+            "type": "string",
+            "description": "Code of delivery status (immediate status returned, further activity should be tracked with GetDetail)"
+          }
+        }
+      },
+      "Destination": {
+        "type": "object",
+        "required": [
+          "contactName",
+          "contactNo",
+          "city",
+          "country"
+        ],
+        "properties": {
+          "contactName": {
+            "type": "string",
+            "description": "Contact name, should has less than 150 characters",
+            "maxLength": 150
+          },
+          "contactNo": {
+            "type": "string",
+            "format": "phone",
+            "description": "Phone number in international format, should be in permitted locations, fake number will not be accepted"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email of contact (optional)"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PUDO",
+              "Doorstep"
+            ],
+            "description": "Specifies destination type whether it's a CollectionPoint Location (PUDO) or a normal delivery to the consignee\u2019s address (Doorstep). <br>\n  Values:<br>\n - Doorstep (Default)\n - PUDO\n"
+          },
+          "id": {
+            "type": "string",
+            "description": "PUDO location id. Required if type = 'PUDO'."
+          },
+          "address": {
+            "type": "string",
+            "description": "Street address should be 1000 characters or less",
+            "maxLength": 1000
+          },
+          "coordinates": {
+            "$ref": "#/components/schemas/GeoPoint"
+          },
+          "addressCode": {
+            "$ref": "#/components/schemas/AddressCode"
+          },
+          "city": {
+            "type": "string",
+            "description": "City identified by name (Refer to /countries list, should be in cities list for country)"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country identified by iso3Code (Refer to /countries list)"
+          },
+          "contactIdentityNo": {
+            "type": "string",
+            "description": "Contact Identity Number"
+          },
+          "options": {
+            "$ref": "#/components/schemas/Options"
+          }
+        }
+      },
+      "Document": {
+        "type": "object",
+        "description": "Document details.",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 300,
+            "description": "Document URL."
+          },
+          "type": {
+            "type": "string",
+            "description": "Document type. Allowed values: `invoice`, `other`. Default value is `other`.",
+            "enum": [
+              "invoice",
+              "other"
+            ],
+            "default": "other"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Errors response for standard issues",
+        "properties": {
+          "code": {
+            "type": "number",
+            "description": "Error code semantically similar to HTTP codes"
+          },
+          "message": {
+            "type": "string",
+            "description": "error message"
+          }
+        }
+      },
+      "GeoPoint": {
+        "type": "object",
+        "description": "Geographical coordinates with latitude & longtitude",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "description": "latitude in number format -180 to 180"
+          },
+          "longitude": {
+            "type": "number",
+            "description": "longitude in number format -180 to 180"
+          }
+        }
+      },
+      "HealchCheckResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "ERROR"
+            ],
+            "description": "Upstream service OK/ERROR"
+          }
+        }
+      },
+      "Options": {
+        "type": "object",
+        "properties": {
+          "preferredDateTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date merchant promised for pickup / estimated delivery"
+          },
+          "amountToCollect": {
+            "type": "number",
+            "description": "Amount that Delivery Assistant should collect at the location."
+          },
+          "specialInstructions": {
+            "type": "string",
+            "description": "Additional note about delivery/pickup preferences"
+          }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "required": [
+          "customerRef",
+          "type",
+          "origin",
+          "destination",
+          "packages"
+        ],
+        "properties": {
+          "customerRef": {
+            "type": "string",
+            "description": "Customer Order reference (may be guaranteed to be unique)",
+            "minLength": 1
+          },
+          "customerRef2": {
+            "type": "string",
+            "description": "Customer Order reference 2",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Delivery",
+              "Pickup"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "On Demand",
+              "Same Day",
+              "Next Day",
+              "Cross Border"
+            ],
+            "default": "Next Day"
+          },
+          "dtBillingOptions": {
+            "type": "string",
+            "description": "Describes who should pay the Duty & Tax",
+            "enum": [
+              "DDP",
+              "DDU"
+            ]
+          },
+          "autoConfirm": {
+            "type": "boolean",
+            "description": "Automatically confirm don\u2019t send SMS to receiver to confirm location (If SMS is enabled for the account)",
+            "default": false
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Destination"
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Package"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "description": "This array can be empty if no documents are available.",
+            "items": {
+              "$ref": "#/components/schemas/Document"
+            }
+          }
+        }
+      },
+      "OrderDetails": {
+        "type": "object",
+        "properties": {
+          "readyForDelivery": {
+            "type": "boolean",
+            "description": "Indicates if order is ready to be delivered and is awaiting pickup.",
+            "minLength": 1
+          },
+          "customerRef": {
+            "type": "string",
+            "description": "Customer Order reference (may be guaranteed to be unique)",
+            "minLength": 1
+          },
+          "customerRef2": {
+            "type": "string",
+            "description": "Customer Order reference 2",
+            "minLength": 1
+          },
+          "shipaRef": {
+            "type": "string",
+            "description": "Shipa order reference"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current order status",
+            "minLength": 1
+          },
+          "chargeableWeight": {
+            "type": "number",
+            "description": "Shipment weight used to calculate shipping cost upon invoicing"
+          },
+          "storyStatusId": {
+            "type": "integer",
+            "description": "Current story id of the order"
+          },
+          "storyStatusText": {
+            "type": "string",
+            "description": "Current story text of the order"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "Delivery",
+              "Pickup"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "On Demand",
+              "Same Day",
+              "Next Day",
+              "Cross Border"
+            ],
+            "default": "Next Day"
+          },
+          "dtBillingOptions": {
+            "type": "string",
+            "description": "Describes who should pay the Duty & Tax",
+            "enum": [
+              "DDP",
+              "DDU"
+            ]
+          },
+          "autoConfirm": {
+            "type": "boolean",
+            "description": "Automatically confirm don\u2019t send SMS to receiver to confirm location (If SMS is enabled for the account)",
+            "default": false
+          },
+          "origin": {
+            "type": "object",
+            "properties": {
+              "contactName": {
+                "type": "string",
+                "description": "Contact name, should has less than 150 characters",
+                "maxLength": 150
+              },
+              "contactNo": {
+                "type": "string",
+                "format": "phone",
+                "description": "Phone number in international format, should be in permitted locations, fake number will not be accepted"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "Email of contact"
+              },
+              "address": {
+                "type": "string",
+                "description": "Street address should be 1000 characters or less",
+                "maxLength": 1000
+              },
+              "coordinates": {
+                "$ref": "#/components/schemas/GeoPoint"
+              },
+              "addressCode": {
+                "type": "object",
+                "description": "Address code",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Code type. Types are 'makani' (ARE only) | 'w3w' (all countries) | 'paci' (KWT only) | 'short-address' (KSA only)"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "address code"
+                  }
+                }
+              },
+              "city": {
+                "type": "string",
+                "description": "City identified by name"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country identified by iso3Code (Refer to /countries list). For \"Cross Border\" order category, it can be the isoAlpha3 code for any country (worldwide).\n"
+              },
+              "options": {
+                "$ref": "#/components/schemas/Options"
+              }
+            }
+          },
+          "destination": {
+            "type": "object",
+            "properties": {
+              "contactName": {
+                "type": "string",
+                "description": "Contact name, should has less than 150 characters",
+                "maxLength": 150
+              },
+              "contactNo": {
+                "type": "string",
+                "format": "phone",
+                "description": "Phone number in international format, should be in permitted locations, fake number will not be accepted"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "description": "Email of contact"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "PUDO",
+                  "Doorstep"
+                ],
+                "description": "Specifies destination type whether it's a CollectionPoint Location (PUDO) or a normal delivery to the consignee\u2019s address (Doorstep). <br>\n  Values:<br>\n - Doorstep (Default)\n - PUDO\n"
+              },
+              "address": {
+                "type": "string",
+                "description": "Street address should be 1000 characters or less",
+                "maxLength": 1000
+              },
+              "coordinates": {
+                "$ref": "#/components/schemas/GeoPoint"
+              },
+              "addressCode": {
+                "type": "object",
+                "description": "Address code",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "Code type. Types are 'makani' (ARE only) | 'w3w' (all countries) | 'paci' (KWT only) | 'short-address' (KSA only)"
+                  },
+                  "code": {
+                    "type": "string",
+                    "description": "address code"
+                  }
+                }
+              },
+              "city": {
+                "type": "string",
+                "description": "City identified by name (Refer to /countries list, should be in cities list for country)"
+              },
+              "country": {
+                "type": "string",
+                "description": "Country identified by iso3Code (Refer to /countries list). For \"Cross Border\" order category, it can be the isoAlpha3 code for any country (worldwide).\n"
+              },
+              "contactIdentityNo": {
+                "type": "string",
+                "description": "Contact Identity Number"
+              },
+              "options": {
+                "$ref": "#/components/schemas/Options"
+              }
+            }
+          },
+          "packages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PackageDetails"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "description": "This array can be empty if no documents are available.",
+            "items": {
+              "type": "object",
+              "description": "Document details.",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "maxLength": 300,
+                  "description": "Document URL."
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Document type. Allowed values: `invoice`, `other`. Default value is `other`.",
+                  "enum": [
+                    "invoice",
+                    "other"
+                  ],
+                  "default": "other"
+                }
+              }
+            }
+          }
+        }
+      },
+      "Origin": {
+        "type": "object",
+        "required": [
+          "contactName",
+          "contactNo",
+          "city",
+          "country"
+        ],
+        "properties": {
+          "contactName": {
+            "type": "string",
+            "description": "Contact name, should has less than 150 characters",
+            "maxLength": 150
+          },
+          "contactNo": {
+            "type": "string",
+            "format": "phone",
+            "description": "Phone number in international format, should be in permitted locations, fake number will not be accepted"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email of contact (optional)"
+          },
+          "address": {
+            "type": "string",
+            "description": "Street address should be 1000 characters or less",
+            "maxLength": 1000
+          },
+          "coordinates": {
+            "$ref": "#/components/schemas/GeoPoint"
+          },
+          "addressCode": {
+            "$ref": "#/components/schemas/AddressCode"
+          },
+          "city": {
+            "type": "string",
+            "description": "City identified by name (Refer to /countries list, should be in cities list for country)"
+          },
+          "country": {
+            "type": "string",
+            "description": "Country identified by iso3Code (Refer to /countries list). For \"Cross Border\" order category, it can be the isoAlpha3 code for any country (worldwide).\n"
+          },
+          "options": {
+            "$ref": "#/components/schemas/Options"
+          }
+        }
+      },
+      "Package": {
+        "type": "object",
+        "required": [
+          "name",
+          "customerRef"
+        ],
+        "properties": {
+          "customerRef": {
+            "type": "string",
+            "description": "required, no spaces recommended",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Package name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Package details. Maximum length is 1000 characters, any exceeding text will be truncated."
+          },
+          "goodsValue": {
+            "type": "number",
+            "description": "Invoice value of package items. Must be > 0 if category is \u2018Cross Border\u2019"
+          },
+          "commodity": {
+            "type": "string"
+          },
+          "length": {
+            "type": "number",
+            "description": "Package length (CM)"
+          },
+          "height": {
+            "type": "number",
+            "description": "Package height (CM)"
+          },
+          "width": {
+            "type": "number",
+            "description": "Package width (CM)"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Package weight (KG)"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Package items quantity (#)",
+            "minimum": 1
+          },
+          "itemsCode": {
+            "type": "string",
+            "description": "The itemsCode is code of the package"
+          },
+          "volumetricWeight": {
+            "type": "number",
+            "description": "Weight in Kilograms"
+          },
+          "items": {
+            "type": "array",
+            "description": "Items attribute list down the items in a package which can be used in Pickup order type (RVP) to provide a hint for the courier on what items are expected to be picked up.",
+            "items": {
+              "$ref": "#/components/schemas/PackageItem"
+            }
+          }
+        }
+      },
+      "PackageDetails": {
+        "type": "object",
+        "properties": {
+          "customerRef": {
+            "type": "string",
+            "description": "Customer package reference",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "description": "Package name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Package details. Maximum length is 1000 characters."
+          },
+          "goodsValue": {
+            "type": "number",
+            "description": "Invoice value of package items"
+          },
+          "commodity": {
+            "type": "string"
+          },
+          "length": {
+            "type": "number",
+            "description": "Package length (CM)"
+          },
+          "height": {
+            "type": "number",
+            "description": "Package height (CM)"
+          },
+          "width": {
+            "type": "number",
+            "description": "Package width (CM)"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Package weight (KG)"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Package items quantity (#)",
+            "minimum": 1
+          },
+          "itemsCode": {
+            "type": "string",
+            "description": "The itemsCode is code of the package"
+          },
+          "volumetricWeight": {
+            "type": "number",
+            "description": "Weight in Kilograms"
+          },
+          "shipaRef": {
+            "type": "string",
+            "description": "Shipa package referene"
+          },
+          "items": {
+            "type": "array",
+            "description": "Items attribute list down the items in a package which can be used in Pickup order type (RVP) to provide a hint for the courier on what items are expected to be picked up.",
+            "items": {
+              "$ref": "#/components/schemas/PackageItem"
+            }
+          }
+        }
+      },
+      "PackageItem": {
+        "type": "object",
+        "description": "Item in a package which can be used in Pickup order type (RVP) to provide a hint for the courier on what items are expected to be picked up.",
+        "required": [
+          "sku"
+        ],
+        "properties": {
+          "sku": {
+            "type": "string",
+            "description": "SKU of the item"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Item quantity"
+          },
+          "description": {
+            "type": "string",
+            "description": "Item description"
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "URL to the photo of the item"
+          }
+        }
+      },
+      "ResponseCountries": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Country"
+        }
+      },
+      "ResponseHistory": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/State"
+        }
+      },
+      "State": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Code of state"
+          },
+          "date": {
+            "type": "number",
+            "description": "Time of state (timestamp, UTC)"
+          },
+          "details": {
+            "type": "object",
+            "description": "Information about state"
+          },
+          "statusCode": {
+            "$ref": "#/components/schemas/StoryStatusCodes"
+          }
+        },
+        "description": "Entry of history (sorted in ascending date order)"
+      },
+      "StoryStatusCodes": {
+        "type": "string",
+        "description": "Story status codes with description. <br>\n[Download status codes as file](https://shipadelivery-devportal.apigee.io/files/Shipa_StoryStatusCodes.xlsx) <br>\nType abbreviations: **I** | intermediate, **F** | final <br>\n| Code | Type | Description |\n| ---------| - | ----------- |\n| 1  | I | Order Created |\n| 2  | I | Pending Pickup Confirmation |\n| 3  | I | Ready For Pickup |\n| 4  | I | Scheduled For Pickup |\n| 5  | I | Out For Pickup |\n| 6  | I | On The Way To Pickup Location |\n| 7  | I | Arrived At Pickup Location |\n| 8  | I | Pickup Failed |\n| 9  | I | On Hold With Sender |\n| 10 | F | Cancelled |\n| 11 | I | Pickup Completed |\n| 12 | I | Received By Destination Hub |\n| 13 | I | Pending Delivery Confirmation |\n| 14 | I | Ready To Ship |\n| 15 | I | Scheduled For Delivery |\n| 16 | I | Out For Delivery |\n| 17 | I | On The Way To Delivery Location |\n| 18 | I | Arrived At Delivery Location |\n| 19 | F | Delivered |\n| 20 | I | Delivery Failed |\n| 21 | I | On Hold At Destination Hab |\n| 22 | I | Rescheduled |\n| 23 | I | Scheduled For Return |\n| 24 | I | Out For Return |\n| 25 | I | Return Arrived |\n| 26 | F | Returned |\n| 27 | I | Arrived Sorting Facility at Destination|\n| 28 | I | Received At Origin Facility|\n| 29 | I | In Transit|\n| 30 | I | Customs Clearance \\| In Progress |\n| 31 | I | Customs Clearance \\| On Hold |\n| 33 | I | Customs Clearance \\| Complete |\n| 34 | I | Departed Origin Facility|\n| 35 | I | Departed Origin Airport |\n| 36 | I | Arrived Destination Airport |\n| 37 | I | Arrived At Port Of Exit |\n| 38 | I | Received By Port Of Exit |\n| 39 | I | On Hold With Port Of Exit |\n| 40 | I | Received By Port Of Entry |\n| 41 | I | Received From Customs |\n| 42 | I | Received By Origin Hub |\n| 43 | I | Received By Sorting Hub |\n| 44 | I | Shipped To Origin Hub |\n| 45 | I | Shipped To Sorting Hub |\n| 46 | I | Shipped To Destination Hub |\n| 47 | I | Arrived To Origin Hub |\n| 48 | I | Arrived To Sorting Hub |\n| 49 | I | Arrived To Destination Hub |\n| 50 | I | On The Way To Collection Point |\n| 51 | I | Arrived At Collection Point |\n| 52 | I | Received At Collection Point |\n| 53 | I | Pending Fulfillment |\n| 54 | I | Picked Fulfillment |\n| 55 | I | Packed Fulfillment |\n| 56 | I | Shipped Fulfillment |\n| 57 | I | In Transit (internal) |\n| 58 | I | Arrived To Destination City |\n| 60 | F | Damaged |\n| 61 | I | Dispatch Failed |\n| 62 | I | Customs Clearance - Details Missing |\n| 63 | I | Customs Clearance - Details Received |\n| 68 | F | Disposed |\n| 69 | F | Relabeled |\n| 70 | F | Lost |\n| 73 | I | Address Updated |\n| 78 | I | Repacked |\n| 81 | I | Pickup Attempt Failed |\n| 82 | I | Delivery Attempt Failed |\n"
+      },
+      "Tracking": {
+        "type": "object",
+        "required": [
+          "eta",
+          "location"
+        ],
+        "properties": {
+          "duration": {
+            "type": "object",
+            "description": "Estimated Arrival Time in text or seconds (value)",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "value": {
+                "type": "integer"
+              }
+            }
+          },
+          "distance": {
+            "type": "object",
+            "description": "Estimated distance to destination in text or meters (value)",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "value": {
+                "type": "integer"
+              }
+            }
+          },
+          "location": {
+            "$ref": "#/components/schemas/GeoPoint"
+          }
+        }
+      }
+    }
+  }
+}
