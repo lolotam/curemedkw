@@ -11,7 +11,7 @@ INSERT INTO verification_cases
 SELECT label,md5('verification-order:'||label)::uuid,md5('verification-attempt:'||label)::uuid,
   jsonb_build_object('invoice_id','verification-invoice-'||label,'external_identifier',md5('verification-order:'||label)::uuid,
     'transaction_payment_id','verification-payment-'||label,'invoice_status','PAID','transaction_status','SUCCESS','details','{}'::jsonb)
-FROM unnest(ARRAY['legacy','durable','mismatch','stale','expiry','retry','expired-final','changed-total']) label;
+FROM unnest(ARRAY['legacy','durable','mismatch','stale','expiry','retry','expired-final','changed-total','refunded-later']) label;
 INSERT INTO public.orders(id,customer_name,customer_email,customer_phone,governorate,city,address_line,subtotal,total,payment_method)
 SELECT order_id,'Synthetic buyer','buyer@example.test','50000001','Hawally','Hawally','Synthetic street',20,20,'pay_by_link'
 FROM verification_cases;
@@ -185,6 +185,7 @@ UPDATE private.wa_pending_payment_verifications SET lease_expires_at=clock_times
 UPDATE private.wa_pending_payment_verifications SET attempt_count=6,lease_token=(gen_random_uuid()),lease_expires_at=now()-interval '1 minute'
   WHERE order_id=(SELECT order_id FROM verification_cases WHERE label='expired-final');
 UPDATE public.orders SET total=21 WHERE id=(SELECT order_id FROM verification_cases WHERE label='changed-total');
+UPDATE public.orders SET payment_status='refunded' WHERE id=(SELECT order_id FROM verification_cases WHERE label='refunded-later');
 SET LOCAL ROLE service_role;
 DO $expired_worker_and_changed_total$
 DECLARE c record; old_claim jsonb; claim jsonb; verified jsonb;
@@ -214,14 +215,26 @@ BEGIN
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
 END
 $expired_worker_and_changed_total$;
+DO $refund_does_not_block_payment_evidence$
+DECLARE c record; claim jsonb; receipt jsonb;
+BEGIN
+  SELECT * INTO c FROM pg_temp.verification_cases WHERE label='refunded-later';
+  claim:=public.wa_claim_pending_payment_verification(c.order_id,'84000000-0000-4000-8000-000000000003');
+  receipt:=public.wa_resolve_pending_payment_verification((claim->>'id')::uuid,(claim->>'lease_token')::uuid,
+    c.attestation||'{"amount_millis":20000,"currency":"KWD"}','resolved');
+  IF receipt->>'evidence_id' IS NULL OR receipt->>'expansion_state' IS DISTINCT FROM 'skipped' THEN
+    RAISE EXCEPTION 'Later refund erased valid payment evidence or scheduled a notification';
+  END IF;
+END
+$refund_does_not_block_payment_evidence$;
 RESET ROLE;
 DO $persisted_evidence$
 DECLARE c record;
 BEGIN
-  IF (SELECT count(*) FROM private.wa_payment_evidence)<>4 OR (SELECT count(*) FROM private.order_payment_verifications)<>4
-    OR (SELECT count(*) FROM public.whatsapp_notification_events)<>3 OR EXISTS(SELECT 1 FROM public.shipments)
+  IF (SELECT count(*) FROM private.wa_payment_evidence)<>5 OR (SELECT count(*) FROM private.order_payment_verifications)<>5
+    OR (SELECT count(*) FROM public.whatsapp_notification_events)<>4 OR (SELECT count(*) FROM public.shipments)<>4
     OR EXISTS(SELECT 1 FROM public.whatsapp_delivery_jobs) THEN
-    RAISE EXCEPTION 'Evidence/event/receipt cardinality drifted or a send/shipment was invented';
+    RAISE EXCEPTION 'Evidence/event/receipt/intent cardinality drifted or a message send was invented';
   END IF;
   SELECT * INTO c FROM pg_temp.verification_cases WHERE label='durable';
   IF NOT EXISTS(SELECT 1 FROM private.order_payment_verifications WHERE order_id=c.order_id AND dispatch_decision='enqueued')
@@ -248,6 +261,9 @@ BEGIN
     order_id=(SELECT order_id FROM pg_temp.verification_cases WHERE label='expired-final') AND state='needs_review'
       AND safe_reason='verification_attempts_exhausted') THEN
     RAISE EXCEPTION 'Expired final worker remained endlessly retryable';
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.shipments WHERE order_id=(SELECT order_id FROM pg_temp.verification_cases WHERE label='refunded-later')) THEN
+    RAISE EXCEPTION 'Later refund created an automatic shipment';
   END IF;
 END
 $persisted_evidence$;

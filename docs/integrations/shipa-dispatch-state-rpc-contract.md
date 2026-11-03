@@ -1,5 +1,7 @@
 # Shipa dispatch-result state subset
 
+Dependency update, 2026-11-04: shared first-success/strict evidence SQL and receipt-owned automatic/manual intents are now implemented locally. See `shared-payment-owner-contract.md` and `shipa-intent-rpc-contract.md`. Submission begin, its final durable marker/worker and end-to-end runtime remain unfinished. The sections below retain the original state/result checkpoint and its proof boundaries.
+
 2026-11-03. Locally tested state/result dependency, not a complete dispatch implementation. This migration does not create a payment receipt writer, enqueue/manual-request writer, submission owner, status poller, reconciliation endpoint or scheduler. No code can infer permission to book from these objects alone.
 
 ## Ownership and schema

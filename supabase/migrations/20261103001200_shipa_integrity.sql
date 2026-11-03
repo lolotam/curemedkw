@@ -22,9 +22,9 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='shipa_invalid_review_snapshot';
   END IF;
   v_destination:=jsonb_build_object('contactName',p_order.customer_name,'contactPhone',p_order.customer_phone,
-    'countryCode',p_order.country,'governorate',p_order.governorate,'city',p_order.city,
-    'addressLine',p_order.address_line,'area',p_order.area,'block',p_order.block,
-    'street',p_order.street,'building',p_order.building);
+    'countryCode',coalesce(p_order.country,''),'governorate',coalesce(p_order.governorate,''),'city',coalesce(p_order.city,''),
+    'addressLine',coalesce(p_order.address_line,''),'area',coalesce(p_order.area,''),'block',coalesce(p_order.block,''),
+    'street',coalesce(p_order.street,''),'building',coalesce(p_order.building,''));
   IF p_overrides ? 'destination' THEN
     IF jsonb_typeof(p_overrides->'destination') IS DISTINCT FROM 'object'
       OR (p_overrides->'destination')-ARRAY['contactName','contactPhone','countryCode','governorate','city',
@@ -144,14 +144,18 @@ BEGIN
     OR p_delivery#>'{destination,contactPhone}'='null'::jsonb
     OR nullif(btrim(p_delivery#>>'{destination,governorate}'),'') IS NULL
     OR nullif(btrim(p_delivery#>>'{destination,city}'),'') IS NULL
-    OR nullif(btrim(p_delivery#>>'{destination,addressLine}'),'') IS NULL THEN
+    OR (nullif(btrim(p_delivery#>>'{destination,addressLine}'),'') IS NULL
+      AND (nullif(btrim(p_delivery#>>'{destination,street}'),'') IS NULL
+        OR nullif(btrim(p_delivery#>>'{destination,building}'),'') IS NULL)) THEN
     v_reasons:=array_append(v_reasons,'destination_incomplete');
   END IF;
   IF nullif(btrim(p_config#>>'{origin,contactName}'),'') IS NULL
     OR private.shipa_kuwait_phone(p_config#>>'{origin,contactPhone}') IS NULL
     OR nullif(btrim(p_config#>>'{origin,address,governorate}'),'') IS NULL
     OR nullif(btrim(p_config#>>'{origin,address,area}'),'') IS NULL
-    OR nullif(btrim(p_config#>>'{origin,address,addressLine}'),'') IS NULL
+    OR (nullif(btrim(p_config#>>'{origin,address,addressLine}'),'') IS NULL
+      AND (nullif(btrim(p_config#>>'{origin,address,street}'),'') IS NULL
+        OR nullif(btrim(p_config#>>'{origin,address,building}'),'') IS NULL))
     OR p_config->>'serviceCode' IS NULL THEN v_reasons:=array_append(v_reasons,'origin_or_service_incomplete'); END IF;
   IF p_delivery#>'{parcel,weightKg}'='null'::jsonb OR p_delivery#>'{parcel,dimensionsCm}'='null'::jsonb THEN
     v_reasons:=array_append(v_reasons,'parcel_incomplete');
@@ -217,10 +221,21 @@ BEGIN
 END
 $fn$;
 
+CREATE OR REPLACE FUNCTION private.shipa_automatic_integrity(p_order_id uuid,p_environment text)
+RETURNS jsonb LANGUAGE plpgsql SET search_path=pg_catalog,public,private,pg_temp AS $fn$
+BEGIN
+  RETURN public.shipa_check_integrity(p_order_id,jsonb_build_object('environment',p_environment));
+EXCEPTION WHEN invalid_parameter_value THEN
+  IF SQLERRM NOT IN ('shipa_invalid_review_snapshot','shipa_invalid_config','shipa_invalid_origin','shipa_invalid_parcel') THEN RAISE; END IF;
+  RETURN jsonb_build_object('accepted',false,'reasons',jsonb_build_array('delivery_input_invalid'),'input_fingerprint',NULL);
+END
+$fn$;
+
 REVOKE ALL ON FUNCTION private.shipa_kuwait_phone(text),
   private.shipa_delivery_snapshot(public.orders,jsonb,jsonb),
   private.shipa_item_snapshot(uuid),private.shipa_coupon_snapshot(public.orders),
   private.shipa_price_snapshot(public.orders),private.shipa_delivery_issues(jsonb,jsonb),
-  private.shipa_input_fingerprint(public.orders,public.integrations,jsonb) FROM PUBLIC,anon,authenticated,service_role;
+  private.shipa_input_fingerprint(public.orders,public.integrations,jsonb),private.shipa_automatic_integrity(uuid,text)
+  FROM PUBLIC,anon,authenticated,service_role;
 REVOKE ALL ON FUNCTION public.shipa_check_integrity(uuid,jsonb) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.shipa_check_integrity(uuid,jsonb) TO service_role;

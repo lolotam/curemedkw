@@ -191,7 +191,7 @@ BEGIN
     WHEN p_manual_only THEN 'already_paid_manual_only' WHEN NOT settings.enabled THEN 'disabled'
     WHEN settings.dispatch_mode='manual_after_packing' THEN 'manual_mode' ELSE 'enqueued' END;
   IF decision='enqueued' THEN
-    integrity:=public.shipa_check_integrity(p_order.id,jsonb_build_object('environment',settings.environment));
+    integrity:=private.shipa_automatic_integrity(p_order.id,settings.environment);
     IF NOT (integrity->>'accepted')::boolean THEN decision:='integrity_hold'; END IF;
   END IF;
   RETURN jsonb_build_object('integration_id',settings.id,'environment',settings.environment,

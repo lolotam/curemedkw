@@ -1,5 +1,7 @@
 # Shipa integrity and review fingerprint
 
+Dependency update, 2026-11-04: shared payment evidence, retention activation and receipt-owned intents/reviews now exist locally. The original integrity checkpoint below remains historical evidence; submission begin/runtime are still unfinished. The committed assembled proof now lives at `supabase/tests/shipa/payment_owner_proof.py`.
+
 2026-11-03. This additive SQL dependency supports the reviewed manual and automatic Shipa paths. It does not enable either path. It installs functions only; it changes no existing table grants, defaults, triggers, constraints or stored order values.
 
 ## Service boundary
@@ -29,7 +31,7 @@ The function compares item quantity/unit price/line total with current stored ca
 
 Negative/NaN prices and inconsistent totals are review issues. Total uses subtotal minus discount; unexpected nonzero delivery_fee/tax_amount, if those columns are introduced, remain review-only. Non-KWD currency is flagged; the payment owner separately rejects an unbound provider identity/amount/currency, with no staff override of payment evidence.
 
-Destination needs a nonblank contact, valid Kuwait phone, Kuwait country, governorate, city and full address line. Origin/service and explicit parcel defaults are checked for completeness. The function does not infer detailed-address components. Captured KWT directory membership, merchant Next Day entitlement, final adapter payload validation and other runtime eligibility checks remain mandatory before begin-submission. Missing dimensions/weight are review work, never fabricated defaults.
+Destination needs a nonblank contact, valid Kuwait phone, Kuwait country, governorate, city and either a full address line or structured street plus building. Origin requires governorate/area with that same freeform-or-structured rule, plus the configured contact/service and explicit parcel defaults. Nullable optional order fields become empty strings for review. No block/PACI/coordinate requirement is invented. Captured KWT directory membership, merchant Next Day entitlement, final adapter payload validation and other runtime eligibility checks remain mandatory before begin-submission. Missing dimensions/weight are review work, never fabricated defaults.
 
 Review reasons are deduplicated and sorted fixed codes: catalog_missing, catalog_price_mismatch, item_total_mismatch, items_missing, subtotal_mismatch, coupon_requires_review, discount_mismatch, order_total_mismatch, unsupported_fee_or_tax, unsupported_currency, destination_incomplete, origin_or_service_incomplete and parcel_incomplete. Invalid authority/shape raises22023/shipa_invalid_review_snapshot (or the reused settings validator's fixed error). A missing order raisesP0002/shipa_order_missing. No raw provider errors are stored or returned.
 
