@@ -17,10 +17,12 @@ Foreign keys refer only to newly created integration/receipt/shipment tables in 
 ```text
 shipa_complete(_shipment_id uuid, _attempt_token uuid, _result jsonb) -> safe summary
 shipa_expire_leases(_shipment_id uuid | SQL null = null) -> {expired,more_due}
-shipa_read_shipment(_shipment_id uuid, _actor_id uuid) -> safe summary | SQL null
+shipa_read_shipment(_shipment_id uuid, _actor_id uuid) -> safe summary | SQL null (MUTATING)
 ```
 
-All wrappers revoke browser execution. The first two are internal worker operations; later endpoint authorization must distinguish real scheduler/service invocations from browser calls. Read independently requires a real admin actor and a nonnull shipment id, then expires only that row's lease. It cannot invoke the global sweep by omitting the id.
+All wrappers revoke browser execution. The first two are internal worker operations; later endpoint authorization must distinguish real scheduler/service invocations from browser calls. `shipa_read_shipment` is a MUTATING operation: it expires a targeted lease before returning a summary, and is not a read-only operational/health probe. Call it through the authorized POST RPC path, not a GET/head health check. It requires a nonnull shipment id and cannot invoke the global sweep by omitting that id.
+
+The supplied actor UUID is not authentication. The service endpoint must obtain the user's identity from a verified `auth.getUser` result and real role lookup, then supply that service-derived id. It must reject browser actor/id authority fields; looking up whether an arbitrary browser-supplied UUID belongs to an admin is insufficient. SQL independently rechecks the supplied actor's admin row, but that does not prove the HTTP caller is that actor. Full handler identity-provenance tests remain a required endpoint dependency and are not claimed by the SQL role fixture.
 
 Safe summary keys: shipment_id, state, changed, conflict, shipa_ref, provider_status, attempt_count, retry_count, retry_at, last_error_code, updated_at. Read adds order_id, environment, source, customer_ref, created_at, reviewed_fingerprint and input_fingerprint. It does not return payloads or credentials. `changed` describes shipment state/metadata, not whether a conflict audit was inserted.
 
@@ -28,17 +30,27 @@ Safe summary keys: shipment_id, state, changed, conflict, shipa_ref, provider_st
 
 - Accepted: exactly `{outcome:'accepted',shipaRef:<safe nonempty reference>,orderStatus:<bounded string or null>}`.
 - Uncertain: exactly `{outcome:'uncertain',code:<one of the current ShipaFailureCode values>}`.
-- Local rejection: exactly `{outcome:'rejected_local',code:<one of the current ShipaLocalRejectionCode values>}`. Strip the adapter's UI field/message members before invoking this internal RPC. A local rejection is a proven no-fetch result, not a generic HTTP4xx classification.
+- Local rejection: exactly `{outcome:'rejected_local',code:<one of the current ShipaLocalRejectionCode values>}`. Strip the adapter's UI field/message members before invoking this internal RPC. The adapter reports zero fetch for that particular validation call; this does not prove that the persisted attempt never dispatched. A matching token or service_role alone provides no such evidence.
 
 The row is locked before mutation, and the token must equal its current attempt. A stale token returns40001/shipa_stale_attempt. Accepted from submitting/unknown records the reference once; an identical replay is unchanged. A later ambiguous observation cannot displace known acceptance. A conflicting accepted reference retains the known reference and records an alert. A reference already owned by a different shipment leaves this attempt unknown with remote_reference_conflict, not queued or stranded by an unhandled unique violation.
 
-Uncertain results become unknown with no retry time. Exact replay does not append another event. Local validation failure becomes needs_review without scheduling a retry. No provider no-creation/retry guarantee exists in the captured contract, so this subset implements no provider-driven retry authorization. Later conclusive reconciliation must obey the recorded vendor evidence and current token, rather than infer absence from404.
+Uncertain results become unknown with no retry time. Exact replay does not append another event. Once a submission marker exists, local validation results cannot establish non-dispatch. For submitting plus rejected_local, SQL records unknown/no_dispatch_unproven and a fixed conflict audit. For unknown plus rejected_local, it preserves the original uncertainty, timestamp, token, payload, counters and null retry time; it only records an idempotent conflict audit. It never turns either case into needs_review/new creation authority. A known created result remains created.
+
+| Persisted state | Incoming observation | Disposition |
+| --- | --- | --- |
+| submitting | rejected_local | unknown; no retry; non-dispatch remains unproven |
+| unknown after network uncertainty or expiry | rejected_local, including replay | unknown remains sticky; original uncertainty and attempt context retained |
+| created | rejected_local or uncertain | created unchanged |
+| submitting/unknown | matching accepted reference | created, subject to reference-conflict protection |
+| before submission marker | local validation failure | A later dedicated validation/enqueue owner may hold for review before any dispatch; shipa_complete provides no such pre-marker transition |
+
+No provider no-creation/retry guarantee exists in the captured contract, so this subset implements no provider-driven retry authorization. Later conclusive reconciliation must obey the recorded vendor evidence and current token, rather than infer absence from404. Manual review alone may not requeue any possibly dispatched attempt; enqueue/begin predicates must inspect durable submission/reconciliation evidence rather than use needs_review or a local-error code as permission to create again.
 
 Expiry processes at most100expired submitting rows per invocation under FOR UPDATE SKIP LOCKED, retains token/payload/counters, makes them unknown, and reports remaining due work. Re-running the sweep does not requeue or duplicate expired events. A late matching accepted result remains recordable after expiry.
 
 ## Actual local proof and remaining requirements
 
-`supabase/tests/shipa/dispatch_state.sql` passed actual anon/non-admin/service-role denial tests, current-token fencing, accepted/unknown replay, terminal acceptance preservation, conflicting remote identities, zero automatic rebooking, retained unknown context and bounded100+5expiry with106lease events including the targeted read.
+`supabase/tests/shipa/dispatch_state.sql` passed actual anon/non-admin/service-role denial tests, current-token fencing, accepted/unknown replay, terminal acceptance preservation, conflicting remote identities, zero automatic rebooking, retained unknown context and bounded100+5expiry with106lease events including the targeted read. SA's follow-up regression first failed on expiry-to-local-rejection; after the fix it proves sticky unknown for both expired and network-uncertain attempts, no retry/creation authority, retained original error/outcome and idempotent local-result audit. It also checks submitting-to-local-rejection is conservative unknown. The migration remains unapplied in production and unfrozen; these changes supersede the earlier c04ed418 source contract, not its immutable historical review receipt.
 
 Manager's guarded exact-image proof applied both Shipa migrations twice with private absent and twice with a preexisting private schema/permissive fixture grants, preserving baseline owners/ACLs/defaults/constraints/triggers/policies. Two competing settings writers produced one commit/one conflict. Two competing result writers were forced to contend on the same row: one state change, one idempotent result and one event. The final terminal-ambiguity regression failed before correction and passed after applying the corrected function. These are local database tests, not provider or end-to-end booking proof.
 

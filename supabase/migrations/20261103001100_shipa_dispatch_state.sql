@@ -103,6 +103,7 @@ $fn$;
 CREATE OR REPLACE FUNCTION public.shipa_complete(_shipment_id uuid,_attempt_token uuid,_result jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
 DECLARE v_row public.shipments; v_kind text; v_code text; v_reference text; v_status text; v_key text; v_event text;
+  v_changed boolean:=false;
 BEGIN
   v_kind:=_result->>'outcome';
   IF _shipment_id IS NULL OR _attempt_token IS NULL OR v_kind IS NULL OR v_kind NOT IN ('accepted','uncertain','rejected_local') THEN
@@ -160,10 +161,25 @@ BEGIN
     IF v_row.last_outcome=_result THEN RETURN private.shipa_dispatch_summary(v_row,false); END IF;
     RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='shipa_attempt_not_inflight';
   END IF;
+  IF v_kind='rejected_local' THEN
+    -- A persisted submission marker records a possible external attempt. A later
+    -- validator result, service role or matching token cannot prove non-dispatch.
+    -- Pre-marker validation belongs before begin-submission; only authoritative
+    -- reconciliation may later resolve this uncertainty.
+    IF v_row.state='submitting' THEN
+      UPDATE public.shipments SET state='unknown',retry_at=NULL,
+        last_error_code='no_dispatch_unproven',
+        last_outcome='{"outcome":"uncertain","code":"invalid_response"}'::jsonb,
+        updated_at=clock_timestamp() WHERE id=v_row.id RETURNING * INTO v_row;
+      v_changed:=true;
+    END IF;
+    INSERT INTO public.shipment_events(shipment_id,event_key,event_type,attempt_token,code)
+      VALUES(v_row.id,v_key,'conflicting_result',_attempt_token,'no_dispatch_unproven') ON CONFLICT DO NOTHING;
+    RETURN private.shipa_dispatch_summary(v_row,v_changed,true);
+  END IF;
   IF v_row.last_outcome=_result THEN RETURN private.shipa_dispatch_summary(v_row,false); END IF;
   BEGIN
-  UPDATE public.shipments SET state=CASE v_kind WHEN 'accepted' THEN 'created'
-    WHEN 'rejected_local' THEN 'needs_review' ELSE 'unknown' END,
+  UPDATE public.shipments SET state=CASE v_kind WHEN 'accepted' THEN 'created' ELSE 'unknown' END,
     shipa_ref=CASE WHEN v_kind='accepted' THEN v_reference ELSE NULL END,
     provider_status=CASE WHEN v_kind='accepted' THEN v_status ELSE provider_status END,
     last_outcome=_result,last_error_code=v_code,retry_at=NULL,updated_at=clock_timestamp()
@@ -203,6 +219,8 @@ BEGIN
 END
 $fn$;
 
+-- MUTATING read: performs targeted lease expiry. _actor_id must be derived from
+-- the caller's authenticated identity by the service endpoint, never a browser UUID.
 CREATE OR REPLACE FUNCTION public.shipa_read_shipment(_shipment_id uuid,_actor_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
 DECLARE v_row public.shipments;

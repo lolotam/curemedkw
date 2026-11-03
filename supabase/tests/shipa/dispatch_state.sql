@@ -99,6 +99,13 @@ BEGIN
   IF v_result->>'state'<>'unknown' OR v_result->>'retry_at' IS NOT NULL THEN
     RAISE EXCEPTION 'Expired attempt became retryable';
   END IF;
+  v_replay:=public.shipa_complete('60000000-0000-4000-8000-000000000001',
+    '70000000-0000-4000-8000-000000000001','{"outcome":"rejected_local","code":"invalid_city"}');
+  IF v_replay->>'state'<>'unknown' OR v_replay->>'retry_at' IS NOT NULL
+    OR v_replay->>'changed'<>'false' OR v_replay->>'last_error_code'<>'timeout'
+    OR v_replay->>'updated_at' IS DISTINCT FROM v_result->>'updated_at' THEN
+    RAISE EXCEPTION 'Local validation erased possible dispatch after expiry';
+  END IF;
   v_result:=public.shipa_complete('60000000-0000-4000-8000-000000000001',
     '70000000-0000-4000-8000-000000000001','{"outcome":"accepted","shipaRef":"SB-fixture-1","orderStatus":"Created"}');
   IF v_result->>'state'<>'created' THEN RAISE EXCEPTION 'Late matching result was lost'; END IF;
@@ -125,10 +132,20 @@ BEGIN
   v_replay:=public.shipa_complete('60000000-0000-4000-8000-000000000003',
     '70000000-0000-4000-8000-000000000003','{"outcome":"uncertain","code":"server_error"}');
   IF v_replay->>'changed'<>'false' THEN RAISE EXCEPTION 'Unknown replay appended a duplicate'; END IF;
+  v_replay:=public.shipa_complete('60000000-0000-4000-8000-000000000003',
+    '70000000-0000-4000-8000-000000000003','{"outcome":"rejected_local","code":"invalid_city"}');
+  IF v_replay->>'state'<>'unknown' OR v_replay->>'retry_at' IS NOT NULL
+    OR v_replay->>'changed'<>'false' OR v_replay->>'last_error_code'<>'server_error'
+    OR v_replay->>'updated_at' IS DISTINCT FROM v_result->>'updated_at' THEN
+    RAISE EXCEPTION 'Local validation erased a prior network uncertainty';
+  END IF;
+  v_replay:=public.shipa_complete('60000000-0000-4000-8000-000000000003',
+    '70000000-0000-4000-8000-000000000003','{"outcome":"rejected_local","code":"invalid_city"}');
+  IF v_replay->>'changed'<>'false' THEN RAISE EXCEPTION 'Local replay mutated unknown state'; END IF;
   v_result:=public.shipa_complete('60000000-0000-4000-8000-000000000004',
     '70000000-0000-4000-8000-000000000004','{"outcome":"rejected_local","code":"invalid_city"}');
-  IF v_result->>'state'<>'needs_review' OR v_result->>'retry_at' IS NOT NULL THEN
-    RAISE EXCEPTION 'Local failure bypassed review';
+  IF v_result->>'state'<>'unknown' OR v_result->>'retry_at' IS NOT NULL THEN
+    RAISE EXCEPTION 'Post-marker local result asserted unproven non-dispatch';
   END IF;
   BEGIN
     PERFORM public.shipa_complete('60000000-0000-4000-8000-000000000005',
@@ -158,10 +175,11 @@ DO $retained$
 BEGIN
   IF NOT EXISTS(SELECT 1 FROM public.shipments WHERE id='60000000-0000-4000-8000-000000000003'
     AND state='unknown' AND attempt_token IN ('70000000-0000-4000-8000-000000000003')
-    AND payload_hash=repeat('b',64) AND retry_count=0 AND attempt_count=1) THEN
+    AND payload_hash=repeat('b',64) AND retry_count=0 AND attempt_count=1
+    AND last_outcome='{"outcome":"uncertain","code":"server_error"}'::jsonb) THEN
     RAISE EXCEPTION 'Unknown result lost immutable attempt context';
   END IF;
-  IF (SELECT count(*) FROM public.shipment_events WHERE shipment_id='60000000-0000-4000-8000-000000000003')<>1 THEN
+  IF (SELECT count(*) FROM public.shipment_events WHERE shipment_id='60000000-0000-4000-8000-000000000003')<>2 THEN
     RAISE EXCEPTION 'Replay duplicated shipment events';
   END IF;
   IF (SELECT count(*) FROM public.shipment_events WHERE event_type='lease_expired')<>106 THEN
