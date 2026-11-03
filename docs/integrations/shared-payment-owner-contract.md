@@ -65,7 +65,7 @@ The assembled harness includes the existing guarded fixture and pinned PostgreSQ
 
 ```powershell
 python supabase/tests/whatsapp/fixture_safety_test.py
-python supabase/tests/shipa/payment_owner_proof.py --state <private-fixture-state.json> --baseline <private-schema-only-baseline.sql>
+python supabase/tests/shipa/payment_owner_proof.py --state <private-fixture-state.json> --baseline <private-schema-only-baseline.sql> --deno <verified-deno-2.5.6.exe> --deno-cache <private-deno-cache>
 ```
 
 The proof covers absent and pre-existing `private` schema, adversarial default privileges, two schema applications, unchanged pre-existing owners/ACL/defaults/constraints/triggers/policies, retained WhatsApp SQL fixtures, actual-role owner/strict-evidence scenarios, forced callback/webhook lock collision, concurrent GET claim skip-locking, and contended strict completions with one evidence/Shipa receipt. It proves database behavior only. It does not execute Deno handlers, MyFatoorah, Shipa or WhatsApp, or claim a deployed journey.

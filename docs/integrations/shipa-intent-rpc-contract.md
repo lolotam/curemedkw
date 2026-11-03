@@ -1,5 +1,7 @@
 # Shipa receipt-owned intents and staff review
 
+Dependency update: migration 01600 now supplies the local preparation/begin/permanent-marker dependency; see `shipa-submission-rpc-contract.md`. The intent checkpoint below retains its original scope. Runtime worker/endpoints and native proof remain unfinished.
+
 Migration `20261103001500_shipa_intents.sql` is a local, unactivated foundation. It creates shipment intents and staff-review audit, not provider bookings. Submission preparation/begin, a durable submission ledger, provider calls, status/reconciliation, authenticated endpoints, scheduler and UI remain required dependencies. Current settings RPC still refuses enablement with `shipa_runtime_not_ready`.
 
 ## One receipt, one environment-specific identity

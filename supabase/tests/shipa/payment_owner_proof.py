@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -15,12 +16,14 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103000100_whatsapp_core.sql", "20261103000200_whatsapp_transactions.sql",
     "20261103001000_shipa_settings.sql", "20261103001100_shipa_dispatch_state.sql",
     "20261103001200_shipa_integrity.sql", "20261103001300_integration_payment_owner.sql",
-    "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql"))
+    "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
+    "20261103001600_shipa_submission.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
-        ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql")
+        ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
+        ROOT / "supabase/tests/shipa/submission.sql")
 
 
 def open_psql(container):
@@ -192,7 +195,10 @@ def concurrent_manual_adoption(container, claim):
         "\"governorate\":\"Hawally\",\"area\":\"Hawally\",\"block\":\"\",\"street\":\"\",\"building\":\"\",\"addressLine\":\"Synthetic office\"}},"
         "\"parcel\":{\"count\":1,\"weightKg\":1,\"dimensionsCm\":{\"lengthCm\":10,\"widthCm\":8,\"heightCm\":6}}}') WHERE provider='shipa'; "
         "INSERT INTO public.site_settings(key,value) VALUES('ecommerce_mode','{\"shoppingEnabled\":true,\"checkoutEnabled\":true}') "
-        "ON CONFLICT(key) DO UPDATE SET value=excluded.value;", "postgres")
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value; "
+        "INSERT INTO private.integration_credentials(integration_id,environment,provider,key_version,nonce,ciphertext,revision,updated_by) "
+        "SELECT id,'sandbox','shipa',1,encode(decode(repeat('ab',12),'hex'),'base64'),encode(decode(repeat('cd',17),'hex'),'base64'),1,"
+        "'83000000-0000-4000-8000-000000000001' FROM public.integrations;", "postgres")
     request = manual_request(container, claim["order_id"])
     complete = "SET LOCAL ROLE service_role; SELECT public.shipa_request_manual("
     complete += f"'{claim['order_id']}','{json.dumps(request)}','83000000-0000-4000-8000-000000000001'); COMMIT;"
@@ -280,9 +286,64 @@ def concurrent_automatic_and_manual(container):
             raise RuntimeError("Automatic/manual overlap lost the single unattempted intent identity")
     finally:
         close_processes((first, second))
+    return order
 
 
-def prove_schema_case(container, state, baseline, preexisting_private):
+def prepared_submission(container, order):
+    shipment = fixture.sql(container, f"SELECT id FROM public.shipments WHERE order_id='{order}'", "postgres")
+    output = fixture.sql(container, f"SET ROLE service_role; SELECT public.shipa_prepare_submission('{shipment}')", "postgres")
+    if not output.startswith("SET\n"):
+        raise RuntimeError("Preparation fixture did not observe its service-role command result")
+    preparation = json.loads(output.split("\n", 1)[1])
+    if preparation.get("ready") is not True:
+        raise RuntimeError("Synthetic reviewed shipment was not ready for submission")
+    return preparation
+
+
+def sql_payload_matches_adapter(preparation, deno, cache):
+    completed = subprocess.run([str(deno), "run", "--config", str(ROOT / "deno.shipa.json"),
+        "--frozen", "--cached-only", str(ROOT / "supabase/tests/shipa/verify_sql_submission_payload.ts")],
+        input=json.dumps(preparation), text=True, encoding="utf-8", capture_output=True,
+        env=dict(os.environ, DENO_DIR=str(cache)), timeout=30)
+    if completed.returncode:
+        raise RuntimeError("Actual SQL-to-Shipa-builder contract failed: " + completed.stderr.strip())
+    if completed.stdout.strip() != "SQL preparation matches the actual Shipa request builder":
+        raise RuntimeError("SQL-to-adapter proof did not return its expected receipt")
+
+
+def concurrent_begin_submission(container, preparation):
+    fields = ("settings_revision", "input_fingerprint", "credential_revision", "credential_fingerprint", "payload", "payload_hash")
+    prepared = json.dumps({field: preparation[field] for field in fields})
+    winning_attempt = "83000000-0000-4000-8000-000000000031"
+    competing_attempt = "83000000-0000-4000-8000-000000000032"
+    shipment = preparation["shipment_id"]
+    first, second = open_psql(container), open_psql(container)
+    try:
+        write_sql(first, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL ROLE service_role; "
+            f"SELECT public.shipa_begin_submission('{shipment}','{winning_attempt}','{prepared}');")
+        winner = json.loads(first.stdout.readline())
+        write_sql(second, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='shipa-begin-race'; "
+            f"SET LOCAL ROLE service_role; SELECT public.shipa_begin_submission('{shipment}','{competing_attempt}','{prepared}'); COMMIT;")
+        write_sql(first, "RESET ROLE; " + observe_lock("shipa-begin-race") + "COMMIT;")
+        for process in (first, second):
+            process.stdin.close()
+            process.wait(timeout=15)
+            if process.returncode:
+                raise RuntimeError("Concurrent begin failed: " + process.stderr.read().strip())
+        loser = json.loads(second.stdout.read().strip())
+        if winner["ready"] is not True or loser["ready"] is not False or winner["attempt_token"] != winning_attempt:
+            raise RuntimeError("Two workers obtained provider-creation authority")
+        persisted = json.loads(fixture.sql(container, f"SELECT jsonb_build_array("
+            f"(SELECT count(*) FROM private.shipa_submission_markers WHERE shipment_id='{shipment}'),"
+            f"(SELECT attempt_count FROM public.shipments WHERE id='{shipment}'),"
+            f"(SELECT state FROM public.shipments WHERE id='{shipment}'))", "postgres"))
+        if persisted != [1, 1, "submitting"]:
+            raise RuntimeError("Begin did not atomically retain exactly one attempt/marker")
+    finally:
+        close_processes((first, second))
+
+
+def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
         fixture.sql(container, "CREATE SCHEMA private AUTHORIZATION postgres; "
@@ -308,25 +369,35 @@ def prove_schema_case(container, state, baseline, preexisting_private):
     claim, attestation = concurrent_verification_claims(container)
     concurrent_strict_completion(container, claim, attestation)
     concurrent_manual_adoption(container, claim)
-    concurrent_automatic_and_manual(container)
+    order = concurrent_automatic_and_manual(container)
+    preparation = prepared_submission(container, order)
+    sql_payload_matches_adapter(preparation, runtime[0], runtime[1])
+    concurrent_begin_submission(container, preparation)
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
         "one_first_success_one_replay": True, "concurrent_get_claims_skip_locked": True,
         "concurrent_strict_completion_one_evidence_one_shipa_receipt": True,
         "concurrent_manual_clicks_single_intent_review": True,
-        "concurrent_automatic_manual_single_identity": True, "production_access": False}
+        "concurrent_automatic_manual_single_identity": True, "actual_sql_payload_matches_deno_adapter": True,
+        "concurrent_begin_one_marker_one_authorized_worker": True, "production_access": False}
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--baseline", type=Path, required=True)
+    parser.add_argument("--deno", type=Path, required=True)
+    parser.add_argument("--deno-cache", type=Path, required=True)
     args = parser.parse_args()
+    version = subprocess.run([str(args.deno), "--version"], capture_output=True, text=True, check=True)
+    if version.stdout.splitlines()[0] != "deno 2.5.6 (stable, release, x86_64-pc-windows-msvc)":
+        raise RuntimeError("Proof requires the verified Deno 2.5.6 Windows runtime")
     state = json.loads(args.state.read_text(encoding="utf-8"))
     container = fixture.marker_guard(state)
     try:
-        receipts = [prove_schema_case(container, args.state, args.baseline, existing) for existing in (False, True)]
+        receipts = [prove_schema_case(container, args.state, args.baseline, existing, (args.deno, args.deno_cache))
+                    for existing in (False, True)]
         print(json.dumps({"shared_payment_owner_proof": receipts}))
     finally:
         fixture.restore(args.state, args.baseline)
