@@ -257,4 +257,48 @@ BEGIN
   END IF;
 END
 $durability$;
+-- Credential mutation must retain the key used by the real begins above.
+SET LOCAL ROLE service_role;
+DO $inflight_key_protection$
+DECLARE actor uuid:='86000000-0000-4000-8000-000000000001'; safe jsonb; patch jsonb; envelope jsonb; change jsonb;
+BEGIN
+  safe:=public.shipa_read_settings(actor);
+  patch:=((safe->'settings')-'revision')||'{"enabled":false}';
+  patch:=jsonb_set(jsonb_set(patch,'{sandbox}',(patch->'sandbox')-'credential'),'{live}',(patch->'live')-'credential');
+  envelope:=public.shipa_read_credential((safe->>'integration_id')::uuid,'sandbox')->'envelope';
+  FOREACH change IN ARRAY ARRAY['{"mode":"remove","environment":"sandbox"}'::jsonb,
+    jsonb_build_object('mode','replace','environment','sandbox','envelope',envelope)] LOOP
+    BEGIN
+      PERFORM public.shipa_save_settings(0,patch,change,actor);
+      RAISE EXCEPTION 'Inflight or unknown key was removed/replaced';
+    EXCEPTION WHEN object_not_in_prerequisite_state THEN
+      IF SQLERRM<>'shipa_credential_in_use' THEN RAISE; END IF;
+    END;
+  END LOOP;
+  -- Another environment remains configurable, and disabling without a key
+  -- mutation must remain possible while unknown work is being reconciled.
+  safe:=public.shipa_save_settings(0,patch,jsonb_build_object('mode','replace','environment','live',
+    'envelope',jsonb_set(envelope,'{environment}','"live"')),actor);
+  safe:=public.shipa_save_settings(1,patch,NULL,actor);
+  IF safe#>>'{settings,enabled}'<>'false' THEN RAISE EXCEPTION 'Could not disable while retaining the inflight key'; END IF;
+END
+$inflight_key_protection$;
+RESET ROLE;
+UPDATE public.shipments SET state='needs_review',attempt_count=0,attempt_token=NULL,submitted_at=NULL,
+  payload=NULL,payload_hash=NULL,credential_fingerprint=NULL,lease_expires_at=NULL WHERE state<>'created';
+SET LOCAL ROLE service_role;
+DO $permanent_key_protection$
+DECLARE actor uuid:='86000000-0000-4000-8000-000000000001'; safe jsonb; patch jsonb;
+BEGIN
+  safe:=public.shipa_read_settings(actor); patch:=(safe->'settings')-'revision';
+  patch:=jsonb_set(jsonb_set(patch,'{sandbox}',(patch->'sandbox')-'credential'),'{live}',(patch->'live')-'credential');
+  BEGIN
+    PERFORM public.shipa_save_settings(2,patch,'{"mode":"remove","environment":"sandbox"}',actor);
+    RAISE EXCEPTION 'Reset display fields erased permanent key protection';
+  EXCEPTION WHEN object_not_in_prerequisite_state THEN
+    IF SQLERRM<>'shipa_credential_in_use' THEN RAISE; END IF;
+  END;
+END
+$permanent_key_protection$;
+RESET ROLE;
 ROLLBACK;

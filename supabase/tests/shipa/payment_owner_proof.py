@@ -17,13 +17,13 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001000_shipa_settings.sql", "20261103001100_shipa_dispatch_state.sql",
     "20261103001200_shipa_integrity.sql", "20261103001300_integration_payment_owner.sql",
     "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
-    "20261103001600_shipa_submission.sql"))
+    "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
-        ROOT / "supabase/tests/shipa/submission.sql")
+        ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql")
 
 
 def open_psql(container):
@@ -343,6 +343,71 @@ def concurrent_begin_submission(container, preparation):
         close_processes((first, second))
 
 
+def concurrent_begin_and_credential_mutation(container, previous_preparation):
+    order = "83000000-0000-4000-8000-000000000042"
+    attempt = "83000000-0000-4000-8000-000000000043"
+    actor = "83000000-0000-4000-8000-000000000001"
+    # Resolve the preceding real begin before seeding this race. Otherwise an
+    # older unresolved marker could make a broken new-begin guard appear safe.
+    fixture.sql(container, "SET ROLE service_role; DO $resolved$ DECLARE safe jsonb; patch jsonb; envelope jsonb; BEGIN "
+        f"IF public.shipa_complete('{previous_preparation['shipment_id']}','83000000-0000-4000-8000-000000000031',"
+        "'{\"outcome\":\"accepted\",\"shipaRef\":\"SB-resolved-before-rotation\",\"orderStatus\":\"Created\"}')->>'state'<>'created' "
+        "THEN RAISE EXCEPTION 'previous_begin_not_resolved'; END IF; "
+        f"safe:=public.shipa_read_settings('{actor}'); patch:=((safe->'settings')-'revision')||'{{\"enabled\":false}}'; "
+        "patch:=jsonb_set(jsonb_set(patch,'{sandbox}',(patch->'sandbox')-'credential'),'{live}',(patch->'live')-'credential'); "
+        "envelope:=public.shipa_read_credential((safe->>'integration_id')::uuid,'sandbox')->'envelope'; "
+        f"PERFORM public.shipa_save_settings((safe#>>'{{settings,revision}}')::integer,patch,"
+        f"jsonb_build_object('mode','replace','environment','sandbox','envelope',envelope),'{actor}'); END $resolved$; "
+        "RESET ROLE; UPDATE public.integrations SET enabled=true WHERE provider='shipa';", "postgres")
+    if fixture.sql(container, "SELECT count(*) FROM public.shipments shipment WHERE state<>'created' "
+            "AND private.shipa_has_possible_dispatch(shipment)", "postgres") != "0":
+        raise RuntimeError("Older unresolved dispatch evidence contaminated the new-begin race")
+    status = json.dumps({"invoice_id": "rotation-race-invoice", "external_identifier": order,
+        "transaction_payment_id": "rotation-race-payment", "invoice_status": "PAID", "transaction_status": "SUCCESS", "details": {}})
+    fixture.sql(container, "INSERT INTO public.orders(id,customer_name,customer_email,customer_phone,governorate,city,address_line,subtotal,total,payment_method) "
+        f"VALUES ('{order}','Synthetic','rotation@example.test','50000001','Hawally','Hawally','Synthetic street',20,20,'pay_by_link'); "
+        "INSERT INTO public.payment_attempts(id,order_id,amount,idempotency_key,invoice_id) "
+        f"VALUES ('{attempt}','{order}',20,'rotation-intent-race','rotation-race-invoice'); "
+        "INSERT INTO public.order_items(order_id,product_id,product_name_snapshot,quantity,unit_price,line_total) "
+        f"VALUES ('{order}','83000000-0000-4000-8000-000000000015','Race item',2,10,20); "
+        "SET ROLE service_role; DO $seed$ DECLARE claim jsonb; BEGIN "
+        f"PERFORM public.wa_record_provider_payment_outcome('{order}','{attempt}','{status}','signed_webhook'); "
+        f"claim:=public.wa_claim_pending_payment_verification('{order}','83000000-0000-4000-8000-000000000014'); "
+        f"PERFORM public.wa_apply_verified_payment('{order}','{attempt}','{status}'::jsonb||jsonb_build_object("
+        "'amount_millis',20000,'currency','KWD','pending_id',claim->'id','lease_token',claim->'lease_token'),'payment_sweep'); END $seed$;", "postgres")
+    preparation = prepared_submission(container, order)
+    fields = ("settings_revision", "input_fingerprint", "credential_revision", "credential_fingerprint", "payload", "payload_hash")
+    prepared = json.dumps({field: preparation[field] for field in fields})
+    shipment = preparation["shipment_id"]
+    first, second = open_psql(container), open_psql(container)
+    try:
+        write_sql(first, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL ROLE service_role; "
+            f"SELECT public.shipa_begin_submission('{shipment}','83000000-0000-4000-8000-000000000044','{prepared}');")
+        started = json.loads(first.stdout.readline())
+        write_sql(second, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='shipa-credential-race'; "
+            "SET LOCAL ROLE service_role; DO $rotation$ DECLARE patch jsonb; safe jsonb; BEGIN "
+            f"safe:=public.shipa_read_settings('{actor}'); patch:=((safe->'settings')-'revision')||'{{\"enabled\":false}}'; "
+            "patch:=jsonb_set(jsonb_set(patch,'{sandbox}',(patch->'sandbox')-'credential'),'{live}',(patch->'live')-'credential'); "
+            f"BEGIN PERFORM public.shipa_save_settings((safe#>>'{{settings,revision}}')::integer,patch,"
+            f"'{{\"mode\":\"remove\",\"environment\":\"sandbox\"}}','{actor}'); "
+            "RAISE EXCEPTION 'rotation_crossed_active_begin'; EXCEPTION WHEN object_not_in_prerequisite_state THEN "
+            "IF SQLERRM<>'shipa_credential_in_use' THEN RAISE; END IF; END; END $rotation$; SELECT 'rotation_refused'; COMMIT;")
+        write_sql(first, "RESET ROLE; " + observe_lock("shipa-credential-race") + "COMMIT;")
+        for process in (first, second):
+            process.stdin.close()
+            process.wait(timeout=15)
+            if process.returncode:
+                raise RuntimeError("Begin/key-mutation race failed: " + process.stderr.read().strip())
+        if started["ready"] is not True or second.stdout.read().strip() != "rotation_refused":
+            raise RuntimeError("Credential mutation did not wait and refuse the committed submission")
+        persisted = json.loads(fixture.sql(container, "SELECT public.shipa_read_credential("
+            f"'{preparation['integration_id']}','sandbox')", "postgres"))
+        if persisted["credential_revision"] != preparation["credential_revision"] or persisted["credential_fingerprint"] != preparation["credential_fingerprint"]:
+            raise RuntimeError("Contended credential mutation changed the key used by a submission")
+    finally:
+        close_processes((first, second))
+
+
 def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
@@ -373,6 +438,7 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     preparation = prepared_submission(container, order)
     sql_payload_matches_adapter(preparation, runtime[0], runtime[1])
     concurrent_begin_submission(container, preparation)
+    concurrent_begin_and_credential_mutation(container, preparation)
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
@@ -380,7 +446,8 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
         "concurrent_strict_completion_one_evidence_one_shipa_receipt": True,
         "concurrent_manual_clicks_single_intent_review": True,
         "concurrent_automatic_manual_single_identity": True, "actual_sql_payload_matches_deno_adapter": True,
-        "concurrent_begin_one_marker_one_authorized_worker": True, "production_access": False}
+        "concurrent_begin_one_marker_one_authorized_worker": True,
+        "concurrent_begin_blocks_credential_mutation": True, "production_access": False}
 
 
 def main():
