@@ -2,10 +2,13 @@ import {
   DEFAULT_SHIPA_SETTINGS,
   KUWAIT_COUNTRY_CODE,
   SCHEDULER_HEARTBEAT_MAX_AGE_MS,
+  SHIPA_MAX_PICKUP_INSTRUCTIONS_LENGTH,
   applyShipaPublicSettingsPatch,
   createDefaultShipaSettings,
   evaluateShipaActivationReadiness,
+  missingShipaOriginAddressFields,
   parseShipaPublicSettings,
+  parseShipaSaveRequest,
   parseShipaSettings,
   shipaPublicSettingsForEnvironment,
   withShipaDispatchMode,
@@ -14,7 +17,10 @@ import {
   type DispatchMode,
   type ShipaActivationReadinessInput,
   type ShipaEnvironment,
+  type ShipaOriginAddress,
   type ShipaPublicSettings,
+  type ShipaSaveablePublicSettings,
+  type ShipaSaveableSettings,
   type ShipaSettings,
 } from "@/lib/shipaSettings";
 
@@ -35,7 +41,9 @@ const completePublicSettings = (): ShipaPublicSettings => ({
       addressLine: "Warehouse 3",
     },
   },
-  serviceCode: "draft-service",
+  serviceCode: "Same Day",
+  autoConfirm: false,
+  pickupInstructions: "",
   parcel: {
     count: 1,
     weightKg: 1.5,
@@ -467,5 +475,287 @@ describe("scheduler heartbeat", () => {
       readinessInput({ schedulerHeartbeatAt: null }),
     );
     expect(readiness.ready).toBe(true);
+  });
+});
+
+describe("auto confirmation and pickup instructions", () => {
+  it("defaults to no auto confirmation and no pickup text", () => {
+    const defaults = createDefaultShipaSettings();
+    expect(defaults.sandbox.autoConfirm).toBe(false);
+    expect(defaults.sandbox.pickupInstructions).toBe("");
+    expect(defaults.live.autoConfirm).toBe(false);
+    expect(defaults.live.pickupInstructions).toBe("");
+  });
+
+  it("patches the two fields in one environment only", () => {
+    const patched = withShipaEnvironmentSettings(completeSettings(), "live", {
+      autoConfirm: true,
+      pickupInstructions: "Ask for the warehouse manager",
+    });
+
+    expect(patched.live.autoConfirm).toBe(true);
+    expect(patched.live.pickupInstructions).toBe("Ask for the warehouse manager");
+    expect(patched.sandbox.autoConfirm).toBe(false);
+    expect(patched.sandbox.pickupInstructions).toBe("");
+    expect(patched.sandbox.credential.present).toBe(true);
+    expect(patched.live.credential.keyVersion).toBe(1);
+  });
+
+  it("keeps both environments intact when the dispatch mode changes", () => {
+    const patched = withShipaEnvironmentSettings(completeSettings(), "sandbox", {
+      autoConfirm: true,
+      pickupInstructions: "Leave at the counter",
+    });
+    const switched = withShipaDispatchMode(patched, "automatic_after_payment");
+
+    expect(switched.dispatchMode).toBe("automatic_after_payment");
+    expect(switched.sandbox.autoConfirm).toBe(true);
+    expect(switched.sandbox.pickupInstructions).toBe("Leave at the counter");
+    expect(switched.live.autoConfirm).toBe(false);
+    expect(switched.live.pickupInstructions).toBe("");
+  });
+
+  it("keeps the active environment switch separate from the drafts", () => {
+    const patched = withShipaEnvironmentSettings(completeSettings(), "live", {
+      autoConfirm: true,
+    });
+    const switched = withShipaEnvironment(patched, "live");
+
+    expect(switched.environment).toBe("live");
+    expect(switched.live.autoConfirm).toBe(true);
+    expect(switched.sandbox.autoConfirm).toBe(false);
+  });
+
+  it("accepts pickup instructions up to the documented length", () => {
+    const longest = "x".repeat(SHIPA_MAX_PICKUP_INSTRUCTIONS_LENGTH);
+    const accepted = parseShipaPublicSettings({
+      ...completePublicSettings(),
+      pickupInstructions: longest,
+    });
+    expect(accepted.ok).toBe(true);
+    expect(accepted.settings?.pickupInstructions).toBe(longest);
+
+    const refused = parseShipaPublicSettings({
+      ...completePublicSettings(),
+      pickupInstructions: `${longest}y`,
+    });
+    expect(refused.ok).toBe(false);
+    expect(refused.code).toBe("invalid_settings");
+  });
+
+  it("refuses a non-boolean auto confirmation", () => {
+    const result = parseShipaPublicSettings({
+      ...completePublicSettings(),
+      autoConfirm: "yes",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("invalid_settings");
+  });
+});
+
+describe("service code vocabulary", () => {
+  const acceptedCodes = ["On Demand", "Same Day", "Next Day"] as const;
+
+  it.each(acceptedCodes)("accepts the %s service code", (code) => {
+    const result = parseShipaPublicSettings({ ...completePublicSettings(), serviceCode: code });
+    expect(result.ok).toBe(true);
+    expect(result.settings?.serviceCode).toBe(code);
+  });
+
+  it.each(["Cross Border", "draft-service", "Next day", "same day"])(
+    "refuses the %s service code",
+    (code) => {
+      const result = parseShipaPublicSettings({ ...completePublicSettings(), serviceCode: code });
+      expect(result.ok).toBe(false);
+      expect(result.code).toBe("invalid_settings");
+    },
+  );
+
+  it("accepts an unset service code", () => {
+    const result = parseShipaPublicSettings({ ...completePublicSettings(), serviceCode: null });
+    expect(result.ok).toBe(true);
+    expect(result.settings?.serviceCode).toBeNull();
+  });
+
+  it("treats a valid service code as configuration, never as an entitlement", () => {
+    const settings = withShipaEnvironmentSettings(completeSettings(), "sandbox", {
+      serviceCode: "Next Day",
+    });
+    const readiness = evaluateShipaActivationReadiness(
+      readinessInput({ settings, vendorReferenceAvailable: false }),
+    );
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.map((issue) => issue.code)).toContain("provider_reference_unavailable");
+  });
+
+  it("refuses an unknown service code through the activation path too", () => {
+    const settings = completeSettings();
+    const broken = {
+      ...settings,
+      sandbox: { ...settings.sandbox, serviceCode: "Cross Border" },
+    } as unknown as ShipaSettings;
+    const readiness = evaluateShipaActivationReadiness(readinessInput({ settings: broken }));
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.map((issue) => issue.code)).toContain("invalid_settings");
+  });
+});
+
+describe("freeform address completeness", () => {
+  const address = (overrides: Partial<ShipaOriginAddress>): ShipaOriginAddress => ({
+    countryCode: KUWAIT_COUNTRY_CODE,
+    governorate: "Hawalli",
+    area: "Hawally",
+    block: "",
+    street: "",
+    building: "",
+    addressLine: "",
+    ...overrides,
+  });
+
+  it("accepts a full freeform address line without a block, street or building", () => {
+    const freeform = address({ addressLine: "Warehouse 3, 12th Street, behind the pharmacy" });
+    expect(missingShipaOriginAddressFields(freeform)).toEqual([]);
+
+    const settings = withShipaEnvironmentSettings(completeSettings(), "sandbox", {
+      origin: { address: freeform },
+    });
+    const readiness = evaluateShipaActivationReadiness(readinessInput({ settings }));
+    expect(readiness.ready).toBe(true);
+  });
+
+  it("requires the structured street and building when there is no address line", () => {
+    expect(missingShipaOriginAddressFields(address({ street: "12th Street" }))).toEqual(["building"]);
+    expect(
+      missingShipaOriginAddressFields(address({ street: "12th Street", building: "8" })),
+    ).toEqual([]);
+  });
+
+  it("still requires the governorate and the area", () => {
+    expect(
+      missingShipaOriginAddressFields(address({ governorate: "", addressLine: "Warehouse 3" })),
+    ).toEqual(["governorate"]);
+    expect(
+      missingShipaOriginAddressFields(address({ area: "", addressLine: "Warehouse 3" })),
+    ).toEqual(["area"]);
+  });
+
+  it("reports an incomplete freeform address as incomplete", () => {
+    const settings = withShipaEnvironmentSettings(completeSettings(), "sandbox", {
+      origin: { address: address({ addressLine: "   " }) },
+    });
+    const readiness = evaluateShipaActivationReadiness(readinessInput({ settings }));
+
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.map((issue) => issue.code)).toContain("origin_address_incomplete");
+  });
+});
+
+describe("browser save request", () => {
+  const saveablePublicSettings = (): ShipaSaveablePublicSettings => {
+    const draft = completePublicSettings();
+    return {
+      appId: draft.appId,
+      origin: draft.origin,
+      serviceCode: "Next Day",
+      autoConfirm: true,
+      pickupInstructions: "Ask for the warehouse manager",
+      parcel: draft.parcel,
+    };
+  };
+
+  const saveableSettings = (): ShipaSaveableSettings => ({
+    enabled: false,
+    environment: "sandbox",
+    dispatchMode: "manual_after_packing",
+    sandbox: saveablePublicSettings(),
+    live: saveablePublicSettings(),
+  });
+
+  it("accepts exactly an expected revision and the five safe settings fields", () => {
+    const result = parseShipaSaveRequest({ expectedRevision: 3, settings: saveableSettings() });
+
+    expect(result.ok).toBe(true);
+    expect(result.request?.expectedRevision).toBe(3);
+    expect(Object.keys(result.request?.settings ?? {}).sort()).toEqual([
+      "dispatchMode",
+      "enabled",
+      "environment",
+      "live",
+      "sandbox",
+    ]);
+  });
+
+  it("keeps the two new fields in the save payload", () => {
+    const result = parseShipaSaveRequest({ expectedRevision: 0, settings: saveableSettings() });
+
+    expect(result.ok).toBe(true);
+    expect(result.request?.settings.sandbox.autoConfirm).toBe(true);
+    expect(result.request?.settings.sandbox.pickupInstructions).toBe("Ask for the warehouse manager");
+    expect(result.request?.settings.live.autoConfirm).toBe(true);
+  });
+
+  it.each(["actor", "provider", "proof"])("refuses an unknown %s field", (field) => {
+    const result = parseShipaSaveRequest({
+      expectedRevision: 0,
+      settings: saveableSettings(),
+      [field]: "value",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("invalid_request");
+  });
+
+  it("refuses an endpoint field as a credential-like field", () => {
+    const result = parseShipaSaveRequest({
+      expectedRevision: 0,
+      settings: saveableSettings(),
+      endpoint: "https://example.invalid",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("forbidden_credential_field");
+  });
+
+  it("refuses credential metadata inside an environment", () => {
+    const result = parseShipaSaveRequest({
+      expectedRevision: 0,
+      settings: {
+        ...saveableSettings(),
+        sandbox: {
+          ...saveablePublicSettings(),
+          credential: { present: true, rotatedAt: null, keyVersion: 1 },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("invalid_request");
+  });
+
+  it.each([-1, 2147483647, 1.5])("refuses the expected revision %s", (revision) => {
+    const result = parseShipaSaveRequest({ expectedRevision: revision, settings: saveableSettings() });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("invalid_request");
+  });
+
+  it("refuses a request without an expected revision", () => {
+    const result = parseShipaSaveRequest({ settings: saveableSettings() });
+
+    expect(result.ok).toBe(false);
+    expect(result.code).toBe("invalid_request");
+  });
+
+  it("never echoes a rejected value", () => {
+    const result = parseShipaSaveRequest({
+      expectedRevision: 0,
+      settings: saveableSettings(),
+      apiKey: ["marker", "value"].join("-"),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(JSON.stringify(result)).not.toContain("marker-value");
   });
 });
