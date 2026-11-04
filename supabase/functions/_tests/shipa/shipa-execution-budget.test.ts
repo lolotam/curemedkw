@@ -26,6 +26,46 @@ import { createFakeExecutionScheduler } from "./shipa-manual-fixtures.ts";
 /** The deterministic clock and timer, shared with the manual fixtures. */
 const createFakeScheduler = createFakeExecutionScheduler;
 
+for (const kind of ["rejection", "synchronous_throw"] as const) {
+  Deno.test(`review cap: late ${kind} obeys deadline before timer callback`, async () => {
+    let now = 0;
+    const budget = createShipaExecutionBudget({
+      itemBudgetMs: 100,
+      clock: { now: () => now },
+    });
+    try {
+      const deferred = Promise.withResolvers<void>();
+      const pending = budget.run(() => {
+        if (kind === "synchronous_throw") {
+          now = 101;
+          throw new Error("synthetic failure");
+        }
+        return deferred.promise;
+      });
+      now = 101;
+      if (kind === "rejection") deferred.reject(new Error("synthetic failure"));
+      await assertRejects(() => pending, ShipaExecutionBudgetError);
+      assertEquals(budget.reason, "timeout");
+    } finally {
+      budget.dispose();
+    }
+  });
+  Deno.test(`review cap: live ${kind} preserves the original error`, async () => {
+    const budget = createShipaExecutionBudget();
+    const original = new Error("synthetic live failure");
+    try {
+      const pending = budget.run(() => {
+        if (kind === "synchronous_throw") throw original;
+        return Promise.reject(original);
+      });
+      assertEquals(await pending.catch((error: unknown) => error), original);
+      assertEquals(budget.abandoned, false);
+    } finally {
+      budget.dispose();
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // The limits
 // ---------------------------------------------------------------------------
@@ -305,4 +345,24 @@ Deno.test("a backward clock creates no new authority", () => {
   now = 0;
   assertEquals(budget.remainingMs(), 0);
   assertEquals(budget.abandoned, true);
+});
+
+Deno.test("review cap: abandoned returned rejection is observed without late work", async () => {
+  let now = 0;
+  const budget = createShipaExecutionBudget({
+    itemBudgetMs: 100,
+    clock: { now: () => now },
+  });
+  try {
+    await assertRejects(() =>
+      budget.run(() => {
+        now = 101;
+        return Promise.reject(new Error("synthetic abandoned rejection"));
+      }), ShipaExecutionBudgetError);
+    // Do not suppress the global unhandled-rejection event. The runner must
+    // fail if production drops this already-started rejected promise.
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  } finally {
+    budget.dispose();
+  }
 });

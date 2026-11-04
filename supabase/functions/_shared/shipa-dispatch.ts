@@ -327,15 +327,15 @@ export function createShipaDispatcher(
     //    budget after the begin is uncertain: no new HTTP request happens and
     //    no completion is written.
     const remaining = budget.remainingMs();
-    if (budget.abandoned || remaining <= SHIPA_COMPLETION_BUDGET_MS) {
+    const providerWindow = Math.floor(remaining - SHIPA_COMPLETION_BUDGET_MS);
+    if (
+      budget.abandoned || !Number.isFinite(providerWindow) || providerWindow < 1
+    ) {
       return { status: "uncertain", code: "budget_exhausted" };
     }
-    const deadlineMs = Math.max(
-      1,
-      Math.min(
-        SHIPA_EXECUTION_PROVIDER_DEADLINE_MS,
-        Math.floor(remaining - SHIPA_COMPLETION_BUDGET_MS),
-      ),
+    const deadlineMs = Math.min(
+      SHIPA_EXECUTION_PROVIDER_DEADLINE_MS,
+      providerWindow,
     );
 
     let result: ShipaCreateResult;

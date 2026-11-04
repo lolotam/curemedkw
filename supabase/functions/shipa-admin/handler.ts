@@ -285,7 +285,13 @@ async function runShipmentAction(
     }
   } catch (error) {
     const failure = mapShipaShipmentFailure(error);
-    return jsonError(request, failure.code, failure.message, failure.status);
+    return jsonError(
+      request,
+      failure.code,
+      failure.message,
+      failure.status,
+      failure.intent === undefined ? {} : { intent: failure.intent },
+    );
   }
 }
 

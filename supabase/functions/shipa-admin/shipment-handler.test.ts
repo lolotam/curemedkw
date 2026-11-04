@@ -88,6 +88,9 @@ Deno.test("an already cancelled manual request cannot reach review or the provid
   assertEquals(harness.client.calls.length, 0);
   assertEquals(harness.keyReader.callCount(), 0);
   assertEquals(response.status, 503);
+  const body = await response.json();
+  assertEquals(body.error.code, "unavailable");
+  assertEquals(Object.hasOwn(body.error, "intent"), false);
 });
 
 Deno.test("cancellation during a possibly committed review prevents late dispatch", async () => {
@@ -734,3 +737,110 @@ Deno.test("keeps the configuration actions working", async () => {
   assertEquals(harness.client.calledFunctions(), ["shipa_read_settings"]);
   assertEquals(harness.provider.requests.length, 0);
 });
+
+for (
+  const issue of [
+    "missing",
+    "foreign",
+    "malformed",
+    "transport",
+    "key",
+    "invalid_key",
+  ] as const
+) {
+  Deno.test(`review cap: ${issue} failure after intent preserves receipt and HTTP status`, async () => {
+    const harness = await createHarness();
+    queueSession(harness.client);
+    harness.client.respond("shipa_request_manual", {
+      data: createTestSummaryDocument({
+        state: "queued",
+        attemptCount: 0,
+        shipaRef: null,
+        retryAt: null,
+      }),
+    });
+    const binding = issue === "missing"
+      ? null
+      : issue === "foreign"
+      ? createTestCanonicalBinding({
+        orderId: SHIPA_TEST_REVIEW_OTHER_ORDER_ID,
+      })
+      : issue === "malformed"
+      ? { unexpected: "synthetic private marker" }
+      : createTestCanonicalBinding();
+    harness.client.respond(
+      "shipa_resolve_dispatch_binding",
+      issue === "transport"
+        ? { rejection: new Error("synthetic private marker") }
+        : { data: binding },
+    );
+    const handler = issue === "key" || issue === "invalid_key"
+      ? createShipaAdminHandler({
+        client: harness.client,
+        fetchImpl: harness.provider.fetch,
+        readEncryptionKey: () =>
+          issue === "key" ? undefined : "synthetic invalid key",
+      })
+      : harness.handler;
+    const response = await handler(createAdminRequest(createBody()));
+    const expectedStatus = {
+      missing: 404,
+      foreign: 409,
+      malformed: 502,
+      transport: 503,
+      key: 503,
+      invalid_key: 503,
+    }[issue];
+    const expectedCode = {
+      missing: "not_found",
+      foreign: "conflict",
+      malformed: "invalid_response",
+      transport: "unavailable",
+      key: "unavailable",
+      invalid_key: "unavailable",
+    }[issue];
+    assertEquals(response.status, expectedStatus);
+    const raw = await response.text();
+    const body = JSON.parse(raw);
+    assertEquals(body.error.code, expectedCode);
+    assertEquals(body.error.intent, {
+      id: SHIPA_TEST_REVIEW_SHIPMENT_ID,
+      state: "queued",
+    });
+    assertEquals(Object.keys(body.error).sort(), ["code", "intent", "message"]);
+    assertEquals(Object.keys(body.error.intent).sort(), ["id", "state"]);
+    assertEquals(raw.includes("synthetic private marker"), false);
+    assertEquals(raw.includes(SHIPA_TEST_REVIEW_OTHER_ORDER_ID), false);
+    assertEquals(harness.client.calledFunctions(), [
+      "shipa_request_manual",
+      "shipa_resolve_dispatch_binding",
+    ]);
+    assertEquals(harness.provider.requests.length, 0);
+  });
+}
+
+for (const issue of ["malformed", "foreign"] as const) {
+  Deno.test(`review cap: ${issue} refusal before intent has no receipt`, async () => {
+    const harness = await createHarness();
+    queueSession(harness.client);
+    const body = createBody();
+    if (issue === "malformed") {
+      body.request = { ...createTestManualRequest(), integrationId: "foreign" };
+    } else {harness.client.respond("shipa_request_manual", {
+        error: {
+          ...createTestSqlError("42501"),
+          intent: { id: SHIPA_TEST_REVIEW_SHIPMENT_ID, state: "queued" },
+        },
+      });}
+    const response = await harness.handler(createAdminRequest(body));
+    assertEquals(response.status, issue === "malformed" ? 400 : 403);
+    const answer = await response.json();
+    assertEquals(Object.hasOwn(answer.error, "intent"), false);
+    assertEquals(
+      harness.client.calledFunctions(),
+      issue === "malformed" ? [] : ["shipa_request_manual"],
+    );
+    assertEquals(harness.keyReader.callCount(), 0);
+    assertEquals(harness.provider.requests.length, 0);
+  });
+}

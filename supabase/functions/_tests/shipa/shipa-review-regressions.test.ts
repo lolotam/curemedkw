@@ -32,6 +32,62 @@ import {
 
 // Real crypto, parsers, stores, adapter and dispatcher; only SDK/fetch/clock
 // boundaries are synthetic. No provider request or credential is real.
+for (const phase of ["during_begin", "after_received_begin"] as const) {
+  Deno.test(`SA contract: abort ${phase} never detaches or dispatches`, async () => {
+    const client = createFakeShipaSubmissionRpcClient();
+    const { keyring } = await createSyntheticKeyring();
+    const provider = createAcceptedProviderFetch();
+    const controller = new AbortController();
+    const budget = createShipaExecutionBudget({ signal: controller.signal });
+    await queueCredentialDocument(client, keyring);
+    client.queue({ data: createTestPreparationDocument() });
+    const deferred = phase === "during_begin" ? client.queueDeferred() : null;
+    if (deferred === null) client.queueResponder(createBeginResponder());
+    const dispatcher = createShipaDispatcher({
+      client,
+      keyring,
+      budget,
+      fetchImpl: provider.fetch,
+      now: () => {
+        if (phase === "after_received_begin") controller.abort();
+        return SHIPA_TEST_MANUAL_NOW_MS;
+      },
+    });
+    try {
+      const pending = dispatcher.processShipment(SHIPA_TEST_DISPATCH_INPUT);
+      if (deferred) {
+        await deferred.called;
+        controller.abort();
+      }
+      assertEquals(await pending, {
+        status: "uncertain",
+        code: phase === "during_begin" ? "begin_uncertain" : "budget_exhausted",
+      });
+      const begins = client.calls.filter((c) =>
+        c.fn === "shipa_begin_submission"
+      );
+      assertEquals(begins.length, 1);
+      if (deferred) {
+        deferred.resolve(
+          createBeginResponder()("shipa_begin_submission", begins[0].args),
+        );
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      assertEquals(provider.requests.length, 0);
+      assertEquals(
+        client.calls.filter((c) => c.fn === "shipa_complete").length,
+        0,
+      );
+      assertEquals(
+        client.calls.filter((c) => c.fn === "shipa_begin_submission").length,
+        1,
+      );
+    } finally {
+      budget.dispose();
+    }
+  });
+}
+
 for (const interruption of ["browser_abort", "item_deadline"] as const) {
   Deno.test(`review: accepted booking survives ${interruption}`, async () => {
     const client = createFakeShipaSubmissionRpcClient();
@@ -194,6 +250,48 @@ Deno.test("review: begin refused before invocation is not_started", async () => 
       "shipa_prepare_submission",
     ]);
     assertEquals(provider.requests.length, 0);
+  } finally {
+    budget.dispose();
+  }
+});
+
+Deno.test("review cap: fractional provider window cannot consume settlement reserve", async () => {
+  const client = createFakeShipaSubmissionRpcClient();
+  const { keyring } = await createSyntheticKeyring();
+  const scheduler = createFakeExecutionScheduler();
+  const budget = createShipaExecutionBudget({
+    clock: scheduler.clock,
+    timer: scheduler.timer,
+  });
+  const provider = createAcceptedProviderFetch();
+  await queueCredentialDocument(client, keyring);
+  client.queue({ data: createTestPreparationDocument() });
+  client.queueResponder(createBeginResponder());
+  client.queueResponder(createSummaryResponder());
+  const dispatcher = createShipaDispatcher({
+    client,
+    keyring,
+    budget,
+    fetchImpl: provider.fetch,
+    now: () => {
+      scheduler.advance(11_999.5);
+      return SHIPA_TEST_MANUAL_NOW_MS;
+    },
+  });
+  try {
+    assertEquals(await dispatcher.processShipment(SHIPA_TEST_DISPATCH_INPUT), {
+      status: "uncertain",
+      code: "budget_exhausted",
+    });
+    assertEquals(
+      client.calls.filter((c) => c.fn === "shipa_begin_submission").length,
+      1,
+    );
+    assertEquals(provider.requests.length, 0);
+    assertEquals(
+      client.calls.filter((c) => c.fn === "shipa_complete").length,
+      0,
+    );
   } finally {
     budget.dispose();
   }

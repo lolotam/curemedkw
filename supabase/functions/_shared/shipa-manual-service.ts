@@ -64,6 +64,8 @@ import {
 import { mapShipaReviewSqlError } from "./shipa-review-responses.ts";
 import { createShipaReviewStore } from "./shipa-review-store.ts";
 import {
+  mapShipaShipmentFailure,
+  type ShipaIntentReceipt,
   type ShipaManualShipmentSummary,
   ShipaShipmentError,
 } from "./shipa-shipment-actions.ts";
@@ -232,8 +234,10 @@ export function createShipaManualService(
     // ONE admission budget covers review, canonical lookup, key load and the
     // dispatch admission. No pre-dispatch phase resets the fifteen seconds.
     const budget = newBudget();
+    let intent: ShipaIntentReceipt | undefined;
     try {
       const summary = await requestManual(budget, input);
+      intent = { id: summary.shipmentId, state: summary.state };
       // The intent is confirmed, but neither read-only lookup nor key loading
       // can create a submission marker. Report their budget expiry truthfully.
       const shipment = {
@@ -280,6 +284,17 @@ export function createShipaManualService(
         shipment,
         dispatch,
       };
+    } catch (error) {
+      // Only the strictly parsed SQL acknowledgement establishes this receipt.
+      // Preserve existing HTTP error semantics; never invent a receipt for an
+      // unacknowledged intent or trust a browser/upstream error's metadata.
+      if (intent !== undefined) {
+        throw new ShipaShipmentError(
+          mapShipaShipmentFailure(error).code,
+          intent,
+        );
+      }
+      throw error;
     } finally {
       budget.dispose();
     }
@@ -297,17 +312,21 @@ export function createShipaManualService(
     budget: ShipaExecutionBudget,
     input: ShipaManualCreateInput,
   ): Promise<ShipaSubmissionSafeSummary> {
+    let reviewInvoked = false;
     try {
-      return await budget.run(() =>
-        reviewStore.requestManual({
+      return await budget.run(() => {
+        reviewInvoked = true;
+        return reviewStore.requestManual({
           actor: input.actor,
           orderId: input.orderId,
           request: input.request,
-        })
-      );
+        });
+      });
     } catch (error) {
       if (isShipaExecutionBudgetError(error)) {
-        throw new ShipaShipmentError("operation_uncertain");
+        throw new ShipaShipmentError(
+          reviewInvoked ? "operation_uncertain" : "unavailable",
+        );
       }
       if (error instanceof ShipaReviewError) {
         if (error.code === "unavailable" || error.code === "invalid_response") {

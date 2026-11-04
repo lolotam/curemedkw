@@ -60,13 +60,18 @@ mapping helpers. The optional-field change grants no send/retry authority.
 
 ## Boundaries still required before use
 
-The provider adapter enforces a network/body deadline of at most 10 seconds, clamped to remaining
-item time. The core now fences every lazy operation and awaited continuation with one 15-second
-monotonic budget, fresh per invocation or injected by the surrounding manual item. The manual
-handler propagates request cancellation through that same budget. Late review/credential/prepare/
-begin answers cannot start later provider work, including when a timer callback is delayed. These
-client fences do not cancel SQL or establish production runtime suspension/network guarantees;
-the future scheduler still needs its own 50-second parent envelope and serial item composition.
+The provider adapter enforces a network/body deadline of at most 10 seconds, clamped to the
+floored admission window after reserving 3000 ms for completion. A floored window below 1 ms
+authorizes no provider call. One 15-second monotonic admission budget is fresh per invocation or
+injected by the surrounding manual item; the manual handler propagates cancellation through it.
+Late review/credential/prepare/begin answers cannot start later provider work, including when a
+timer callback is delayed. Late rejection/synchronous throw are fenced too, and an already-started
+promise is observed even if its guard refuses admission. After the one provider invocation, the
+adapter's bounded await and one separate 3000-ms settlement fence preserve its observed outcome
+independently of browser abort. A delayed event-loop turn can therefore add a bounded settlement
+tail; this is not an unconditional 15-second end-to-end guarantee. These client fences do not
+cancel SQL or establish production suspension/network guarantees; the future scheduler must
+reserve the tail inside its own 50-second parent envelope and serial item composition.
 Pre-begin invalid draft/payload is a fixed response with no completion mutation, because
 completion requires an existing token/marker. Unknown dispatch stays sticky in SQL and cannot become
 re-creation authority through a local validation failure, staff review or a negative lookup.

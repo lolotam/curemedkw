@@ -230,6 +230,10 @@ export function createShipaExecutionBudget(
   }
 
   function guard<T>(promise: PromiseLike<T>): Promise<T> {
+    // The operation already exists. Observe its rejection even if admission
+    // expired while invoking it; this attaches no later dispatch continuation.
+    const observed = Promise.resolve(promise);
+    void observed.catch(() => undefined);
     try {
       requireLive();
     } catch (error) {
@@ -266,7 +270,7 @@ export function createShipaExecutionBudget(
         timer.cancel(handle);
         handle = null;
       }
-      Promise.resolve(promise).then(
+      observed.then(
         (value) => {
           if (settled) return;
           // A blocked event loop may settle the promise before its overdue
@@ -287,6 +291,12 @@ export function createShipaExecutionBudget(
         },
         (error: unknown) => {
           if (settled) return;
+          try {
+            requireLive();
+          } catch {
+            rejector(new ShipaExecutionBudgetError(reason ?? "timeout"));
+            return;
+          }
           settled = true;
           if (handle !== null) {
             timer.cancel(handle);
@@ -311,6 +321,11 @@ export function createShipaExecutionBudget(
     try {
       started = operation();
     } catch (error) {
+      try {
+        requireLive();
+      } catch (fence) {
+        return Promise.reject(fence);
+      }
       return Promise.reject(error);
     }
     return guard(started);

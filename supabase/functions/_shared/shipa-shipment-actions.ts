@@ -55,6 +55,7 @@ import {
   parseShipaReviewShipmentId,
 } from "./shipa-review-validation.ts";
 import {
+  type ShipaShipmentState,
   ShipaSubmissionError,
   type ShipaSubmissionErrorCode,
 } from "./shipa-submission-contract.ts";
@@ -224,6 +225,12 @@ const SHIPA_SHIPMENT_ERROR_STATUS: Readonly<
   operation_uncertain: 503,
 };
 
+/** SQL-confirmed intent identity and acknowledgement-stage state only. */
+export interface ShipaIntentReceipt {
+  readonly id: string;
+  readonly state: ShipaShipmentState;
+}
+
 /**
  * The single failure type of the shipment actions.
  *
@@ -233,19 +240,24 @@ const SHIPA_SHIPMENT_ERROR_STATUS: Readonly<
  */
 export class ShipaShipmentError extends Error {
   readonly code: ShipaShipmentErrorCode;
+  readonly intent?: ShipaIntentReceipt;
 
-  constructor(code: ShipaShipmentErrorCode) {
+  constructor(code: ShipaShipmentErrorCode, intent?: ShipaIntentReceipt) {
     super(SHIPA_SHIPMENT_ERROR_MESSAGES[code]);
     this.name = "ShipaShipmentError";
     this.code = code;
+    if (intent !== undefined) {
+      this.intent = Object.freeze({ id: intent.id, state: intent.state });
+    }
   }
 }
 
-/** One mapped failure. It carries a code, a status and fixed text only. */
+/** Fixed failure vocabulary plus an optional strictly confirmed intent receipt. */
 export interface ShipaShipmentFailure {
   readonly code: ShipaShipmentErrorCode;
   readonly status: number;
   readonly message: string;
+  readonly intent?: ShipaIntentReceipt;
 }
 
 /**
@@ -258,7 +270,12 @@ export function mapShipaShipmentFailure(
   error: unknown,
 ): ShipaShipmentFailure {
   if (error instanceof ShipaShipmentError) {
-    return failureFor(error.code);
+    return {
+      ...failureFor(error.code),
+      ...(error.intent !== undefined
+        ? { intent: { id: error.intent.id, state: error.intent.state } }
+        : {}),
+    };
   }
   if (error instanceof ShipaReviewError) {
     return failureFor(error.code);
