@@ -96,7 +96,7 @@ const ERROR_CODE_PATTERN = /^[a-z_]+$/;
 /** The result shape of the SDK invocation. */
 export interface EvolutionInvokeResult {
   readonly data: unknown;
-  readonly error: { readonly message?: string } | null;
+  readonly error: { readonly message?: string; readonly context?: unknown } | null;
 }
 
 /** The injected invocation boundary. */
@@ -187,27 +187,75 @@ export function parseEvolutionPairingResponse(
   }
 
   if (payload.success === false) {
-    if (!hasExactKeys(payload, ["success", "error"])) {
-      return invalidResponse();
-    }
-    const error = payload.error;
-    if (!isPlainObject(error)) return invalidResponse();
-    if (!hasExactKeys(error, ["code", "message"])) return invalidResponse();
-    const code = error.code;
-    if (typeof code !== "string") return invalidResponse();
-    if (!ERROR_CODE_PATTERN.test(code)) return invalidResponse();
-    // The message of the server is deliberately dropped.
-    if (Object.prototype.hasOwnProperty.call(EVOLUTION_PAIRING_ERROR_MESSAGES, code)) {
-      return { ok: false, code, message: evolutionPairingMessage(code) };
-    }
-    return {
-      ok: false,
-      code: "unavailable",
-      message: EVOLUTION_PAIRING_FALLBACK_MESSAGE,
-    };
+    return parseFailureEnvelope(payload) ?? invalidResponse();
   }
 
   return invalidResponse();
+}
+
+/** Parse only a closed failure envelope, never an HTTP-error QR/success. */
+function parseFailureEnvelope(payload: unknown): EvolutionPairingResult | undefined {
+  if (!isPlainObject(payload) || payload.success !== false) return undefined;
+  if (!hasExactKeys(payload, ["success", "error"])) return undefined;
+  const error = payload.error;
+  if (!isPlainObject(error) || !hasExactKeys(error, ["code", "message"])) return undefined;
+  const code = error.code;
+  if (typeof code !== "string" || !ERROR_CODE_PATTERN.test(code)) return undefined;
+  // The message of the server is deliberately dropped.
+  if (Object.prototype.hasOwnProperty.call(EVOLUTION_PAIRING_ERROR_MESSAGES, code)) {
+    return { ok: false, code, message: evolutionPairingMessage(code) };
+  }
+  return { ok: false, code: "unavailable", message: EVOLUTION_PAIRING_FALLBACK_MESSAGE };
+}
+
+const HTTP_ERROR_BODY_BYTES = 4096;
+const HTTP_ERROR_BODY_WAIT_MS = 1000;
+
+/** Consume a real SDK HTTP-error response once, with byte and wait bounds. */
+async function readHttpFailure(error: unknown): Promise<EvolutionPairingResult | undefined> {
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    if (!isPlainObject(error) || !(error.context instanceof Response)) return undefined;
+    const response = error.context;
+    if (response.ok || !response.body) return undefined;
+    const length = response.headers.get("content-length");
+    if (length !== null && Number(length) > HTTP_ERROR_BODY_BYTES) {
+      void response.body.cancel().catch(() => {});
+      return undefined;
+    }
+    reader = response.body.getReader();
+    const expiresAt = performance.now() + HTTP_ERROR_BODY_WAIT_MS;
+    let deadlineReached = false;
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        deadlineReached = true;
+        reject(new Error("HTTP error body deadline exceeded."));
+        void reader?.cancel().catch(() => {});
+      }, HTTP_ERROR_BODY_WAIT_MS);
+    });
+    const decoder = new TextDecoder();
+    let bytes = 0;
+    let text = "";
+    for (;;) {
+      if (performance.now() >= expiresAt) return undefined;
+      const chunk = await Promise.race([reader.read(), expired]);
+      if (deadlineReached || performance.now() >= expiresAt) return undefined;
+      if (chunk.done) break;
+      bytes += chunk.value.byteLength;
+      if (bytes > HTTP_ERROR_BODY_BYTES) return undefined;
+      text += decoder.decode(chunk.value, { stream: true });
+    }
+    return parseFailureEnvelope(JSON.parse(text + decoder.decode()) as unknown);
+  } catch {
+    return undefined;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    if (reader) {
+      void reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+  }
 }
 
 /**
@@ -231,6 +279,8 @@ export function createEvolutionPairingClient(
     }
     if (!isPlainObject(response)) return invalidResponse();
     if (response.error !== null && response.error !== undefined) {
+      const failure = await readHttpFailure(response.error);
+      if (failure?.ok === false) return failure;
       return {
         ok: false,
         code: "unavailable",

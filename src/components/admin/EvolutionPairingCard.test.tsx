@@ -37,6 +37,16 @@ import {
 
 const QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
 
+it("shows a real HTTP configuration failure using fixed local wording", async () => {
+  invokeMock.mockResolvedValue({ data: null, error: { context: new Response(JSON.stringify({
+    success: false, error: { code: "not_configured", message: "private server detail" },
+  }), { status: 503 }) } });
+  render(<EvolutionPairingCard />);
+  expect(await screen.findByText(EVOLUTION_PAIRING_ERROR_MESSAGES.not_configured)).toBeTruthy();
+  expect(screen.queryByText("private server detail")).toBeNull();
+  expect(invokeMock).toHaveBeenCalledTimes(1);
+});
+
 function ok(
   state: "connected" | "disconnected" | "connecting" | "unknown",
   qrDataUrl: string | null = null,
