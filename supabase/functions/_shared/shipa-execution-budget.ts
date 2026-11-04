@@ -3,9 +3,11 @@
 // What this module is
 // -------------------
 // One small helper that bounds a whole manual item. The review request, the
-// canonical binding lookup, the key load, the preparation, the begin, the
-// provider request and the completion share ONE budget, so no phase can reset
-// the fifteen seconds the item was given.
+// canonical binding lookup, the key load, the preparation and the begin share
+// ONE admission budget, so no pre-dispatch phase can reset the fifteen seconds
+// the item was given. The dispatcher reserves settlement time before the one
+// provider invocation; the adapter then owns its bounded await and an observed
+// result gets a separate bounded completion, independent of browser abort.
 //
 // What this module deliberately does not do
 // -----------------------------------------

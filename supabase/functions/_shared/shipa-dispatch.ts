@@ -32,11 +32,14 @@
 //   this slice does not implement.
 // * No authority to repeat creation is produced anywhere, including for `needs_review`,
 //   a local rejection, a negative lookup or a service credential.
-// * Every phase runs under one bounded execution budget. The budget is checked
+// * Pre-dispatch phases run under one bounded execution budget. The budget is checked
 //   BEFORE a lazy operation is invoked and every await is bounded by the
 //   remaining time, so a call that resolves after the deadline never reaches
 //   the provider. The budget bounds this process only: it cannot prove that
 //   the database cancelled or rolled back an abandoned call.
+// * Once the provider is invoked, its bounded adapter owns the await, independent
+//   of browser disconnect. Its outcome gets one separate bounded completion
+//   attempt, even if the item deadline elapsed. Neither boundary retries.
 //
 // Source of truth:
 //   docs/integrations/shipa-submission-rpc-contract.md
@@ -80,6 +83,9 @@ import {
   SHIPA_EXECUTION_PROVIDER_DEADLINE_MS,
   type ShipaExecutionBudget,
 } from "./shipa-execution-budget.ts";
+
+/** Reserve for persisting one observed outcome; never a resend allowance. */
+export const SHIPA_COMPLETION_BUDGET_MS = 3_000;
 
 // ---------------------------------------------------------------------------
 // The input and the result
@@ -278,9 +284,11 @@ export function createShipaDispatcher(
     // 5. Begin. Only a received, matching, durable `ready=true` answer
     //    authorises a provider request.
     let begun: ShipaSubmissionBegin | ShipaSubmissionRefusal;
+    let beginInvoked = false;
     try {
-      begun = await budget.run(() =>
-        store.begin({
+      begun = await budget.run(() => {
+        beginInvoked = true;
+        return store.begin({
           binding,
           preparation,
           credential: {
@@ -288,9 +296,12 @@ export function createShipaDispatcher(
             credentialFingerprint: loaded.credentialFingerprint,
           },
           attemptToken: attemptId,
-        })
-      );
-    } catch {
+        });
+      });
+    } catch (error) {
+      if (!beginInvoked && isShipaExecutionBudgetError(error)) {
+        return { status: "not_started", code: "budget_exhausted" };
+      }
       // A transport failure, an unusable answer and an exhausted budget are
       // all uncertain: the marker may exist, so this is never a not-started
       // refusal and never a proof that no marker was committed.
@@ -312,16 +323,19 @@ export function createShipaDispatcher(
     //    draft. There is no lookup, no retry and no second attempt.
     //
     //    The remaining time is checked immediately before the provider is
-    //    invoked, and the client deadline is clamped to it. An exhausted
+    //    invoked, and the client deadline reserves completion time. An exhausted
     //    budget after the begin is uncertain: no new HTTP request happens and
     //    no completion is written.
     const remaining = budget.remainingMs();
-    if (budget.abandoned || remaining <= 0) {
+    if (budget.abandoned || remaining <= SHIPA_COMPLETION_BUDGET_MS) {
       return { status: "uncertain", code: "budget_exhausted" };
     }
     const deadlineMs = Math.max(
       1,
-      Math.min(SHIPA_EXECUTION_PROVIDER_DEADLINE_MS, Math.floor(remaining)),
+      Math.min(
+        SHIPA_EXECUTION_PROVIDER_DEADLINE_MS,
+        Math.floor(remaining - SHIPA_COMPLETION_BUDGET_MS),
+      ),
     );
 
     let result: ShipaCreateResult;
@@ -333,28 +347,34 @@ export function createShipaDispatcher(
         deadlineMs,
         ...(fetchImpl !== undefined ? { fetchImpl } : {}),
       });
-      result = await budget.run(() => shipa.createOrder(begun.draft));
-    } catch (error) {
-      if (isShipaExecutionBudgetError(error)) {
-        // The request may have reached the provider. The marker and the
-        // lease carry the recovery, and no completion is written.
-        return { status: "uncertain", code: "budget_exhausted" };
-      }
+      // After invocation, a browser disconnect is not cancellation of a booking.
+      // The adapter bounds fetch AND body read by deadlineMs. Do not race this
+      // observed outcome against the request's abort/item fence and discard it.
+      result = await shipa.createOrder(begun.draft);
+    } catch {
       // An unexpected failure after the begin is uncertain, never a proven
       // non-dispatch.
       result = { outcome: "uncertain", code: "invalid_response" };
     }
 
     // 7. Complete exactly once, with the same token and the real outcome.
+    // A separate 3-second settlement fence cannot authorize any provider call.
+    // It preserves a known acceptance even across a delayed event-loop turn
+    // or browser abort. A failed/lost completion still requires reconciliation.
+    const settlement = createShipaExecutionBudget({
+      itemBudgetMs: SHIPA_COMPLETION_BUDGET_MS,
+    });
     let summary: ShipaSubmissionSafeSummary;
     try {
-      summary = await budget.run(() =>
+      summary = await settlement.run(() =>
         store.complete(binding, attemptId, result)
       );
     } catch {
       // The completion is not retried and the outcome is not inferred. The
       // durable marker and the lease carry the recovery.
       return { status: "persistence_uncertain", code: "persistence_uncertain" };
+    } finally {
+      settlement.dispose();
     }
 
     return describeOutcome(result, summary);

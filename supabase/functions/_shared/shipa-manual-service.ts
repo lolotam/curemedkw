@@ -4,7 +4,9 @@
 // -------------------
 // The server-side composition of one manual booking. It owns exactly one
 // review request, exactly one canonical binding lookup, one lazy keyring load
-// and exactly one dispatch, in that order, under one shared execution budget.
+// and exactly one dispatch, in that order, under one shared admission budget.
+// The dispatcher's bounded provider/settlement phase preserves observed results
+// independently of browser abort after invocation; it never repeats a booking.
 //
 // What this module deliberately does not do
 // -----------------------------------------
@@ -227,18 +229,41 @@ export function createShipaManualService(
   async function create(
     input: ShipaManualCreateInput,
   ): Promise<ShipaManualCreateResult> {
-    // ONE budget covers the review, the canonical lookup, the key load and
-    // the dispatch. No phase may reset the fifteen seconds of the item.
+    // ONE admission budget covers review, canonical lookup, key load and the
+    // dispatch admission. No pre-dispatch phase resets the fifteen seconds.
     const budget = newBudget();
     try {
       const summary = await requestManual(budget, input);
-      const binding = await resolveCanonicalBinding(
-        budget,
-        summary,
-        input.orderId,
-        input.request.environment,
-      );
-      const keyring = await loadKeyringUnderBudget(budget);
+      // The intent is confirmed, but neither read-only lookup nor key loading
+      // can create a submission marker. Report their budget expiry truthfully.
+      const shipment = {
+        shipmentId: summary.shipmentId,
+        orderId: input.orderId,
+        environment: input.request.environment,
+        state: summary.state,
+        attemptCount: summary.attemptCount,
+        retryCount: summary.retryCount,
+        updatedAt: summary.updatedAt,
+      };
+      let binding: ShipaCanonicalBinding;
+      let keyring: IntegrationCredentialKeyring;
+      try {
+        binding = await resolveCanonicalBinding(
+          budget,
+          summary,
+          input.orderId,
+          input.request.environment,
+        );
+        keyring = await loadKeyringUnderBudget(budget);
+      } catch (error) {
+        if (isShipaExecutionBudgetError(error)) {
+          return {
+            shipment,
+            dispatch: { status: "not_started", code: "budget_exhausted" },
+          };
+        }
+        throw error;
+      }
       const dispatcher = createShipaDispatcher({
         client,
         keyring,
@@ -252,15 +277,7 @@ export function createShipaManualService(
         environment: binding.environment,
       });
       return {
-        shipment: {
-          shipmentId: binding.shipmentId,
-          orderId: binding.orderId,
-          environment: binding.environment,
-          state: summary.state,
-          attemptCount: summary.attemptCount,
-          retryCount: summary.retryCount,
-          updatedAt: summary.updatedAt,
-        },
+        shipment,
         dispatch,
       };
     } finally {
@@ -324,9 +341,6 @@ export function createShipaManualService(
       if (error instanceof ShipaShipmentError) throw error;
       if (error instanceof ShipaReviewError) {
         throw new ShipaShipmentError(error.code);
-      }
-      if (isShipaExecutionBudgetError(error)) {
-        throw new ShipaShipmentError("unavailable");
       }
       throw error;
     }
