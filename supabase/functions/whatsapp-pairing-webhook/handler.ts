@@ -176,7 +176,10 @@ export function createEvolutionPairingWebhookHandler(
 
     // A QR or a message is refused whatever the event field claims.
     for (const key of REFUSED_PAYLOAD_KEYS) {
-      if (key in sanitized) return errorResponse(400, "invalid_request");
+      if (
+        key in sanitized ||
+        (isPlainObject(sanitized.data) && key in sanitized.data)
+      ) return errorResponse(400, "invalid_request");
     }
 
     if (

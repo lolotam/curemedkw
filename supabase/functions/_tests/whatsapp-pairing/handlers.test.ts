@@ -707,6 +707,26 @@ Deno.test("a QR or a message payload is refused by the webhook", async () => {
   assertEquals(response.status, 400);
 });
 
+Deno.test("nested QR and message payloads are refused by the webhook", async () => {
+  const handler = createWebhook();
+  for (const key of ["message", "messages", "base64", "qrcode", "qr"]) {
+    const response = await handler(
+      request(
+        WEBHOOK_ENDPOINT,
+        JSON.stringify({
+          instance: "curemed",
+          event: "connection.update",
+          data: { state: "open", [key]: "synthetic payload" },
+        }),
+        { headers: { "x-curemed-webhook-key": HOOK_MARKER } },
+      ),
+    );
+    assertEquals(response.status, 400, `nested ${key} must be refused`);
+    assertEquals(response.headers.get("cache-control"), "no-store");
+    assertEquals((await response.json()).error.code, "invalid_request");
+  }
+});
+
 Deno.test("a valid connection update is acknowledged without a write", async () => {
   const handler = createWebhook();
   const body = JSON.stringify({
