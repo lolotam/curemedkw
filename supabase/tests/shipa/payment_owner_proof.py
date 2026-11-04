@@ -18,9 +18,10 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001200_shipa_integrity.sql", "20261103001300_integration_payment_owner.sql",
     "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
     "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql",
-    "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql"))
+    "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql",
+    "20261103002000_whatsapp_expansion.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
-    "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql")) + (
+    "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
@@ -457,6 +458,59 @@ def concurrent_unbound_and_callback(container):
         close_processes((first, second))
 
 
+def concurrent_expansion_correction(container):
+    actor = "83000000-0000-4000-8000-000000000001"
+    order = "92000000-0000-4000-8000-000000000002"
+    attempt = "92000000-0000-4000-8000-000000000003"
+    status = json.dumps({"invoice_id": "expansion-race-invoice", "external_identifier": order,
+        "transaction_payment_id": "expansion-race-payment", "invoice_status": "PAID", "transaction_status": "SUCCESS", "details": {}})
+    fixture.sql(container, "DO $$DECLARE config jsonb:=private.wa_legacy_config("
+        "'{\"enabled\":true,\"language\":\"en\",\"admin_numbers\":[\"50000002\"]}'); BEGIN "
+        "UPDATE public.whatsapp_settings SET cutover_version=1,integration_enabled=true,automation_enabled=true,provider='postora',"
+        "account_identity='postora:expansion-race',audiences=jsonb_set(config->'audiences','{buyer,templates,en}','\"{{bad}}\"'),"
+        "recipients=config->'recipients',settings_revision=settings_revision+1; UPDATE private.wa_release_state SET state='active'; END$$; "
+        "INSERT INTO public.orders(id,customer_name,customer_email,customer_phone,subtotal,total,payment_method) "
+        f"VALUES('{order}','Synthetic','expansion-race@example.test','50000001',20,20,'pay_by_link'); "
+        "INSERT INTO public.payment_attempts(id,order_id,amount,idempotency_key,invoice_id) "
+        f"VALUES('{attempt}','{order}',20,'expansion-race','expansion-race-invoice'); "
+        f"SET ROLE service_role; SELECT public.wa_record_provider_payment_outcome('{order}','{attempt}','{status}','signed_webhook');", "postgres")
+    claim = json.loads(fixture.sql(container, f"SET ROLE service_role; SELECT public.wa_claim_pending_payment_verification('{order}','{actor}')", "postgres").splitlines()[-1])
+    verified = dict(json.loads(status), amount_millis=20000, currency="KWD", pending_id=claim["id"], lease_token=claim["lease_token"])
+    receipt = json.loads(fixture.sql(container, f"SET ROLE service_role; SELECT public.wa_apply_verified_payment('{order}','{attempt}','{json.dumps(verified)}','payment_sweep')", "postgres").splitlines()[-1])
+    if receipt["expansion_state"] != "enqueue_failed":
+        raise RuntimeError("Invalid-template race did not retain a failed event")
+    event = receipt["event_id"]
+    revision = fixture.sql(container, "UPDATE public.whatsapp_settings SET audiences=jsonb_set(audiences,'{buyer,templates,en}',"
+        "'\"Order {{order_number}} {{total}}\"'),settings_revision=settings_revision+1 WHERE singleton RETURNING settings_revision", "postgres").splitlines()[0]
+    call = f"SELECT public.wa_correct_event_expansion('{event}',1,{revision},'Reviewed race correction','{actor}');"
+    first, second = open_psql(container), open_psql(container)
+    try:
+        write_sql(first, "BEGIN; SET LOCAL statement_timeout='10s'; DO $$BEGIN "
+            "PERFORM 1 FROM public.whatsapp_settings WHERE singleton FOR SHARE; "
+            f"PERFORM 1 FROM public.whatsapp_notification_events WHERE id='{event}' FOR UPDATE; END$$; SELECT 'locked';")
+        if first.stdout.readline().strip() != "locked":
+            raise RuntimeError("Expansion correction did not acquire its event lock")
+        write_sql(second, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='wa-expansion-correction'; SET LOCAL ROLE service_role; " + call + " COMMIT;")
+        write_sql(first, observe_lock("wa-expansion-correction") + "SET LOCAL ROLE service_role; " + call + " COMMIT;")
+        for process in (first, second):
+            process.stdin.close()
+            process.wait(timeout=15)
+        if first.returncode or second.returncode == 0 or "input_revision_conflict" not in second.stderr.read():
+            raise RuntimeError("Competing correction did not preserve one approved input revision: " + first.stderr.read())
+        winner = json.loads(first.stdout.read().strip())
+        if winner["input_revision"] != 2 or winner["state"] != "expanded" or len(winner["job_ids"]) != 2:
+            raise RuntimeError("Correction did not produce the expected single job set")
+        replay = json.loads(fixture.sql(container, f"SET ROLE service_role; SELECT public.wa_repair_event('{event}','worker',NULL)", "postgres").splitlines()[-1])
+        counts = json.loads(fixture.sql(container, f"SELECT jsonb_build_array("
+            f"(SELECT count(*) FROM private.wa_event_input_revisions WHERE event_id='{event}'),"
+            f"(SELECT count(*) FROM public.whatsapp_delivery_jobs WHERE event_id='{event}'),"
+            f"(SELECT count(*) FROM private.wa_payment_evidence WHERE order_id='{order}'))", "postgres"))
+        if replay != winner or counts != [2, 2, 1]:
+            raise RuntimeError("Repair replay duplicated approved inputs, jobs or strict evidence")
+    finally:
+        close_processes((first, second))
+
+
 def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
@@ -489,6 +543,7 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     concurrent_begin_submission(container, preparation)
     concurrent_begin_and_credential_mutation(container, preparation)
     concurrent_unbound_and_callback(container)
+    concurrent_expansion_correction(container)
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
@@ -498,6 +553,7 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
         "concurrent_automatic_manual_single_identity": True, "actual_sql_payload_matches_deno_adapter": True,
         "concurrent_begin_one_marker_one_authorized_worker": True,
         "concurrent_begin_blocks_credential_mutation": True, "unbound_callback_one_owner_preserved_history": True,
+        "concurrent_expansion_one_approved_revision_and_job_set": True,
         "production_access": False}
 
 

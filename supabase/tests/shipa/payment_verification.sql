@@ -91,8 +91,8 @@ BEGIN
     END IF;
     IF c.label='legacy' AND (first_result->'event_id'<>'null'::jsonb OR first_result->>'expansion_state' IS DISTINCT FROM 'legacy_owned') THEN
       RAISE EXCEPTION 'Strict GET scheduled the legacy send again';
-    ELSIF c.label='durable' AND (first_result->>'event_id' IS NULL OR first_result->>'expansion_state' IS DISTINCT FROM 'enqueue_failed') THEN
-      RAISE EXCEPTION 'Durable evidence skipped the visible expansion dependency';
+    ELSIF c.label='durable' AND (first_result->>'event_id' IS NULL OR first_result->>'expansion_state' IS DISTINCT FROM 'expanded') THEN
+      RAISE EXCEPTION 'Durable evidence did not expand the immutable paid event';
     END IF;
     INSERT INTO pg_temp.verification_receipts VALUES(c.label,first_result);
   END LOOP;
@@ -233,13 +233,16 @@ DECLARE c record;
 BEGIN
   IF (SELECT count(*) FROM private.wa_payment_evidence)<>5 OR (SELECT count(*) FROM private.order_payment_verifications)<>5
     OR (SELECT count(*) FROM public.whatsapp_notification_events)<>4 OR (SELECT count(*) FROM public.shipments)<>4
-    OR EXISTS(SELECT 1 FROM public.whatsapp_delivery_jobs) THEN
-    RAISE EXCEPTION 'Evidence/event/receipt/intent cardinality drifted or a message send was invented';
+    OR (SELECT count(*) FROM public.whatsapp_delivery_jobs)<>4
+    OR EXISTS(SELECT 1 FROM public.whatsapp_delivery_jobs WHERE state<>'queued' OR attempt_count<>0 OR provider_message_id IS NOT NULL
+      OR order_id NOT IN (SELECT order_id FROM verification_cases WHERE label IN ('durable','expiry'))) THEN
+    RAISE EXCEPTION 'Evidence/event/receipt/intent cardinality drifted or dispatch authority was invented';
   END IF;
   SELECT * INTO c FROM pg_temp.verification_cases WHERE label='durable';
   IF NOT EXISTS(SELECT 1 FROM private.order_payment_verifications WHERE order_id=c.order_id AND dispatch_decision='enqueued')
     OR NOT EXISTS(SELECT 1 FROM public.whatsapp_notification_events WHERE order_id=c.order_id
-      AND expansion_state='enqueue_failed' AND safe_reason='expansion_pending' AND next_repair_at IS NOT NULL) THEN
+      AND expansion_state='expanded' AND safe_reason IS NULL AND next_repair_at IS NULL
+      AND expansion_summary->>'job_count'='2') THEN
     RAISE EXCEPTION 'GET after signed paid reclassified a fresh outcome as historical';
   END IF;
   IF public.wa_list_pending_payment_verifications(c.order_id,1)#>>'{0,leased}' IS DISTINCT FROM 'false' THEN
