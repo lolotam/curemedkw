@@ -1,0 +1,282 @@
+{
+  "source": "b919ae732f5251d927f5b5ac4c72e5e14188394d",
+  "schemaCheckpoint": "a045e2dc0aec0c639da5030433192309ca95ef3f",
+  "paths": [
+    {
+      "path": "supabase/migrations/20261103000100_whatsapp_core.sql",
+      "gitBlob": "a9e6de21bb6a9f8e0db61520283e934c5d47495f",
+      "sha256GitBytes": "f3ec064093fb61ed82b6b5f1b508aa484931a810067ef3e48de6a6df95bb4f33",
+      "bytes": 24450
+    },
+    {
+      "path": "supabase/migrations/20261103000200_whatsapp_transactions.sql",
+      "gitBlob": "4e4bba6e026c7954451b7fae79330ac9c436bd1f",
+      "sha256GitBytes": "ce006111ef2e25abf633434cb7e00fe0df5435c9084b0a72ecb0e8342beb77d8",
+      "bytes": 54089
+    },
+    {
+      "path": "supabase/migrations/20261103001000_shipa_settings.sql",
+      "gitBlob": "0a8d64b7303785f0fe2ee5af3ff70b528f2daa22",
+      "sha256GitBytes": "0d9ff796e4d27ae2ff62d1f45f1ca1e348d4dc4c926c94ab9b2f9cfe691e4061",
+      "bytes": 15836
+    },
+    {
+      "path": "supabase/migrations/20261103001100_shipa_dispatch_state.sql",
+      "gitBlob": "d1ebc855b16624936c4c930c994b0e3ce1a09a88",
+      "sha256GitBytes": "892f3807142094ac7d57ec5b23a174e9ae9d7342b66401b88c88ef13dbd2bf32",
+      "bytes": 15204
+    },
+    {
+      "path": "supabase/migrations/20261103001200_shipa_integrity.sql",
+      "gitBlob": "175ff08a7f6f58de5ff1e4a30a8af9695c15c52e",
+      "sha256GitBytes": "23ab29cdd197c49a4784b6d6901321f08ccd702bc4a965fc478172dcf1df3ab4",
+      "bytes": 15798
+    },
+    {
+      "path": "supabase/migrations/20261103001300_integration_payment_owner.sql",
+      "gitBlob": "e255271ed8fca9db6e93336563a01859e02e0e2c",
+      "sha256GitBytes": "ace2e227724ed1770249eeca14b083eb05973aa06bf2452da940864f137b2860",
+      "bytes": 22945
+    },
+    {
+      "path": "supabase/migrations/20261103001400_integration_payment_verification.sql",
+      "gitBlob": "d79f0e81d2090556972f09d25718bd09cd8dbaf0",
+      "sha256GitBytes": "ba670299454089a88f0037ad6600d962c6be51668f8df10f8786f44643bb0c19",
+      "bytes": 18174
+    },
+    {
+      "path": "supabase/migrations/20261103001500_shipa_intents.sql",
+      "gitBlob": "d3f2776e291f94276ed7e162fad6bad7ca99acd0",
+      "sha256GitBytes": "d0a63bfea19ad44f569cf775a191bc1b81d7b1027ff7de2505333fae5a38a090",
+      "bytes": 15039
+    },
+    {
+      "path": "supabase/migrations/20261103001600_shipa_submission.sql",
+      "gitBlob": "964759fbcc7632dcea1a85677cee2370094c1da5",
+      "sha256GitBytes": "4a075d6d796f78e888bbde9f83b8bbcf3a3809fb1ce5a442d7c27583af97b509",
+      "bytes": 17870
+    },
+    {
+      "path": "supabase/migrations/20261103001700_shipa_credential_readiness.sql",
+      "gitBlob": "3463de1ab8e95b771925322bc7fc5deb4f1193fb",
+      "sha256GitBytes": "0b16da6dc689218c50d20834d6696140034e90de060e7b0ecedfefd3cbe99df7",
+      "bytes": 14958
+    },
+    {
+      "path": "supabase/migrations/20261103001800_integration_unbound_payments.sql",
+      "gitBlob": "e4e1bb8d5e97cded3f8d980787ec2f543dd9305b",
+      "sha256GitBytes": "48f55c313375538342aa7ec4140bfff99db31fba2e671ddb33ca712ce6404ee2",
+      "bytes": 13271
+    },
+    {
+      "path": "supabase/migrations/20261103001900_whatsapp_rendering.sql",
+      "gitBlob": "9cbfcf766b7b477381891f0a33e32f598369969f",
+      "sha256GitBytes": "82d19da5216280b6d7406c6a4c48f32c12f5e401a02f70d3dcbb443455bf1eac",
+      "bytes": 11204
+    },
+    {
+      "path": "supabase/migrations/20261103002000_whatsapp_expansion.sql",
+      "gitBlob": "54a473285cb7b43d98010bd1c630eb2c4e753634",
+      "sha256GitBytes": "d2046cb0a2642cbffe743e7129d16f7c0e27d9748f2ac8e3316e8cd9d97b6c0c",
+      "bytes": 24407
+    },
+    {
+      "path": "supabase/migrations/20261103002100_shipa_optional_instructions.sql",
+      "gitBlob": "b0a51fb279870764c3422104e422f8ad860071ec",
+      "sha256GitBytes": "fd5ddaa934cd2938f07d8d77b78e82053411e5d91312291b98342e881e5fc1a5",
+      "bytes": 2795
+    },
+    {
+      "path": "supabase/migrations/20261103002200_whatsapp_delivery_claim.sql",
+      "gitBlob": "7ceca74ae5bad580bcbea428791deb231557093d",
+      "sha256GitBytes": "85bccfa2fb08cff31b44659d963e6a4d624408ad38e8bcae3bd5f44760508fe5",
+      "bytes": 18120
+    },
+    {
+      "path": "supabase/migrations/20261103002300_whatsapp_delivery_finish.sql",
+      "gitBlob": "84fc1dbbde53ce928ef31c1296ee64dbbdc8bf4e",
+      "sha256GitBytes": "fcb3be097dcbac92c1d58708c983ea963edebd84cfc8a666cb1b8e16538adde6",
+      "bytes": 7990
+    },
+    {
+      "path": "supabase/migrations/20261103002400_shipa_dispatch_selection.sql",
+      "gitBlob": "83dabe1d5623b997884ad830725e1192bf1a6e43",
+      "sha256GitBytes": "a6157a3079af4db8d3b66fde033207d94b457b8f1171d3e44ff9096f742f6024",
+      "bytes": 4430
+    },
+    {
+      "path": "supabase/migrations/20261103002500_shipa_tracking.sql",
+      "gitBlob": "e1ebb45c739c589b8fd9d155dea9c0968e15faca",
+      "sha256GitBytes": "85ff4a46d2a378ec5301585f78cdf775a74e3918b72dd80c9a5db59c182efab0",
+      "bytes": 11099
+    },
+    {
+      "path": "supabase/migrations/20261103002600_shipa_reconciliation.sql",
+      "gitBlob": "af93d37a75ae8ebd7ab080a0181765bcfc8442db",
+      "sha256GitBytes": "7316458fd55d10fc815bde8dc5f610485e8eadd4768662b6f27b81006855220d",
+      "bytes": 13299
+    },
+    {
+      "path": "supabase/migrations/20261103002700_integration_invoice_guard.sql",
+      "gitBlob": "4e85904b0a5bbc982ff9f3677a66087560d51e1f",
+      "sha256GitBytes": "3a0fe0325b740026df4f5a6d2653d122e9a37295f4fc66bf133b4e1c33217180",
+      "bytes": 6097
+    },
+    {
+      "path": "supabase/tests/compose.whatsapp.yml",
+      "gitBlob": "060fe90ab2887b2697a87343dcc56216055af614",
+      "sha256GitBytes": "8cdf254737acd7425280139e9013fea66d46db79f9f77b6eb4b2a7bb0a275733",
+      "bytes": 985
+    },
+    {
+      "path": "supabase/tests/shipa/credential_readiness.sql",
+      "gitBlob": "048e63b184c123c286cd84b016875eb4676f1592",
+      "sha256GitBytes": "949af52c5aeb159e67799b7885ffb8115a4b4289cfe8355ca5f31c15e4c495e1",
+      "bytes": 10593
+    },
+    {
+      "path": "supabase/tests/shipa/dispatch_selection.sql",
+      "gitBlob": "bbfee94d6e40993852baec55cec2597912d7a6e0",
+      "sha256GitBytes": "fe9470dff24121806b59c72a4459423f0589f4774122b57d391e9fa7ef3eea39",
+      "bytes": 13702
+    },
+    {
+      "path": "supabase/tests/shipa/dispatch_state.sql",
+      "gitBlob": "b1a7ff2c3d0e774af0cce09b93eeac9ffb27b2b2",
+      "sha256GitBytes": "150bb6ee4f660ca40cd40813cc8da062c92339650d1029ee67645ed5cbc98e83",
+      "bytes": 10802
+    },
+    {
+      "path": "supabase/tests/shipa/integrity.sql",
+      "gitBlob": "f3474ab1831e4c7b0ea5e3690524b81d7c137527",
+      "sha256GitBytes": "e01f9bb64adde599e00da80440c8ba61b71af759a2e64a7bfc2c3496a35fd41f",
+      "bytes": 10404
+    },
+    {
+      "path": "supabase/tests/shipa/intents.sql",
+      "gitBlob": "828c3d471dbab188133e9408396a5c037d61fa29",
+      "sha256GitBytes": "0ca903137042bc50818bfba203ef840b80e1f4f257af207c22e055fd6acb8a4a",
+      "bytes": 14247
+    },
+    {
+      "path": "supabase/tests/shipa/invoice_guard.sql",
+      "gitBlob": "e88a43c1a1135aeb4447fc0a8340bd8f05243dd4",
+      "sha256GitBytes": "a222db360de988297b7de4b35e84f50ff5c8054dce9d8976a85f39dc05dc85b9",
+      "bytes": 7893
+    },
+    {
+      "path": "supabase/tests/shipa/payment_owner.sql",
+      "gitBlob": "eea9c26b697d6552a87bd7f4eb6995d65be08a46",
+      "sha256GitBytes": "cc140dbd2f4d35fa7c3be6d2fd08a8007c83a16025e3198fc98329b27a4a57ba",
+      "bytes": 17180
+    },
+    {
+      "path": "supabase/tests/shipa/payment_verification.sql",
+      "gitBlob": "ca1155a0e447ab412822526a12a1b0b7e0aa9523",
+      "sha256GitBytes": "b6dbf55ed22892da2518921275df130158aa3bb6c6120bf103af46337f8e8646",
+      "bytes": 17798
+    },
+    {
+      "path": "supabase/tests/shipa/reconciliation.sql",
+      "gitBlob": "8bca91a76ca9b5c4e32fb01c3ef0bda0f933e99c",
+      "sha256GitBytes": "928b2f2dc4b6e68b441798f362cc534888d2105aaf33b08ae04f2e54c0fdf6f4",
+      "bytes": 15575
+    },
+    {
+      "path": "supabase/tests/shipa/settings.sql",
+      "gitBlob": "375013ce79a9a46bd580ec74a8967c89f6a7eb6d",
+      "sha256GitBytes": "49bcc31dea1562fbce96c3e60e2208998bf1faf6fb7257b8adbbe12d0c370ca4",
+      "bytes": 7114
+    },
+    {
+      "path": "supabase/tests/shipa/submission.sql",
+      "gitBlob": "ca42bd6ce621cc26d85e9b7358ca08c1aeb62ef4",
+      "sha256GitBytes": "678d1c46ff0ae78e0bc1960cbd307f69ce4d5f3737e0f7412a6f285118d31a9d",
+      "bytes": 19921
+    },
+    {
+      "path": "supabase/tests/shipa/submission_payload.sql",
+      "gitBlob": "0f2f4e15a3bf52580405ce1d07f5ec0447b2f14c",
+      "sha256GitBytes": "c0b10f8ff12cb9e73308c981467dd2f2106871ffbbf317f1fd82667aa243e052",
+      "bytes": 1734
+    },
+    {
+      "path": "supabase/tests/shipa/tracking.sql",
+      "gitBlob": "d3dfe852535d954da6f254fcede502d5fab99f2c",
+      "sha256GitBytes": "96af1202933dbf36c3cdaa992cc9a7a0c107ff14a36c9e8ff9d46699d4511109",
+      "bytes": 13725
+    },
+    {
+      "path": "supabase/tests/shipa/unbound_payments.sql",
+      "gitBlob": "b9c2cdad0a6d7b20de7c997d33dcce3ea611daa6",
+      "sha256GitBytes": "19a58e3e7cf475885f97116a651b95c28e38642fd250c8ec7cb3f1477b8d3905",
+      "bytes": 10661
+    },
+    {
+      "path": "supabase/tests/whatsapp/activation.sql",
+      "gitBlob": "c7447f07f33acb416bd464320d4330ec771284a8",
+      "sha256GitBytes": "349ea74b8dfa33651b1e321f65bc1d9f957e6e58bfbac64f1fe913e47f09b404",
+      "bytes": 8399
+    },
+    {
+      "path": "supabase/tests/whatsapp/core_proof.py",
+      "gitBlob": "cd6069642d78880b699376814d8feb8a760df1a3",
+      "sha256GitBytes": "60237dec259542e01610ed26c78fc90a790948ee13d7481a91953e12b74569e7",
+      "bytes": 4674
+    },
+    {
+      "path": "supabase/tests/whatsapp/credentials.sql",
+      "gitBlob": "eb8acf4e665aaab00ce01a4a05cb7852b7762215",
+      "sha256GitBytes": "68180a39fa2ce4649716b2061b4e58f83052534b6c5cc9292ee362abfc83720e",
+      "bytes": 6726
+    },
+    {
+      "path": "supabase/tests/whatsapp/delivery.sql",
+      "gitBlob": "39933f680aafcc2dd549b8e9058a7d5dec9ffff6",
+      "sha256GitBytes": "8d05559cb01a66890589d064451bc03e3744d4960d0d8bd75dbd9a9f10040c94",
+      "bytes": 19232
+    },
+    {
+      "path": "supabase/tests/whatsapp/expansion.sql",
+      "gitBlob": "e40312661c02997d808953c11c5410103266bdda",
+      "sha256GitBytes": "0851f6a618c68fd3729b534bf65e86776363761c8bffed117ff77013ce26fa2c",
+      "bytes": 16574
+    },
+    {
+      "path": "supabase/tests/whatsapp/fixture.py",
+      "gitBlob": "327d86d23c7a09f2f52307b9f52c061b36703151",
+      "sha256GitBytes": "9dc2ae0196d4a3286493c45f0bc349dd291612ec472ea9cbae712a5abe8609a9",
+      "bytes": 10256
+    },
+    {
+      "path": "supabase/tests/whatsapp/fixture_safety_test.py",
+      "gitBlob": "c27a4d3b79ff64ee2229d1936f99a89df1e31bbd",
+      "sha256GitBytes": "577f7e829d360f5aaa46997d03f867c63be03061c9982ac1783d7fdbfad776ee",
+      "bytes": 2038
+    },
+    {
+      "path": "supabase/tests/whatsapp/privileges.sql",
+      "gitBlob": "68351365b9f8268bd9d5ed9e0f38bf75e5f98f3d",
+      "sha256GitBytes": "621fc4d2e2a73f633cee6dfa7eb9c513ce37396c5582e161087b6e6466a1b353",
+      "bytes": 4038
+    },
+    {
+      "path": "supabase/tests/whatsapp/rendering.sql",
+      "gitBlob": "7874ba452cb299fe756482d57ad8673eda020c49",
+      "sha256GitBytes": "c95af5ca4bc2f82e7265ebce654f635e95609dff783fe99fe8902c7e5d80af3d",
+      "bytes": 8071
+    },
+    {
+      "path": "supabase/tests/whatsapp/settings.sql",
+      "gitBlob": "8aa3dedd4d1c6e0bf2f5ac1a674dac4779f1f794",
+      "sha256GitBytes": "c1cb8c237a141fab9a5699ceeb9d8e633a6177dccf69cc8f3287f0a4af7b36d2",
+      "bytes": 13657
+    },
+    {
+      "path": "supabase/tests/whatsapp/transactions.sql",
+      "gitBlob": "2dd4a4d91c7e1fa00be9a46ae0fe3afef2772bcf",
+      "sha256GitBytes": "28c4c5f6d473eb62c86a287ea7c610aa08883939f229e346a5d29ec2da4e0d83",
+      "bytes": 3506
+    }
+  ]
+}
