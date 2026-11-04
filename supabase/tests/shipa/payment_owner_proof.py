@@ -20,14 +20,16 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql",
     "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql",
     "20261103002000_whatsapp_expansion.sql", "20261103002100_shipa_optional_instructions.sql",
-    "20261103002200_whatsapp_delivery_claim.sql", "20261103002300_whatsapp_delivery_finish.sql"))
+    "20261103002200_whatsapp_delivery_claim.sql", "20261103002300_whatsapp_delivery_finish.sql",
+    "20261103002400_shipa_dispatch_selection.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql", "delivery.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
         ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql",
-        ROOT / "supabase/tests/shipa/unbound_payments.sql", ROOT / "supabase/tests/shipa/submission_payload.sql")
+        ROOT / "supabase/tests/shipa/unbound_payments.sql", ROOT / "supabase/tests/shipa/submission_payload.sql",
+        ROOT / "supabase/tests/shipa/dispatch_selection.sql")
 
 
 def open_psql(container):
