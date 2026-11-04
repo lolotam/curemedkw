@@ -1,10 +1,11 @@
 # Shipa one-shipment execution core
 
-`createShipaDispatcher({client,keyring,fetchImpl?,now?}).processShipment({shipmentId,integrationId,environment})`
-is an internal server operation. A future authenticated admin route or worker must derive that
+`createShipaDispatcher({client,keyring,fetchImpl?,now?,budget?}).processShipment({shipmentId,integrationId,environment})`
+is an internal server operation. The authenticated manual route and any future worker must derive that
 three-field binding from canonical records; a browser cannot supply its own actor, paid flag,
-endpoint, credential, draft or arbitrary binding as authority. This checkpoint supplies no route,
-scheduler, activation or delivery-status endpoint. The optional clock is server-owned and defaults
+endpoint, credential, draft or arbitrary binding as authority. The manual route is documented in
+`shipa-manual-runtime-contract.md`; no scheduler, activation or provider delivery-status endpoint is
+supplied. The optional clock is server-owned and defaults
 to `Date.now`; a browser cannot supply it.
 
 The real credential loader decrypts the selected environment's stored key first. The real submission
@@ -59,14 +60,19 @@ mapping helpers. The optional-field change grants no send/retry authority.
 
 ## Boundaries still required before use
 
-The provider adapter enforces its existing 10-second network/body deadline. The received-lease check
-above is implemented; endpoint/item/scheduler envelope budgets and cancellation/fencing of late
-asynchronous continuations still need assembly in the future wrapper. This core alone is not that
-proof. Pre-begin invalid draft/payload is a fixed response with no completion mutation, because
+The provider adapter enforces a network/body deadline of at most 10 seconds, clamped to remaining
+item time. The core now fences every lazy operation and awaited continuation with one 15-second
+monotonic budget, fresh per invocation or injected by the surrounding manual item. The manual
+handler propagates request cancellation through that same budget. Late review/credential/prepare/
+begin answers cannot start later provider work, including when a timer callback is delayed. These
+client fences do not cancel SQL or establish production runtime suspension/network guarantees;
+the future scheduler still needs its own 50-second parent envelope and serial item composition.
+Pre-begin invalid draft/payload is a fixed response with no completion mutation, because
 completion requires an existing token/marker. Unknown dispatch stays sticky in SQL and cannot become
 re-creation authority through a local validation failure, staff review or a negative lookup.
 
-Actual route/worker authentication, canonical candidate selection, scheduler heartbeat,
-readiness/activation, expiry/status/reconciliation, UI and live provider entitlement remain separate
+The manual route's administrator authentication/canonical binding has local actual-SDK/SQL proof;
+deployed routing and worker authentication, scheduler heartbeat, readiness/activation,
+provider status/reconciliation runtime, order UI and live provider entitlement remain separate
 gates. Keep the shared payment owner, broad coupon SHARE/short transaction/no HTTP rule, Ministry
 hold and separate production migration/merge/native-operation approvals.

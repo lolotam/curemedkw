@@ -7,6 +7,12 @@
 // credential, read the readiness projection and run one read-only diagnostic
 // probe. It is the concrete contract a later admin UI calls.
 //
+// It also serves the three bounded shipment actions: preview the integrity of
+// one order, read one targeted shipment, and create one manual booking. The
+// configuration actions keep their own parsers, their own services and their
+// own failure vocabulary; the shipment actions have a separate vocabulary and
+// a separate composition.
+//
 // How a request is answered
 // -------------------------
 //   1. A CORS preflight is answered without authentication, without a
@@ -17,10 +23,10 @@
 //      from a real role row. Only the returned `{userId}` is authority.
 //   4. The body is read with a real byte cap, after the administrator was
 //      verified and before any service or key work happens.
-//   5. The action is one of the five closed shapes. The nested request is
+//   5. The action is one of the closed shapes. The nested request is
 //      validated by the existing shared parsers.
-//   6. The real settings store, credential service or readiness service runs
-//      with the verified actor.
+//   6. The real settings store, credential service, readiness service or
+//      manual composition runs with the verified actor.
 //
 // The actor
 // ---------
@@ -52,6 +58,17 @@ import { handleOptions, jsonError, jsonResponse } from "../_shared/cors.ts";
 import type { ShipaFetch } from "../_shared/shipa-client.ts";
 import type { ShipaServiceActor } from "../_shared/shipa-configuration-service-contract.ts";
 import {
+  createShipaManualService,
+  type ShipaManualService,
+} from "../_shared/shipa-manual-service.ts";
+import {
+  isShipaShipmentActionRequest,
+  mapShipaShipmentFailure,
+  parseShipaShipmentAction,
+  ShipaShipmentError,
+  type ShipaShipmentParsedAction,
+} from "../_shared/shipa-shipment-actions.ts";
+import {
   createShipaRuntimeServices,
   type ShipaRuntimeClient,
   type ShipaRuntimeServices,
@@ -69,6 +86,8 @@ export interface ShipaAdminHandlerOptions {
   readonly readEncryptionKey: () => string | undefined;
   /** The fetch boundary of the provider adapter. */
   readonly fetchImpl?: ShipaFetch;
+  /** Server wall clock used only for the SQL lease check; never request input. */
+  readonly now?: () => number;
 }
 
 /** The request handler of the admin endpoint. */
@@ -90,6 +109,9 @@ export function createShipaAdminHandler(
     fetchImpl: options.fetchImpl,
   });
 
+  // The manual composition runs over the same injected client and the same
+  // injected fetch boundary. Its keyring is the runtime's lazy keyring: a
+  // preview and a read never ask for it.
   return async function handleShipaAdminRequest(
     request: Request,
   ): Promise<Response> {
@@ -119,6 +141,39 @@ export function createShipaAdminHandler(
         code,
         SHIPA_ADMIN_ERROR_MESSAGES[code],
         body.status,
+      );
+    }
+
+    // The shipment actions are a separate vocabulary with their own closed
+    // failure surface. They are recognised before the configuration
+    // vocabulary, and the five configuration results stay exactly as they
+    // were.
+    if (isShipaShipmentActionRequest(body.value)) {
+      const shipmentAction = parseShipaShipmentAction(body.value);
+      if (!shipmentAction.ok) {
+        const failure = mapShipaShipmentFailure(
+          new ShipaShipmentError("invalid_request"),
+        );
+        return jsonError(
+          request,
+          failure.code,
+          failure.message,
+          failure.status,
+        );
+      }
+      return await runShipmentAction(
+        request,
+        createShipaManualService({
+          client: options.client,
+          loadKeyring: () => runtime.requireKeyring(),
+          budgetOptions: { signal: request.signal },
+          ...(options.fetchImpl !== undefined
+            ? { fetchImpl: options.fetchImpl }
+            : {}),
+          ...(options.now !== undefined ? { now: options.now } : {}),
+        }),
+        shipmentAction.action,
+        actor,
       );
     }
 
@@ -180,6 +235,57 @@ async function runAdminAction(
         request: action.request,
       });
     }
+  }
+}
+
+/**
+ * Runs one validated shipment action against the real manual composition.
+ *
+ * The actor is the verified administrator and nothing else. The failures are
+ * answered with the shipment vocabulary: a fixed code, a fixed status and
+ * fixed text, never an upstream message, a SQL fragment, a draft, a key, a
+ * fingerprint or an attempt token.
+ */
+async function runShipmentAction(
+  request: Request,
+  manualService: ShipaManualService,
+  action: ShipaShipmentParsedAction,
+  actor: ShipaServiceActor,
+): Promise<Response> {
+  try {
+    switch (action.action) {
+      case "shipment.preview": {
+        const data = await manualService.preview({
+          actor,
+          orderId: action.orderId,
+          request: action.request,
+        });
+        return jsonResponse(request, { success: true, data }, 200);
+      }
+
+      case "shipment.read": {
+        const data = await manualService.read({
+          actor,
+          shipmentId: action.shipmentId,
+        });
+        return jsonResponse(request, { success: true, data }, 200);
+      }
+
+      case "shipment.create": {
+        const result = await manualService.create({
+          actor,
+          orderId: action.orderId,
+          request: action.request,
+        });
+        return jsonResponse(request, {
+          success: true,
+          data: { shipment: result.shipment, dispatch: result.dispatch },
+        }, 200);
+      }
+    }
+  } catch (error) {
+    const failure = mapShipaShipmentFailure(error);
+    return jsonError(request, failure.code, failure.message, failure.status);
   }
 }
 

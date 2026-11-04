@@ -5,6 +5,7 @@ import { createShipaRuntimeClient } from "../../functions/_shared/shipa-runtime.
 import { createShipaReviewStore } from "../../functions/_shared/shipa-review-store.ts";
 import { ShipaReviewError } from "../../functions/_shared/shipa-review-contract.ts";
 import { createShipaCredentialService } from "../../functions/_shared/shipa-credential-service.ts";
+import { createShipaAdminHandler } from "../../functions/shipa-admin/handler.ts";
 import {
   createShipaDispatcher,
   type ShipaDispatchInput,
@@ -48,6 +49,33 @@ const sdk = createClient("https://guarded-sql.test", "synthetic-sdk-key", {
       const request = new Request(value, init);
       const url = new URL(request.url);
       assertEquals(url.origin, "https://guarded-sql.test");
+      if (url.pathname === "/auth/v1/user") {
+        if (
+          request.headers.get("authorization") !== "Bearer synthetic-session"
+        ) {
+          return Response.json({ message: "Synthetic session refused" }, {
+            status: 401,
+          });
+        }
+        return Response.json({
+          id: "89000000-0000-4000-8000-000000000001",
+          email: "core-proof@example.test",
+          app_metadata: {},
+          user_metadata: {},
+        });
+      }
+      if (url.pathname === "/rest/v1/user_roles") {
+        assertEquals(
+          url.searchParams.get("user_id"),
+          "eq.89000000-0000-4000-8000-000000000001",
+        );
+        assertEquals(url.searchParams.get("role"), "eq.admin");
+        const role = await bridge({
+          kind: "role",
+          actor: "89000000-0000-4000-8000-000000000001",
+        });
+        return Response.json(role.error ?? role.data, { status: role.status });
+      }
       assertEquals(request.method, "POST");
       assertEquals(url.pathname.startsWith("/rest/v1/rpc/shipa_"), true);
       const fn = url.pathname.split("/").at(-1);
@@ -106,7 +134,15 @@ const seeded = await bridge({ kind: "seed" });
 if (!isPlainRecord(seeded.data)) {
   throw new Error("Missing fixture shipment bindings");
 }
-for (const label of ["accepted", "uncertain", "lost_begin", "lost_complete"]) {
+for (
+  const label of [
+    "accepted",
+    "uncertain",
+    "lost_begin",
+    "lost_complete",
+    "manual_endpoint",
+  ]
+) {
   const binding = seeded.data[label];
   if (
     !isPlainRecord(binding) || !isIntegrationUuid(binding.shipmentId) ||
@@ -129,13 +165,18 @@ const canonical = await client.rpc("shipa_resolve_dispatch_binding", {
   _shipment_id: bindings.accepted.shipmentId,
 });
 if (
-  !isPlainRecord(canonical) || canonical.error !== null || !isPlainRecord(canonical.data) ||
+  !isPlainRecord(canonical) || canonical.error !== null ||
+  !isPlainRecord(canonical.data) ||
   !isIntegrationUuid(canonical.data.order_id)
 ) {
   throw new Error("Missing canonical fixture order binding");
 }
 const orderId = canonical.data.order_id;
-const preview = await review.preview({ actor, orderId, request: { environment: "sandbox" } });
+const preview = await review.preview({
+  actor,
+  orderId,
+  request: { environment: "sandbox" },
+});
 assertEquals(preview.accepted, true);
 const request = {
   environment: "sandbox",
@@ -149,7 +190,10 @@ const request = {
 const adopted = await review.requestManual({ actor, orderId, request });
 assertEquals(adopted.shipmentId, bindings.accepted.shipmentId);
 assertEquals(adopted.changed, false);
-const safeRead = await review.readShipment({ actor, shipmentId: adopted.shipmentId });
+const safeRead = await review.readShipment({
+  actor,
+  shipmentId: adopted.shipmentId,
+});
 assertEquals(safeRead?.orderId, orderId);
 assertEquals(safeRead?.source, "manual");
 assertEquals(safeRead?.customerRef.startsWith("CM-"), true);
@@ -166,7 +210,8 @@ const forged = await assertRejects(() =>
     shipmentId: adopted.shipmentId,
   }), ShipaReviewError);
 assertEquals(forged.code, "forbidden");
-const beforeLoss = calls.filter((call) => call.fn === "shipa_request_manual").length;
+const beforeLoss =
+  calls.filter((call) => call.fn === "shipa_request_manual").length;
 loseManualReviewResponse = true;
 const lostReview = await assertRejects(() =>
   review.requestManual({
@@ -175,7 +220,10 @@ const lostReview = await assertRejects(() =>
     request: { ...request, reviewReason: "Synthetic lost-response review" },
   }), ShipaReviewError);
 assertEquals(lostReview.code, "unavailable");
-assertEquals(calls.filter((call) => call.fn === "shipa_request_manual").length, beforeLoss + 1);
+assertEquals(
+  calls.filter((call) => call.fn === "shipa_request_manual").length,
+  beforeLoss + 1,
+);
 assertEquals(
   (await review.readShipment({ actor, shipmentId: adopted.shipmentId }))?.state,
   "queued",
@@ -183,26 +231,38 @@ assertEquals(
 
 let activeCase = "";
 const posts: Record<string, number> = {};
-const dispatcher = createShipaDispatcher({
-  client,
-  keyring: master.keyring,
-  fetchImpl: (target, init) => {
-    const url = new URL(target);
-    assertEquals(url.origin, "https://sandbox-api.shipadelivery.com");
-    assertEquals(url.pathname, "/v2/orders");
-    assertEquals(url.searchParams.get("apikey"), credential);
-    assertEquals(init.method, "POST");
-    const payload = JSON.parse(String(init.body));
-    assertEquals(payload.destination.options.amountToCollect, 0);
-    assertEquals(Object.hasOwn(payload.origin, "options"), false);
-    posts[activeCase] = (posts[activeCase] ?? 0) + 1;
-    return Promise.resolve(
-      activeCase === "uncertain" ? Response.json({}, { status: 503 }) : Response.json({
+const provider = async (target: string, init: RequestInit) => {
+  const url = new URL(target);
+  assertEquals(url.origin, "https://sandbox-api.shipadelivery.com");
+  assertEquals(url.pathname, "/v2/orders");
+  assertEquals(url.searchParams.get("apikey"), credential);
+  assertEquals(init.method, "POST");
+  const payload = JSON.parse(String(init.body));
+  assertEquals(payload.destination.options.amountToCollect, 0);
+  assertEquals(Object.hasOwn(payload.origin, "options"), false);
+  const marker = await bridge({
+    kind: "marker",
+    shipment: bindings[activeCase].shipmentId,
+  });
+  assertEquals(
+    marker.data,
+    true,
+    "provider request preceded its durable submission marker",
+  );
+  posts[activeCase] = (posts[activeCase] ?? 0) + 1;
+  return Promise.resolve(
+    activeCase === "uncertain"
+      ? Response.json({}, { status: 503 })
+      : Response.json({
         shipaRef: `SYNTHETIC-${activeCase}`,
         orderStatus: "Created",
       }),
-    );
-  },
+  );
+};
+const dispatcher = createShipaDispatcher({
+  client,
+  keyring: master.keyring,
+  fetchImpl: provider,
 });
 for (
   const [label, expected] of [
@@ -232,16 +292,98 @@ for (
     false,
   );
 }
-const unknown = await review.readShipment({ actor, shipmentId: bindings.uncertain.shipmentId });
+const unknown = await review.readShipment({
+  actor,
+  shipmentId: bindings.uncertain.shipmentId,
+});
 assertEquals(unknown?.state, "unknown");
 assertEquals(unknown?.retryAt, null);
+
+// The real HTTP handler verifies its session through the actual SDK and reads
+// the actual SQL role row. Only remote auth/provider transport is synthetic.
+const handler = createShipaAdminHandler({
+  client,
+  readEncryptionKey: () => master.encoded,
+  fetchImpl: provider,
+});
+async function endpoint(
+  payload: unknown,
+  expectedStatus = 200,
+  sessionMarker = "synthetic-session",
+) {
+  const response = await handler(
+    new Request("https://guarded.test/shipa-admin?actor=forged", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${sessionMarker}`,
+        "x-actor-id": "forged",
+      },
+      body: JSON.stringify(payload),
+    }),
+  );
+  assertEquals(response.status, expectedStatus);
+  const text = await response.text();
+  for (
+    const sensitive of [
+      credential,
+      master.encoded,
+      "ciphertext",
+      "nonce",
+      "attempt_token",
+      "Synthetic buyer address",
+    ]
+  ) {
+    assertEquals(text.includes(sensitive), false);
+  }
+  return JSON.parse(text);
+}
+activeCase = "manual_endpoint";
+const endpointBinding = await client.rpc("shipa_resolve_dispatch_binding", {
+  _shipment_id: bindings.manual_endpoint.shipmentId,
+});
+if (!isPlainRecord(endpointBinding) || !isPlainRecord(endpointBinding.data)) {
+  throw new Error("Missing endpoint binding");
+}
+const endpointOrder = endpointBinding.data.order_id;
+const endpointPreview = await endpoint({
+  action: "shipment.preview",
+  orderId: endpointOrder,
+  request: { environment: "sandbox" },
+});
+assertEquals(endpointPreview.data.accepted, true);
+const endpointBody = {
+  action: "shipment.create",
+  orderId: endpointOrder,
+  request: {
+    ...request,
+    expectedSettingsRevision: endpointPreview.data.settingsRevision,
+    expectedInputFingerprint: endpointPreview.data.inputFingerprint,
+  },
+};
+const callsBeforeDenied = calls.length;
+await endpoint(endpointBody, 401, "invalid-session");
+assertEquals(calls.length, callsBeforeDenied);
+await endpoint({ ...endpointBody, actor }, 400);
+assertEquals(calls.length, callsBeforeDenied);
+const booked = await endpoint(endpointBody);
+assertEquals(booked.data.dispatch.status, "created");
+assertEquals(posts.manual_endpoint, 1);
+const loaded = await endpoint({
+  action: "shipment.read",
+  shipmentId: bindings.manual_endpoint.shipmentId,
+});
+assertEquals(loaded.data.state, "created");
+assertEquals(loaded.data.shipaRef, "SYNTHETIC-manual_endpoint");
+const replayed = await endpoint(endpointBody, 409);
+assertEquals(replayed.error.code, "needs_reconciliation");
+assertEquals(posts.manual_endpoint, 1);
 await input.cancel();
 await Deno.stdout.write(
   encoder.encode(
     JSON.stringify({
       kind: "complete",
       receipt:
-        "Real SDK/review/core/crypto/SQL and committed-response-loss cases passed; provider POST synthetic",
+        "Real SDK/auth-role HTTP/manual/review/core/crypto/SQL and committed-response-loss cases passed; provider POST synthetic",
     }) + "\n",
   ),
 );

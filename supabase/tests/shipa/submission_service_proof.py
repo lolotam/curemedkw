@@ -30,7 +30,7 @@ def seed_intents(container):
         "INSERT INTO public.products(id,brand,name,price,sku,slug) VALUES "
         "('93000000-0000-4000-8000-000000000001','flexitol','Synthetic item',10,'submission-core-item','submission-core-item');", "postgres")
     bindings = {}
-    for label in ("accepted", "uncertain", "lost_begin", "lost_complete"):
+    for label in ("accepted", "uncertain", "lost_begin", "lost_complete", "manual_endpoint"):
         order = str(uuid.uuid5(uuid.NAMESPACE_URL, "curemed-submission-order:" + label))
         attempt = str(uuid.uuid5(uuid.NAMESPACE_URL, "curemed-submission-attempt:" + label))
         status = {"invoice_id": "core-invoice-" + label, "external_identifier": order,
@@ -80,7 +80,7 @@ def main():
             if request["kind"] == "complete":
                 receipt = request["receipt"]
                 break
-            if calls >= 60:
+            if calls >= 90:
                 raise RuntimeError("Submission bridge exceeded its operation budget")
             calls += 1
             if request == {"kind": "seed"} and bindings is None:
@@ -88,6 +88,17 @@ def main():
                 response = {"data": bindings, "error": None, "status": 200}
             elif request["kind"] == "rpc":
                 response = execute_rpc(container, request)
+            elif request == {"kind": "role", "actor": ACTOR}:
+                rows = fixture.sql(container, "SET ROLE service_role; SELECT coalesce(jsonb_agg(jsonb_build_object('role',role)),'[]'::jsonb) "
+                    f"FROM public.user_roles WHERE user_id='{ACTOR}' AND role='admin'", "postgres").splitlines()[-1]
+                response = {"data": json.loads(rows), "error": None, "status": 200}
+            elif request.get("kind") == "marker" and request.get("shipment") in {entry["shipmentId"] for entry in bindings.values()}:
+                # Observer-only assertion as the guarded fixture owner. All application
+                # RPC mutations still execute through the service-role bridge above.
+                marked = fixture.sql(container, "SELECT state='submitting' AND attempt_count=1 "
+                    "AND EXISTS(SELECT 1 FROM private.shipa_submission_markers marker WHERE marker.shipment_id=shipment.id) "
+                    f"FROM public.shipments shipment WHERE id={literal(request['shipment'])}::uuid", "postgres").splitlines()[-1]
+                response = {"data": marked == "t", "error": None, "status": 200}
             else:
                 raise RuntimeError("Unexpected submission bridge operation")
             process.stdin.write(json.dumps(response) + "\n")
@@ -101,7 +112,7 @@ def main():
                 "'markers',(SELECT count(*) FROM private.shipa_submission_markers WHERE shipment_id=shipment.id),"
                 "'events',(SELECT count(*) FROM public.shipment_events WHERE shipment_id=shipment.id)) "
                 f"FROM public.shipments shipment WHERE id='{binding['shipmentId']}'", "postgres"))
-        for label, expected in (("accepted", "created"), ("uncertain", "unknown"), ("lost_begin", "submitting"), ("lost_complete", "created")):
+        for label, expected in (("accepted", "created"), ("uncertain", "unknown"), ("lost_begin", "submitting"), ("lost_complete", "created"), ("manual_endpoint", "created")):
             if persisted[label]["state"] != expected or persisted[label]["attempts"] != 1 or persisted[label]["markers"] != 1:
                 raise RuntimeError("One-attempt marker/state invariant failed")
         reviews = int(fixture.sql(container, "SELECT count(*) FROM private.shipa_reviews "

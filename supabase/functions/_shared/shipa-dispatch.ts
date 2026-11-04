@@ -32,13 +32,21 @@
 //   this slice does not implement.
 // * No authority to repeat creation is produced anywhere, including for `needs_review`,
 //   a local rejection, a negative lookup or a service credential.
+// * Every phase runs under one bounded execution budget. The budget is checked
+//   BEFORE a lazy operation is invoked and every await is bounded by the
+//   remaining time, so a call that resolves after the deadline never reaches
+//   the provider. The budget bounds this process only: it cannot prove that
+//   the database cancelled or rolled back an abandoned call.
 //
 // Source of truth:
 //   docs/integrations/shipa-submission-rpc-contract.md
 //   docs/integrations/shipa-dispatch-state-rpc-contract.md
 //   supabase/migrations/20261103001600_shipa_submission.sql
 
-import { isIntegrationUuid, isPlainRecord } from "./integration-credential-contract.ts";
+import {
+  isIntegrationUuid,
+  isPlainRecord,
+} from "./integration-credential-contract.ts";
 import type { IntegrationCredentialKeyring } from "./integration-credentials.ts";
 import {
   ShipaCredentialLoaderError,
@@ -50,7 +58,11 @@ import {
   isShipaEnvironment,
   type ShipaEnvironment,
 } from "./shipa-contract.ts";
-import { ShipaClient, type ShipaCreateResult, type ShipaFetch } from "./shipa-client.ts";
+import {
+  ShipaClient,
+  type ShipaCreateResult,
+  type ShipaFetch,
+} from "./shipa-client.ts";
 import {
   type ShipaSubmissionBegin,
   type ShipaSubmissionBinding,
@@ -62,6 +74,12 @@ import {
 } from "./shipa-submission-contract.ts";
 import { shipaJsonEqual } from "./shipa-submission-responses.ts";
 import { createShipaSubmissionStore } from "./shipa-submission-store.ts";
+import {
+  createShipaExecutionBudget,
+  isShipaExecutionBudgetError,
+  SHIPA_EXECUTION_PROVIDER_DEADLINE_MS,
+  type ShipaExecutionBudget,
+} from "./shipa-execution-budget.ts";
 
 // ---------------------------------------------------------------------------
 // The input and the result
@@ -90,7 +108,8 @@ export type ShipaDispatchNotStartedCode =
   | ShipaSubmissionRefusal["code"]
   | "draft_invalid"
   | "payload_mismatch"
-  | "context_mismatch";
+  | "context_mismatch"
+  | "budget_exhausted";
 
 /**
  * The reasons the outcome is uncertain.
@@ -103,7 +122,8 @@ export type ShipaDispatchUncertainCode =
   | "begin_lease_unusable"
   | "provider_uncertain"
   | "provider_rejected_local"
-  | "provider_invalid_response";
+  | "provider_invalid_response"
+  | "budget_exhausted";
 
 /**
  * The safe execution status of one shipment.
@@ -155,6 +175,16 @@ export interface ShipaDispatcherOptions {
   readonly fetchImpl?: ShipaFetch;
   /** Server wall clock for checking the received SQL lease; never browser input. */
   readonly now?: () => number;
+  /**
+   * The shared execution budget of the surrounding item.
+   *
+   * It is injected when the caller owns a wider item, for example a manual
+   * review whose canonical lookup and key load already consumed part of the
+   * fifteen seconds. Without it this core creates a FRESH budget for every
+   * `processShipment` invocation: the budget belongs to the invocation, not
+   * to the constructor and not to a single await.
+   */
+  readonly budget?: ShipaExecutionBudget;
 }
 
 /** The one-shipment execution core. */
@@ -184,6 +214,7 @@ export function createShipaDispatcher(
 
   const loader = createShipaCredentialLoader({ client, keyring });
   const store = createShipaSubmissionStore({ client });
+  const sharedBudget = options.budget;
 
   async function processShipment(
     input: ShipaDispatchInput,
@@ -193,23 +224,36 @@ export function createShipaDispatcher(
       return { status: "not_started", code: "invalid_request" };
     }
 
+    // The budget of THIS invocation. An injected budget is shared with the
+    // manual phases around the call, so the fifteen seconds of the whole item
+    // are not reset here. Without one, every invocation gets a fresh budget.
+    const budget = sharedBudget ?? createShipaExecutionBudget();
+
     // 1. Load the credential for this integration and environment. The loaded
     //    tuple is immutable for this execution.
     let loaded: ShipaCredentialSecret;
     try {
-      loaded = await loader.readSecret({
-        integrationId: binding.integrationId,
-        environment: binding.environment,
-      });
+      loaded = await budget.run(() =>
+        loader.readSecret({
+          integrationId: binding.integrationId,
+          environment: binding.environment,
+        })
+      );
     } catch (error) {
+      if (isShipaExecutionBudgetError(error)) {
+        return { status: "not_started", code: "budget_exhausted" };
+      }
       return { status: "not_started", code: mapLoaderFailure(error) };
     }
 
     // 2. Prepare. Preparation is mutating but never grants send authority.
     let preparation: ShipaSubmissionPreparation | ShipaSubmissionRefusal;
     try {
-      preparation = await store.prepare(binding);
+      preparation = await budget.run(() => store.prepare(binding));
     } catch (error) {
+      if (isShipaExecutionBudgetError(error)) {
+        return { status: "not_started", code: "budget_exhausted" };
+      }
       return { status: "not_started", code: mapStoreFailure(error) };
     }
     if (preparation.ready === false) {
@@ -235,18 +279,21 @@ export function createShipaDispatcher(
     //    authorises a provider request.
     let begun: ShipaSubmissionBegin | ShipaSubmissionRefusal;
     try {
-      begun = await store.begin({
-        binding,
-        preparation,
-        credential: {
-          credentialRevision: loaded.credentialRevision,
-          credentialFingerprint: loaded.credentialFingerprint,
-        },
-        attemptToken: attemptId,
-      });
+      begun = await budget.run(() =>
+        store.begin({
+          binding,
+          preparation,
+          credential: {
+            credentialRevision: loaded.credentialRevision,
+            credentialFingerprint: loaded.credentialFingerprint,
+          },
+          attemptToken: attemptId,
+        })
+      );
     } catch {
-      // A transport failure or an unusable answer is not a proof that no
-      // marker exists, so this is uncertain and never a not-started refusal.
+      // A transport failure, an unusable answer and an exhausted budget are
+      // all uncertain: the marker may exist, so this is never a not-started
+      // refusal and never a proof that no marker was committed.
       return { status: "uncertain", code: "begin_uncertain" };
     }
     if (begun.ready === false) {
@@ -263,16 +310,36 @@ export function createShipaDispatcher(
 
     // 6. One create request, with the same loaded key and the returned
     //    draft. There is no lookup, no retry and no second attempt.
+    //
+    //    The remaining time is checked immediately before the provider is
+    //    invoked, and the client deadline is clamped to it. An exhausted
+    //    budget after the begin is uncertain: no new HTTP request happens and
+    //    no completion is written.
+    const remaining = budget.remainingMs();
+    if (budget.abandoned || remaining <= 0) {
+      return { status: "uncertain", code: "budget_exhausted" };
+    }
+    const deadlineMs = Math.max(
+      1,
+      Math.min(SHIPA_EXECUTION_PROVIDER_DEADLINE_MS, Math.floor(remaining)),
+    );
+
     let result: ShipaCreateResult;
     try {
       const { apiKey } = loaded;
       const shipa = new ShipaClient({
         environment: binding.environment,
         apiKey,
+        deadlineMs,
         ...(fetchImpl !== undefined ? { fetchImpl } : {}),
       });
-      result = await shipa.createOrder(begun.draft);
-    } catch {
+      result = await budget.run(() => shipa.createOrder(begun.draft));
+    } catch (error) {
+      if (isShipaExecutionBudgetError(error)) {
+        // The request may have reached the provider. The marker and the
+        // lease carry the recovery, and no completion is written.
+        return { status: "uncertain", code: "budget_exhausted" };
+      }
       // An unexpected failure after the begin is uncertain, never a proven
       // non-dispatch.
       result = { outcome: "uncertain", code: "invalid_response" };
@@ -281,7 +348,9 @@ export function createShipaDispatcher(
     // 7. Complete exactly once, with the same token and the real outcome.
     let summary: ShipaSubmissionSafeSummary;
     try {
-      summary = await store.complete(binding, attemptId, result);
+      summary = await budget.run(() =>
+        store.complete(binding, attemptId, result)
+      );
     } catch {
       // The completion is not retried and the outcome is not inferred. The
       // durable marker and the lease carry the recovery.
@@ -321,7 +390,10 @@ function describeOutcome(
 }
 
 /** A failed/invalid server clock cannot authorize a provider request. */
-function hasSubmissionWindow(begun: ShipaSubmissionBegin, now: () => number): boolean {
+function hasSubmissionWindow(
+  begun: ShipaSubmissionBegin,
+  now: () => number,
+): boolean {
   try {
     const currentTime = now();
     return Number.isFinite(currentTime) &&
@@ -347,7 +419,9 @@ function requireDispatchInput(
   if (!isPlainRecord(input)) return null;
   if (
     Object.keys(input).length !== 3 ||
-    !["shipmentId", "integrationId", "environment"].every((key) => Object.hasOwn(input, key))
+    !["shipmentId", "integrationId", "environment"].every((key) =>
+      Object.hasOwn(input, key)
+    )
   ) return null;
   if (!isIntegrationUuid(input.shipmentId)) return null;
   if (!isIntegrationUuid(input.integrationId)) return null;
