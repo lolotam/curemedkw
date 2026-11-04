@@ -6,6 +6,10 @@ const allowedOrigins = new Set([
   "http://localhost:5173",
 ]);
 
+export function isAllowedOrigin(origin: string): boolean {
+  return allowedOrigins.has(origin);
+}
+
 export function corsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("origin") ?? "";
   const allowOrigin = allowedOrigins.has(origin) ? origin : "https://curemedkw.com";

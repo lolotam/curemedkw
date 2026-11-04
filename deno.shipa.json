@@ -1,0 +1,25 @@
+{
+  "lock": false,
+  "nodeModulesDir": "none",
+  "compilerOptions": {
+    "strict": true,
+    "types": [],
+    "lib": [
+      "deno.window",
+      "dom",
+      "dom.iterable"
+    ]
+  },
+  "test": {
+    "include": [
+      "supabase/functions/_tests/whatsapp-pairing/"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-import-prefix"
+      ]
+    }
+  }
+}

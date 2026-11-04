@@ -18,3 +18,9 @@ verify_jwt = false
 [functions.send-order-email]
 verify_jwt = false
 
+
+[functions.whatsapp-pairing]
+verify_jwt = false
+
+[functions.whatsapp-pairing-webhook]
+verify_jwt = false
