@@ -21,7 +21,7 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql",
     "20261103002000_whatsapp_expansion.sql", "20261103002100_shipa_optional_instructions.sql",
     "20261103002200_whatsapp_delivery_claim.sql", "20261103002300_whatsapp_delivery_finish.sql",
-    "20261103002400_shipa_dispatch_selection.sql"))
+    "20261103002400_shipa_dispatch_selection.sql", "20261103002500_shipa_tracking.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql", "delivery.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
@@ -29,7 +29,7 @@ TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
         ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql",
         ROOT / "supabase/tests/shipa/unbound_payments.sql", ROOT / "supabase/tests/shipa/submission_payload.sql",
-        ROOT / "supabase/tests/shipa/dispatch_selection.sql")
+        ROOT / "supabase/tests/shipa/dispatch_selection.sql", ROOT / "supabase/tests/shipa/tracking.sql")
 
 
 def open_psql(container):
@@ -640,6 +640,47 @@ def concurrent_whatsapp_delivery(container):
         close_processes(tuple(process for process in (holder, claimant, busy, rotation, bootstrap, bootstrap_peer) if process is not None))
 
 
+def concurrent_tracking_refresh(container, shipment):
+    actor = "83000000-0000-4000-8000-000000000001"
+    context = json.loads(fixture.sql(container, "SET ROLE service_role; "
+        f"SELECT public.shipa_read_tracking_context('{shipment}','{actor}')", "postgres").splitlines()[-1])
+    observation = {"shipaRef": context["shipa_ref"], "customerRef": context["customer_ref"],
+        "status": "Tracking race first", "story": [], "tracking": {"available": False}}
+    def call(document):
+        normalized = json.dumps(document).replace("'", "''")
+        return "SELECT public.shipa_record_tracking_observation(" \
+            f"'{shipment}','{context['attempt_token']}','{context['updated_at']}'," \
+            f"'{context['credential_fingerprint']}','{normalized}','{actor}');"
+    first, second = open_psql(container), open_psql(container)
+    try:
+        write_sql(first, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL ROLE service_role; " + call(observation))
+        saved = json.loads(first.stdout.readline())
+        second_call = call(observation | {"status": "Tracking stale peer"}).removeprefix("SELECT ")
+        write_sql(second, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='shipa-tracking-race'; "
+            "SET LOCAL ROLE service_role; DO $peer$ BEGIN BEGIN PERFORM " + second_call +
+            " RAISE EXCEPTION 'stale_tracking_overwrite'; EXCEPTION WHEN serialization_failure THEN "
+            "IF SQLERRM<>'shipa_tracking_changed' THEN RAISE; END IF; END; END $peer$; "
+            "SELECT 'stale_refused'; COMMIT;")
+        # Observer alone uses the fixture owner; both mutation calls run as service_role.
+        write_sql(first, "RESET ROLE; " + observe_lock("shipa-tracking-race") + "COMMIT;")
+        for process in (first, second):
+            process.stdin.close()
+            process.wait(timeout=15)
+            if process.returncode:
+                raise RuntimeError("Tracking refresh contention failed: " + process.stderr.read().strip())
+        if second.stdout.read().strip() != "stale_refused" or saved["provider_status"] != "Tracking race first":
+            raise RuntimeError("Concurrent stale tracking response was not refused")
+        persisted = json.loads(fixture.sql(container, "SELECT jsonb_build_array("
+            f"(SELECT provider_status FROM private.shipa_tracking_snapshots WHERE shipment_id='{shipment}'),"
+            f"(SELECT state FROM public.shipments WHERE id='{shipment}'),"
+            f"(SELECT attempt_count FROM public.shipments WHERE id='{shipment}'),"
+            f"(SELECT count(*) FROM private.shipa_submission_markers WHERE shipment_id='{shipment}'))", "postgres"))
+        if persisted != ["Tracking race first", "created", 1, 1]:
+            raise RuntimeError("Tracking contention changed acceptance/attempt or lost the newer snapshot")
+    finally:
+        close_processes((first, second))
+
+
 def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
@@ -675,11 +716,12 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     concurrent_unbound_and_callback(container)
     concurrent_expansion_correction(container)
     concurrent_whatsapp_delivery(container)
+    concurrent_tracking_refresh(container, preparation["shipment_id"])
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
         "wa_claim_repair_lock_order": True, "wa_account_single_inflight": True, "wa_key_rotation_blocked_inflight": True,
-        "wa_missing_slot_bootstrap_race": True,
+        "wa_missing_slot_bootstrap_race": True, "tracking_stale_peer_waits_and_refuses": True,
         "one_first_success_one_replay": True, "concurrent_get_claims_skip_locked": True,
         "concurrent_strict_completion_one_evidence_one_shipa_receipt": True,
         "concurrent_manual_clicks_single_intent_review": True,
