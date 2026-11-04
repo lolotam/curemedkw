@@ -7,7 +7,7 @@ import subprocess
 
 BASE = "0522c5534e87025f66ea195175897d2d43adddce"
 SOURCES = "docs/releases/curemed-app-sources-20261104.json"
-SOURCES_SHA256 = "dfc268f8f95cc2e546927f7365b17b618eee7d48bbf5e7729f371af78fde8c30"
+SOURCES_SHA256 = "7e8ba2c14ba9f6f2897b10523f5006721d9e6ea562359d66856d95242d8986fe"
 CORRECTIONS = {"ops/edge-env.manifest.example.json", "supabase/config.toml"}
 ADDITIONS = {
     SOURCES, "docs/releases/curemed-app-20261104.md", "scripts/verify-curemed-app-release.py",
@@ -17,6 +17,8 @@ ADDITIONS = {
     "src/pages/admin/AdminOrdersDeletion.test.tsx",
     "src/lib/boundedHttpErrorJson.ts", "scripts/tests/test_curemed_app_release.py",
     "supabase/functions/_tests/shipa/shipa-pr24-boundary-regressions.test.ts",
+    "src/lib/pngDataUrl.ts", "supabase/functions/_shared/evolution-pairing-png.ts",
+    "supabase/functions/_shared/json-unique-members.ts", "scripts/tests/test_edge_import_specifiers.py",
 }
 
 
