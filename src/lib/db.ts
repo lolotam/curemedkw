@@ -1726,8 +1726,7 @@ export function useDeleteOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      // Delete items first (no cascade defined client-side)
-      await supabase.from("order_items").delete().eq("order_id", id);
+      // The database cascades items atomically; a refused parent delete must keep them.
       const { error } = await supabase.from("orders").delete().eq("id", id);
       if (error) throw error;
     },
