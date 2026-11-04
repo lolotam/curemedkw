@@ -9,6 +9,7 @@ BASELINE = "878dde5748548094aab457b54402809d81770668"
 INVENTORY = "docs/releases/curemed-schema-20261104.json"
 INVENTORY_SHA256 = "af08cb473cfc52186ac1bf35181a34d6731d05ac1716fcd3081747af046b62e6"
 SOURCES = "docs/releases/curemed-schema-sources-20261104.json"
+SOURCES_SHA256 = "a74e0e6eeed772747343ebd17723386ff141b982d4e623275ee099f2f0bc0b87"
 OWN_PATHS = {
     INVENTORY,
     SOURCES,
@@ -44,7 +45,10 @@ def verify(root, base=BASELINE, staged=False):
     if (len(migrations) != 20 or names != sorted(set(names))
             or [x["ordinal"] for x in migrations] != list(range(1, 21))):
         raise ReleaseCompositionError("Migration count/order mismatch")
-    sources = json.loads(read(SOURCES))
+    raw_sources = read(SOURCES)
+    if hashlib.sha256(raw_sources).hexdigest() != SOURCES_SHA256:
+        raise ReleaseCompositionError("Frozen proof-source inventory changed")
+    sources = json.loads(raw_sources)
     records = sources["paths"]
     selected = {entry["path"] for entry in records}
     if len(records) != len(selected):
@@ -56,7 +60,7 @@ def verify(root, base=BASELINE, staged=False):
     if any(not p.startswith(("supabase/migrations/", "supabase/tests/"))
            or ".." in Path(p).parts for p in selected):
         raise ReleaseCompositionError("Non-schema source selected")
-    args = ["diff", "--name-only", "--diff-filter=ACDMRT", base]
+    args = ["diff", "--no-renames", "--no-ext-diff", "--name-only", "--diff-filter=ACDMRT", base]
     args += ["--cached"] if staged else ["HEAD"]
     changed = set(git(root, *args).decode("utf-8").splitlines())
     if changed != selected | OWN_PATHS:

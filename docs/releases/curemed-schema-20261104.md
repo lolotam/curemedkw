@@ -29,6 +29,8 @@ After committing, `python scripts/verify-curemed-schema-release.py` verifies the
 
 Manager validation on this assembly: canonical Git-byte/composition check PASS (51 changed paths, 20 migrations, 26 selected proof-support paths); composition regressions **4/4 PASS**; existing fixture-safety boundary tests **4/4 PASS**; staged whitespace check PASS. No SQL, Docker, server or provider operation was performed. These are lead executions, not independent SA/bot reruns. Source/code/test/docs guard inspection covers the new static verifier, its negative regressions and this documented evidence boundary.
 
+Round-one review corrections: independently pin the raw proof-source manifest, and disable rename/external-diff processing so deletion of an existing path cannot disappear behind a selected added path. Both coordinated manifest/proof removal and rename-hidden baseline deletion were reproduced as failing regressions before the fixes; the corrected composition suite is **6/6 PASS**. The twenty migration blobs and all 26 proof-support source blobs remain unchanged. These static fixes do not resolve other SQL source-review findings or grant full SQL freeze/execution approval.
+
 ## Database evidence limits and prerequisite
 
 The 22 retained `.sql` proof files and guarded fixture tooling are source artifacts only in this assembly. They were not executed by this release-construction task. Earlier manager actual-role/rerun/contention results belong to their original checkpoints and isolated fixtures; they are not SA reruns, current production proof or a newly executed full twenty-migration compatibility matrix.

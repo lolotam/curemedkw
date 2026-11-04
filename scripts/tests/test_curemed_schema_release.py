@@ -32,7 +32,11 @@ class SchemaReleaseTests(unittest.TestCase):
         self.git("config", "core.autocrlf", "false")
         self.git("config", "core.hooksPath", str(self.root / "no-hooks"))
         (self.root / "baseline.txt").write_text("synthetic baseline\n", encoding="utf-8")
+        old_source = self.root / "src/legacy-runtime.ts"
+        old_source.parent.mkdir()
+        old_source.write_bytes(self.files["supabase/tests/shipa/invoice_guard.sql"])
         self.git("add", "baseline.txt")
+        self.git("add", "src/legacy-runtime.ts")
         self.git("commit", "-m", "synthetic baseline")
         self.base = self.git("rev-parse", "HEAD").decode().strip()
         for path, data in self.files.items():
@@ -61,7 +65,7 @@ class SchemaReleaseTests(unittest.TestCase):
 
     def test_runtime_file_is_refused(self):
         target = self.root / "src/unreviewed-runtime.ts"
-        target.parent.mkdir()
+        target.parent.mkdir(exist_ok=True)
         target.write_text("export const runtime = true;\n", encoding="utf-8")
         self.git("add", "src/unreviewed-runtime.ts")
         with self.assertRaisesRegex(release.ReleaseCompositionError, "out-of-scope"):
@@ -70,6 +74,23 @@ class SchemaReleaseTests(unittest.TestCase):
     def test_missing_migration_is_refused(self):
         self.git("rm", "--cached", self.migration)
         with self.assertRaisesRegex(release.ReleaseCompositionError, "missing"):
+            release.verify(self.root, self.base, staged=True)
+
+    def test_coordinated_proof_and_source_manifest_removal_is_refused(self):
+        path = "supabase/tests/shipa/invoice_guard.sql"
+        manifest_path = self.root / release.SOURCES
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["paths"] = [x for x in manifest["paths"] if x["path"] != path]
+        manifest_path.write_bytes((json.dumps(manifest, indent=2) + "\n").encode())
+        self.git("add", release.SOURCES)
+        self.git("rm", "--cached", path)
+        with self.assertRaisesRegex(release.ReleaseCompositionError, "Frozen proof-source inventory changed"):
+            release.verify(self.root, self.base, staged=True)
+
+    def test_rename_cannot_hide_deletion_of_baseline_runtime(self):
+        self.git("config", "diff.renames", "true")
+        self.git("rm", "src/legacy-runtime.ts")
+        with self.assertRaisesRegex(release.ReleaseCompositionError, "out-of-scope"):
             release.verify(self.root, self.base, staged=True)
 
 
