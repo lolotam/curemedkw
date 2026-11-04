@@ -24,7 +24,15 @@ import {
   rawBody,
 } from "./fixtures.ts";
 
-const PNG_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+const PNG_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==";
+
+Deno.test("canonical base64 without a complete PNG remains a safe no-QR result", async () => {
+  for (const base64 of ["SGVsbG8=", "iVBORw0KGgo=", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"]) {
+    const provider = createFakeProvider(() => jsonBody({ base64 }));
+    assertEquals(await client(provider.fetch).requestConnect(), { state: "unknown", qrDataUrl: null });
+    assertEquals(provider.calls.length, 1);
+  }
+});
 
 Deno.test("a foreign top-level identity cannot accompany a flat QR", async () => {
   const provider = createFakeProvider(() =>

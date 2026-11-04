@@ -35,7 +35,7 @@ import {
   type EvolutionPairingResult,
 } from "@/lib/evolutionPairing";
 
-const QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+const QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==";
 
 it("shows a real HTTP configuration failure using fixed local wording", async () => {
   invokeMock.mockResolvedValue({ data: null, error: { context: new Response(JSON.stringify({

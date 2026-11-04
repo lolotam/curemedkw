@@ -28,7 +28,7 @@ const PAIRING_ENDPOINT = "https://curemedkw.com/functions/v1/whatsapp-pairing";
 const WEBHOOK_ENDPOINT =
   "https://curemedkw.com/functions/v1/whatsapp-pairing-webhook";
 
-const PNG_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+const PNG_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==";
 
 Deno.test("a stalled admin body expires before configuration or provider access", async () => {
   const harness = createHarness();
@@ -340,6 +340,28 @@ Deno.test("an expired administrator session requests sign-in before provider con
   assertEquals((await response.json()).error.code, "unauthorized");
   assertEquals(harness.provider.calls.length, 0);
   assertEquals(harness.configReads(), 0);
+});
+
+Deno.test("duplicate action members are refused before any connect or status call", async () => {
+  for (const body of [
+    '{"action":"status","action":"connect"}',
+    '{"action":"connect","action":"status"}',
+    '{"action":"status","\\u0061ction":"connect"}',
+  ]) {
+    const harness = createHarness();
+    const response = await harness.handler(request(PAIRING_ENDPOINT, body, { headers: adminHeaders() }));
+    assertEquals(response.status, 400);
+    assertEquals(harness.configReads(), 0);
+    assertEquals(harness.provider.calls.length, 0);
+  }
+});
+
+Deno.test("one escaped JSON action remains valid without duplicate members", async () => {
+  const harness = createHarness();
+  const response = await harness.handler(request(PAIRING_ENDPOINT,
+    '{"\\u0061ction":"con\\u006eect"}', { headers: adminHeaders() }));
+  assertEquals(response.status, 200);
+  assertEquals(harness.provider.calls.length, 1);
 });
 
 Deno.test("a caller without the admin role is refused", async () => {

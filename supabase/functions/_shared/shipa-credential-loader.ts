@@ -56,6 +56,7 @@ import {
 } from "./integration-credentials.ts";
 
 export * from "./shipa-credential-loader-contract.ts";
+import { shipaTimestampMilliseconds } from "./shipa-settings-validation.ts";
 import {
   type ShipaCredentialBinding,
   type ShipaCredentialLoader,
@@ -362,7 +363,7 @@ function requireRotatedAt(raw: unknown): void {
     typeof raw !== "string" ||
     raw.length === 0 ||
     raw.length > MAX_ROTATED_AT_LENGTH ||
-    !SQL_TIMESTAMP_PATTERN.test(raw)
+    !SQL_TIMESTAMP_PATTERN.test(raw) || !Number.isFinite(shipaTimestampMilliseconds(raw))
   ) {
     throw new ShipaCredentialLoaderError("invalid_response");
   }

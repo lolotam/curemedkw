@@ -18,18 +18,24 @@ class SchemaReadinessError(RuntimeError):
 
 
 def read_live_ledger(container, filenames):
-    if not CONTAINER.fullmatch(container) or any(not FILENAME.fullmatch(x) for x in filenames):
+    if (not CONTAINER.fullmatch(container) or not 1 <= len(filenames) <= 20
+            or any(len(x) > 200 or not FILENAME.fullmatch(x) for x in filenames)):
         raise SchemaReadinessError("schema_target_invalid")
     quoted = ",".join("'" + name + "'" for name in filenames)
+    # Bound data before psql serializes it, even if an unexpected ledger lacks
+    # uniqueness or contains huge text. 21 bounded rows stay below 32KiB;
+    # a duplicate/extra row still fails the exact twenty-row comparison.
     query = ("SELECT COALESCE(json_agg(json_build_object('filename',filename,'checksum',checksum)),"
-             "'[]'::json)::text FROM public.self_hosted_migrations WHERE filename IN (" + quoted + ");")
+             "'[]'::json)::text FROM (SELECT CASE WHEN octet_length(filename)<=200 THEN filename END AS filename,"
+             "CASE WHEN octet_length(checksum)=64 THEN substring(checksum from '^[0-9a-f]{64}$') END AS checksum "
+             "FROM public.self_hosted_migrations WHERE filename IN (" + quoted + ") LIMIT 21) bounded;")
     try:
         # Match the subsequent migration runner's supported target overrides.
         database_user = os.environ.get("SUPABASE_DB_USER") or "postgres"
         database_name = os.environ.get("SUPABASE_DB_NAME") or "postgres"
         result = subprocess.run(["docker", "exec", "-i", container, "psql", "-X", "-v",
                                  "ON_ERROR_STOP=1", "-U", database_user, "-d", database_name, "-At", "-c", query],
-                                capture_output=True, text=True, timeout=15)
+                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=15)
         if result.returncode or len(result.stdout) > 32768:
             raise ValueError()
         return json.loads(result.stdout)

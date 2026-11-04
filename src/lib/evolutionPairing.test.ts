@@ -22,7 +22,7 @@ import {
   type EvolutionInvoke,
 } from "@/lib/evolutionPairing";
 
-const QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
+const QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNgAAAAAgABSK+kcQAAAABJRU5ErkJggg==";
 
 function successEnvelope(
   connection: unknown = { state: "connected", qrDataUrl: null },
@@ -50,11 +50,18 @@ it("an empty PNG data prefix is not a pairing credential", () => {
   expect(answer.ok).toBe(false);
 });
 
-it("bounded long base64 is parsed without recursive regex processing", () => {
+it("bounded long non-PNG base64 is refused without recursive regex processing", () => {
   const answer = parseEvolutionPairingResponse(successEnvelope({ state: "connecting", qrDataUrl: "data:image/png;base64," + "AAAA".repeat(60_000) }));
-  expect(answer.ok).toBe(true);
+  expect(answer.ok).toBe(false);
   expect(parseEvolutionPairingResponse(successEnvelope({ state: "connecting", qrDataUrl: "data:image/png;base64,AB==" })).ok).toBe(false);
 });
+
+it.each(["SGVsbG8=", "iVBORw0KGgo=", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB"])(
+  "does not present malformed or truncated PNG bytes as a pairing code: %s", (base64) => {
+    expect(parseEvolutionPairingResponse(successEnvelope({ state: "connecting",
+      qrDataUrl: "data:image/png;base64," + base64 })).ok).toBe(false);
+  },
+);
 
 describe("the action vocabulary", () => {
   it("sends exactly the two permitted actions to the pairing endpoint", async () => {

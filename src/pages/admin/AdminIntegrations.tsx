@@ -41,8 +41,8 @@ export default function AdminIntegrations() {
   const {
     settingsState,
     readinessState,
-    saved,
-    draft,
+    saved: storedSaved,
+    draft: storedDraft,
     editorEnvironment,
     apiKeyText,
     removeConfirmOpen,
@@ -84,6 +84,10 @@ export default function AdminIntegrations() {
     updateEditor,
     changeEditorEnvironment,
   } = useShipaConfiguration();
+  // A failed read confirms nothing. The hook keeps the last copy so an
+  // unsaved edit is not lost, but the page shows no stored value as current.
+  const saved = settingsFailed ? null : storedSaved;
+  const draft = settingsFailed ? null : storedDraft;
 
   return (
     <AdminPageShell

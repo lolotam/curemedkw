@@ -1,5 +1,5 @@
 // PR24 boundary regressions: real production modules; only the SDK is faked.
-import { assertEquals, assertRejects } from "jsr:@std/assert@1.0.19";
+import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1.0.19";
 import { readShipaAdminJsonBody } from "../../_shared/shipa-admin-actions.ts";
 import {
   decryptIntegrationCredential,
@@ -14,9 +14,14 @@ import {
   SHIPA_TEST_INTEGRATION_ID,
   SHIPA_TEST_SHIPMENT_ID,
 } from "./shipa-submission-fixtures.ts";
-import { createSyntheticKeyring } from "./shipa-credential-loader-fixtures.ts";
+import { createSyntheticKeyring, createStoredCredentialDocument, createFakeShipaCredentialRpcClient } from "./shipa-credential-loader-fixtures.ts";
 import { mapShipaShipmentFailure } from "../../_shared/shipa-shipment-actions.ts";
-import { ShipaCredentialLoaderError } from "../../_shared/shipa-credential-loader.ts";
+import { ShipaCredentialLoaderError, createShipaCredentialLoader } from "../../_shared/shipa-credential-loader.ts";
+import { parseShipaReadinessDocument } from "../../_shared/shipa-readiness-responses.ts";
+import { createReadinessDocument } from "./shipa-readiness-service-fixtures.ts";
+import { ShipaConfigurationError } from "../../_shared/shipa-configuration-service-contract.ts";
+import { mapShipaSqlError } from "../../_shared/shipa-settings-responses.ts";
+import { readTimestamp } from "../../_shared/shipa-submission-validation.ts";
 import {
   createManualHarness,
   queueManualCreateSuccess,
@@ -38,6 +43,40 @@ Deno.test("malformed UTF-8 is refused rather than silently repairing a saved val
     ok: false,
     status: 400,
   });
+});
+
+Deno.test("impossible rotation metadata is refused before safe presence is reported", async () => {
+  const { keyring } = await createSyntheticKeyring();
+  const document = await createStoredCredentialDocument({ keyring });
+  const client = createFakeShipaCredentialRpcClient();
+  client.queue({ data: { ...document, rotated_at: "2026-02-31T25:61:61+99:99" } });
+  const loader = createShipaCredentialLoader({ client, keyring });
+  const error = await assertRejects(() => loader.readMetadata({ integrationId: SHIPA_TEST_INTEGRATION_ID,
+    environment: "sandbox" }), ShipaCredentialLoaderError);
+  assertEquals(error.code, "invalid_response");
+});
+
+Deno.test("readiness and submission timestamps refuse calendar and clock rollover", () => {
+  for (const stamp of ["2026-01-31T24:00:00Z", "2026-02-31T10:00:00Z", "2026-01-01T25:61:61+99:99"]) {
+    assertThrows(() => parseShipaReadinessDocument(createReadinessDocument({
+      scheduler: { last_ok_at: stamp, current: true },
+    })), ShipaConfigurationError);
+    assertEquals(readTimestamp(stamp), null);
+  }
+  const valid = "2026-11-04T10:00:00.123456+03:00";
+  assertEquals(readTimestamp(valid), valid);
+});
+
+Deno.test("database concurrency refusals keep the conflict recovery contract", () => {
+  for (const code of ["40001", "23505", "40P01"]) {
+    assertEquals(mapShipaSqlError({ code }).code, "conflict");
+  }
+});
+
+Deno.test("compact package arrays cannot amplify into unbounded normalized objects", () => {
+  const baseline = { shipaRef: "synthetic-reference", packages: [{}] };
+  assertEquals(parseShipaOrderDetail(baseline).ok, true);
+  assertEquals(parseShipaOrderDetail({ ...baseline, packages: Array.from({ length: 1001 }, () => ({})) }).ok, false);
 });
 
 Deno.test("unpaired surrogates cannot silently change an encrypted credential", async () => {

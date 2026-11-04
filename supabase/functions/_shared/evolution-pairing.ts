@@ -26,6 +26,7 @@ import {
   readBoundedText,
   withAbortSignal,
 } from "./evolution-pairing-io.ts";
+import { isCanonicalPngBase64 } from "./evolution-pairing-png.ts";
 export {
   EvolutionBodyTooLargeError,
   readBoundedText,
@@ -176,21 +177,16 @@ export function mapEvolutionProviderState(
   }
 }
 
-/** True for canonical, bounded, standard base64. */
+/** True for bounded canonical base64 that decodes to one complete PNG. */
 function isCanonicalBase64(value: string): boolean {
-  if (value.length === 0) return false;
   if (value.length > EVOLUTION_QR_MAX_BASE64_CHARS) return false;
-  try {
-    return btoa(atob(value)) === value;
-  } catch {
-    return false;
-  }
+  return isCanonicalPngBase64(value);
 }
 
 /**
  * Reads the pairing QR of a provider body. Only a bounded canonical PNG
- * data URL is accepted; an SVG, a URL, an HTML fragment or a damaged
- * payload is not a usable QR and stays a safe no-QR state.
+ * data URL is accepted; an SVG, a URL, an HTML fragment, non-PNG bytes or
+ * a truncated PNG is not a usable QR and stays a safe no-QR state.
  */
 function readQrDataUrl(body: Record<string, unknown>): string | null {
   const raw = body.base64;

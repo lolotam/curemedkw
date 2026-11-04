@@ -44,6 +44,8 @@ export const SHIPA_MAX_CITY_COUNT = 5000;
 export const SHIPA_MAX_COUNTRY_COUNT = 500;
 /** Maximum number of history entries accepted in one story document. */
 export const SHIPA_MAX_STORY_ENTRIES = 2000;
+/** Normalization resource bound, not a claim about merchant entitlement. */
+export const SHIPA_MAX_PACKAGE_DETAILS = 1000;
 
 // --- Normalised shapes ------------------------------------------------------
 
@@ -345,7 +347,7 @@ function parsePackageDetails(
   value: unknown,
 ): readonly ShipaPackageDetail[] | null {
   if (value === undefined || value === null) return [];
-  if (!Array.isArray(value)) return null;
+  if (!Array.isArray(value) || value.length > SHIPA_MAX_PACKAGE_DETAILS) return null;
   const packages: ShipaPackageDetail[] = [];
   for (const entry of value) {
     const record = isPlainRecord(entry) ? entry : null;

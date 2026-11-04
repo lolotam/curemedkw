@@ -40,6 +40,19 @@ vi.mock("@/integrations/supabase/clientRuntime", () => ({
 let fake: FakeInvoke;
 let client: ShipaAdminClient;
 
+it("does not activate a new environment using readiness for the previous one", () => {
+  const saved = settingsFixture();
+  saved.live = structuredClone(saved.sandbox);
+  const draft = { ...draftFromShipaSettings(saved), enabled: true,
+    dispatchMode: "automatic_after_payment" as const, environment: "live" as const };
+  const now = Date.parse("2026-11-03T10:00:00Z");
+  const readiness = readinessFixture({ live: { credentialPresent: true, configurationReady: true,
+    probeCurrent: true, credentialsVerified: true, originCityMatched: true, safeCode: null } });
+  const issues = shipaAutomaticActivationIssues({ draft, saved, built: buildShipaSaveableSettings(draft),
+    readiness, newKeyPending: false, nowMs: now });
+  expect(issues.some((issue) => issue.includes("revision or environment"))).toBe(true);
+});
+
 it.each(["active configuration", "pending credential"])("rechecks established automation after changing %s", (change) => {
   const saved = settingsFixture();
   saved.enabled = true;
@@ -157,6 +170,10 @@ describe("the action vocabulary", () => {
 });
 
 describe("the closed failure surface", () => {
+  it("refuses successful probe flags paired with a provider failure code", async () => {
+    fake.queueResult(successResponse(readinessFixture({ sandbox: { safeCode: "unauthorized" } })));
+    expect(await client.readReadiness()).toMatchObject({ ok: false, code: "invalid_response" });
+  });
   it("refuses oversized HTTP error bodies instead of reading them as a valid code", async () => {
     fake.queueResult({ data: null, error: { context: new Response(JSON.stringify({
       error: { code: "conflict", message: "x".repeat(5000) },

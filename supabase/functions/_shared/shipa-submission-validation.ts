@@ -4,6 +4,7 @@ import {
   isIntegrationUuid,
   isPlainRecord,
 } from "./integration-credential-contract.ts";
+import { shipaTimestampMilliseconds } from "./shipa-settings-validation.ts";
 import {
   isValidShipaOrderId,
   type ShipaOrderDraft,
@@ -262,7 +263,7 @@ export function readCount(value: unknown, maximum: number): number | null {
 
 export function readTimestamp(value: unknown): string | null {
   return typeof value === "string" && TIMESTAMP_PATTERN.test(value) &&
-      Number.isFinite(Date.parse(value))
+      Number.isFinite(shipaTimestampMilliseconds(value))
     ? value
     : null;
 }

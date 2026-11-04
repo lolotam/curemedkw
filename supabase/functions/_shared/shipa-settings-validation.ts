@@ -375,10 +375,10 @@ export function evaluateShipaActivationReadiness(
   return { ready: issues.length === 0, issues };
 }
 
-/** Timezone and calendar validation before using a timestamp as scheduling evidence. */
+/** Validate SQL/ISO calendar, clock and offset components before scheduling use. */
 export function shipaTimestampMilliseconds(timestamp: string): number {
   const parts =
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}(?::?\d{2})?)$/
       .exec(timestamp);
   if (parts === null) return Number.NaN;
   const [year, month, day, hour, minute, second] = parts.slice(1, 7).map(
@@ -391,11 +391,15 @@ export function shipaTimestampMilliseconds(timestamp: string): number {
     hour > 23 || minute > 59 || second > 59
   ) return Number.NaN;
   const offset = parts[7];
+  const offsetDigits = offset.replace(":", "");
+  const offsetMinutes = offsetDigits.slice(3) || "00";
   if (
     offset !== "Z" &&
-    (Number(offset.slice(1, 3)) > 23 || Number(offset.slice(4)) > 59)
+    (Number(offsetDigits.slice(1, 3)) > 23 || Number(offsetMinutes) > 59)
   ) {
     return Number.NaN;
   }
-  return Date.parse(timestamp);
+  const normalized = timestamp.replace(" ", "T");
+  return Date.parse(offset === "Z" ? normalized :
+    normalized.slice(0, -offset.length) + offsetDigits.slice(0, 3) + ":" + offsetMinutes);
 }

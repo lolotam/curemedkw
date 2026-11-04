@@ -36,6 +36,19 @@ function deferredResponse() {
 }
 
 describe("readiness response ordering", () => {
+  it("keeps unsaved configuration on a failed reload and prevents a stale write", async () => {
+    const { result } = renderHook(() => useShipaConfiguration());
+    await waitFor(() => expect(result.current.readinessState.status).toBe("ready"));
+    act(() => result.current.patchEnvironment("sandbox", { origin: { contactName: "Unsaved pickup" } }));
+    fake.queueResult(failureResponse("unavailable"));
+    await act(async () => { await result.current.requestReload(); });
+    expect(result.current.saved?.revision).toBe(7);
+    expect(result.current.draft?.sandbox.settings.origin.contactName).toBe("Unsaved pickup");
+    expect(result.current.settingsState.status).toBe("error");
+    const calls = fake.calls.length;
+    act(() => result.current.requestSave());
+    expect(fake.calls).toHaveLength(calls);
+  });
   it("does not issue a second write for simultaneous save requests", async () => {
     const { result } = renderHook(() => useShipaConfiguration());
     await waitFor(() => expect(result.current.readinessState.status).toBe("ready"));

@@ -111,6 +111,17 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         self.assertEqual(command[command.index("-U") + 1], "curemed_operator")
         self.assertEqual(command[command.index("-d") + 1], "curemed_fixture")
 
+    def test_ledger_output_is_bounded_in_the_query_and_stderr_is_not_buffered(self):
+        response = SimpleNamespace(returncode=0, stdout=json.dumps(self.rows))
+        with patch.object(checks.subprocess, "run", return_value=response) as process:
+            checks.read_live_ledger("curemed-db", [x["filename"] for x in self.items])
+        query = process.call_args.args[0][-1]
+        self.assertIn("octet_length(checksum)", query)
+        self.assertIn("octet_length(filename)", query)
+        self.assertIn("LIMIT 21", query)
+        self.assertEqual(process.call_args.kwargs.get("stderr"), checks.subprocess.DEVNULL)
+        self.assertNotIn("capture_output", process.call_args.kwargs)
+
 
 if __name__ == "__main__":
     unittest.main()

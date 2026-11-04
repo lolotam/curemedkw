@@ -96,8 +96,6 @@ export function useShipaConfiguration() {
       const result = await shipaAdminClient.readSettings();
       if (!mountedRef.current || sequence !== settingsSequenceRef.current) return false;
       if (result.ok === false) {
-        setSaved(null);
-        setDraft(null);
         setSettingsState({ status: "error", code: result.code, message: result.message });
         return false;
       }
@@ -108,8 +106,6 @@ export function useShipaConfiguration() {
       return true;
     } catch {
       if (!mountedRef.current || sequence !== settingsSequenceRef.current) return false;
-      setSaved(null);
-      setDraft(null);
       setSettingsState({ status: "error", code: "unavailable", message: UNAVAILABLE_MESSAGE });
       return false;
     }
@@ -216,7 +212,7 @@ export function useShipaConfiguration() {
   );
 
   const prepareRequest = useCallback((): ShipaAdminSaveRequest | null => {
-    if (draft === null || saved === null) return null;
+    if (draft === null || saved === null || settingsState.status !== "ready") return null;
     const build = buildShipaSaveableSettings(draft);
     if (build.ok === false) {
       setApiKeyText("");
@@ -236,7 +232,7 @@ export function useShipaConfiguration() {
       expectedRevision: parsed.request.expectedRevision,
       settings: parsed.request.settings,
     };
-  }, [draft, saved]);
+  }, [draft, saved, settingsState.status]);
 
   /** Saves the configuration, optionally with one credential operation. */
   const requestSave = useCallback(

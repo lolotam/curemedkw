@@ -29,6 +29,7 @@ import { createFakeFetch, jsonResponse } from "./shipa-fixtures.ts";
 import {
   countryResponse,
   createEnvironmentReadiness,
+  createMissingEnvironmentReadiness,
   createObservationAcknowledgement,
   createReadinessDocument,
   healthResponse,
@@ -274,7 +275,7 @@ Deno.test("stops at a failing health without asking for the directory", async ()
           origin_city_matched: false,
           safe_code: "server_error",
         }),
-        live: createEnvironmentReadiness({ safe_code: "credential_missing" }),
+        live: createMissingEnvironmentReadiness(),
       },
     }),
   );
@@ -727,7 +728,7 @@ Deno.test("returns the honest projection after a concurrent revision", async () 
           origin_city_matched: false,
           safe_code: "verification_stale",
         }),
-        live: createEnvironmentReadiness({ safe_code: "credential_missing" }),
+        live: createMissingEnvironmentReadiness(),
       },
     }),
   );

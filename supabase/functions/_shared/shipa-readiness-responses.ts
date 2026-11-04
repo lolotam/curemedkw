@@ -21,6 +21,7 @@
 //   docs/integrations/shipa-readiness-rpc-contract.md
 
 import { isPlainRecord } from "./integration-credential-contract.ts";
+import { shipaTimestampMilliseconds } from "./shipa-settings-validation.ts";
 import {
   hasExactRecordKeys,
   ShipaConfigurationError,
@@ -235,7 +236,7 @@ function isSqlTimestamp(value: unknown): value is string {
   if (
     typeof value !== "string" ||
     !SQL_TIMESTAMP_PATTERN.test(value) ||
-    Number.isNaN(Date.parse(value))
+    !Number.isFinite(shipaTimestampMilliseconds(value))
   ) {
     return false;
   }
@@ -342,6 +343,9 @@ function parseEnvironmentReadiness(
   }
 
   const safeCode = readSafeCode(raw["safe_code"]);
+  if (safeCode !== null && raw["credentials_verified"] === true && raw["probe_current"] === true) {
+    throw new ShipaConfigurationError("invalid_response");
+  }
   if (raw["service_entitlement"] !== "unconfirmed") {
     throw new ShipaConfigurationError("invalid_response");
   }

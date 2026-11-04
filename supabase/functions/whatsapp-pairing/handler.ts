@@ -38,6 +38,7 @@ import {
   isPlainObject,
   readBoundedText,
 } from "../_shared/evolution-pairing.ts";
+import { hasDuplicateTopLevelMember } from "../_shared/json-unique-members.ts";
 
 /** The hard fence of one request, authorization and provider included. */
 export const REQUEST_FENCE_MS = 15_000;
@@ -305,7 +306,7 @@ export function createEvolutionPairingHandler(
       } catch {
         return errorResponse(req, 400, "invalid_request");
       }
-      if (!isPlainObject(parsed)) {
+      if (!isPlainObject(parsed) || hasDuplicateTopLevelMember(bodyText)) {
         return errorResponse(req, 400, "invalid_request");
       }
       const keys = Object.keys(parsed);

@@ -22,6 +22,7 @@ import {
   isIntegrationUuid,
   isPlainRecord,
 } from "./integration-credential-contract.ts";
+import { shipaTimestampMilliseconds } from "./shipa-settings-validation.ts";
 import {
   SHIPA_MAX_REVISION,
   shipaSettingsSchema,
@@ -97,7 +98,7 @@ const RUNTIME_NOT_READY_REASON = "shipa_runtime_not_ready";
  */
 export function mapShipaSqlError(error: unknown): ShipaSettingsError {
   const sqlState = readSqlStateCode(error);
-  if (sqlState === "40001") return new ShipaSettingsError("conflict");
+  if (sqlState === "40001" || sqlState === "23505" || sqlState === "40P01") return new ShipaSettingsError("conflict");
   if (sqlState === "42501") return new ShipaSettingsError("forbidden");
   if (sqlState === "22023") return new ShipaSettingsError("invalid_request");
   if (sqlState === "55000") {
@@ -179,7 +180,7 @@ const SQL_TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}(?::?\d{2})?)$/;
 
 function isSqlTimestamp(value: unknown): value is string {
-  if (typeof value !== "string" || !SQL_TIMESTAMP_PATTERN.test(value) || Number.isNaN(Date.parse(value))) return false;
+  if (typeof value !== "string" || !SQL_TIMESTAMP_PATTERN.test(value) || !Number.isFinite(shipaTimestampMilliseconds(value))) return false;
   const date = value.slice(0, 10);
   return new Date(`${date}T00:00:00Z`).toISOString().slice(0, 10) === date;
 }

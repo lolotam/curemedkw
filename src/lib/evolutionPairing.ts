@@ -18,6 +18,7 @@
 
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { readBoundedHttpErrorJson } from "@/lib/boundedHttpErrorJson";
+import { isCanonicalPngBase64 } from "@/lib/pngDataUrl";
 
 /** The two actions the endpoint accepts. */
 export type EvolutionPairingAction = "status" | "connect";
@@ -87,9 +88,7 @@ const CONNECTION_STATES: readonly EvolutionConnectionState[] = [
 const QR_DATA_PREFIX = "data:image/png;base64,";
 function isCanonicalQr(qr: string): boolean {
   if (!qr.startsWith(QR_DATA_PREFIX) || qr.length <= QR_DATA_PREFIX.length) return false;
-  const payload = qr.slice(QR_DATA_PREFIX.length);
-  try { return btoa(atob(payload)) === payload; }
-  catch { return false; }
+  return isCanonicalPngBase64(qr.slice(QR_DATA_PREFIX.length));
 }
 
 const ERROR_CODE_PATTERN = /^[a-z_]+$/;

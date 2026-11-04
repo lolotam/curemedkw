@@ -32,6 +32,19 @@ export function createEnvironmentReadiness(
   };
 }
 
+/** A consistent environment with no stored credential. */
+export function createMissingEnvironmentReadiness(): Record<string, unknown> {
+  return createEnvironmentReadiness({
+    credential_present: false,
+    configuration_ready: false,
+    probe_current: false,
+    credentials_verified: false,
+    origin_city_matched: false,
+    last_checked_at: null,
+    safe_code: "credential_missing",
+  });
+}
+
 /** The exact readiness document `shipa_read_readiness` returns. */
 export function createReadinessDocument(
   overrides: Record<string, unknown> = {},

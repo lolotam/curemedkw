@@ -30,6 +30,7 @@
 
 import {
   parseShipaSettings,
+  shipaTimestampMilliseconds,
   SHIPA_MAX_REVISION,
   type ShipaCredentialMetadata,
   type ShipaEnvironment,
@@ -150,7 +151,7 @@ const TIMESTAMP_PATTERN =
 
 function isTimestamp(value: unknown): value is string {
   if (typeof value !== "string" || !TIMESTAMP_PATTERN.test(value)) return false;
-  if (Number.isNaN(Date.parse(value))) return false;
+  if (!Number.isFinite(shipaTimestampMilliseconds(value))) return false;
   const day = value.slice(0, 10);
   return new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) === day;
 }
@@ -379,6 +380,7 @@ function parseEnvironmentReadiness(
 
   const safeCode = raw.safeCode;
   if (safeCode !== null && !isKnownSafeCode(safeCode)) return null;
+  if (safeCode !== null && raw.credentialsVerified && raw.probeCurrent) return null;
 
   if (raw.serviceEntitlement !== "unconfirmed") return null;
 

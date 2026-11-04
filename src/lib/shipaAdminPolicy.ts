@@ -3,6 +3,7 @@ import {
   KUWAIT_COUNTRY_CODE,
   missingShipaOriginAddressFields,
   SCHEDULER_HEARTBEAT_MAX_AGE_MS,
+  shipaTimestampMilliseconds,
   type ShipaEnvironment,
   type ShipaPublicSettingsPatch,
   type ShipaSaveablePublicSettings,
@@ -64,7 +65,7 @@ export function shipaAutomaticActivationIssues(context: ShipaActivationContext):
   }
   if (
     readiness.settingsRevision !== saved.revision ||
-    readiness.activeEnvironment !== saved.environment
+    readiness.activeEnvironment !== draft.environment
   ) {
     issues.push(
       "The readiness facts belong to a different revision or environment. Reload before enabling automatic dispatch.",
@@ -142,7 +143,7 @@ export function isShipaSchedulerCurrent(readiness: ShipaReadinessDto, nowMs: num
   if (!readiness.scheduler.current) return false;
   const lastOkAt = readiness.scheduler.lastOkAt;
   if (lastOkAt === null) return false;
-  const heartbeatMs = Date.parse(lastOkAt);
+  const heartbeatMs = shipaTimestampMilliseconds(lastOkAt);
   if (!Number.isFinite(heartbeatMs)) return false;
   if (heartbeatMs > nowMs) return false;
   return nowMs - heartbeatMs <= SCHEDULER_HEARTBEAT_MAX_AGE_MS;
