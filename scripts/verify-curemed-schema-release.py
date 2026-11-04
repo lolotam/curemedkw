@@ -9,13 +9,14 @@ BASELINE = "878dde5748548094aab457b54402809d81770668"
 INVENTORY = "docs/releases/curemed-schema-20261104.json"
 INVENTORY_SHA256 = "af08cb473cfc52186ac1bf35181a34d6731d05ac1716fcd3081747af046b62e6"
 SOURCES = "docs/releases/curemed-schema-sources-20261104.json"
-SOURCES_SHA256 = "a74e0e6eeed772747343ebd17723386ff141b982d4e623275ee099f2f0bc0b87"
+SOURCES_SHA256 = "143da0e3bb1abd227c9512b56c8508cc79587bd0b2a383f77404ad1d7b58c7e7"
 OWN_PATHS = {
     INVENTORY,
     SOURCES,
     "docs/releases/curemed-schema-20261104.md",
     "scripts/verify-curemed-schema-release.py",
     "scripts/tests/test_curemed_schema_release.py",
+    "scripts/tests/test_whatsapp_core_reapplication.py",
 }
 
 

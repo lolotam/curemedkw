@@ -152,9 +152,22 @@ def start(state_path, baseline, *, resume=False):
     state_path.write_text(json.dumps(state), encoding="utf-8")
     compose(state, "up", "-d", "--wait", "--wait-timeout", "120")
     container = inspect_guard(state)
-    sql(container, "CREATE SCHEMA curemed_fixture_meta; "
-        "CREATE TABLE curemed_fixture_meta.identity(marker uuid PRIMARY KEY); "
-        f"INSERT INTO curemed_fixture_meta.identity VALUES ('{state['marker']}');")
+    initialize_metadata = True
+    if resume:
+        present = sql(container, "SELECT to_regclass('curemed_fixture_meta.identity') IS NOT NULL;")
+        if present == "t":
+            marker_guard(state)
+            initialize_metadata = False
+        elif present == "f":
+            schema_exists = sql(container, "SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='curemed_fixture_meta');")
+            if schema_exists != "f":
+                raise RuntimeError("Incomplete fixture metadata refused; marker not established")
+        else:
+            raise RuntimeError("Unusable fixture metadata observation")
+    if initialize_metadata:
+        sql(container, "CREATE SCHEMA curemed_fixture_meta; "
+            "CREATE TABLE curemed_fixture_meta.identity(marker uuid PRIMARY KEY); "
+            f"INSERT INTO curemed_fixture_meta.identity VALUES ('{state['marker']}');")
     marker_guard(state)
     # This target has all four safety gates plus the database marker. It is disposable.
     sql(container, "DROP SCHEMA IF EXISTS public CASCADE; "

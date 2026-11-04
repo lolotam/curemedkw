@@ -220,9 +220,12 @@
     },
     {
       "path": "supabase/tests/whatsapp/core_proof.py",
-      "gitBlob": "cd6069642d78880b699376814d8feb8a760df1a3",
-      "sha256GitBytes": "60237dec259542e01610ed26c78fc90a790948ee13d7481a91953e12b74569e7",
-      "bytes": 4674
+      "gitBlob": "9725fd70fdb4ef69605ec6e8a29ad99a48c0130d",
+      "sha256GitBytes": "1fb3078ed6f6f26175e9b6cb7cc822aae93a52440f86b62a1ebbf8a4ce61680a",
+      "bytes": 5622,
+      "originalGitBlob": "cd6069642d78880b699376814d8feb8a760df1a3",
+      "originalSha256GitBytes": "60237dec259542e01610ed26c78fc90a790948ee13d7481a91953e12b74569e7",
+      "reviewCorrection": "Compare baseline and newly created tracked metadata separately on rerun"
     },
     {
       "path": "supabase/tests/whatsapp/credentials.sql",
@@ -244,15 +247,21 @@
     },
     {
       "path": "supabase/tests/whatsapp/fixture.py",
-      "gitBlob": "327d86d23c7a09f2f52307b9f52c061b36703151",
-      "sha256GitBytes": "9dc2ae0196d4a3286493c45f0bc349dd291612ec472ea9cbae712a5abe8609a9",
-      "bytes": 10256
+      "gitBlob": "7deff6143283865dedebe5dedf9d31ee031660db",
+      "sha256GitBytes": "b2ede4aac6960d8ce9591ee4b91546d3c9335f79d2d0e76a847ccb9753398e24",
+      "bytes": 10918,
+      "originalGitBlob": "327d86d23c7a09f2f52307b9f52c061b36703151",
+      "originalSha256GitBytes": "9dc2ae0196d4a3286493c45f0bc349dd291612ec472ea9cbae712a5abe8609a9",
+      "reviewCorrection": "Verify/reuse existing resume marker before restore"
     },
     {
       "path": "supabase/tests/whatsapp/fixture_safety_test.py",
-      "gitBlob": "c27a4d3b79ff64ee2229d1936f99a89df1e31bbd",
-      "sha256GitBytes": "577f7e829d360f5aaa46997d03f867c63be03061c9982ac1783d7fdbfad776ee",
-      "bytes": 2038
+      "gitBlob": "b75b44742260d5f885136997ecbdc9a32b53649b",
+      "sha256GitBytes": "d57b4863f37cb30ec42dc904150553ea267d25891836143ab599622256b50e25",
+      "bytes": 5589,
+      "originalGitBlob": "c27a4d3b79ff64ee2229d1936f99a89df1e31bbd",
+      "originalSha256GitBytes": "577f7e829d360f5aaa46997d03f867c63be03061c9982ac1783d7fdbfad776ee",
+      "reviewCorrection": "Add resume/mismatch/absent/partial metadata boundary regressions"
     },
     {
       "path": "supabase/tests/whatsapp/privileges.sql",
@@ -278,5 +287,10 @@
       "sha256GitBytes": "28c4c5f6d473eb62c86a287ea7c610aa08883939f229e346a5d29ec2da4e0d83",
       "bytes": 3506
     }
-  ]
+  ],
+  "proofSourceCorrections": {
+    "supabase/tests/whatsapp/core_proof.py": "Compare baseline and newly created tracked metadata separately on rerun",
+    "supabase/tests/whatsapp/fixture.py": "Verify/reuse existing resume marker before restore",
+    "supabase/tests/whatsapp/fixture_safety_test.py": "Add resume/mismatch/absent/partial metadata boundary regressions"
+  }
 }

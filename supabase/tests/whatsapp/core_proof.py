@@ -1,4 +1,4 @@
-"""Prove inert schema and safe reapplication on the guarded disposable database."""
+"""Compare tracked baseline and first-pass metadata on a guarded disposable DB."""
 import argparse
 import hashlib
 import json
@@ -55,6 +55,8 @@ def main():
         "__PRIVATE_EXISTED__", "true" if args.preexisting_private else "false")
     before = fixture.sql(container, query)
     core = Path(__file__).resolve().parents[2] / "migrations/20261103000100_whatsapp_core.sql"
+    first_pass_query = None
+    first_pass_snapshot = None
     for pass_number in (1, 2):
         fixture.sql(container, core.read_text(encoding="utf-8"), "postgres")
         if args.with_transactions:
@@ -64,7 +66,17 @@ def main():
         if before != after:
             raise RuntimeError(f"Existing schema/ACL/default/trigger/policy drift on pass {pass_number}")
         fixture.sql(container, Path(__file__).with_name("privileges.sql").read_text(encoding="utf-8"), "postgres")
+        if pass_number == 1:
+            after_identities = fixture.sql(container, "SELECT string_agg(c.oid::text,',') FROM pg_class c "
+                                          "JOIN pg_namespace n ON n.oid=c.relnamespace WHERE c.relkind IN ('r','p','S','v') "
+                                          "AND n.nspname IN ('public','auth','storage','private');")
+            first_pass_query = SNAPSHOT.replace("__OIDS__", after_identities).replace("__PRIVATE_EXISTED__", "true")
+            first_pass_snapshot = fixture.sql(container, first_pass_query)
+        elif fixture.sql(container, first_pass_query) != first_pass_snapshot:
+            raise RuntimeError("New integration metadata drift on pass 2")
     print(json.dumps({"passes": 2, "existing_objects_unchanged": True,
+                      "new_integration_metadata_unchanged": True,
+                      "first_pass_metadata_fingerprint": hashlib.sha256(first_pass_snapshot.encode()).hexdigest(),
                       "schema_acl_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
                       "real_runner": "postgres NOSUPERUSER", "rows_copied": 0,
                       "preexisting_private": args.preexisting_private,
