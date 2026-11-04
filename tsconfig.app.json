@@ -23,7 +23,8 @@
     "noFallthroughCasesInSwitch": false,
 
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "npm:zod@3.25.76": ["./node_modules/zod"]
     }
   },
   "include": ["src"]
