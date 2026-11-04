@@ -27,10 +27,12 @@ export function EcommerceHoldNotice() {
     >
       <div className="container flex items-start gap-3 py-2.5 text-sm">
         <Info className="mt-0.5 h-4 w-4 shrink-0" />
+        {/* Phones: the title is its own bold line and the notice sits under it
+            one step smaller; from sm up both share one line split by a dash. */}
         <p className="min-w-0">
-          <span className="font-semibold">{title}</span>
-          <span className="mx-1.5 opacity-50">—</span>
-          <span>{holdNotice(mode, lang)}</span>
+          <span className="block text-base font-semibold sm:inline sm:text-sm">{title}</span>
+          <span className="mx-1.5 hidden opacity-50 sm:inline">—</span>
+          <span className="block sm:inline">{holdNotice(mode, lang)}</span>
         </p>
       </div>
     </div>
