@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Edge modules shared with the browser import zod the way the Deno
+      // runtime needs it; the bundle resolves that to the same npm package.
+      "npm:zod@3.25.76": "zod",
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "@tanstack/react-query", "@tanstack/query-core"],
   },
