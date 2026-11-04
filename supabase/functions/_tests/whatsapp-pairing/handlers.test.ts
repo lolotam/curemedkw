@@ -31,13 +31,72 @@ const WEBHOOK_ENDPOINT =
 const PNG_QR = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB";
 
 Deno.test("a stalled admin body expires before configuration or provider access", async () => {
-  const harness = createHarness({ fenceMs: 5 });
+  const harness = createHarness();
+  const started = Promise.withResolvers<void>();
   let cancelled = false;
   const body = new ReadableStream<Uint8Array>({
+    pull() {
+      started.resolve();
+    },
     cancel() {
       cancelled = true;
     },
+  }, { highWaterMark: 0 });
+  const schedule = globalThis.setTimeout;
+  const clock: { expire?: () => void; milliseconds?: number } = {};
+  // Drive the configured timer after reader acquisition. A 5ms startup race
+  // previously let authorization expire before this body test had started.
+  globalThis.setTimeout = (callback, milliseconds, ...args) => {
+    if (milliseconds === 15_000 && typeof callback === "function") {
+      clock.milliseconds = milliseconds;
+      clock.expire = () => callback(...args);
+      return 0;
+    }
+    return schedule(callback, milliseconds, ...args);
+  };
+  const guard = Promise.withResolvers<never>();
+  const guardTimer = schedule(() => {
+    guard.reject(new Error("The body reader did not start."));
+  }, 1_000);
+  let pending: Promise<Response> | undefined;
+  try {
+    pending = harness.handler(
+      new Request(PAIRING_ENDPOINT, {
+        method: "POST",
+        headers: { authorization: "Bearer admin-session-token" },
+        body,
+      }),
+    );
+    await Promise.race([started.promise, guard.promise]);
+    assertEquals(clock.milliseconds, 15_000);
+    assert(clock.expire);
+    clock.expire();
+    const response = await pending;
+    assertEquals(response.status, 504);
+    assertEquals(cancelled, true);
+    assertEquals(harness.configReads(), 0);
+    assertEquals(harness.provider.calls.length, 0);
+  } finally {
+    globalThis.setTimeout = schedule;
+    clearTimeout(guardTimer);
+    clock.expire?.();
+    await pending?.catch(() => {});
+  }
+});
+
+Deno.test("an authorization timeout never starts reading the request body", async () => {
+  const admin = createFakeAdmin({
+    userId: "user-1",
+    role: "admin",
+    delayMs: 25,
   });
+  const harness = createHarness({ admin, fenceMs: 1 });
+  let readStarted = false;
+  const body = new ReadableStream<Uint8Array>({
+    pull() {
+      readStarted = true;
+    },
+  }, { highWaterMark: 0 });
   const response = await harness.handler(
     new Request(PAIRING_ENDPOINT, {
       method: "POST",
@@ -45,8 +104,9 @@ Deno.test("a stalled admin body expires before configuration or provider access"
       body,
     }),
   );
+  await admin.settleAuthDelay();
   assertEquals(response.status, 504);
-  assertEquals(cancelled, true);
+  assertEquals(readStarted, false);
   assertEquals(harness.configReads(), 0);
   assertEquals(harness.provider.calls.length, 0);
 });
