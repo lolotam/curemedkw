@@ -18,9 +18,9 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001200_shipa_integrity.sql", "20261103001300_integration_payment_owner.sql",
     "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
     "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql",
-    "20261103001800_integration_unbound_payments.sql"))
+    "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
-    "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql")) + (
+    "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
