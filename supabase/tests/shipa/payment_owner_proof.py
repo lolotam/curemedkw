@@ -19,9 +19,10 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
     "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql",
     "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql",
-    "20261103002000_whatsapp_expansion.sql", "20261103002100_shipa_optional_instructions.sql"))
+    "20261103002000_whatsapp_expansion.sql", "20261103002100_shipa_optional_instructions.sql",
+    "20261103002200_whatsapp_delivery_claim.sql", "20261103002300_whatsapp_delivery_finish.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
-    "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql")) + (
+    "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql", "delivery.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
@@ -529,6 +530,114 @@ def concurrent_expansion_correction(container):
         close_processes((first, second))
 
 
+def concurrent_whatsapp_delivery(container):
+    """Real row-lock races; no provider call or cryptographic key claim."""
+    actor = "93000000-0000-4000-8000-000000000001"
+    fixture.sql(container, f"INSERT INTO auth.users(id,email) VALUES('{actor}','delivery-race@example.test'); "
+        f"INSERT INTO public.user_roles(user_id,role) VALUES('{actor}','admin'); "
+        "UPDATE public.whatsapp_settings SET provider='postora',account_identity='postora:expansion-race',"
+        "integration_enabled=true,automation_enabled=true,scheduler_heartbeat_at=NULL; "
+        "UPDATE private.wa_release_state SET state='active',active_credential_binding='postora:expansion-race'; "
+        "INSERT INTO private.wa_credentials(provider,account_identity,purpose,credential_revision,key_version,ciphertext,nonce) "
+        "VALUES('postora','postora:expansion-race','provider_api',1,1,repeat('a',48),repeat('b',16)); "
+        "INSERT INTO public.whatsapp_account_dispatch(provider,account_identity,next_slot_at) "
+        "VALUES('postora','postora:expansion-race',clock_timestamp()-interval '1 second') ON CONFLICT DO NOTHING;", "postgres")
+    context = json.loads(fixture.sql(container, "SELECT jsonb_build_object('event',event.id,'revision',settings.settings_revision,"
+        "'jobs',(SELECT jsonb_agg(id ORDER BY normalized_recipient) FROM public.whatsapp_delivery_jobs WHERE event_id=event.id)) "
+        "FROM public.whatsapp_notification_events event JOIN private.wa_payment_outcomes owner ON owner.id=event.outcome_id "
+        "CROSS JOIN public.whatsapp_settings settings WHERE owner.invoice_id='expansion-race-invoice'", "postgres"))
+    if len(context["jobs"]) != 2:
+        raise RuntimeError("Delivery race requires the two actual corrected paid jobs")
+    job, next_job = context["jobs"]
+    holder, claimant = open_psql(container), open_psql(container)
+    busy, rotation, bootstrap, bootstrap_peer = None, None, None, None
+    try:
+        write_sql(holder, "BEGIN; SET LOCAL statement_timeout='10s'; DO $$BEGIN "
+            f"PERFORM 1 FROM public.whatsapp_notification_events WHERE id='{context['event']}' FOR UPDATE; END$$; SELECT 'locked';")
+        if holder.stdout.readline().strip() != "locked":
+            raise RuntimeError("Delivery repair did not hold the event")
+        write_sql(claimant, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='wa-delivery-claim'; "
+            f"SET LOCAL ROLE service_role; SELECT public.wa_claim_delivery('{job}','worker',clock_timestamp()+interval '30 seconds');")
+        write_sql(holder, observe_lock("wa-delivery-claim") + "SET LOCAL ROLE service_role; "
+            f"SELECT public.wa_repair_event('{context['event']}','worker',NULL); COMMIT;")
+        holder.stdin.close()
+        holder.wait(timeout=15)
+        if holder.returncode:
+            raise RuntimeError("Repair/claim lock order failed: " + holder.stderr.read().strip())
+        claimed = json.loads(claimant.stdout.readline())
+        if claimed.get("claimed") is not True:
+            raise RuntimeError("Contended repair lost the queued paid claim")
+        busy = open_psql(container)
+        write_sql(busy, "BEGIN; SET LOCAL statement_timeout='3s'; SET LOCAL ROLE service_role; "
+            f"SELECT public.wa_claim_delivery('{next_job}','worker',clock_timestamp()+interval '30 seconds'); COMMIT;")
+        busy.stdin.close()
+        busy.wait(timeout=5)
+        busy_output = busy.stdout.read().strip()
+        if busy.returncode or json.loads(busy_output).get("code") != "account_busy":
+            raise RuntimeError("Concurrent account claim did not refuse without another token: " + busy.stderr.read().strip())
+        credential = json.dumps({"provider": "postora", "account_identity": "postora:expansion-race",
+            "purpose": "provider_api", "generation": 0, "credential_revision": 2, "key_version": 1,
+            "ciphertext": "b" * 48, "nonce": "c" * 16})
+        rotation = open_psql(container)
+        write_sql(rotation, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='wa-delivery-key-rotation'; "
+            f"SET LOCAL ROLE service_role; SELECT public.wa_store_credential({context['revision']},'{credential}','{actor}'); COMMIT;")
+        # RPC ran as service_role; only fixture-owner observation may see the
+        # other connection's detailed lock metadata, as in the retained races.
+        write_sql(claimant, "RESET ROLE; " + observe_lock("wa-delivery-key-rotation") + "COMMIT;")
+        claimant.stdin.close()
+        for process in (claimant, rotation):
+            if process is rotation:
+                process.stdin.close()
+            process.wait(timeout=15)
+        rotation_error = rotation.stderr.read().strip()
+        if claimant.returncode or rotation.returncode == 0 or "active_delivery_must_finish_or_expire" not in rotation_error:
+            raise RuntimeError("Credential rotation did not serialize and refuse during active delivery: "
+                + claimant.stderr.read().strip() + " / " + rotation_error)
+        counts = json.loads(fixture.sql(container, "SELECT jsonb_build_array("
+            f"(SELECT count(*) FROM public.whatsapp_delivery_attempts WHERE job_id IN ('{job}','{next_job}')),"
+            "(SELECT credential_revision FROM private.wa_credentials WHERE provider='postora' AND account_identity='postora:expansion-race'))", "postgres"))
+        if counts != [1, 1]:
+            raise RuntimeError("Racing claim/rotation changed attempt count or key")
+        completed = json.loads(fixture.sql(container, "SET ROLE service_role; "
+            f"SELECT public.wa_finish_delivery('{job}','{claimed['attempt_token']}',"
+            "'{\"kind\":\"accepted\",\"providerMessageId\":\"delivery-race-first\"}')", "postgres").splitlines()[-1])
+        if completed["state"] != "accepted":
+            raise RuntimeError("Committed contended claim could not finish")
+        # Remove only this released, synthetic operational slot. Existing jobs,
+        # outcomes and attempt history remain untouched; test simultaneous
+        # first-slot creation separately from the existing-row regression.
+        removed = fixture.sql(container, "DELETE FROM public.whatsapp_account_dispatch WHERE provider='postora' "
+            "AND account_identity='postora:expansion-race' AND active_job_id IS NULL RETURNING account_identity", "postgres")
+        if not removed.startswith("postora:expansion-race"):
+            raise RuntimeError("Bootstrap setup did not remove its released synthetic slot")
+        bootstrap, bootstrap_peer = open_psql(container), open_psql(container)
+        write_sql(bootstrap, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL ROLE service_role; "
+            f"SELECT public.wa_claim_delivery('{next_job}','worker',clock_timestamp()+interval '30 seconds');")
+        bootstrapped = json.loads(bootstrap.stdout.readline())
+        if bootstrapped.get("claimed") is not True:
+            raise RuntimeError("Missing slot did not create one durable reservation")
+        write_sql(bootstrap_peer, "BEGIN; SET LOCAL statement_timeout='3s'; SET LOCAL ROLE service_role; "
+            f"SELECT public.wa_claim_delivery('{job}','worker',clock_timestamp()+interval '30 seconds'); COMMIT;")
+        bootstrap_peer.stdin.close()
+        bootstrap_peer.wait(timeout=5)
+        if bootstrap_peer.returncode or json.loads(bootstrap_peer.stdout.read().strip()).get("code") != "account_busy":
+            raise RuntimeError("Simultaneous first-slot bootstrap waited or acquired a second token")
+        write_sql(bootstrap, "COMMIT;")
+        bootstrap.stdin.close()
+        bootstrap.wait(timeout=15)
+        if bootstrap.returncode:
+            raise RuntimeError("Bootstrap reservation could not commit")
+        fixture.sql(container, "SET ROLE service_role; "
+            f"SELECT public.wa_finish_delivery('{next_job}','{bootstrapped['attempt_token']}',"
+            "'{\"kind\":\"accepted\",\"providerMessageId\":\"delivery-race-second\"}')", "postgres")
+        attempt_count = fixture.sql(container, "SELECT count(*) FROM public.whatsapp_delivery_attempts "
+            f"WHERE job_id IN ('{job}','{next_job}')", "postgres")
+        if attempt_count != "2":
+            raise RuntimeError("Bootstrap peer created a duplicate delivery attempt")
+    finally:
+        close_processes(tuple(process for process in (holder, claimant, busy, rotation, bootstrap, bootstrap_peer) if process is not None))
+
+
 def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
@@ -563,9 +672,12 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     concurrent_begin_and_credential_mutation(container, preparation)
     concurrent_unbound_and_callback(container)
     concurrent_expansion_correction(container)
+    concurrent_whatsapp_delivery(container)
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
+        "wa_claim_repair_lock_order": True, "wa_account_single_inflight": True, "wa_key_rotation_blocked_inflight": True,
+        "wa_missing_slot_bootstrap_race": True,
         "one_first_success_one_replay": True, "concurrent_get_claims_skip_locked": True,
         "concurrent_strict_completion_one_evidence_one_shipa_receipt": True,
         "concurrent_manual_clicks_single_intent_review": True,
