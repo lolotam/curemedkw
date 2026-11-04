@@ -308,11 +308,11 @@ export const evolutionPairingClient: EvolutionPairingClient =
  * can drop a pairing QR when the session behind it changes.
  */
 export function subscribeToPairingAuthChanges(
-  onChange: (event: string) => void,
+  onChange: (event: string, userId: string | null) => void,
 ): () => void {
   const auth = supabase.auth;
   if (!auth || typeof auth.onAuthStateChange !== "function") return () => {};
-  const { data } = auth.onAuthStateChange((event) => onChange(event));
+  const { data } = auth.onAuthStateChange((event, session) => onChange(event, session?.user?.id ?? null));
   return () => {
     data?.subscription.unsubscribe();
   };

@@ -70,6 +70,8 @@ export interface EvolutionWebhookHandlerOptions {
  */
 const REFUSED_PAYLOAD_KEYS = [
   "base64",
+  "code",
+  "pairingCode",
   "qrcode",
   "qr",
   "message",

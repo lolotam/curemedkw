@@ -12,14 +12,14 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 const { invokeMock, authState } = vi.hoisted(() => ({
   invokeMock: vi.fn(),
-  authState: { callback: null as null | ((event: string) => void) },
+  authState: { callback: null as null | ((event: string, session?: { user: { id: string } } | null) => void) },
 }));
 
 vi.mock("@/integrations/supabase/clientRuntime", () => ({
   supabase: {
     functions: { invoke: invokeMock },
     auth: {
-      onAuthStateChange: (callback: (event: string) => void) => {
+      onAuthStateChange: (callback: (event: string, session?: { user: { id: string } } | null) => void) => {
         authState.callback = callback;
         return { data: { subscription: { unsubscribe: () => {} } } };
       },
@@ -95,6 +95,75 @@ function deferred<T>() {
 beforeEach(() => {
   invokeMock.mockReset();
   authState.callback = null;
+});
+
+it("keeps the QR through same-user tab refocus", async () => {
+  const fake = createFakeClient();
+  render(<EvolutionPairingCard client={fake.client} />);
+  await screen.findByText("Not connected");
+  act(() => authState.callback?.("INITIAL_SESSION", { user: { id: "admin-a" } }));
+  fireEvent.click(screen.getByRole("button", { name: /Show pairing code/ }));
+  await screen.findByAltText(/pairing QR code/i);
+  act(() => authState.callback?.("SIGNED_IN", { user: { id: "admin-a" } }));
+  expect(screen.getByAltText(/pairing QR code/i)).toBeTruthy();
+  expect(fake.readStatus).toHaveBeenCalledTimes(1);
+  expect(fake.requestConnect).toHaveBeenCalledTimes(1);
+});
+
+it("keeps an in-flight status answer through same-user refocus", async () => {
+  const pending = deferred<EvolutionPairingResult>();
+  const fake = createFakeClient();
+  fake.readStatus.mockImplementation(() => pending.promise);
+  render(<EvolutionPairingCard client={fake.client} />);
+  act(() => authState.callback?.("INITIAL_SESSION", { user: { id: "admin-a" } }));
+  act(() => authState.callback?.("SIGNED_IN", { user: { id: "admin-a" } }));
+  await act(async () => pending.resolve(ok("connected")));
+  await screen.findByText("Connected");
+  expect(screen.getByRole("button", { name: "Paired" })).toBeDisabled();
+  expect(fake.readStatus).toHaveBeenCalledTimes(1);
+});
+
+it("clears the QR and refreshes status when the authenticated user changes", async () => {
+  const fake = createFakeClient();
+  render(<EvolutionPairingCard client={fake.client} />);
+  await screen.findByText("Not connected");
+  act(() => authState.callback?.("INITIAL_SESSION", { user: { id: "admin-a" } }));
+  fireEvent.click(screen.getByRole("button", { name: /Show pairing code/ }));
+  await screen.findByAltText(/pairing QR code/i);
+  fake.readStatus.mockResolvedValue(ok("connected"));
+  act(() => authState.callback?.("SIGNED_IN", { user: { id: "admin-b" } }));
+  await screen.findByText("Connected");
+  expect(screen.queryByAltText(/pairing QR code/i)).toBeNull();
+  expect(fake.readStatus).toHaveBeenCalledTimes(2);
+  expect(fake.requestConnect).toHaveBeenCalledTimes(1);
+});
+
+it("fences an old user's pending QR when another user signs in", async () => {
+  const pending = deferred<EvolutionPairingResult>();
+  const fake = createFakeClient();
+  fake.requestConnect.mockImplementation(() => pending.promise);
+  render(<EvolutionPairingCard client={fake.client} />);
+  await screen.findByText("Not connected");
+  act(() => authState.callback?.("INITIAL_SESSION", { user: { id: "admin-a" } }));
+  fireEvent.click(screen.getByRole("button", { name: /Show pairing code/ }));
+  act(() => authState.callback?.("SIGNED_IN", { user: { id: "admin-b" } }));
+  await waitFor(() => expect(fake.readStatus).toHaveBeenCalledTimes(2));
+  await act(async () => pending.resolve(ok("connecting", QR)));
+  expect(screen.queryByAltText(/pairing QR code/i)).toBeNull();
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+it("leaves loading immediately on sign-out and discards the old status", async () => {
+  const pending = deferred<EvolutionPairingResult>();
+  const fake = createFakeClient();
+  fake.readStatus.mockImplementation(() => pending.promise);
+  render(<EvolutionPairingCard client={fake.client} />);
+  act(() => authState.callback?.("SIGNED_OUT"));
+  await screen.findByText(EVOLUTION_PAIRING_ERROR_MESSAGES.unauthorized);
+  await act(async () => pending.resolve(ok("connected")));
+  expect(screen.queryByText("Connected")).toBeNull();
+  expect(screen.queryByText("Checking")).toBeNull();
+  expect(fake.readStatus).toHaveBeenCalledTimes(1);
 });
 
 describe("the mounted card", () => {

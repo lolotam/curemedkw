@@ -108,7 +108,7 @@
     "CUREMED_EVOLUTION_API_KEY",
     "CUREMED_EVOLUTION_WEBHOOK_SECRET"
   ],
-  "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' \u00e2\u20ac\u201d the server's router is hand-patched and diverged from this repo.",
+  "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' \u2014 the server's router is hand-patched and diverged from this repo.",
   "deployFunctions": [
     "_shared",
     "create-myfatoorah-payment",

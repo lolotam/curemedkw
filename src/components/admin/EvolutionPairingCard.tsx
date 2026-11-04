@@ -37,6 +37,7 @@ import {
 import {
   EVOLUTION_QR_DISPLAY_MS,
   evolutionPairingClient,
+  evolutionPairingMessage,
   subscribeToPairingAuthChanges,
   type EvolutionConnection,
   type EvolutionConnectionState,
@@ -92,6 +93,7 @@ export function EvolutionPairingCard({
   const mountedRef = useRef(true);
   // The flag fences a second connect in the same frame.
   const connectPendingRef = useRef(false);
+  const sessionIdentityRef = useRef<{ initialized: boolean; userId: string | null }>({ initialized: false, userId: null });
 
   const dropQr = useCallback(() => {
     setQrDataUrl(null);
@@ -107,16 +109,6 @@ export function EvolutionPairingCard({
     };
   }, []);
 
-  // A session change drops the pairing QR of the old session.
-  useEffect(() => {
-    return subscribeToPairingAuthChanges((event) => {
-      if (event === "SIGNED_OUT" || event === "SIGNED_IN" || event === "USER_UPDATED") {
-        generationRef.current += 1;
-        dropQr();
-        setConnection(null);
-      }
-    });
-  }, [dropQr]);
 
   const readStatus = useCallback(async () => {
     const generation = generationRef.current + 1;
@@ -136,6 +128,41 @@ export function EvolutionPairingCard({
     setErrorMessage(result.message);
     setLoadState("error");
   }, [client, dropQr]);
+
+  // A session change drops the pairing QR of the old session.
+  // A same-user focus/refresh event is not an identity change.
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = subscribeToPairingAuthChanges((event, userId) => {
+      const previous = sessionIdentityRef.current;
+      const first = !previous.initialized;
+      const changed = previous.initialized && previous.userId !== userId;
+      sessionIdentityRef.current = { initialized: true, userId: event === "SIGNED_OUT" ? null : userId };
+      if (first && event === "INITIAL_SESSION") return;
+      if (event !== "SIGNED_OUT" && !changed && !first && userId !== null) return;
+
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer);
+      const generation = ++generationRef.current;
+      dropQr();
+      setConnection(null);
+      if (event === "SIGNED_OUT" || userId === null) {
+        setErrorMessage(evolutionPairingMessage("unauthorized"));
+        setLoadState("error");
+        return;
+      }
+      setErrorMessage(null);
+      setLoadState("loading");
+      // Return from Supabase's auth callback before asking it for a token.
+      refreshTimer = setTimeout(() => {
+        refreshTimer = undefined;
+        if (mountedRef.current && generation === generationRef.current) void readStatus();
+      }, 0);
+    });
+    return () => {
+      unsubscribe();
+      if (refreshTimer !== undefined) clearTimeout(refreshTimer);
+    };
+  }, [dropQr, readStatus]);
 
   // The state may be read on mount. It never connects.
   useEffect(() => {

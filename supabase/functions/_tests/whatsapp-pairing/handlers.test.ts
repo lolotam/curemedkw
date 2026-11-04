@@ -787,6 +787,27 @@ Deno.test("nested QR and message payloads are refused by the webhook", async () 
   }
 });
 
+Deno.test("pairing-code credentials are refused at both webhook locations", async () => {
+  const handler = createWebhook();
+  for (const key of ["code", "pairingCode"]) {
+    for (const nested of [false, true]) {
+      const response = await handler(request(
+        WEBHOOK_ENDPOINT,
+        JSON.stringify({
+          instance: "curemed",
+          event: "connection.update",
+          ...(nested
+            ? { data: { state: "open", [key]: "synthetic code" } }
+            : { [key]: "synthetic code" }),
+        }),
+        { headers: { "x-curemed-webhook-key": HOOK_MARKER } },
+      ));
+      assertEquals(response.status, 400);
+      assertEquals(response.headers.get("cache-control"), "no-store");
+    }
+  }
+});
+
 Deno.test("a valid connection update is acknowledged without a write", async () => {
   const handler = createWebhook();
   const body = JSON.stringify({

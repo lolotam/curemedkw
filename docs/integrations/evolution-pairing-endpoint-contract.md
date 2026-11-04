@@ -51,3 +51,10 @@ The current main manifest and existing endpoint settings must remain semanticall
 ## SDK HTTP failure wording
 
 For a real non-2xx invocation, Supabase stores the failure response in `FunctionsHttpError.context`, rather than returning the body as successful data. The browser consumes only a native failed `Response`, once, with a4096-byte streamed cap and1000ms wait bound. It reuses the closed failure-envelope parser and returns only fixed local wording for supported codes. Declared oversize is rejected before a reader starts; actual streamed bytes remain authoritative. Unknown/malformed/oversized/stalled/otherwise unusable bodies retain the generic safe fallback. A success/QR document inside an HTTP error can never become a pairing success. Readers/timers are cancelled/released, late settlement is observed, and this performs no retry or additional invocation.
+
+
+## Authentication-event and credential-payload boundaries
+
+The auth subscription projects only event plus the SDK session's user ID for transient UI identity comparison; the ID is never sent as backend/provider authority. INITIAL_SESSION establishes the baseline. Same-user focus/sign-in/token events preserve the current QR/status request. Sign-out or real identity changes discard QR data and invalidate pending answers; a real new identity schedules a read-only status refresh outside the SDK auth callback, guarded and cancelled on replacement/unmount. Sign-out leaves loading with fixed local wording. QR/connect remains explicit, and every new backend action independently reauthenticates the real user/admin role.
+
+Connection-only webhook refusal also includes the provider QR-family fields code and pairingCode, at both envelope and native data levels. Valid connection updates are still acknowledged without storage/readiness changes. The manifest's original warning string and all existing values are compared using explicit UTF-8 decoding of Git bytes; Windows default text decoding must not be used as a semantic-reference oracle.
