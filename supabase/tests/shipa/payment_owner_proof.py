@@ -21,7 +21,8 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql",
     "20261103002000_whatsapp_expansion.sql", "20261103002100_shipa_optional_instructions.sql",
     "20261103002200_whatsapp_delivery_claim.sql", "20261103002300_whatsapp_delivery_finish.sql",
-    "20261103002400_shipa_dispatch_selection.sql", "20261103002500_shipa_tracking.sql"))
+    "20261103002400_shipa_dispatch_selection.sql", "20261103002500_shipa_tracking.sql",
+    "20261103002600_shipa_reconciliation.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql", "delivery.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
@@ -29,7 +30,8 @@ TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
         ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql",
         ROOT / "supabase/tests/shipa/unbound_payments.sql", ROOT / "supabase/tests/shipa/submission_payload.sql",
-        ROOT / "supabase/tests/shipa/dispatch_selection.sql", ROOT / "supabase/tests/shipa/tracking.sql")
+        ROOT / "supabase/tests/shipa/dispatch_selection.sql", ROOT / "supabase/tests/shipa/tracking.sql",
+        ROOT / "supabase/tests/shipa/reconciliation.sql")
 
 
 def open_psql(container):
@@ -681,6 +683,58 @@ def concurrent_tracking_refresh(container, shipment):
         close_processes((first, second))
 
 
+def concurrent_reconciliation_and_late_completion(container):
+    actor = "83000000-0000-4000-8000-000000000001"
+    # This real begin survived the earlier credential-race proof. Record its
+    # uncertain result; do not manufacture another attempt/marker for recovery.
+    shipment = fixture.sql(container, "SELECT id FROM public.shipments "
+        "WHERE order_id='83000000-0000-4000-8000-000000000042'", "postgres")
+    fixture.sql(container, "SET ROLE service_role; SELECT public.shipa_complete("
+        f"'{shipment}','83000000-0000-4000-8000-000000000044','{{\"outcome\":\"uncertain\",\"code\":\"timeout\"}}')", "postgres")
+    context = json.loads(fixture.sql(container, "SET ROLE service_role; "
+        f"SELECT public.shipa_read_reconciliation_context('{shipment}','{actor}')", "postgres").splitlines()[-1])
+    # Identity projection correctness is tested independently by reconciliation.sql.
+    # This race isolates row-lock/idempotency and late-result ownership behavior.
+    detail = fixture.sql(container, "SELECT private.shipa_reconciliation_facts(payload)||"
+        "'{\"shipaRef\":\"RECONCILIATION-RACE\",\"status\":\"Created\"}'::jsonb "
+        f"FROM public.shipments WHERE id='{shipment}'", "postgres").replace("'", "''")
+    reconcile = "SELECT public.shipa_apply_reconciled_detail("
+    reconcile += f"'{shipment}','{context['attempt_token']}','{context['updated_at']}',"
+    reconcile += f"'{context['credential_fingerprint']}','{detail}','{actor}');"
+    first, peer, late = open_psql(container), open_psql(container), open_psql(container)
+    try:
+        write_sql(first, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL ROLE service_role; " + reconcile)
+        accepted = json.loads(first.stdout.readline())
+        write_sql(peer, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='shipa-reconcile-peer'; "
+            "SET LOCAL ROLE service_role; " + reconcile + " COMMIT;")
+        write_sql(late, "BEGIN; SET LOCAL statement_timeout='10s'; SET LOCAL application_name='shipa-reconcile-late'; "
+            "SET LOCAL ROLE service_role; SELECT public.shipa_complete("
+            f"'{shipment}','{context['attempt_token']}',"
+            "'{\"outcome\":\"accepted\",\"shipaRef\":\"RECONCILIATION-RACE\",\"orderStatus\":\"Created\"}'); COMMIT;")
+        write_sql(first, "RESET ROLE; " + observe_lock("shipa-reconcile-peer") + observe_lock("shipa-reconcile-late") + "COMMIT;")
+        for process in (first, peer, late):
+            process.stdin.close()
+            process.wait(timeout=15)
+            if process.returncode:
+                raise RuntimeError("Reconciliation/late completion contention failed: " + process.stderr.read().strip())
+        if accepted["state"] != "created" or accepted["changed"] is not True:
+            raise RuntimeError("First reconciliation did not retain the accepted booking")
+        for process in (peer, late):
+            replay = json.loads(process.stdout.read().strip())
+            if replay["state"] != "created" or replay["changed"] is not False or replay["shipa_ref"] != "RECONCILIATION-RACE":
+                raise RuntimeError("Contended positive replay changed the accepted booking")
+        persisted = json.loads(fixture.sql(container, "SELECT jsonb_build_array("
+            f"(SELECT state FROM public.shipments WHERE id='{shipment}'),"
+            f"(SELECT attempt_count FROM public.shipments WHERE id='{shipment}'),"
+            f"(SELECT count(*) FROM private.shipa_submission_markers WHERE shipment_id='{shipment}'),"
+            f"(SELECT count(*) FROM private.shipa_reconciliation_proofs WHERE shipment_id='{shipment}'),"
+            f"(SELECT count(*) FROM public.shipment_events WHERE shipment_id='{shipment}' AND event_type='reconciled'))", "postgres"))
+        if persisted != ["created", 1, 1, 1, 1]:
+            raise RuntimeError("Concurrent recovery duplicated the attempt/proof/event or lost acceptance")
+    finally:
+        close_processes((first, peer, late))
+
+
 def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     fixture.restore(state, baseline)
     if preexisting_private:
@@ -717,11 +771,13 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     concurrent_expansion_correction(container)
     concurrent_whatsapp_delivery(container)
     concurrent_tracking_refresh(container, preparation["shipment_id"])
+    concurrent_reconciliation_and_late_completion(container)
     return {"preexisting_private": preexisting_private, "schema_applications": 2,
         "baseline_unchanged": True, "schema_fingerprint": hashlib.sha256(before.encode()).hexdigest(),
         "actual_role_fixtures": True, "forced_callback_webhook_contention": True,
         "wa_claim_repair_lock_order": True, "wa_account_single_inflight": True, "wa_key_rotation_blocked_inflight": True,
         "wa_missing_slot_bootstrap_race": True, "tracking_stale_peer_waits_and_refuses": True,
+        "reconciliation_peer_and_late_completion_single_acceptance": True,
         "one_first_success_one_replay": True, "concurrent_get_claims_skip_locked": True,
         "concurrent_strict_completion_one_evidence_one_shipa_receipt": True,
         "concurrent_manual_clicks_single_intent_review": True,
