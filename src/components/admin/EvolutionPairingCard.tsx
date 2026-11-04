@@ -92,7 +92,8 @@ export function EvolutionPairingCard({
   const generationRef = useRef(0);
   const mountedRef = useRef(true);
   // The flag fences a second connect in the same frame.
-  const connectPendingRef = useRef(false);
+  // Its operation token prevents an old finally from unlocking a newer call.
+  const connectPendingRef = useRef<symbol | null>(null);
   const sessionIdentityRef = useRef<{ initialized: boolean; userId: string | null }>({ initialized: false, userId: null });
 
   const dropQr = useCallback(() => {
@@ -143,6 +144,8 @@ export function EvolutionPairingCard({
 
       if (refreshTimer !== undefined) clearTimeout(refreshTimer);
       const generation = ++generationRef.current;
+      connectPendingRef.current = null;
+      setBusy(false);
       dropQr();
       setConnection(null);
       if (event === "SIGNED_OUT" || userId === null) {
@@ -171,8 +174,9 @@ export function EvolutionPairingCard({
 
   const requestQr = useCallback(async () => {
     // A second click in the same frame must not start a second connect.
-    if (connectPendingRef.current) return;
-    connectPendingRef.current = true;
+    if (connectPendingRef.current !== null) return;
+    const operation = Symbol("pairing-connect");
+    connectPendingRef.current = operation;
 
     const generation = generationRef.current + 1;
     generationRef.current = generation;
@@ -196,8 +200,10 @@ export function EvolutionPairingCard({
         setDialogOpen(true);
       }
     } finally {
-      connectPendingRef.current = false;
-      if (mountedRef.current) setBusy(false);
+      if (connectPendingRef.current === operation) {
+        connectPendingRef.current = null;
+        if (mountedRef.current) setBusy(false);
+      }
     }
   }, [client, dropQr]);
 

@@ -153,6 +153,54 @@ it("fences an old user's pending QR when another user signs in", async () => {
   expect(screen.queryByRole("dialog")).toBeNull();
 });
 
+it("releases an old identity's connect lock without letting its finally unlock a new request", async () => {
+  const oldRequest = deferred<EvolutionPairingResult>();
+  const newRequest = deferred<EvolutionPairingResult>();
+  const fake = createFakeClient();
+  fake.requestConnect.mockImplementationOnce(() => oldRequest.promise)
+    .mockImplementationOnce(() => newRequest.promise);
+  try {
+    render(<EvolutionPairingCard client={fake.client} />);
+    await screen.findByText("Not connected");
+    act(() => authState.callback?.("INITIAL_SESSION", { user: { id: "admin-a" } }));
+    fireEvent.click(screen.getByRole("button", { name: /Show pairing code/ }));
+    act(() => authState.callback?.("SIGNED_IN", { user: { id: "admin-b" } }));
+    await waitFor(() => expect(fake.readStatus).toHaveBeenCalledTimes(2));
+    await screen.findByText("Not connected");
+    fireEvent.click(screen.getByRole("button", { name: /Show pairing code/ }));
+    expect(fake.requestConnect).toHaveBeenCalledTimes(2);
+    await act(async () => oldRequest.resolve(ok("connecting", QR)));
+    expect(screen.queryByAltText(/pairing QR code/i)).toBeNull();
+    const preparing = screen.getByRole("button", { name: /Show pairing code/ });
+    expect(preparing).toBeDisabled();
+    fireEvent.click(preparing);
+    expect(fake.requestConnect).toHaveBeenCalledTimes(2);
+    await act(async () => newRequest.resolve(ok("connecting", QR)));
+    await screen.findByAltText(/pairing QR code/i);
+  } finally {
+    await act(async () => {
+      oldRequest.resolve(ok("unknown"));
+      newRequest.resolve(ok("unknown"));
+    });
+  }
+});
+
+it("same-user refocus never releases an in-flight connect lock", async () => {
+  const pending = deferred<EvolutionPairingResult>();
+  const fake = createFakeClient();
+  fake.requestConnect.mockImplementation(() => pending.promise);
+  render(<EvolutionPairingCard client={fake.client} />);
+  await screen.findByText("Not connected");
+  act(() => authState.callback?.("INITIAL_SESSION", { user: { id: "admin-a" } }));
+  fireEvent.click(screen.getByRole("button", { name: /Show pairing code/ }));
+  act(() => authState.callback?.("SIGNED_IN", { user: { id: "admin-a" } }));
+  const preparing = screen.getByRole("button", { name: /Show pairing code/ });
+  expect(preparing).toBeDisabled();
+  fireEvent.click(preparing);
+  expect(fake.requestConnect).toHaveBeenCalledTimes(1);
+  await act(async () => pending.resolve(ok("connecting", QR)));
+});
+
 it("leaves loading immediately on sign-out and discards the old status", async () => {
   const pending = deferred<EvolutionPairingResult>();
   const fake = createFakeClient();
