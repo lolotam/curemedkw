@@ -21,6 +21,7 @@
 // durable queue, and it grants no trust.
 
 import type { ShipaEnvironment, ShipaSettings } from "@/lib/shipaSettings";
+import { shipaTimestampMilliseconds } from "@/lib/shipaSettings";
 
 /**
  * Persisted shipment source, not the actor executing this attempt. A scheduler
@@ -251,8 +252,11 @@ export function evaluateDispatchPolicy(input: DispatchPolicyInput): DispatchPoli
     case "needs_review":
       review.push("shipment_needs_review");
       break;
+    case "rejected":
+      if (!input.retry) blocking.push("retry_not_retryable");
+      break;
     default:
-      // `none`, `queued` and `rejected` may proceed to the remaining checks.
+      // `none` and `queued` may proceed to the remaining checks.
       break;
   }
 
@@ -264,7 +268,7 @@ export function evaluateDispatchPolicy(input: DispatchPolicyInput): DispatchPoli
 
   // Pricing and coupon integrity.
   if (input.validation.pricingStatus !== "accepted") {
-    if (input.source === "automatic") {
+    if (input.source === "automatic" || input.validation.pricingStatus === "not_checked") {
       // Automatic fulfillment may never acknowledge a pricing mismatch.
       review.push("pricing_review_required");
     } else if (!input.review.pricingException || !input.review.pricingException.acknowledged) {
@@ -293,7 +297,7 @@ export function evaluateDispatchPolicy(input: DispatchPolicyInput): DispatchPoli
       review.push("retry_input_changed");
     }
     if (!retry.retryable) blocking.push("retry_not_retryable");
-    const retryAtMs = retry.retryAt ? Date.parse(retry.retryAt) : Number.NaN;
+    const retryAtMs = retry.retryAt ? shipaTimestampMilliseconds(retry.retryAt) : Number.NaN;
     if (Number.isNaN(retryAtMs)) {
       blocking.push("retry_not_due");
     } else {

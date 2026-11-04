@@ -86,7 +86,7 @@ Deno.test("a stalled admin body expires before configuration or provider access"
 
 Deno.test("an authorization timeout never starts reading the request body", async () => {
   const admin = createFakeAdmin({
-    userId: "user-1",
+    userId: "11111111-2222-4333-8444-555555555555",
     role: "admin",
     delayMs: 25,
   });
@@ -188,7 +188,10 @@ function createHarness(
         jsonBody({ instance: { instanceName: "curemed", state: "close" } })),
   );
   const admin = options.admin ??
-    createFakeAdmin({ userId: "user-1", role: "admin" });
+    createFakeAdmin({
+      userId: "11111111-2222-4333-8444-555555555555",
+      role: "admin",
+    });
   let configReads = 0;
   const handler = createEvolutionPairingHandler({
     admin: admin.client,
@@ -231,7 +234,11 @@ Deno.test("an already aborted request cannot start a provider connect", async ()
 
 Deno.test("the authorization deadline bounds waiting rather than only later provider work", async () => {
   const harness = createHarness({
-    admin: createFakeAdmin({ userId: "user-1", role: "admin", delayMs: 70 }),
+    admin: createFakeAdmin({
+      userId: "11111111-2222-4333-8444-555555555555",
+      role: "admin",
+      delayMs: 70,
+    }),
     fenceMs: 5,
   });
   const pending = harness.handler(
@@ -292,7 +299,7 @@ Deno.test("a malformed bearer is refused before any read", async () => {
 Deno.test("a service role or anon key is not an administrator", async () => {
   const harness = createHarness({
     admin: createFakeAdmin({
-      userId: "user-1",
+      userId: "11111111-2222-4333-8444-555555555555",
       role: "admin",
       validTokens: ["admin-session-token"],
     }),
@@ -310,15 +317,37 @@ Deno.test("a service role or anon key is not an administrator", async () => {
         { headers: { authorization } },
       ),
     );
-    assertEquals(response.status, 403);
+    assertEquals(response.status, 401);
   }
+  assertEquals(harness.provider.calls.length, 0);
+  assertEquals(harness.configReads(), 0);
+});
+
+Deno.test("an expired administrator session requests sign-in before provider configuration", async () => {
+  const harness = createHarness({
+    admin: createFakeAdmin({
+      userId: "11111111-2222-4333-8444-555555555555",
+      role: "admin",
+      validTokens: ["current-session"],
+    }),
+  });
+  const response = await harness.handler(
+    request(PAIRING_ENDPOINT, JSON.stringify({ action: "status" }), {
+      headers: adminHeaders(),
+    }),
+  );
+  assertEquals(response.status, 401);
+  assertEquals((await response.json()).error.code, "unauthorized");
   assertEquals(harness.provider.calls.length, 0);
   assertEquals(harness.configReads(), 0);
 });
 
 Deno.test("a caller without the admin role is refused", async () => {
   const harness = createHarness({
-    admin: createFakeAdmin({ userId: "user-2", role: "customer" }),
+    admin: createFakeAdmin({
+      userId: "22222222-3333-4444-8555-666666666666",
+      role: "customer",
+    }),
   });
 
   const response = await harness.handler(
@@ -412,7 +441,7 @@ Deno.test("a forged body actor is refused", async () => {
   const harness = createHarness();
   const forged = [
     { action: "status", actor: "someone-else" },
-    { action: "status", userId: "user-1" },
+    { action: "status", userId: "11111111-2222-4333-8444-555555555555" },
     { action: "status", role: "admin" },
   ];
 
@@ -573,7 +602,7 @@ Deno.test("another method is refused", async () => {
 Deno.test("a slow authorization never reaches the provider", async () => {
   const harness = createHarness({
     admin: createFakeAdmin({
-      userId: "user-1",
+      userId: "11111111-2222-4333-8444-555555555555",
       role: "admin",
       delayMs: 60,
     }),

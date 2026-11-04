@@ -16,15 +16,15 @@
 import { z } from "zod";
 
 import {
-  SCHEDULER_HEARTBEAT_MAX_AGE_MS,
   missingShipaOriginAddressFields,
+  SCHEDULER_HEARTBEAT_MAX_AGE_MS,
+  type ShipaPublicSettings,
   shipaPublicSettingsForEnvironment,
   shipaPublicSettingsSchema,
-  shipaSaveRequestSchema,
-  shipaSettingsSchema,
-  type ShipaPublicSettings,
   type ShipaSaveRequest,
+  shipaSaveRequestSchema,
   type ShipaSettings,
+  shipaSettingsSchema,
 } from "./shipa-settings.ts";
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,8 @@ function containsForbiddenSettingKey(value: unknown): boolean {
   }
   if (!isPlainRecord(value)) return false;
   return Object.entries(value).some(([key, child]) =>
-    FORBIDDEN_SETTING_KEYS.includes(normalizeSettingKey(key)) || containsForbiddenSettingKey(child)
+    FORBIDDEN_SETTING_KEYS.includes(normalizeSettingKey(key)) ||
+    containsForbiddenSettingKey(child)
   );
 }
 
@@ -124,7 +125,9 @@ export interface ShipaSaveRequestParseResult {
  * than preserved, and credential-like fields are reported with their own
  * stable code so a caller can log "a secret was sent" instead of "invalid".
  */
-export function parseShipaSettings(raw: unknown): ShipaSettingsParseResult<ShipaSettings> {
+export function parseShipaSettings(
+  raw: unknown,
+): ShipaSettingsParseResult<ShipaSettings> {
   return parseSettingsDraft(shipaSettingsSchema, raw, "invalid_settings");
 }
 
@@ -133,7 +136,9 @@ export function parseShipaSettings(raw: unknown): ShipaSettingsParseResult<Shipa
  * schema means an unexpected key is rejected instead of being carried along
  * into a save payload.
  */
-export function parseShipaPublicSettings(raw: unknown): ShipaSettingsParseResult<ShipaPublicSettings> {
+export function parseShipaPublicSettings(
+  raw: unknown,
+): ShipaSettingsParseResult<ShipaPublicSettings> {
   return parseSettingsDraft(shipaPublicSettingsSchema, raw, "invalid_settings");
 }
 
@@ -147,7 +152,9 @@ export function parseShipaPublicSettings(raw: unknown): ShipaSettingsParseResult
  * blocks exclude the server-derived credential metadata, so a browser can
  * never claim that a key exists.
  */
-export function parseShipaSaveRequest(raw: unknown): ShipaSaveRequestParseResult {
+export function parseShipaSaveRequest(
+  raw: unknown,
+): ShipaSaveRequestParseResult {
   if (containsForbiddenSettingKey(raw)) {
     return {
       ok: false,
@@ -202,6 +209,7 @@ export type ShipaActivationIssueCode =
   | "origin_phone_missing"
   | "origin_address_incomplete"
   | "parcel_weight_missing"
+  | "service_code_missing"
   | "scheduler_heartbeat_missing"
   | "scheduler_heartbeat_invalid"
   | "scheduler_heartbeat_in_future"
@@ -261,12 +269,21 @@ export function evaluateShipaActivationReadiness(
   if (!parseShipaSettings(input.settings).ok) {
     return {
       ready: false,
-      issues: [{ code: "invalid_settings", message: "Invalid Shipa settings." }],
+      issues: [{
+        code: "invalid_settings",
+        message: "Invalid Shipa settings.",
+      }],
     };
   }
   const issues: ShipaActivationIssue[] = [];
   const environment = input.settings.environment;
   const active = shipaPublicSettingsForEnvironment(input.settings, environment);
+  if (active.serviceCode === null) {
+    issues.push({
+      code: "service_code_missing",
+      message: "A delivery service must be selected.",
+    });
+  }
 
   if (!input.vendorReferenceAvailable) {
     issues.push({
@@ -278,21 +295,29 @@ export function evaluateShipaActivationReadiness(
   if (!input.providerAdapterReady) {
     issues.push({
       code: "provider_adapter_not_ready",
-      message: "No verified provider adapter is available yet, so real activation is blocked.",
+      message:
+        "No verified provider adapter is available yet, so real activation is blocked.",
     });
   }
   if (!input.activeEnvironmentCredentialPresent) {
     issues.push({
       code: "credential_missing",
-      message: `No credential is configured for the ${environment} environment.`,
+      message:
+        `No credential is configured for the ${environment} environment.`,
     });
   }
 
   if (!active.origin.contactName.trim()) {
-    issues.push({ code: "origin_contact_missing", message: "Origin contact name is required." });
+    issues.push({
+      code: "origin_contact_missing",
+      message: "Origin contact name is required.",
+    });
   }
   if (!active.origin.contactPhone.trim()) {
-    issues.push({ code: "origin_phone_missing", message: "Origin contact phone is required." });
+    issues.push({
+      code: "origin_phone_missing",
+      message: "Origin contact phone is required.",
+    });
   }
   const missingAddress = missingShipaOriginAddressFields(active.origin.address);
   if (missingAddress.length > 0) {
@@ -316,15 +341,17 @@ export function evaluateShipaActivationReadiness(
     if (heartbeatRaw === null || heartbeatRaw.trim() === "") {
       issues.push({
         code: "scheduler_heartbeat_missing",
-        message: "Automatic dispatch needs a scheduler heartbeat; none has been recorded.",
+        message:
+          "Automatic dispatch needs a scheduler heartbeat; none has been recorded.",
       });
     } else if (!Number.isFinite(nowMs)) {
       issues.push({
         code: "scheduler_heartbeat_invalid",
-        message: "The reference time is unusable, so the scheduler heartbeat cannot be evaluated.",
+        message:
+          "The reference time is unusable, so the scheduler heartbeat cannot be evaluated.",
       });
     } else {
-      const heartbeatMs = Date.parse(heartbeatRaw);
+      const heartbeatMs = shipaTimestampMilliseconds(heartbeatRaw);
       if (Number.isNaN(heartbeatMs)) {
         issues.push({
           code: "scheduler_heartbeat_invalid",
@@ -333,7 +360,8 @@ export function evaluateShipaActivationReadiness(
       } else if (heartbeatMs > nowMs) {
         issues.push({
           code: "scheduler_heartbeat_in_future",
-          message: "The scheduler heartbeat is in the future, so it cannot be trusted.",
+          message:
+            "The scheduler heartbeat is in the future, so it cannot be trusted.",
         });
       } else if (nowMs - heartbeatMs > SCHEDULER_HEARTBEAT_MAX_AGE_MS) {
         issues.push({
@@ -345,4 +373,29 @@ export function evaluateShipaActivationReadiness(
   }
 
   return { ready: issues.length === 0, issues };
+}
+
+/** Timezone and calendar validation before using a timestamp as scheduling evidence. */
+export function shipaTimestampMilliseconds(timestamp: string): number {
+  const parts =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/
+      .exec(timestamp);
+  if (parts === null) return Number.NaN;
+  const [year, month, day, hour, minute, second] = parts.slice(1, 7).map(
+    Number,
+  );
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (
+    year < 1 || month < 1 || month > 12 || day < 1 || day > days[month - 1] ||
+    hour > 23 || minute > 59 || second > 59
+  ) return Number.NaN;
+  const offset = parts[7];
+  if (
+    offset !== "Z" &&
+    (Number(offset.slice(1, 3)) > 23 || Number(offset.slice(4)) > 59)
+  ) {
+    return Number.NaN;
+  }
+  return Date.parse(timestamp);
 }

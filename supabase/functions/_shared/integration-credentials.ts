@@ -161,6 +161,8 @@ export async function encryptIntegrationCredential(
   }
   const plaintextBytes = new TextEncoder().encode(plaintext);
   if (
+    new TextDecoder("utf-8", { fatal: true }).decode(plaintextBytes) !==
+      plaintext ||
     plaintextBytes.length === 0 ||
     plaintextBytes.length > INTEGRATION_CREDENTIAL_MAX_PLAINTEXT_BYTES
   ) {

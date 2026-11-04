@@ -20,6 +20,7 @@
 // settings block is validated with the shared parser before the call, so the
 // nested credential metadata can never ride along in a save.
 import { supabase } from "@/integrations/supabase/clientRuntime";
+import { readBoundedHttpErrorJson } from "@/lib/boundedHttpErrorJson";
 import {
   parseShipaAdminEnvelope,
   parseShipaReadinessPayload,
@@ -339,13 +340,13 @@ async function recoverCodeFromContext(
 ): Promise<ShipaAdminErrorCode | null> {
   if (!isRecord(error)) return null;
   const context = error.context;
-  if (!isRecord(context) || typeof context.json !== "function") return null;
+  if (!(context instanceof Response)) return null;
   if (READ_RESPONSES.has(context)) return null;
   READ_RESPONSES.add(context);
 
   let body: unknown = null;
   try {
-    body = await (context.json as () => Promise<unknown>).call(context);
+    body = await readBoundedHttpErrorJson(context);
   } catch {
     return null;
   }

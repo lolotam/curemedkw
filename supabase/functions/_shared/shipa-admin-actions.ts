@@ -192,7 +192,12 @@ export async function readShipaAdminJsonBody(
   }
 
   try {
-    return { ok: true, value: JSON.parse(new TextDecoder().decode(bytes)) };
+    return {
+      ok: true,
+      value: JSON.parse(
+        new TextDecoder("utf-8", { fatal: true }).decode(bytes),
+      ),
+    };
   } catch {
     return { ok: false, status: 400 };
   }

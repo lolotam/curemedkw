@@ -329,7 +329,7 @@ describe("the explicit connect", () => {
     });
   });
 
-  it("expires the QR locally and asks for a refresh", async () => {
+  it("clears the QR locally and names the explicit connect action", async () => {
     const fake = createFakeClient();
 
     render(<EvolutionPairingCard client={fake.client} qrLifetimeMs={20} />);
@@ -338,7 +338,7 @@ describe("the explicit connect", () => {
     await screen.findByAltText(/pairing QR code/i);
 
     await waitFor(() => {
-      expect(screen.getByText(/no longer shown here/i)).toBeTruthy();
+      expect(screen.getByText(/no longer shown here/i).textContent).toContain("Show pairing code");
     });
     expect(screen.queryByAltText(/pairing QR code/i)).toBeNull();
   });

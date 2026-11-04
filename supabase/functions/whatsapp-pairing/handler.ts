@@ -10,7 +10,7 @@
 //     or an actor from the request. The instance and the origin are fixed
 //     in the shared client, and the credential is read from the server
 //     configuration only after the caller is authorized.
-//   * It does not decode the bearer token. The real isAdminCaller helper
+//   * It does not decode the bearer token. The shared administrator helper
 //     resolves the session through the auth server and checks the admin
 //     role; a body actor, an anonymous call, the anon key and the service
 //     role key are not an authority.
@@ -22,9 +22,11 @@
 // The factory takes its dependencies, so the real authorization helper and
 // the real provider client run against a fake SDK and a fake fetch.
 
-import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-
-import { isAdminCaller } from "../_shared/caller-auth.ts";
+import {
+  requireShipaAdmin,
+  type ShipaAdminAuthorization,
+  type ShipaAuthClient,
+} from "../_shared/shipa-auth.ts";
 import { corsHeaders, isAllowedOrigin } from "../_shared/cors.ts";
 import { withAbortSignal } from "../_shared/evolution-pairing-io.ts";
 import {
@@ -90,7 +92,7 @@ export interface EvolutionPairingConfig {
 /** The dependencies of the handler. */
 export interface EvolutionPairingHandlerOptions {
   /** The service role client the real admin helper runs on. */
-  readonly admin: SupabaseClient;
+  readonly admin: ShipaAuthClient;
   /** Reads the server configuration, lazily, after authorization. */
   readonly readConfig: () => EvolutionPairingConfig | undefined;
   /** The injected fetch boundary of the provider client. */
@@ -235,10 +237,10 @@ export function createEvolutionPairingHandler(
     try {
       // Authentication is required for both actions and comes before any
       // configuration read and any provider call.
-      let authorized = false;
+      let authorization: ShipaAdminAuthorization;
       try {
-        authorized = await withAbortSignal(
-          isAdminCaller(req, options.admin),
+        authorization = await withAbortSignal(
+          requireShipaAdmin(req, options.admin),
           fence.signal,
         );
       } catch {
@@ -262,7 +264,17 @@ export function createEvolutionPairingHandler(
             : "aborted",
         );
       }
-      if (!authorized) return errorResponse(req, 403, "forbidden");
+      if (!authorization.ok) {
+        return errorResponse(
+          req,
+          authorization.status,
+          authorization.status === 401
+            ? "unauthorized"
+            : authorization.status === 403
+            ? "forbidden"
+            : "provider_unavailable",
+        );
+      }
 
       // The request contract is closed: one action and nothing else.
       const url = new URL(req.url);

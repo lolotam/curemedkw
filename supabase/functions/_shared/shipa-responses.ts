@@ -322,10 +322,10 @@ export function parseShipaCreateResponse(
   };
 }
 
-function parseParty(value: unknown): ShipaOrderParty | null {
+function parseParty(value: unknown): ShipaOrderParty | null | undefined {
   if (value === undefined || value === null) return null;
   const record = isPlainRecord(value) ? value : null;
-  if (record === null) return null;
+  if (record === null) return undefined;
   const contactName = readField(
     record,
     "contactName",
@@ -333,7 +333,7 @@ function parseParty(value: unknown): ShipaOrderParty | null {
   );
   const city = readField(record, "city", readCityName);
   const country = readField(record, "country", boundedString(3));
-  if (!contactName.valid || !city.valid || !country.valid) return null;
+  if (!contactName.valid || !city.valid || !country.valid) return undefined;
   return {
     contactName: contactName.value,
     city: city.value,
@@ -404,9 +404,9 @@ export function parseShipaOrderDetail(
     return INVALID_RESPONSE;
   }
   const origin = parseParty(record["origin"]);
-  if (origin === null) return INVALID_RESPONSE;
+  if (origin === undefined) return INVALID_RESPONSE;
   const destination = parseParty(record["destination"]);
-  if (destination === null) return INVALID_RESPONSE;
+  if (destination === undefined) return INVALID_RESPONSE;
   const packages = parsePackageDetails(record["packages"]);
   if (packages === null) return INVALID_RESPONSE;
   return {

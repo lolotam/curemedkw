@@ -55,6 +55,21 @@ const PRIOR_DECISION_FIXTURE: Readonly<{
 });
 
 describe("eligibility", () => {
+  it("never treats a rejected shipment without retry evidence as fresh work", () => {
+    const decision = evaluateDispatchPolicy(baseInput({ shipment: "rejected", retry: null }));
+    expect(decision.allowed).toBe(false);
+    expect(decision.reasons).toContain("retry_not_retryable");
+  });
+
+  it("cannot acknowledge pricing that was never checked", () => {
+    const decision = evaluateDispatchPolicy(baseInput({
+      validation: { pricingStatus: "not_checked", requiredDeliveryDataValid: true },
+      review: { currentInputFingerprint: "fingerprint-current", approvedInputFingerprint: "fingerprint-current",
+        pricingException: { acknowledged: true, reviewedInputFingerprint: "fingerprint-current" } },
+    }));
+    expect(decision.allowed).toBe(false);
+    expect(decision.reasons).toContain("pricing_review_required");
+  });
   it("allows a paid order with a verified receipt", () => {
     const decision = evaluateDispatchPolicy(baseInput());
     expect(decision.allowed).toBe(true);
@@ -278,8 +293,8 @@ describe("existing shipment state", () => {
     expect(decision.reasons).toContain("shipment_needs_review");
   });
 
-  it("lets a definitively rejected shipment be attempted again", () => {
-    const decision = evaluateDispatchPolicy(baseInput({ shipment: "rejected" }));
+  it("lets an explicitly reviewed corrected shipment queued by the server proceed", () => {
+    const decision = evaluateDispatchPolicy(baseInput({ shipment: "queued" }));
     expect(decision.allowed).toBe(true);
   });
 });
@@ -522,6 +537,14 @@ describe("safe retry", () => {
     );
     expect(decision.allowed).toBe(true);
   });
+
+  it.each(["2026-11-01", "2026-11-01T09:00:00", "2026-02-30T09:00:00Z"])(
+    "refuses malformed retry scheduling timestamps %s", (retryAt) => {
+      const decision = evaluateDispatchPolicy(baseInput({ shipment: "rejected", retry: retry({ retryAt }) }));
+      expect(decision.allowed).toBe(false);
+      expect(decision.reasons).toContain("retry_not_due");
+    },
+  );
 
   it("blocks a retry that is not documented as retryable", () => {
     const decision = evaluateDispatchPolicy(

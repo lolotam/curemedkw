@@ -1,8 +1,7 @@
 {
   "schemaBase": "0522c5534e87025f66ea195175897d2d43adddce",
   "source": "b919ae732f5251d927f5b5ac4c72e5e14188394d",
-  "pairingCodeMatchesAcceptedHead": "9c70db2025a2ac340616f60abf6385a39b04fcee",
-  "status": "Initial source blobs; new release corrections are explicit review deltas, not falsely attributed to old approvals",
+  "status": "Original imported provenance retained; current release corrections and non-self-referential overlays are frozen below for exact-head review.",
   "paths": [
     {
       "path": "deno.shipa.json",
@@ -746,5 +745,129 @@
       "sha256GitBytes": "63ce07485c4025099dc60d2284b667c31286577bd743020a8842630c0f5528f5",
       "bytes": 1675
     }
-  ]
+  ],
+  "originalPairingCodeMatchedAcceptedHead": "9c70db2025a2ac340616f60abf6385a39b04fcee",
+  "reviewCorrections": {
+    "ops/edge-env.manifest.example.json": {
+      "sha256GitBytes": "c9466fd7c41ec2b36d4195d9b87d1bc42c82058786a865b6aba028145ce43c0a",
+      "reason": "Register shipa-admin, backend encryption dependency and fail-closed schema prerequisite."
+    },
+    "src/components/admin/EvolutionPairingCard.test.tsx": {
+      "sha256GitBytes": "7e2c6aeada8087faf5632c67f68e2b8a15dbf5e98d7133bed0e4e7499ba61a09",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "src/components/admin/EvolutionPairingCard.tsx": {
+      "sha256GitBytes": "35b10eb3396dcf9c6888fccc00697fefa43624de9f17fa7cf6d09145ba17ad0c",
+      "reason": "Point cleared-QR instructions to the explicit connect action."
+    },
+    "src/lib/evolutionPairing.ts": {
+      "sha256GitBytes": "46a6fa3244e3614e62068d8761227b3b814beb6bd3dbdf2088e33a5b4c9efe59",
+      "reason": "Reuse the shared bounded HTTP-error reader without altering pairing response projection."
+    },
+    "src/lib/shipaAdmin.test.ts": {
+      "sha256GitBytes": "c8bdefbdf0fbae9aa34e9f9bb205241ec4b0e024abc65703366114c74427855c",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "src/lib/shipaAdmin.ts": {
+      "sha256GitBytes": "f3345cbbfef15ded587904aef20d16848cc3b0b14820aef5118eedccbf5f5fa7",
+      "reason": "Bound SDK HTTP error parsing and keep the fixed local error vocabulary."
+    },
+    "src/lib/shipaAdminPolicy.ts": {
+      "sha256GitBytes": "5f43145a5996fd772336bc903a8954cf92b183ea7f8ed6b3f895e4c654b9e080",
+      "reason": "Recheck changed active automation settings and pending credentials."
+    },
+    "src/lib/shipaDispatchPolicy.test.ts": {
+      "sha256GitBytes": "6da8f2137cea3162e34e7907636f88030f2e8c41e20463cafc81e70b9279c04f",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "src/lib/shipaDispatchPolicy.ts": {
+      "sha256GitBytes": "1c8642ba0d460fbbbde2c70334abb657c952f87048d28415993dc87999de9b44",
+      "reason": "Refuse missing retry evidence, unchecked pricing and malformed retry timestamps."
+    },
+    "src/lib/shipaSettings.test.ts": {
+      "sha256GitBytes": "a96eec1ab8bc21582923cd44ef3b0a6ae8313850b0adfbfb08638dbcd3f6f647",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "src/test/shipaAdminFixtures.ts": {
+      "sha256GitBytes": "f68f31c26f19d410642bea49208c710031a56857b13fe94b0ce44acdd9c7a93c",
+      "reason": "Use real synthetic HTTP Responses at the SDK error boundary."
+    },
+    "supabase/config.toml": {
+      "sha256GitBytes": "d1034ccc6d3484de371bb54b2be630a52f44b00042c4a06322653a199a84a5ae",
+      "reason": "Register the authenticated shipa-admin handler metadata."
+    },
+    "supabase/functions/_shared/integration-credentials.ts": {
+      "sha256GitBytes": "e6cf42d536a84a583eb9902d8a67049cb87b1ceec6b340b803135a12d1f6dbe8",
+      "reason": "Reject unpaired-surrogate plaintext instead of silently replacing it."
+    },
+    "supabase/functions/_shared/shipa-admin-actions.ts": {
+      "sha256GitBytes": "28145c3931269b74dff08be7b0694ae38a06ff69bc9d5032a5c38da91e570464",
+      "reason": "Refuse malformed UTF-8 JSON bodies."
+    },
+    "supabase/functions/_shared/shipa-credential-loader.ts": {
+      "sha256GitBytes": "bb319924dd63a206223c86bc0be0981afcbf25fa40c9f577dba65d2a3a44be82",
+      "reason": "Separate safe metadata availability from exact-version secret decryption."
+    },
+    "supabase/functions/_shared/shipa-credential-service.ts": {
+      "sha256GitBytes": "689c8539a6c5bb539d8068146ae2e385bdea370b80e79f0c7b0a727212c4cb89",
+      "reason": "Require explicit null SDK error on a credential-save success."
+    },
+    "supabase/functions/_shared/shipa-manual-service.ts": {
+      "sha256GitBytes": "23b9e1561669b7728e44c359cf0220f987f6e8f8c2e34520069af71691a9fdc7",
+      "reason": "Normalize a validated order UUID for canonical post-intent comparison."
+    },
+    "supabase/functions/_shared/shipa-responses.ts": {
+      "sha256GitBytes": "e1882e94a31015ffaa08ba46272469997b82a741fffc306d5f023c67ff17e0db",
+      "reason": "Preserve nullable parties while rejecting malformed objects."
+    },
+    "supabase/functions/_shared/shipa-settings-validation.ts": {
+      "sha256GitBytes": "f7f01906b55859d93c325678d269c4041ff6fb2cc9ef5634151f83984b0463e9",
+      "reason": "Require a delivery service and strict calendar/timezone heartbeat evidence."
+    },
+    "supabase/functions/_shared/shipa-shipment-actions.ts": {
+      "sha256GitBytes": "dde81699d24637b0c4d73e9c0475a9744758ec6627ca4c6c1b5a02ab750fb832",
+      "reason": "Report absent credentials as a configuration refusal with retained intent."
+    },
+    "supabase/functions/_tests/shipa/shipa-credential-loader.test.ts": {
+      "sha256GitBytes": "98de1838f299c7581e141b9b12585a686cdd11c3c537adeea1a499d3fadf54a3",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "supabase/functions/_tests/shipa/shipa-credential-service.test.ts": {
+      "sha256GitBytes": "400b95265986dedbb497b7b1cf375d24b6a8c453ffdde8910377f59c633b8a24",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "supabase/functions/_tests/shipa/shipa-submission-fixtures.ts": {
+      "sha256GitBytes": "c0da7ffba372654f95d7a80f7f634c008ae616e8af76e4fffad8a615631b23ac",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "supabase/functions/_tests/whatsapp-pairing/fixtures.ts": {
+      "sha256GitBytes": "9f1c76d4674b02a5a4b341f483befcd6dca53d3f62e0e1b0c3ddca221cea98a7",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "supabase/functions/_tests/whatsapp-pairing/handlers.test.ts": {
+      "sha256GitBytes": "8d71ba945685fbab53b1e2357223d836d2745e7f3f051d66e6647bba6ad6f245",
+      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+    },
+    "supabase/functions/whatsapp-pairing/handler.ts": {
+      "sha256GitBytes": "4ef445a485f77d3768c56f8451d4586669445302cee0703508c4a17b4e14a978",
+      "reason": "Reuse verified-admin tri-state authorization before provider/config access."
+    },
+    "supabase/functions/whatsapp-pairing/index.ts": {
+      "sha256GitBytes": "29e1d5b23ab5decf003bc9c0aee14093f31e69c4b0ba650ea381d8ca68d32763",
+      "reason": "Use the existing narrow SDK adapter for the shared verified-admin boundary."
+    }
+  },
+  "releaseOverlays": {
+    "docs/releases/curemed-app-20261104.md": "5f7a6f987b31366af5d43f902feff2969e80df5e18ebadd41f382b2f029e9ba2",
+    "scripts/check-curemed-schema-prerequisites.py": "f73b59d47ab6ada6945bd0ab6686753859dc7e4f4612942ffa633cec7dd98040",
+    "scripts/supabase-post-deploy.sh": "bb8b855d0547082b5d6338b2cec7e41b850f21876e5c5d434cab8a058c86d98b",
+    "scripts/tests/test_curemed_app_deployment.py": "3b99bb38b96aec57b41bd44c42ef77076477555d31372b4edce9be6ee8a5af55",
+    "scripts/tests/test_curemed_app_release.py": "093686ad020689dbd92a47a3aaef1042d6fb6bb6fca119b842af1232153b325b",
+    "scripts/tests/test_curemed_schema_prerequisites.py": "00566606ec6a2dff3c2bb5b1947ef0b4507a238ee7a2f655a300fa27df96a87b",
+    "src/lib/boundedHttpErrorJson.ts": "e9d36c1006b80eb5ea268feade5429330d7b8a11f6f16a245f7b04725e6711f5",
+    "src/lib/orderDeletion.ts": "86082c3d3c0cd7e7813f1486a4eab7857a0e9050bec63c4a09bd7e258ddb62ea",
+    "src/pages/admin/AdminOrders.tsx": "a562f439656ef1186e3aabdc18ac0aad7381c23295f19c062c17255bbd16277d",
+    "src/pages/admin/AdminOrdersDeletion.test.tsx": "d1a85a17aafc982f61c364c292989a4be64a4628b72be6a271104ff2c2a39e80",
+    "supabase/functions/_tests/shipa/shipa-pr24-boundary-regressions.test.ts": "c1a1bbe7c56c5c9c0681b72ad1b728189e88f70eca38e0a30bc8e58db0588959"
+  }
 }

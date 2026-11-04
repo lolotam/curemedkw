@@ -238,11 +238,12 @@ export function createShipaManualService(
     try {
       const summary = await requestManual(budget, input);
       intent = { id: summary.shipmentId, state: summary.state };
+      const orderId = input.orderId.toLowerCase();
       // The intent is confirmed, but neither read-only lookup nor key loading
       // can create a submission marker. Report their budget expiry truthfully.
       const shipment = {
         shipmentId: summary.shipmentId,
-        orderId: input.orderId,
+        orderId,
         environment: input.request.environment,
         state: summary.state,
         attemptCount: summary.attemptCount,
@@ -255,7 +256,7 @@ export function createShipaManualService(
         binding = await resolveCanonicalBinding(
           budget,
           summary,
-          input.orderId,
+          orderId,
           input.request.environment,
         );
         keyring = await loadKeyringUnderBudget(budget);

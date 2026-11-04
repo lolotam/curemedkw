@@ -30,9 +30,12 @@ export function shipaAutomaticActivationIssues(context: ShipaActivationContext):
   const { draft, saved, built, readiness, newKeyPending, nowMs } = context;
   if (draft === null || saved === null || built === null || built.ok === false) return [];
   if (!draft.enabled || draft.dispatchMode !== "automatic_after_payment") return [];
+  const stored = buildShipaSaveableSettings(draftFromShipaSettings(saved));
   if (
     saved.enabled && saved.dispatchMode === "automatic_after_payment" &&
-    saved.environment === draft.environment
+    saved.environment === draft.environment && !newKeyPending && stored.ok &&
+    JSON.stringify(stored.settings[draft.environment]) ===
+      JSON.stringify(built.settings[draft.environment])
   ) return [];
   const issues: string[] = [];
   const active = built.settings[draft.environment];
@@ -40,7 +43,6 @@ export function shipaAutomaticActivationIssues(context: ShipaActivationContext):
   if (missing.length > 0) {
     issues.push(`Complete the ${draft.environment} configuration: ${missing.join(", ")}.`);
   }
-  const stored = buildShipaSaveableSettings(draftFromShipaSettings(saved));
   if (
     stored.ok === false ||
     JSON.stringify(stored.settings[draft.environment]) !== JSON.stringify(active)

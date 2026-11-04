@@ -216,7 +216,7 @@ Deno.test("refuses a stored credential of another provider", async () => {
   );
 });
 
-Deno.test("refuses an unsupported key version and never falls back", async () => {
+Deno.test("reports metadata with a retired key but refuses secret reads without fallback", async () => {
   const client = createFakeShipaCredentialRpcClient();
   const { keyring } = await createSyntheticKeyring(1);
   const other = await createSyntheticKeyring(2);
@@ -228,10 +228,11 @@ Deno.test("refuses an unsupported key version and never falls back", async () =>
   client.queue({ data: document });
 
   const loader = createShipaCredentialLoader({ client, keyring });
-  await expectLoaderError(
-    "unknown_key_version",
-    () => loader.readMetadata(BINDING),
-  );
+  assertEquals(await loader.readMetadata(BINDING), {
+    present: true,
+    credentialRevision: 3,
+    credentialFingerprint: SHIPA_TEST_FINGERPRINT,
+  });
   await expectLoaderError(
     "unknown_key_version",
     () => loader.readSecret(BINDING),

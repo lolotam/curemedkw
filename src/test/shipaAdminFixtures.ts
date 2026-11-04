@@ -231,9 +231,7 @@ export function failureResponse(
   return {
     data: null,
     error: {
-      context: {
-        json: async () => ({ success: false, error: { code, message } }),
-      },
+      context: new Response(JSON.stringify({ success: false, error: { code, message } }), { status: 400 }),
     },
   };
 }

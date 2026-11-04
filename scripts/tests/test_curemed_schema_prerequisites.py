@@ -1,6 +1,7 @@
 """The DB/process boundary is mocked; no SQL, Docker or server operation runs."""
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -100,6 +101,15 @@ class SchemaPrerequisiteTests(unittest.TestCase):
                 with self.assertRaisesRegex(checks.SchemaReadinessError, "schema_target_invalid"):
                     checks.read_live_ledger(container, names)
             process.assert_not_called()
+
+    def test_configured_database_is_the_ledger_target_not_the_default(self):
+        response = SimpleNamespace(returncode=0, stdout=json.dumps(self.rows))
+        with patch.dict(os.environ, {"SUPABASE_DB_USER": "curemed_operator", "SUPABASE_DB_NAME": "curemed_fixture"}):
+            with patch.object(checks.subprocess, "run", return_value=response) as process:
+                checks.read_live_ledger("curemed-db", [x["filename"] for x in self.items])
+        command = process.call_args.args[0]
+        self.assertEqual(command[command.index("-U") + 1], "curemed_operator")
+        self.assertEqual(command[command.index("-d") + 1], "curemed_fixture")
 
 
 if __name__ == "__main__":

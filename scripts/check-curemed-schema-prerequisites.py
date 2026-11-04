@@ -2,6 +2,7 @@
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -23,8 +24,11 @@ def read_live_ledger(container, filenames):
     query = ("SELECT COALESCE(json_agg(json_build_object('filename',filename,'checksum',checksum)),"
              "'[]'::json)::text FROM public.self_hosted_migrations WHERE filename IN (" + quoted + ");")
     try:
+        # Match the subsequent migration runner's supported target overrides.
+        database_user = os.environ.get("SUPABASE_DB_USER") or "postgres"
+        database_name = os.environ.get("SUPABASE_DB_NAME") or "postgres"
         result = subprocess.run(["docker", "exec", "-i", container, "psql", "-X", "-v",
-                                 "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres", "-At", "-c", query],
+                                 "ON_ERROR_STOP=1", "-U", database_user, "-d", database_name, "-At", "-c", query],
                                 capture_output=True, text=True, timeout=15)
         if result.returncode or len(result.stdout) > 32768:
             raise ValueError()

@@ -87,7 +87,7 @@ export function createShipaCredentialLoader(options: {
     async readMetadata(
       binding: ShipaCredentialBinding,
     ): Promise<ShipaCredentialMetadata> {
-      const stored = await loadStoredCredential(client, keyring, binding);
+      const stored = await loadStoredCredential(client, binding);
       if (stored === null) {
         return {
           present: false,
@@ -105,7 +105,7 @@ export function createShipaCredentialLoader(options: {
     async readSecret(
       binding: ShipaCredentialBinding,
     ): Promise<ShipaCredentialSecret> {
-      const stored = await loadStoredCredential(client, keyring, binding);
+      const stored = await loadStoredCredential(client, binding);
       if (stored === null) {
         throw new ShipaCredentialLoaderError("credential_missing");
       }
@@ -144,13 +144,11 @@ interface StoredCredential {
  *
  * A null document means the credential is absent; every other defect is a
  * closed failure. The envelope identity is checked against the requested
- * binding before anything is reported as present, and the key version of the
- * envelope must exist in the injected keyring before the credential counts
- * as readable.
+ * binding before anything is reported as present. Safe presence metadata does
+ * not depend on a decryption key; only readSecret requires that exact version.
  */
 async function loadStoredCredential(
   client: ShipaCredentialRpcClient,
-  keyring: IntegrationCredentialKeyring,
   binding: ShipaCredentialBinding,
 ): Promise<StoredCredential | null> {
   const integrationId = requireIntegrationId(binding?.integrationId);
@@ -169,12 +167,6 @@ async function loadStoredCredential(
     // The stored row belongs to another binding. It is never reported as
     // this binding's credential, present or otherwise.
     throw new ShipaCredentialLoaderError("context_mismatch");
-  }
-
-  if (!keyringHasVersion(keyring, document.envelope.key_version)) {
-    // The envelope names a key version this deployment does not hold. No
-    // other version is used as a fallback.
-    throw new ShipaCredentialLoaderError("unknown_key_version");
   }
 
   return {
@@ -416,20 +408,6 @@ function requireEnvironment(
     throw new ShipaCredentialLoaderError("invalid_binding");
   }
   return raw;
-}
-
-/**
- * Reports whether the injected keyring holds a key for exactly this version.
- *
- * The lookup mirrors the crypto module's own resolution, so the loader and
- * the decryptor never disagree about which versions exist. A missing version
- * is refused; no other version is ever used instead.
- */
-function keyringHasVersion(
-  keyring: IntegrationCredentialKeyring,
-  keyVersion: number,
-): boolean {
-  return keyring.get(keyVersion) !== undefined;
 }
 
 /**

@@ -541,6 +541,39 @@ Deno.test("refuses a malformed SDK envelope", async () => {
   assertEquals(failure.code, "invalid_response");
 });
 
+Deno.test("a successful credential save requires an explicit null SDK error", async () => {
+  const client = createFakeShipaSdkClient();
+  const { keyring, keyVersion } = await createSyntheticKeyring();
+  client.respond("shipa_read_settings", { data: createSettingsDocument() });
+  client.respond("shipa_save_settings", {
+    raw: {
+      data: createSettingsDocument({
+        settings: createSettingsBlock({ revision: 1 }),
+      }),
+      error: undefined,
+    },
+  });
+  const service = createShipaCredentialService({
+    client,
+    keyring,
+    currentKeyVersion: keyVersion,
+  });
+  const failure = await expectConfigurationFailure(() =>
+    service.save({
+      actor: ACTOR,
+      request: createCredentialSaveRequest({
+        expectedRevision: 0,
+        credential: { environment: "sandbox", mode: "preserve" },
+      }),
+    })
+  );
+  assertEquals(failure.code, "invalid_response");
+  assertEquals(
+    client.calls.filter((call) => call.fn === "shipa_save_settings").length,
+    1,
+  );
+});
+
 Deno.test("refuses a SQL document with an unknown field", async () => {
   const client = createFakeShipaSdkClient();
   const { keyring, keyVersion } = await createSyntheticKeyring();

@@ -22,10 +22,11 @@
 // it is the existing service role client.
 
 import { getAdminClient } from "../_shared/supabase-admin.ts";
+import { createShipaRuntimeClient } from "../_shared/shipa-runtime.ts";
 import { createEvolutionPairingHandler } from "./handler.ts";
 
 const handler = createEvolutionPairingHandler({
-  admin: getAdminClient(),
+  admin: createShipaRuntimeClient(getAdminClient()),
   // The runtime names of the Curemed instance configuration. The token is
   // the scoped instance token of the "curemed" instance; there is no
   // fallback to a global or master variable.

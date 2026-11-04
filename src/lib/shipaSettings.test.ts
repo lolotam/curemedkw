@@ -335,6 +335,13 @@ describe("Kuwait origin and one-parcel validation", () => {
 });
 
 describe("activation readiness", () => {
+  it("refuses activation without a selected delivery service", () => {
+    const settings = completeSettings();
+    settings.sandbox.serviceCode = null;
+    const readiness = evaluateShipaActivationReadiness(readinessInput({ settings }));
+    expect(readiness.ready).toBe(false);
+    expect(readiness.issues.map((issue) => issue.code)).toContain("service_code_missing");
+  });
   it.each([-1, 0, Number.NaN, Number.POSITIVE_INFINITY])(
     "rejects a typed draft patched with invalid weight %s",
     (weightKg) => {
@@ -418,6 +425,15 @@ describe("activation readiness", () => {
 });
 
 describe("scheduler heartbeat", () => {
+  it.each(["2026-11-02", "2026-11-02T10:00:00", "2026-02-30T10:00:00Z"])(
+    "refuses malformed heartbeat calendar/timezone %s", (schedulerHeartbeatAt) => {
+      const readiness = evaluateShipaActivationReadiness(readinessInput({
+        settings: { ...completeSettings(), dispatchMode: "automatic_after_payment" },
+        schedulerHeartbeatAt,
+      }));
+      expect(readiness.issues.map((issue) => issue.code)).toContain("scheduler_heartbeat_invalid");
+    },
+  );
   const automatic = (overrides: Partial<ShipaActivationReadinessInput> = {}) =>
     readinessInput({
       settings: { ...completeSettings(), dispatchMode: "automatic_after_payment" },

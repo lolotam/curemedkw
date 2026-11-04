@@ -252,8 +252,7 @@ export function EvolutionPairingCard({
 
       {qrExpired && (
         <p className="text-xs text-muted-foreground">
-          The pairing code is no longer shown here. Refresh to request a new
-          one.
+          The pairing code is no longer shown here. Select Show pairing code to request a new one.
         </p>
       )}
 

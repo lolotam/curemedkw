@@ -245,7 +245,10 @@ async function callSaveSettings(
   ) {
     throw new ShipaConfigurationError("invalid_response");
   }
-  if (response["error"] !== null && response["error"] !== undefined) {
+  if (response["error"] === undefined) {
+    throw new ShipaConfigurationError("invalid_response");
+  }
+  if (response["error"] !== null) {
     throw mapShipaConfigurationSqlError(response["error"]);
   }
   return response["data"];

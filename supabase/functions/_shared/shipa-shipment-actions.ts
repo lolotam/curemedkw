@@ -320,6 +320,8 @@ function mapLoaderCode(
   code: ShipaCredentialLoaderErrorCode,
 ): ShipaShipmentErrorCode {
   switch (code) {
+    case "credential_missing":
+      return "not_eligible";
     case "invalid_binding":
       return "invalid_request";
     case "invalid_response":

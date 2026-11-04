@@ -7,7 +7,7 @@ import subprocess
 
 BASE = "0522c5534e87025f66ea195175897d2d43adddce"
 SOURCES = "docs/releases/curemed-app-sources-20261104.json"
-SOURCES_SHA256 = "13ed3f024962ab652a047baf4e302e2c8038a676cff78f6446f5bc93f3ce659d"
+SOURCES_SHA256 = "dfc268f8f95cc2e546927f7365b17b618eee7d48bbf5e7729f371af78fde8c30"
 CORRECTIONS = {"ops/edge-env.manifest.example.json", "supabase/config.toml"}
 ADDITIONS = {
     SOURCES, "docs/releases/curemed-app-20261104.md", "scripts/verify-curemed-app-release.py",
@@ -15,6 +15,8 @@ ADDITIONS = {
     "scripts/tests/test_curemed_app_deployment.py", "scripts/tests/test_curemed_schema_prerequisites.py",
     "src/lib/orderDeletion.ts", "src/pages/admin/AdminOrders.tsx",
     "src/pages/admin/AdminOrdersDeletion.test.tsx",
+    "src/lib/boundedHttpErrorJson.ts", "scripts/tests/test_curemed_app_release.py",
+    "supabase/functions/_tests/shipa/shipa-pr24-boundary-regressions.test.ts",
 }
 
 
@@ -40,15 +42,33 @@ def verify(root, staged=False):
     chain = git("rev-list", "--parents", BASE + "..HEAD").decode().splitlines()
     if any(len(line.split()) != 2 for line in chain):
         raise ValueError("Application closure must preserve linear schema-based ancestry")
+    corrections = manifest["reviewCorrections"]
+    if not isinstance(corrections, dict) or not CORRECTIONS <= set(corrections) <= selected:
+        raise ValueError("Application correction inventory mismatch")
     for entry in records:
-        if entry["path"] in CORRECTIONS:
-            continue
+        correction = corrections.get(entry["path"])
+        expected = entry["sha256GitBytes"]
+        if correction is not None:
+            if set(correction) != {"sha256GitBytes", "reason"} or not correction["reason"]:
+                raise ValueError("Application correction provenance missing")
+            expected = correction["sha256GitBytes"]
         data = git("show", ref + entry["path"])
-        if hashlib.sha256(data).hexdigest() != entry["sha256GitBytes"]:
+        if hashlib.sha256(data).hexdigest() != expected:
             raise ValueError("Unexpected imported application source drift: " + entry["path"])
+    overlays = manifest["releaseOverlays"]
+    # The inventory cannot hash itself, or the verifier containing its own pin.
+    # Both metadata roots require exact-head source review; all other overlays
+    # (including runtime, tests, configuration and docs) have pinned Git bytes.
+    expected_overlays = ADDITIONS - {SOURCES, "scripts/verify-curemed-app-release.py"}
+    if not isinstance(overlays, dict) or set(overlays) != expected_overlays:
+        raise ValueError("Application overlay inventory mismatch")
+    for path, expected in overlays.items():
+        if hashlib.sha256(git("show", ref + path)).hexdigest() != expected:
+            raise ValueError("Unexpected application overlay drift: " + path)
     return {"schemaBase": BASE, "changedPaths": len(changed), "importedSources": len(records),
             "explicitImportedCorrections": sorted(CORRECTIONS), "sqlDelta": 0,
-            "unchangedImportedBytes": "PASS", "snapshot": "index" if staged else "HEAD"}
+            "importedSourceIntegrity": "PASS", "reviewCorrectedImports": len(corrections),
+            "frozenOverlayBytes": "PASS", "snapshot": "index" if staged else "HEAD"}
 
 
 def main():

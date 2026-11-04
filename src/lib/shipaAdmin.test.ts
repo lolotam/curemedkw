@@ -15,6 +15,8 @@ import {
   type ShipaAdminClient,
 } from "@/lib/shipaAdmin";
 import type { ShipaSaveableSettings } from "@/lib/shipaSettings";
+import { shipaAutomaticActivationIssues } from "@/lib/shipaAdminPolicy";
+import { buildShipaSaveableSettings, draftFromShipaSettings } from "@/lib/shipaAdminDraft";
 import {
   createFakeInvoke,
   failureResponse,
@@ -23,6 +25,7 @@ import {
   recordedAction,
   saveableSettingsFixture,
   settingsEnvelopeFixture,
+  settingsFixture,
   successResponse,
   TEST_KEY,
   writtenSettingsFixture,
@@ -36,6 +39,18 @@ vi.mock("@/integrations/supabase/clientRuntime", () => ({
 
 let fake: FakeInvoke;
 let client: ShipaAdminClient;
+
+it.each(["active configuration", "pending credential"])("rechecks established automation after changing %s", (change) => {
+  const saved = settingsFixture();
+  saved.enabled = true;
+  saved.dispatchMode = "automatic_after_payment";
+  const draft = draftFromShipaSettings(structuredClone(saved));
+  if (change === "active configuration") draft.sandbox.settings.origin.contactName = "Updated pickup";
+  const issues = shipaAutomaticActivationIssues({ draft, saved,
+    built: buildShipaSaveableSettings(draft), readiness: null,
+    newKeyPending: change === "pending credential", nowMs: Date.now() });
+  expect(issues.length).toBeGreaterThan(0);
+});
 
 beforeEach(() => {
   fake = createFakeInvoke();
@@ -142,6 +157,31 @@ describe("the action vocabulary", () => {
 });
 
 describe("the closed failure surface", () => {
+  it("refuses oversized HTTP error bodies instead of reading them as a valid code", async () => {
+    fake.queueResult({ data: null, error: { context: new Response(JSON.stringify({
+      error: { code: "conflict", message: "x".repeat(5000) },
+    }), { status: 409 }) } });
+    expect(await client.readSettings()).toMatchObject({ ok: false, code: "unavailable" });
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it("bounds a stalled HTTP error body and never retries the mutation", async () => {
+    vi.useFakeTimers();
+    let stream: ReadableStreamDefaultController<Uint8Array> | undefined;
+    const response = new Response(new ReadableStream<Uint8Array>({ start(controller) { stream = controller; } }), { status: 503 });
+    fake.queueResult({ data: null, error: { context: response } });
+    let settled: unknown;
+    const operation = client.readSettings().then((result) => { settled = result; });
+    try {
+      await vi.advanceTimersByTimeAsync(1001);
+      expect(settled).toMatchObject({ ok: false, code: "unavailable" });
+      expect(fake.calls).toHaveLength(1);
+    } finally {
+      stream?.error(new Error("synthetic test cleanup"));
+      await operation;
+      vi.useRealTimers();
+    }
+  });
   it("shows the fixed local wording of a known code and ignores the server text", async () => {
     fake.queueResult(failureResponse("conflict", "server said something secret"));
 
@@ -322,7 +362,7 @@ describe("the default client", () => {
     invokeMock.mockReset();
     invokeMock.mockResolvedValue({
       data: null,
-      error: { context: { json: async () => ({ success: false, error: { code: "forbidden" } }) } },
+      error: { context: new Response(JSON.stringify({ success: false, error: { code: "forbidden" } }), { status: 403 }) },
     });
 
     const { shipaAdminClient } = await import("@/lib/shipaAdmin");

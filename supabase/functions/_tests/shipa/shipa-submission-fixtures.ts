@@ -196,6 +196,9 @@ export function createFakeShipaSubmissionRpcClient(): FakeShipaSubmissionRpcClie
           const outcome = typeof value === "function"
             ? value(fn, recorded)
             : value;
+          if (outcome.rejection !== undefined) {
+            return Promise.reject(outcome.rejection);
+          }
           return toSdkEnvelope(outcome);
         });
       }

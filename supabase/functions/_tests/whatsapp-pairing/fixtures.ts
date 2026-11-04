@@ -7,7 +7,7 @@
 // No test reaches a network, and no real credential appears. The token and
 // the secret below are synthetic values of a test fixture.
 
-import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import type { ShipaAuthClient } from "../../_shared/shipa-auth.ts";
 
 import type { EvolutionFetch } from "../../_shared/evolution-pairing.ts";
 
@@ -106,7 +106,7 @@ export interface FakeAdminOptions {
 
 /** The fake auth SDK and its call counters. */
 export interface FakeAdmin {
-  readonly client: SupabaseClient;
+  readonly client: ShipaAuthClient;
   readonly authCalls: () => number;
   readonly roleCalls: () => number;
   readonly settleAuthDelay: () => Promise<unknown>;
@@ -121,7 +121,7 @@ export function createFakeAdmin(options: FakeAdminOptions = {}): FakeAdmin {
   let roleCalls = 0;
   let authDelay: Promise<unknown> = Promise.resolve();
 
-  const client = {
+  const client: ShipaAuthClient = {
     auth: {
       getUser: async (token: string) => {
         authCalls += 1;
@@ -174,7 +174,7 @@ export function createFakeAdmin(options: FakeAdminOptions = {}): FakeAdmin {
         select: () => query,
       };
     },
-  } as unknown as SupabaseClient;
+  };
 
   return {
     client,
