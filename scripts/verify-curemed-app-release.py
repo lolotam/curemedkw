@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 import subprocess
 
-BASE = "548aec2844bdb6f561cfb6cb304fee2bce8c35ca"
+BASE = "0522c5534e87025f66ea195175897d2d43adddce"
 SOURCES = "docs/releases/curemed-app-sources-20261104.json"
-SOURCES_SHA256 = "a5fb0161aed99e82ae3ca212c97471cb149a5fefc260ebdbc3ade4ef6e087082"
+SOURCES_SHA256 = "13ed3f024962ab652a047baf4e302e2c8038a676cff78f6446f5bc93f3ce659d"
 CORRECTIONS = {"ops/edge-env.manifest.example.json", "supabase/config.toml"}
 ADDITIONS = {
     SOURCES, "docs/releases/curemed-app-20261104.md", "scripts/verify-curemed-app-release.py",

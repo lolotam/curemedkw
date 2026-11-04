@@ -1,6 +1,6 @@
 # Curemed integration application phase: stacked, zero SQL
 
-This application branch starts at schema head `548aec2844bdb6f561cfb6cb304fee2bce8c35ca`, which itself starts at main `878dde5748548094aab457b54402809d81770668`. The app PR targets the schema branch while stacked, with zero SQL delta. Neither the old feature ancestry nor PR21's review-base ancestry was merged. After an approved schema merge, reconcile the real main/base and repeat exact-head source/composition gates; no future-head approval is inferred.
+This application branch starts at schema head `0522c5534e87025f66ea195175897d2d43adddce`, which itself starts at main `878dde5748548094aab457b54402809d81770668`. The app PR targets the schema branch while stacked, with zero SQL delta. Neither the old feature ancestry nor PR21's review-base ancestry was merged. After an approved schema merge, reconcile the real main/base and repeat exact-head source/composition gates; no future-head approval is inferred.
 
 ## Scope and fixed inputs
 
@@ -40,3 +40,5 @@ No server, SQL execution/apply/activation, native connect/webhook/message/shipme
 Before publication preserve exact frontend and Edge/shared/config/router before-assets. Ordinary app rollback restores measured compatible application deltas while keeping activated invoice index/triggers, retained history, atomic parent deletion, both native instances/keys/data and Q8 logging hardening. Integration switches alone do not quiesce payment callbacks. Never restore stale whole environment/DB snapshots, relax guards, erase history, recreate instances or resend unknown/accepted work to roll back a website. No disarm procedure is included in this zero-SQL app release. Full operational-under-hold proof and later public/native activation remain separate from these source PRs.
 
 Quiescence must cover administrator deletion/mutation access as well as old/new payment writers. Before restoring that access, the separately approved cutover must establish invoice-guard and retention readiness with current metadata evidence. The checksum prerequisite deliberately does not claim that dormant schema has armed those guards; automatic frontend publication alone cannot satisfy this execution condition.
+
+The application source was restacked without feature ancestry onto corrected schema0522c55. Frontend/Edge application bytes remain identical to checkpoint702384a; full348/479/type/build receipts stay attributed to those exact unchanged application bytes, not an invented SQL rehearsal. The new schema proof support and base/provenance metadata are separately validated. The schema first-round MergePilot panel is partial with repository-managed fallback/timeouts; its remaining SQL findings and full coverage are not waived by this application branch.
