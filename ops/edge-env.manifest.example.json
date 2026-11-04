@@ -17,26 +17,120 @@
     ]
   },
   "edgeFunctions": [
-    { "name": "create-myfatoorah-payment", "verifyJwt": false, "methods": ["POST","OPTIONS"],
-      "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","APP_PUBLIC_URL"] },
-    { "name": "verify-myfatoorah-payment", "verifyJwt": false, "methods": ["POST","OPTIONS"],
-      "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","APP_PUBLIC_URL"] },
-    { "name": "myfatoorah-webhook", "verifyJwt": false, "methods": ["POST","OPTIONS"],
-      "requiredSecrets": ["SUPABASE_URL","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_WEBHOOK_SECRET"] }
+    {
+      "name": "shipa-admin",
+      "verifyJwt": false,
+      "methods": ["POST", "OPTIONS"],
+      "requiredSecrets": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "INTEGRATIONS_ENCRYPTION_KEY_V1"]
+    },
+    {
+      "name": "create-myfatoorah-payment",
+      "verifyJwt": false,
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "MYFATOORAH_TOKEN",
+        "MYFATOORAH_BASE_URL",
+        "MYFATOORAH_CURRENCY",
+        "MYFATOORAH_COUNTRY_ISO",
+        "MYFATOORAH_MODE",
+        "APP_PUBLIC_URL"
+      ]
+    },
+    {
+      "name": "verify-myfatoorah-payment",
+      "verifyJwt": false,
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "MYFATOORAH_TOKEN",
+        "MYFATOORAH_BASE_URL",
+        "MYFATOORAH_CURRENCY",
+        "MYFATOORAH_COUNTRY_ISO",
+        "MYFATOORAH_MODE",
+        "APP_PUBLIC_URL"
+      ]
+    },
+    {
+      "name": "myfatoorah-webhook",
+      "verifyJwt": false,
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "MYFATOORAH_WEBHOOK_SECRET"
+      ]
+    },
+    {
+      "name": "whatsapp-pairing",
+      "verifyJwt": false,
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "CUREMED_EVOLUTION_URL",
+        "CUREMED_EVOLUTION_API_KEY"
+      ]
+    },
+    {
+      "name": "whatsapp-pairing-webhook",
+      "verifyJwt": false,
+      "methods": [
+        "POST"
+      ],
+      "requiredSecrets": [
+        "CUREMED_EVOLUTION_WEBHOOK_SECRET"
+      ]
+    }
   ],
-  "requiredSecrets": ["SUPABASE_URL","SUPABASE_ANON_KEY","SUPABASE_SERVICE_ROLE_KEY","MYFATOORAH_TOKEN","MYFATOORAH_BASE_URL","MYFATOORAH_CURRENCY","MYFATOORAH_COUNTRY_ISO","MYFATOORAH_MODE","MYFATOORAH_WEBHOOK_SECRET","APP_PUBLIC_URL"],
-
-  "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' — the server's router is hand-patched and diverged from this repo.",
+  "requiredSecrets": [
+    "INTEGRATIONS_ENCRYPTION_KEY_V1",
+    "SUPABASE_URL",
+    "SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "MYFATOORAH_TOKEN",
+    "MYFATOORAH_BASE_URL",
+    "MYFATOORAH_CURRENCY",
+    "MYFATOORAH_COUNTRY_ISO",
+    "MYFATOORAH_MODE",
+    "MYFATOORAH_WEBHOOK_SECRET",
+    "APP_PUBLIC_URL",
+    "CUREMED_EVOLUTION_URL",
+    "CUREMED_EVOLUTION_API_KEY",
+    "CUREMED_EVOLUTION_WEBHOOK_SECRET"
+  ],
+  "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' \u2014 the server's router is hand-patched and diverged from this repo.",
   "deployFunctions": [
+    "shipa-admin",
     "_shared",
     "create-myfatoorah-payment",
     "verify-myfatoorah-payment",
     "myfatoorah-webhook",
     "payment-health",
     "send-order-email",
-    "send-whatsapp"
+    "send-whatsapp",
+    "whatsapp-pairing",
+    "whatsapp-pairing-webhook"
   ],
-
+  "schemaPrerequisites": {
+    "inventory": "docs/releases/curemed-schema-20261104.json"
+  },
   "defaults": {
     "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",
     "MYFATOORAH_CURRENCY": "KWD",
@@ -45,11 +139,49 @@
     "APP_PUBLIC_URL": "https://curemedkw.com"
   },
   "smokeTests": [
-    { "name": "create payment preflight", "method": "OPTIONS", "url": "https://supabase.curemedkw.com/functions/v1/create-myfatoorah-payment", "origin": "https://curemedkw.com",
-      "expectHeaders": ["access-control-allow-origin","access-control-allow-headers","access-control-allow-methods"] },
-    { "name": "verify payment preflight", "method": "OPTIONS", "url": "https://supabase.curemedkw.com/functions/v1/verify-myfatoorah-payment", "origin": "https://curemedkw.com",
-      "expectHeaders": ["access-control-allow-origin","access-control-allow-headers","access-control-allow-methods"] },
-    { "name": "webhook preflight", "method": "OPTIONS", "url": "https://supabase.curemedkw.com/functions/v1/myfatoorah-webhook", "origin": "https://curemedkw.com",
-      "expectHeaders": ["access-control-allow-origin","access-control-allow-headers","access-control-allow-methods"] }
+    {
+      "name": "create payment preflight",
+      "method": "OPTIONS",
+      "url": "https://supabase.curemedkw.com/functions/v1/create-myfatoorah-payment",
+      "origin": "https://curemedkw.com",
+      "expectHeaders": [
+        "access-control-allow-origin",
+        "access-control-allow-headers",
+        "access-control-allow-methods"
+      ]
+    },
+    {
+      "name": "verify payment preflight",
+      "method": "OPTIONS",
+      "url": "https://supabase.curemedkw.com/functions/v1/verify-myfatoorah-payment",
+      "origin": "https://curemedkw.com",
+      "expectHeaders": [
+        "access-control-allow-origin",
+        "access-control-allow-headers",
+        "access-control-allow-methods"
+      ]
+    },
+    {
+      "name": "webhook preflight",
+      "method": "OPTIONS",
+      "url": "https://supabase.curemedkw.com/functions/v1/myfatoorah-webhook",
+      "origin": "https://curemedkw.com",
+      "expectHeaders": [
+        "access-control-allow-origin",
+        "access-control-allow-headers",
+        "access-control-allow-methods"
+      ]
+    },
+    {
+      "name": "WhatsApp pairing preflight",
+      "method": "OPTIONS",
+      "url": "https://supabase.curemedkw.com/functions/v1/whatsapp-pairing",
+      "origin": "https://curemedkw.com",
+      "expectHeaders": [
+        "access-control-allow-origin",
+        "access-control-allow-headers",
+        "access-control-allow-methods"
+      ]
+    }
   ]
 }

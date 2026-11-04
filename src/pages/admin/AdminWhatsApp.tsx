@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EvolutionPairingCard } from "@/components/admin/EvolutionPairingCard";
 
 interface WaSettings {
   enabled: boolean;
@@ -443,6 +444,10 @@ export default function AdminWhatsApp() {
           </table>
         </div>
       </div>
+
+      {/* Native WhatsApp pairing of the Curemed instance. It is a separate
+          surface: it never changes the Postora settings above. */}
+      <EvolutionPairingCard />
     </div>
   );
 }

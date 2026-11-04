@@ -27,6 +27,7 @@ import {
 } from "@/lib/db";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { orderDeletionErrorMessage } from "@/lib/orderDeletion";
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
   new: "bg-blue-500/10 text-blue-700 dark:text-blue-300",
@@ -173,7 +174,7 @@ export default function AdminOrders() {
                       </Button>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="text-destructive">
+                          <Button variant="ghost" size="icon" className="text-destructive" aria-label={`Delete order ${o.orderNumber}`}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -186,8 +187,12 @@ export default function AdminOrders() {
                             <AlertDialogCancel>Cancel</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={async () => {
-                                await deleteOrder.mutateAsync(o.id);
-                                toast.success("Order deleted");
+                                try {
+                                  await deleteOrder.mutateAsync(o.id);
+                                  toast.success("Order deleted");
+                                } catch (error) {
+                                  toast.error(orderDeletionErrorMessage(error));
+                                }
                               }}
                             >
                               Delete

@@ -426,6 +426,21 @@ directory_checksum() {
   ) | sha256sum | awk '{print $1}'
 }
 
+validate_schema_prerequisites() {
+  # This is read-only and MUST precede env/Kong/function changes. In this release,
+  # missing schema is not repaired by deploying code and then applying SQL.
+  local database_container="${SUPABASE_DB_CONTAINER:-cloud-supabase-hns8fw-supabase-db}"
+  local schema_check="$REPO_DIR/scripts/check-curemed-schema-prerequisites.py"
+  [ -f "$schema_check" ] || die "schema prerequisite checker is missing"
+  python3 "$schema_check" --repo "$REPO_DIR" --manifest "$MANIFEST" \
+    --container "$database_container" >/dev/null || die "schema prerequisites failed; application publication refused"
+  if jq -e '.schemaPrerequisites != null' "$MANIFEST" >/dev/null; then
+    # The subsequent migration runner must target the same DB, never an unrelated
+    # container selected by a broad name match.
+    DB_CTR="$database_container"
+  fi
+}
+
 deploy_functions() {
   # Read the deploy list from the manifest, falling back to the historical
   # hardcoded set so an older manifest still deploys the payment stack.
@@ -607,6 +622,7 @@ run_smoke_tests() {
 validate_inputs
 validate_required_secrets
 validate_runtime_entries
+validate_schema_prerequisites
 generate_runtime_env
 ensure_compose_env_values
 inject_compose_refs
@@ -614,7 +630,7 @@ inject_compose_refs
 RUNNING_CONTAINERS="$(docker ps --format '{{.Names}}' | grep -E 'edge-functions|supabase-kong|supabase-db' || true)"
 EDGE_CTR="$(grep -E 'edge-functions' <<<"$RUNNING_CONTAINERS" | head -1 || true)"
 KONG_CTR="$(grep -E 'supabase-kong' <<<"$RUNNING_CONTAINERS" | head -1 || true)"
-DB_CTR="$(grep -E 'supabase-db' <<<"$RUNNING_CONTAINERS" | head -1 || true)"
+DB_CTR="${DB_CTR:-$(grep -E 'supabase-db' <<<"$RUNNING_CONTAINERS" | head -1 || true)}"
 
 persist_kong_cors
 restart_kong_if_needed
