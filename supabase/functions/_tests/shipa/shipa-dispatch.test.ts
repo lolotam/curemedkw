@@ -11,10 +11,7 @@
 import { assertEquals } from "jsr:@std/assert@1.0.19";
 
 import type { IntegrationCredentialKeyring } from "../../_shared/integration-credentials.ts";
-import {
-  createShipaDispatcher,
-  type ShipaDispatcher,
-} from "../../_shared/shipa-dispatch.ts";
+import { createShipaDispatcher, type ShipaDispatcher } from "../../_shared/shipa-dispatch.ts";
 import {
   createFakeShipaSubmissionRpcClient,
   createStoredCredentialDocument,
@@ -86,6 +83,7 @@ async function createHarness(
   client.queueResponder(createSummaryResponder(options.summary));
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -139,6 +137,7 @@ Deno.test("does not reach the provider before the begin has resolved", async () 
   const begin = client.queueDeferred();
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -261,6 +260,7 @@ Deno.test("keeps a failed completion from producing another request", async () =
   });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -286,6 +286,7 @@ Deno.test("never posts when the begin is lost", async () => {
   const begin = client.queueDeferred();
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -312,6 +313,7 @@ Deno.test("never posts when the begin is refused", async () => {
   });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -335,6 +337,7 @@ Deno.test("never posts when the begin answer is malformed", async () => {
   client.queue({ data: malformed });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -358,6 +361,7 @@ Deno.test("never posts when the begin answer carries another token", async () =>
   }));
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -384,6 +388,7 @@ Deno.test("never posts when the preparation is refused", async () => {
   });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -413,6 +418,7 @@ Deno.test("never posts when the draft is not a legal order", async () => {
   });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -440,6 +446,7 @@ Deno.test("never posts when the built payload does not match the SQL payload", a
   client.queue({ data: document });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -464,6 +471,7 @@ Deno.test("never posts when the credential is missing", async () => {
   queueMissingCredential(client);
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -486,6 +494,7 @@ Deno.test("never posts when the credential cannot be decrypted", async () => {
   client.queue({ data: document });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -521,6 +530,7 @@ Deno.test("keeps a stale loaded credential stale", async () => {
   });
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,
@@ -556,6 +566,7 @@ Deno.test("does not post twice when a second invocation is refused authority", a
   client.queueResponder(createSummaryResponder());
 
   const dispatcher = createShipaDispatcher({
+    now: () => Date.parse("2026-11-04T00:12:12.967Z"),
     client,
     keyring,
     fetchImpl: provider.fetch,

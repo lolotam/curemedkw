@@ -38,10 +38,7 @@
 //   docs/integrations/shipa-dispatch-state-rpc-contract.md
 //   supabase/migrations/20261103001600_shipa_submission.sql
 
-import {
-  isIntegrationUuid,
-  isPlainRecord,
-} from "./integration-credential-contract.ts";
+import { isIntegrationUuid, isPlainRecord } from "./integration-credential-contract.ts";
 import type { IntegrationCredentialKeyring } from "./integration-credentials.ts";
 import {
   ShipaCredentialLoaderError,
@@ -53,11 +50,7 @@ import {
   isShipaEnvironment,
   type ShipaEnvironment,
 } from "./shipa-contract.ts";
-import {
-  ShipaClient,
-  type ShipaCreateResult,
-  type ShipaFetch,
-} from "./shipa-client.ts";
+import { ShipaClient, type ShipaCreateResult, type ShipaFetch } from "./shipa-client.ts";
 import {
   type ShipaSubmissionBegin,
   type ShipaSubmissionBinding,
@@ -107,6 +100,7 @@ export type ShipaDispatchNotStartedCode =
  */
 export type ShipaDispatchUncertainCode =
   | "begin_uncertain"
+  | "begin_lease_unusable"
   | "provider_uncertain"
   | "provider_rejected_local"
   | "provider_invalid_response";
@@ -159,6 +153,8 @@ export interface ShipaDispatcherOptions {
   readonly keyring: IntegrationCredentialKeyring;
   /** The provider fetch boundary. Defaults to the platform fetch. */
   readonly fetchImpl?: ShipaFetch;
+  /** Server wall clock for checking the received SQL lease; never browser input. */
+  readonly now?: () => number;
 }
 
 /** The one-shipment execution core. */
@@ -184,6 +180,7 @@ export function createShipaDispatcher(
   const client = options.client;
   const keyring = options.keyring;
   const fetchImpl = options.fetchImpl;
+  const now = options.now ?? Date.now;
 
   const loader = createShipaCredentialLoader({ client, keyring });
   const store = createShipaSubmissionStore({ client });
@@ -256,6 +253,14 @@ export function createShipaDispatcher(
       return { status: "not_started", code: begun.code };
     }
 
+    // A valid begin can arrive after its durable lease has aged out. Keep a
+    // full 15-second item window before starting the 10-second HTTP operation.
+    // The marker may already exist: do not report local non-dispatch, complete
+    // as a rejection, renew the lease or authorize another attempt.
+    if (!hasSubmissionWindow(begun, now)) {
+      return { status: "uncertain", code: "begin_lease_unusable" };
+    }
+
     // 6. One create request, with the same loaded key and the returned
     //    draft. There is no lookup, no retry and no second attempt.
     let result: ShipaCreateResult;
@@ -315,6 +320,17 @@ function describeOutcome(
   return { status: "uncertain", code: "provider_rejected_local", summary };
 }
 
+/** A failed/invalid server clock cannot authorize a provider request. */
+function hasSubmissionWindow(begun: ShipaSubmissionBegin, now: () => number): boolean {
+  try {
+    const currentTime = now();
+    return Number.isFinite(currentTime) &&
+      Date.parse(begun.leaseExpiresAt) - currentTime >= 15_000;
+  } catch {
+    return false;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The failure mapping
 // ---------------------------------------------------------------------------
@@ -331,9 +347,7 @@ function requireDispatchInput(
   if (!isPlainRecord(input)) return null;
   if (
     Object.keys(input).length !== 3 ||
-    !["shipmentId", "integrationId", "environment"].every((key) =>
-      Object.hasOwn(input, key)
-    )
+    !["shipmentId", "integrationId", "environment"].every((key) => Object.hasOwn(input, key))
   ) return null;
   if (!isIntegrationUuid(input.shipmentId)) return null;
   if (!isIntegrationUuid(input.integrationId)) return null;
