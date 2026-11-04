@@ -14,7 +14,8 @@
                         },
     "test":  {
                  "include":  [
-                                 "supabase/functions/_tests/shipa/"
+                                 "supabase/functions/_tests/shipa/",
+                                 "supabase/functions/shipa-admin/handler.test.ts"
                              ]
              },
     "lint":  {

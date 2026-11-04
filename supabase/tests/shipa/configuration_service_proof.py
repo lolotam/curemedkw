@@ -51,6 +51,7 @@ def main():
     parser.add_argument("--state", type=Path, required=True)
     parser.add_argument("--deno", type=Path, required=True)
     parser.add_argument("--deno-cache", type=Path, required=True)
+    parser.add_argument("--handler", action="store_true", help="Exercise the HTTP handler and real SDK over the local SQL bridge")
     args = parser.parse_args()
     state = json.loads(args.state.read_text(encoding="utf-8"))
     container = fixture.marker_guard(state)
@@ -65,7 +66,7 @@ def main():
     calls = 0
     try:
         process = subprocess.Popen([str(args.deno), "run", "--config", str(ROOT / "deno.shipa.json"), "--frozen", "--cached-only",
-            str(ROOT / "supabase/tests/shipa/verify_configuration_services.ts")], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            str(ROOT / "supabase/tests/shipa" / ("verify_admin_handler.ts" if args.handler else "verify_configuration_services.ts"))], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, text=True, encoding="utf-8", env=dict(os.environ, DENO_DIR=str(args.deno_cache)))
         receipt = None
         for line in process.stdout:
@@ -73,10 +74,17 @@ def main():
             if request["kind"] == "complete":
                 receipt = request["receipt"]
                 break
-            if request["kind"] != "rpc" or calls >= 30:
+            if request["kind"] not in (("rpc", "role") if args.handler else ("rpc",)) or calls >= (60 if args.handler else 30):
                 raise RuntimeError("Unexpected bridge operation or excessive RPC count")
             calls += 1
-            response = execute_rpc(container, request)
+            if request["kind"] == "role":
+                if request != {"kind": "role", "actor": ACTOR}:
+                    raise RuntimeError("Unexpected role lookup binding")
+                rows = fixture.sql(container, "SET ROLE service_role; SELECT coalesce(jsonb_agg(jsonb_build_object('role',role)),'[]'::jsonb) "
+                    f"FROM public.user_roles WHERE user_id='{ACTOR}' AND role='admin'", "postgres").splitlines()[-1]
+                response = {"data": json.loads(rows), "error": None, "status": 200}
+            else:
+                response = execute_rpc(container, request)
             process.stdin.write(json.dumps(response) + "\n")
             process.stdin.flush()
         process.wait(timeout=15)
