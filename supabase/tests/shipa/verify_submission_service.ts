@@ -1,7 +1,9 @@
 // Real SDK/core/crypto/SQL. Provider transport is synthetic; no native booking.
-import { assertEquals } from "jsr:@std/assert@1.0.19";
+import { assertEquals, assertRejects } from "jsr:@std/assert@1.0.19";
 import { createClient } from "npm:@supabase/supabase-js@2.105.1";
 import { createShipaRuntimeClient } from "../../functions/_shared/shipa-runtime.ts";
+import { createShipaReviewStore } from "../../functions/_shared/shipa-review-store.ts";
+import { ShipaReviewError } from "../../functions/_shared/shipa-review-contract.ts";
 import { createShipaCredentialService } from "../../functions/_shared/shipa-credential-service.ts";
 import {
   createShipaDispatcher,
@@ -34,6 +36,7 @@ async function bridge(
 }
 const bindings: Record<string, ShipaDispatchInput> = {};
 const calls: { fn: string; shipment: unknown }[] = [];
+let loseManualReviewResponse = false;
 const sdk = createClient("https://guarded-sql.test", "synthetic-sdk-key", {
   auth: {
     persistSession: false,
@@ -51,6 +54,10 @@ const sdk = createClient("https://guarded-sql.test", "synthetic-sdk-key", {
       const args = await request.json();
       calls.push({ fn: String(fn), shipment: args._shipment_id });
       const response = await bridge({ kind: "rpc", fn, args });
+      if (fn === "shipa_request_manual" && loseManualReviewResponse) {
+        loseManualReviewResponse = false;
+        throw new Error("Synthetic committed-review response loss");
+      }
       // Actual SQL committed before these injected response losses. There is no
       // fake ledger and no model of SQL marker/eligibility behavior here.
       if (
@@ -114,6 +121,66 @@ for (const label of ["accepted", "uncertain", "lost_begin", "lost_complete"]) {
     environment: "sandbox",
   };
 }
+// These calls traverse the real SDK, validators/store and actual service-role
+// SQL. No fake SQL model or browser-provided actor/payment evidence is used.
+const review = createShipaReviewStore({ client });
+const actor = { userId: "89000000-0000-4000-8000-000000000001" };
+const canonical = await client.rpc("shipa_resolve_dispatch_binding", {
+  _shipment_id: bindings.accepted.shipmentId,
+});
+if (
+  !isPlainRecord(canonical) || canonical.error !== null || !isPlainRecord(canonical.data) ||
+  !isIntegrationUuid(canonical.data.order_id)
+) {
+  throw new Error("Missing canonical fixture order binding");
+}
+const orderId = canonical.data.order_id;
+const preview = await review.preview({ actor, orderId, request: { environment: "sandbox" } });
+assertEquals(preview.accepted, true);
+const request = {
+  environment: "sandbox",
+  overrides: {},
+  expectedSettingsRevision: preview.settingsRevision,
+  expectedInputFingerprint: preview.inputFingerprint,
+  reviewReason: "Synthetic packed confirmation",
+  acknowledgePricing: false,
+  packedConfirmed: true,
+};
+const adopted = await review.requestManual({ actor, orderId, request });
+assertEquals(adopted.shipmentId, bindings.accepted.shipmentId);
+assertEquals(adopted.changed, false);
+const safeRead = await review.readShipment({ actor, shipmentId: adopted.shipmentId });
+assertEquals(safeRead?.orderId, orderId);
+assertEquals(safeRead?.source, "manual");
+assertEquals(safeRead?.customerRef.startsWith("CM-"), true);
+const stale = await assertRejects(() =>
+  review.requestManual({
+    actor,
+    orderId,
+    request: { ...request, expectedInputFingerprint: "0".repeat(64) },
+  }), ShipaReviewError);
+assertEquals(stale.code, "conflict");
+const forged = await assertRejects(() =>
+  review.readShipment({
+    actor: { userId: "89000000-0000-4000-8000-000000000099" },
+    shipmentId: adopted.shipmentId,
+  }), ShipaReviewError);
+assertEquals(forged.code, "forbidden");
+const beforeLoss = calls.filter((call) => call.fn === "shipa_request_manual").length;
+loseManualReviewResponse = true;
+const lostReview = await assertRejects(() =>
+  review.requestManual({
+    actor,
+    orderId,
+    request: { ...request, reviewReason: "Synthetic lost-response review" },
+  }), ShipaReviewError);
+assertEquals(lostReview.code, "unavailable");
+assertEquals(calls.filter((call) => call.fn === "shipa_request_manual").length, beforeLoss + 1);
+assertEquals(
+  (await review.readShipment({ actor, shipmentId: adopted.shipmentId }))?.state,
+  "queued",
+);
+
 let activeCase = "";
 const posts: Record<string, number> = {};
 const dispatcher = createShipaDispatcher({
@@ -130,12 +197,10 @@ const dispatcher = createShipaDispatcher({
     assertEquals(Object.hasOwn(payload.origin, "options"), false);
     posts[activeCase] = (posts[activeCase] ?? 0) + 1;
     return Promise.resolve(
-      activeCase === "uncertain"
-        ? Response.json({}, { status: 503 })
-        : Response.json({
-          shipaRef: `SYNTHETIC-${activeCase}`,
-          orderStatus: "Created",
-        }),
+      activeCase === "uncertain" ? Response.json({}, { status: 503 }) : Response.json({
+        shipaRef: `SYNTHETIC-${activeCase}`,
+        orderStatus: "Created",
+      }),
     );
   },
 });
@@ -167,13 +232,16 @@ for (
     false,
   );
 }
+const unknown = await review.readShipment({ actor, shipmentId: bindings.uncertain.shipmentId });
+assertEquals(unknown?.state, "unknown");
+assertEquals(unknown?.retryAt, null);
 await input.cancel();
 await Deno.stdout.write(
   encoder.encode(
     JSON.stringify({
       kind: "complete",
       receipt:
-        "Real SDK/core/crypto/SQL single-attempt and committed-response-loss cases passed; provider POST synthetic",
+        "Real SDK/review/core/crypto/SQL and committed-response-loss cases passed; provider POST synthetic",
     }) + "\n",
   ),
 );

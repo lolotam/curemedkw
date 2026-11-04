@@ -10,6 +10,10 @@ from configuration_service_proof import ACTOR, RPCS, execute_rpc, fixture, liter
 from payment_owner_proof import apply_schema, manual_request
 
 RPCS.update({
+    "shipa_resolve_dispatch_binding": (("_shipment_id", "uuid"),),
+    "shipa_check_integrity": (("_order_id", "uuid"), ("_review_snapshot", "jsonb")),
+    "shipa_request_manual": (("_order_id", "uuid"), ("_request", "jsonb"), ("_actor_id", "uuid")),
+    "shipa_read_shipment": (("_shipment_id", "uuid"), ("_actor_id", "uuid")),
     "shipa_prepare_submission": (("_shipment_id", "uuid"),),
     "shipa_begin_submission": (("_shipment_id", "uuid"), ("_attempt_token", "uuid"), ("_prepared", "jsonb")),
     "shipa_complete": (("_shipment_id", "uuid"), ("_attempt_token", "uuid"), ("_result", "jsonb")),
@@ -100,7 +104,12 @@ def main():
         for label, expected in (("accepted", "created"), ("uncertain", "unknown"), ("lost_begin", "submitting"), ("lost_complete", "created")):
             if persisted[label]["state"] != expected or persisted[label]["attempts"] != 1 or persisted[label]["markers"] != 1:
                 raise RuntimeError("One-attempt marker/state invariant failed")
-        print(json.dumps({"submission_service_bridge": receipt, "operations": calls, "persisted": persisted, "production_access": False}))
+        reviews = int(fixture.sql(container, "SELECT count(*) FROM private.shipa_reviews "
+            f"WHERE shipment_id='{bindings['accepted']['shipmentId']}'", "postgres"))
+        if reviews != 2:
+            raise RuntimeError("Lost manual-review response duplicated or lost the committed review audit")
+        print(json.dumps({"submission_service_bridge": receipt, "operations": calls, "persisted": persisted,
+            "accepted_review_audits": reviews, "production_access": False}))
     finally:
         if process is not None:
             if process.poll() is None:
