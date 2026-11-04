@@ -753,28 +753,28 @@
       "reason": "Register shipa-admin, backend encryption dependency and fail-closed schema prerequisite."
     },
     "src/components/admin/EvolutionPairingCard.test.tsx": {
-      "sha256GitBytes": "7e2c6aeada8087faf5632c67f68e2b8a15dbf5e98d7133bed0e4e7499ba61a09",
-      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+      "sha256GitBytes": "830a4899157bb7203a38a53d348ef4ef5460e13b21f3d08342ac645d9d8f0216",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "src/components/admin/EvolutionPairingCard.tsx": {
       "sha256GitBytes": "35b10eb3396dcf9c6888fccc00697fefa43624de9f17fa7cf6d09145ba17ad0c",
       "reason": "Point cleared-QR instructions to the explicit connect action."
     },
     "src/lib/evolutionPairing.ts": {
-      "sha256GitBytes": "46a6fa3244e3614e62068d8761227b3b814beb6bd3dbdf2088e33a5b4c9efe59",
-      "reason": "Reuse the shared bounded HTTP-error reader without altering pairing response projection."
+      "sha256GitBytes": "55a2f9fd99f842cb72806a71952943d898c87f608bc9875e966789d7c4075c88",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "src/lib/shipaAdmin.test.ts": {
-      "sha256GitBytes": "c8bdefbdf0fbae9aa34e9f9bb205241ec4b0e024abc65703366114c74427855c",
-      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+      "sha256GitBytes": "c3b01a676c629a6bbf4cb3184fb749907df35a6237673fcff0efd57d2605263a",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "src/lib/shipaAdmin.ts": {
       "sha256GitBytes": "f3345cbbfef15ded587904aef20d16848cc3b0b14820aef5118eedccbf5f5fa7",
       "reason": "Bound SDK HTTP error parsing and keep the fixed local error vocabulary."
     },
     "src/lib/shipaAdminPolicy.ts": {
-      "sha256GitBytes": "5f43145a5996fd772336bc903a8954cf92b183ea7f8ed6b3f895e4c654b9e080",
-      "reason": "Recheck changed active automation settings and pending credentials."
+      "sha256GitBytes": "6911243aaeb68dfb3bd09452c81b91e8190a9b6f54f7b64a0b290e09281bf3eb",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "src/lib/shipaDispatchPolicy.test.ts": {
       "sha256GitBytes": "6da8f2137cea3162e34e7907636f88030f2e8c41e20463cafc81e70b9279c04f",
@@ -805,8 +805,8 @@
       "reason": "Refuse malformed UTF-8 JSON bodies."
     },
     "supabase/functions/_shared/shipa-credential-loader.ts": {
-      "sha256GitBytes": "bb319924dd63a206223c86bc0be0981afcbf25fa40c9f577dba65d2a3a44be82",
-      "reason": "Separate safe metadata availability from exact-version secret decryption."
+      "sha256GitBytes": "677171b500ed8bc6eea2bb8e1736cca23791b37b443f316d954474b865745dd8",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "supabase/functions/_shared/shipa-credential-service.ts": {
       "sha256GitBytes": "689c8539a6c5bb539d8068146ae2e385bdea370b80e79f0c7b0a727212c4cb89",
@@ -817,12 +817,12 @@
       "reason": "Normalize a validated order UUID for canonical post-intent comparison."
     },
     "supabase/functions/_shared/shipa-responses.ts": {
-      "sha256GitBytes": "e1882e94a31015ffaa08ba46272469997b82a741fffc306d5f023c67ff17e0db",
-      "reason": "Preserve nullable parties while rejecting malformed objects."
+      "sha256GitBytes": "82385770e9aab0e27c75e55645c54ad6b8defd0ba51320ecd0f2b7f529dfbda3",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "supabase/functions/_shared/shipa-settings-validation.ts": {
-      "sha256GitBytes": "f7f01906b55859d93c325678d269c4041ff6fb2cc9ef5634151f83984b0463e9",
-      "reason": "Require a delivery service and strict calendar/timezone heartbeat evidence."
+      "sha256GitBytes": "4e19021c318581b1cde8356cf821e15b3471550f54ee1eb69b953dce76bd1c6c",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "supabase/functions/_shared/shipa-shipment-actions.ts": {
       "sha256GitBytes": "dde81699d24637b0c4d73e9c0475a9744758ec6627ca4c6c1b5a02ab750fb832",
@@ -845,29 +845,89 @@
       "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
     },
     "supabase/functions/_tests/whatsapp-pairing/handlers.test.ts": {
-      "sha256GitBytes": "8d71ba945685fbab53b1e2357223d836d2745e7f3f051d66e6647bba6ad6f245",
-      "reason": "PR24 source-backed boundary regression or synthetic fixture correction; original source identity remains above."
+      "sha256GitBytes": "7d7009cf58d705beb38c88eb3306053c60c036a951890a7517eaf4e9c1e1ce51",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "supabase/functions/whatsapp-pairing/handler.ts": {
-      "sha256GitBytes": "4ef445a485f77d3768c56f8451d4586669445302cee0703508c4a17b4e14a978",
-      "reason": "Reuse verified-admin tri-state authorization before provider/config access."
+      "sha256GitBytes": "bc62e57da629e1ece8b5d93b906a4c78b68090baa1d6712ee94e904aaba412d3",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     },
     "supabase/functions/whatsapp-pairing/index.ts": {
       "sha256GitBytes": "29e1d5b23ab5decf003bc9c0aee14093f31e69c4b0ba650ea381d8ca68d32763",
       "reason": "Use the existing narrow SDK adapter for the shared verified-admin boundary."
+    },
+    "src/hooks/useShipaConfiguration.test.tsx": {
+      "sha256GitBytes": "31fc71c0914c9f3ddca1230e0d655626c3777afc61aed04a011a9286c0c76fde",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "src/hooks/useShipaConfiguration.ts": {
+      "sha256GitBytes": "91ccecd89b571241a61cb946d4fe67aa3a10fb2c4ba8729cb97bec4fc82ff928",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "src/lib/evolutionPairing.test.ts": {
+      "sha256GitBytes": "ee25d918b44d9abe2bfb268d2d0f689b2de772555f87bb9885f9a7f4be7dd476",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "src/lib/shipaAdminResponses.ts": {
+      "sha256GitBytes": "439f1a426ff55a6a1c0cbb5557227852f6961cf42318775c69b10877776c29d1",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "src/pages/admin/AdminIntegrations.tsx": {
+      "sha256GitBytes": "0426cfa9987d37a90365cd44d41b162e9d3691ebef79dc1890738a77f19cfd22",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_shared/evolution-pairing.ts": {
+      "sha256GitBytes": "71c3abc742d4139ec94a7347c21611b8b1c70c14ea748a7838aa58d29136b2d0",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_shared/shipa-configuration-service-contract.ts": {
+      "sha256GitBytes": "7a6deb7fd8974f3897dee14628f13500ccc1c0b0632511078a6b379cf57be50d",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_shared/shipa-readiness-responses.ts": {
+      "sha256GitBytes": "d18c8c247cec8cfe02524bcee59932dc0c9a98f7b595885e10bd949aefc7e936",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_shared/shipa-settings-responses.ts": {
+      "sha256GitBytes": "286b01db0e965ffede8e15191fea584da19963951c7cbfa9e7aa76906c38807f",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_shared/shipa-settings.ts": {
+      "sha256GitBytes": "e7e6f57c9298c7d692f4aeaa755fddf2fdc02fa93da63175eca526b5bc153ed0",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_shared/shipa-submission-validation.ts": {
+      "sha256GitBytes": "febd521b5bf69f388e4ce13cb19079e45a9099e62ea4c16da12ef0ab1498f861",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_tests/shipa/shipa-readiness-service-fixtures.ts": {
+      "sha256GitBytes": "a39d182f13160edb5a954142da78d684b0669c87b03dbf807f42e5709101e512",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_tests/shipa/shipa-readiness-service.test.ts": {
+      "sha256GitBytes": "b1617a8ade4cc670189007b30a620dcccd303e5988e35baf252f096b43b815a6",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
+    },
+    "supabase/functions/_tests/whatsapp-pairing/provider.test.ts": {
+      "sha256GitBytes": "989607f48a5af764ecc36c78e769b9d6d4e1efa93bdf9f7b7c9e110046e2b4e6",
+      "reason": "PR24 round-two batch (7e31122) and runtime npm:zod specifier fix; see curemed-app-20261104.md"
     }
   },
   "releaseOverlays": {
-    "docs/releases/curemed-app-20261104.md": "5f7a6f987b31366af5d43f902feff2969e80df5e18ebadd41f382b2f029e9ba2",
-    "scripts/check-curemed-schema-prerequisites.py": "f73b59d47ab6ada6945bd0ab6686753859dc7e4f4612942ffa633cec7dd98040",
+    "docs/releases/curemed-app-20261104.md": "a6cd9a79607c9a89025e340da46a846e3cffa8402913487b6746326ee9ac806d",
+    "scripts/check-curemed-schema-prerequisites.py": "6f30dfed8b03615d11b65b51eb74da1945495660f86a37936a8239d868b03d4c",
     "scripts/supabase-post-deploy.sh": "bb8b855d0547082b5d6338b2cec7e41b850f21876e5c5d434cab8a058c86d98b",
     "scripts/tests/test_curemed_app_deployment.py": "3b99bb38b96aec57b41bd44c42ef77076477555d31372b4edce9be6ee8a5af55",
     "scripts/tests/test_curemed_app_release.py": "093686ad020689dbd92a47a3aaef1042d6fb6bb6fca119b842af1232153b325b",
-    "scripts/tests/test_curemed_schema_prerequisites.py": "00566606ec6a2dff3c2bb5b1947ef0b4507a238ee7a2f655a300fa27df96a87b",
+    "scripts/tests/test_curemed_schema_prerequisites.py": "4fbfd27e4ed99008d3a15e6b2b7dc7661e9371589924c895a76c490222786ff4",
+    "scripts/tests/test_edge_import_specifiers.py": "ba18849ec4ef9b37dac0bf6ff235066060c1d958bfe65905981fcdd170d119a1",
     "src/lib/boundedHttpErrorJson.ts": "e9d36c1006b80eb5ea268feade5429330d7b8a11f6f16a245f7b04725e6711f5",
     "src/lib/orderDeletion.ts": "86082c3d3c0cd7e7813f1486a4eab7857a0e9050bec63c4a09bd7e258ddb62ea",
+    "src/lib/pngDataUrl.ts": "7efecfeb75e3b839f2d377041fb29711ae377fa112a67d71cfa7951906adcc0b",
     "src/pages/admin/AdminOrders.tsx": "a562f439656ef1186e3aabdc18ac0aad7381c23295f19c062c17255bbd16277d",
     "src/pages/admin/AdminOrdersDeletion.test.tsx": "d1a85a17aafc982f61c364c292989a4be64a4628b72be6a271104ff2c2a39e80",
-    "supabase/functions/_tests/shipa/shipa-pr24-boundary-regressions.test.ts": "c1a1bbe7c56c5c9c0681b72ad1b728189e88f70eca38e0a30bc8e58db0588959"
+    "supabase/functions/_shared/evolution-pairing-png.ts": "c61437f78f513e0ea2522f416774a592709b7fc9229a7b058ac20cb44ea1e257",
+    "supabase/functions/_shared/json-unique-members.ts": "47b9f0d33b555b4ee7ace41aad0410dd7c60475dd4da575820c226c253ef4f30",
+    "supabase/functions/_tests/shipa/shipa-pr24-boundary-regressions.test.ts": "258834c18e2712f650125ed911c8c86c67cdbde04535a065c2737f2cf9cc8a2f"
   }
 }

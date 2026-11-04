@@ -13,7 +13,7 @@
 // use. Every failure it reports is a fixed, safe message: no rejected value,
 // no field name from the input and no raw Zod issue ever reaches a caller.
 
-import { z } from "zod";
+import { z } from "npm:zod@3.25.76";
 
 import {
   missingShipaOriginAddressFields,

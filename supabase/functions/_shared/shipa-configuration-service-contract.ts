@@ -21,7 +21,7 @@
 // is never actor authority, so every action is parsed from a strict shape
 // that has no room for an actor, an endpoint, a proof or a credential.
 
-import { z } from "zod";
+import { z } from "npm:zod@3.25.76";
 
 import {
   INTEGRATION_CREDENTIAL_MAX_PLAINTEXT_BYTES,

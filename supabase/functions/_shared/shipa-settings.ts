@@ -31,7 +31,7 @@
 // use — so it can be unit-tested directly and reused by the settings UI, the
 // order delivery panel and later server code.
 
-import { z } from "zod";
+import { z } from "npm:zod@3.25.76";
 
 export const DISPATCH_MODES = ["manual_after_packing", "automatic_after_payment"] as const;
 export type DispatchMode = (typeof DISPATCH_MODES)[number];
