@@ -2,6 +2,8 @@
 
 Migration `20261103001600_shipa_submission.sql` implements local SQL preparation and the single atomic begin. No runtime endpoint, provider request, scheduler, native account-readiness proof or deployment is supplied by this checkpoint. Integration settings still refuse enablement until the remaining runtime contracts are installed and approved.
 
+Dependency update: migration 021 and the internal execution core now implement optional-instruction SQL/parser/builder parity and one-attempt execution. See `shipa-dispatch-runtime-contract.md` for actual scope, proofs and remaining endpoint/scheduler/activation gates; the original submission checkpoint below retains its historical boundaries.
+
 ## Service-only protocol
 
 1. Load the selected environment's encrypted credential through `shipa_read_credential(integration_id, environment)` and decrypt in server memory using the existing native crypto contract. The exact root envelope now contains `envelope`, `credential_revision`, `rotated_at` and `credential_fingerprint`. The six-field encrypted envelope itself is unchanged. The fingerprint is SQL-owned and binds the exact stored ciphertext/nonce/key-version/integration/environment tuple; never recompute it through a differently serialized JS object.

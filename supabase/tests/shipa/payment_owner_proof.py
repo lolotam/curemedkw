@@ -19,14 +19,14 @@ MIGRATIONS = tuple(ROOT / "supabase/migrations" / name for name in (
     "20261103001400_integration_payment_verification.sql", "20261103001500_shipa_intents.sql",
     "20261103001600_shipa_submission.sql", "20261103001700_shipa_credential_readiness.sql",
     "20261103001800_integration_unbound_payments.sql", "20261103001900_whatsapp_rendering.sql",
-    "20261103002000_whatsapp_expansion.sql"))
+    "20261103002000_whatsapp_expansion.sql", "20261103002100_shipa_optional_instructions.sql"))
 TESTS = tuple(ROOT / "supabase/tests/whatsapp" / name for name in (
     "privileges.sql", "transactions.sql", "settings.sql", "credentials.sql", "activation.sql", "rendering.sql", "expansion.sql")) + (
         ROOT / "supabase/tests/shipa/settings.sql", ROOT / "supabase/tests/shipa/dispatch_state.sql",
         ROOT / "supabase/tests/shipa/integrity.sql", ROOT / "supabase/tests/shipa/payment_owner.sql",
         ROOT / "supabase/tests/shipa/payment_verification.sql", ROOT / "supabase/tests/shipa/intents.sql",
         ROOT / "supabase/tests/shipa/submission.sql", ROOT / "supabase/tests/shipa/credential_readiness.sql",
-        ROOT / "supabase/tests/shipa/unbound_payments.sql")
+        ROOT / "supabase/tests/shipa/unbound_payments.sql", ROOT / "supabase/tests/shipa/submission_payload.sql")
 
 
 def open_psql(container):
@@ -458,6 +458,24 @@ def concurrent_unbound_and_callback(container):
         close_processes((first, second))
 
 
+def optional_payloads_match_adapter(container, preparation, runtime):
+    # Pure mapping variants derived from the same persisted fixture order.
+    # These changed instructions do NOT carry a fresh begin fingerprint and
+    # are never submitted; this proves SQL/parser/builder shape agreement only.
+    for instructions in ("", " \t\n", "\u00a0\ufeff\u2003", " Call first 09:00-16:00 "):
+        instruction_json = "'" + json.dumps(instructions).replace("'", "''") + "'::jsonb"
+        original = "'" + json.dumps(preparation).replace("'", "''") + "'::jsonb"
+        query = "WITH draft AS (SELECT private.shipa_submission_draft(ordered, " \
+            f"jsonb_set(integration.configuration->shipment.environment,'{{pickupInstructions}}',{instruction_json}), " \
+            "private.shipa_delivery_snapshot(ordered,integration.configuration->shipment.environment,shipment.overrides),shipment.customer_ref) document " \
+            "FROM public.shipments shipment JOIN public.orders ordered ON ordered.id=shipment.order_id " \
+            f"JOIN public.integrations integration ON integration.id=shipment.integration_id WHERE shipment.id='{preparation['shipment_id']}'), " \
+            "wire AS (SELECT document,private.shipa_submission_payload(document) payload FROM draft) " \
+            f"SELECT {original}||jsonb_build_object('draft',document,'payload',payload,'payload_hash',encode(sha256(convert_to(payload::text,'UTF8')),'hex')) FROM wire"
+        variant = json.loads(fixture.sql(container, query, "postgres"))
+        sql_payload_matches_adapter(variant, runtime[0], runtime[1])
+
+
 def concurrent_expansion_correction(container):
     actor = "83000000-0000-4000-8000-000000000001"
     order = "92000000-0000-4000-8000-000000000002"
@@ -540,6 +558,7 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
     order = concurrent_automatic_and_manual(container)
     preparation = prepared_submission(container, order)
     sql_payload_matches_adapter(preparation, runtime[0], runtime[1])
+    optional_payloads_match_adapter(container, preparation, runtime)
     concurrent_begin_submission(container, preparation)
     concurrent_begin_and_credential_mutation(container, preparation)
     concurrent_unbound_and_callback(container)
@@ -551,6 +570,7 @@ def prove_schema_case(container, state, baseline, preexisting_private, runtime):
         "concurrent_strict_completion_one_evidence_one_shipa_receipt": True,
         "concurrent_manual_clicks_single_intent_review": True,
         "concurrent_automatic_manual_single_identity": True, "actual_sql_payload_matches_deno_adapter": True,
+        "optional_instruction_sql_parser_builder_parity": True,
         "concurrent_begin_one_marker_one_authorized_worker": True,
         "concurrent_begin_blocks_credential_mutation": True, "unbound_callback_one_owner_preserved_history": True,
         "concurrent_expansion_one_approved_revision_and_job_set": True,
