@@ -222,6 +222,7 @@ const KNOWN_ERROR_CODES: readonly string[] = [
   "verification_failed",
   "origin_city_unmatched",
   "scheduler_stale",
+  "live_confirmation_required",
   "runtime_not_ready",
   "upgrade_required",
   "unavailable",

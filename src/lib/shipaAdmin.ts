@@ -61,6 +61,7 @@ export type ShipaAdminErrorCode =
   | "verification_failed"
   | "origin_city_unmatched"
   | "scheduler_stale"
+  | "live_confirmation_required"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -92,6 +93,7 @@ export const SHIPA_ADMIN_ERROR_MESSAGES: Readonly<Record<ShipaAdminErrorCode, st
   verification_failed: "The stored credential has not passed verification.",
   origin_city_unmatched: "The pickup city does not match the provider directory.",
   scheduler_stale: "The scheduler has no current successful run.",
+  live_confirmation_required: "Switching Shipa to live needs an explicit confirmation.",
   runtime_not_ready:
     "Shipa delivery cannot be enabled yet because the delivery runtime is not ready.",
   upgrade_required: "Shipa delivery configuration is not available in this deployment yet.",

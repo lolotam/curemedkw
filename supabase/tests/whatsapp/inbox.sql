@@ -59,6 +59,16 @@ BEGIN
   IF (SELECT ack_state FROM public.whatsapp_messages WHERE provider_message_id='early-ack')<>'read' OR EXISTS(SELECT 1 FROM public.whatsapp_pending_acks WHERE provider_message_id='early-ack') THEN RAISE EXCEPTION 'Pending ACK failed'; END IF;
   PERFORM public.wa_ingest_messages('[{"remote_jid":"223456789012345@lid","senderPn":"96550000092@s.whatsapp.net","provider_message_id":"alias-new","direction":"inbound","message_type":"text","sent_at":"2026-11-05T12:01:00Z"}]');
   IF (SELECT chat_id FROM public.whatsapp_messages WHERE provider_message_id='alias-new')<>survivor THEN RAISE EXCEPTION 'Alias duplicated chat'; END IF;
+  -- A short phone jid is a valid address but not an E.164 number: the chat is kept with an unknown phone.
+  PERFORM public.wa_ingest_messages('[{"remote_jid":"12345@s.whatsapp.net","provider_message_id":"short-phone","direction":"inbound","message_type":"text","sent_at":"2026-11-05T12:30:00Z"}]');
+  IF (SELECT normalized_phone FROM public.whatsapp_chats WHERE remote_jid='12345@s.whatsapp.net') IS NOT NULL
+    OR NOT EXISTS(SELECT 1 FROM public.whatsapp_messages WHERE provider_message_id='short-phone') THEN RAISE EXCEPTION 'Short phone jid was dropped'; END IF;
+  -- Equal sent_at: the later-ingested message has the smaller id, so all three functions must agree on tie-b.
+  PERFORM public.wa_ingest_messages('[{"remote_jid":"423456789012345@lid","provider_message_id":"tie-b","direction":"inbound","message_type":"text","sent_at":"2026-11-05T13:00:00Z","count_unread":true}]');
+  PERFORM public.wa_ingest_messages('[{"remote_jid":"423456789012345@lid","provider_message_id":"tie-a","direction":"inbound","message_type":"text","sent_at":"2026-11-05T13:00:00Z","count_unread":true}]');
+  IF (SELECT last_message_id FROM public.whatsapp_chats WHERE remote_jid='423456789012345@lid')<>'tie-b' THEN RAISE EXCEPTION 'Tie order differs from mark-read'; END IF;
+  IF NOT public.wa_mark_chat_read((SELECT id FROM public.whatsapp_chats WHERE remote_jid='423456789012345@lid'),'tie-b','87000000-0000-4000-8000-000000000092') THEN
+    RAISE EXCEPTION 'Mark-read of the latest tied message reported false'; END IF;
 END
 $hardening$;
 SET LOCAL ROLE authenticated;

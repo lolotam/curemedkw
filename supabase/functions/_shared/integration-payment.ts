@@ -40,6 +40,17 @@ export function verifiedPaymentAttestation(raw: unknown) {
   return { ...status, amount_millis: millis, currency: "KWD" };
 }
 
+const EVIDENCE_MISMATCH_CODES: Record<string, string> = {
+  verified_payment_amount_mismatch: "payment_amount_mismatch",
+  verified_order_amount_mismatch: "payment_amount_mismatch",
+  payment_attempt_binding_mismatch: "payment_identity_mismatch",
+  first_success_evidence_mismatch: "payment_identity_mismatch",
+};
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "";
+}
+
 async function paymentRpc(admin: SupabaseClient, name: string, args: Record<string, unknown>) {
   const { data: receipt, error } = await admin.rpc(name, args);
   if (error) throw new Error(error.message || "payment_storage_unavailable");
@@ -104,27 +115,28 @@ export async function verifyPendingIntegrationPayment(admin: SupabaseClient, ord
   });
   if (!isPlainObject(pending)) return;
   const lease = pending.lease_token;
+  const resolve = (result: Record<string, unknown>, terminal: string) => paymentRpc(admin,
+    "wa_resolve_pending_payment_verification", { p_pending_id: pending.id, p_lease_token: lease,
+      p_verified_result: result, p_terminal_state: terminal });
   let verified;
   try {
     const response = await myfatoorahRequest<unknown>(getMyFatoorahConfig(),
       `/v3/payments/${encodeURIComponent(String(pending.transaction_payment_id))}`, { method: "GET", timeoutMs: 10_000 });
     verified = verifiedPaymentAttestation(response.Data);
   } catch (error) {
-    // A failed verification remains durable and bounded by the SQL retry schedule.
-    const message = error instanceof Error ? error.message : "";
-    const mismatch = message === "payment_amount_invalid" || message === "payment_identity_invalid";
-    const code = message === "payment_amount_invalid" ? "payment_amount_mismatch"
-      : message === "payment_identity_invalid" ? "payment_identity_mismatch"
-      : message === "MyFatoorah request timed out" ? "provider_timeout" : "provider_response_invalid";
-    await paymentRpc(admin, "wa_resolve_pending_payment_verification", {
-      p_pending_id: pending.id, p_lease_token: lease,
-      p_verified_result: { code }, p_terminal_state: mismatch ? "evidence_mismatch" : "retry",
-    });
+    // Unreachable or malformed provider responses stay retryable, bounded by the SQL retry schedule.
+    await resolve({ code: errorMessage(error) === "MyFatoorah request timed out" ? "provider_timeout" : "provider_response_invalid" }, "retry");
     return;
   }
-  await paymentRpc(admin, "wa_resolve_pending_payment_verification", {
-    p_pending_id: pending.id, p_lease_token: lease, p_verified_result: verified, p_terminal_state: "resolved",
-  });
+  try {
+    await resolve(verified, "resolved");
+  } catch (error) {
+    // A well-formed provider answer that contradicts the stored attempt is terminal evidence, not a retry.
+    const code = EVIDENCE_MISMATCH_CODES[errorMessage(error)];
+    if (code === undefined) throw error;
+    await resolve({ code }, "evidence_mismatch");
+    return;
+  }
   await notifyPaidOrder(admin, pending.order_id);
 }
 

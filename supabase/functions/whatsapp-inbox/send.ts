@@ -36,7 +36,9 @@ export async function sendInboxMessage(admin: SupabaseClient, provider: Evolutio
       : await provider("text", { number, text: input.text });
     const row = inboxMessage(answer, false);
     if (!row) throw new InboxError("send_uncertain", 502);
-    await inboxRpc(admin, "wa_ingest_messages", { p_rows: [{ ...row, remote_jid: chat.remote_jid ?? row.remote_jid, normalized_phone: chat.normalized_phone ?? row.normalized_phone, direction: "outbound", body: input.text, message_type: kind }] });
+    const stored = await inboxRpc(admin, "wa_ingest_messages", { p_rows: [{ ...row, remote_jid: chat.remote_jid ?? row.remote_jid, normalized_phone: chat.normalized_phone ?? row.normalized_phone, direction: "outbound", body: input.text, message_type: kind }] });
+    // inserted may be 0 when the webhook echo stored it first; a skipped row means it was never stored.
+    if (!isPlainObject(stored) || Number(stored.skipped) !== 0) throw new InboxError("send_uncertain", 502);
     if (mediaId) {
       const { error } = await admin.from("whatsapp_messages").update({ media_object_id: mediaId })
         .eq("instance_identity", "curemed").eq("provider_message_id", row.provider_message_id);

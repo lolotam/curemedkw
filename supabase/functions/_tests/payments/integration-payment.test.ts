@@ -28,12 +28,18 @@ Deno.test("unbound non-success is handled; storage errors still throw", async ()
     else await assertRejects(() => recordIntegrationPayment(admin, raw, "signed_webhook"), Error, message);
   }
 });
-for (const kind of ["amount", "identity", "network", "timeout", "resolved"]) {
+for (const kind of ["malformed", "amount", "identity", "network", "timeout", "resolved"]) {
   Deno.test(`verification classifies ${kind}`, async () => {
     const resolutions: Record<string, unknown>[] = [];
     const admin = fixture((path, body) => {
       if (path.endsWith("wa_claim_pending_payment_verification")) return { id, order_id: id, lease_token: id, transaction_payment_id: "p1" };
-      if (path.endsWith("wa_resolve_pending_payment_verification")) { resolutions.push(body); return {}; }
+      if (path.endsWith("wa_resolve_pending_payment_verification")) {
+        resolutions.push(body);
+        // The SQL owner rejects contradicting evidence on the resolved write.
+        if (body.p_terminal_state === "resolved" && kind === "amount") return Response.json({ message: "verified_payment_amount_mismatch" }, { status: 400 });
+        if (body.p_terminal_state === "resolved" && kind === "identity") return Response.json({ message: "payment_attempt_binding_mismatch" }, { status: 400 });
+        return {};
+      }
       return null;
     });
     const originalFetch = globalThis.fetch;
@@ -42,14 +48,15 @@ for (const kind of ["amount", "identity", "network", "timeout", "resolved"]) {
     globalThis.fetch = () => {
       if (kind === "network") throw new Error("offline");
       if (kind === "timeout") throw new DOMException("timeout", "AbortError");
-      return Promise.resolve(Response.json({ IsSuccess: true, Data: kind === "amount" ? { ...raw, Amount: { BaseCurrency: "USD" } }
-        : kind === "identity" ? { ...raw, Invoice: { ...raw.Invoice, ExternalIdentifier: "invalid" } } : raw }));
+      return Promise.resolve(Response.json({ IsSuccess: true, Data: kind === "malformed" ? { ...raw, Amount: { BaseCurrency: "KWD" } } : raw }));
     };
     try { await verifyPendingIntegrationPayment(admin, id); }
     finally { globalThis.fetch = originalFetch; Deno.env.get = originalEnv; }
-    assertEquals(resolutions.length, 1);
-    assertEquals(resolutions[0].p_terminal_state, ["amount", "identity"].includes(kind) ? "evidence_mismatch" : kind === "resolved" ? "resolved" : "retry");
-    if (kind !== "resolved") assertEquals(resolutions[0].p_verified_result, { code: kind === "amount" ? "payment_amount_mismatch"
+    const mismatch = kind === "amount" || kind === "identity";
+    assertEquals(resolutions.map(row => row.p_terminal_state),
+      mismatch ? ["resolved", "evidence_mismatch"] : [kind === "resolved" ? "resolved" : "retry"]);
+    const last = resolutions[resolutions.length - 1];
+    if (kind !== "resolved") assertEquals(last.p_verified_result, { code: kind === "amount" ? "payment_amount_mismatch"
       : kind === "identity" ? "payment_identity_mismatch" : kind === "timeout" ? "provider_timeout" : "provider_response_invalid" });
   });
 }

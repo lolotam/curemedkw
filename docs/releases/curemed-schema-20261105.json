@@ -216,9 +216,9 @@
       "ordinal": 21,
       "filename": "20261105000100_shipa_activation.sql",
       "path": "supabase/migrations/20261105000100_shipa_activation.sql",
-      "gitBlob": "4236c0d16b9fa27ed92bf1e1ec0eb1891b3004b3",
-      "sha256GitBytes": "7a38bd69061c44e8373e9226e6d47df503ca0d8cf94f293bb1c7a8d82cc0c62a",
-      "bytes": 9050,
+      "gitBlob": "b7ebadb978f644f66cb47b01df52112c7ee0ba30",
+      "sha256GitBytes": "3a2fca2da32520da0b260f7ea7c81e20903cd0718ca17afed21f23b33ff911cb",
+      "bytes": 9211,
       "header": "-- Activation consumes saved, server-attested readiness. No live provider calls.",
       "activationFunctions": []
     },
@@ -226,9 +226,9 @@
       "ordinal": 22,
       "filename": "20261105000200_whatsapp_inbox.sql",
       "path": "supabase/migrations/20261105000200_whatsapp_inbox.sql",
-      "gitBlob": "43eef3f62b4c4c19f3e3a631c002c6b324eaabd5",
-      "sha256GitBytes": "a57ef5787d1e2e93caf9124554cbded314cd14070b09b63c3b68ed3b4701ca7a",
-      "bytes": 15726,
+      "gitBlob": "d8a5e8f9a4da5e7b18b63fe38a90bcadcb878db8",
+      "sha256GitBytes": "6e4484768018d0ad414d8d35f83c3fc1826c55fc831c87eee35c0653e287012c",
+      "bytes": 16314,
       "header": "BEGIN;",
       "activationFunctions": []
     }

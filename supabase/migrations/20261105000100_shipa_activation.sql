@@ -56,7 +56,9 @@ BEGIN
   IF v_row.revision<>_expected_revision THEN
     RAISE EXCEPTION USING ERRCODE='40001', MESSAGE='settings_conflict';
   END IF;
+  -- Confirmation guards the transition into live; later saves of an active live integration need none.
   IF _settings->'enabled'='true'::jsonb AND _settings->>'environment'='live'
+    AND NOT (v_row.enabled AND v_row.environment='live')
     AND (_settings->'liveActivationConfirmed') IS DISTINCT FROM 'true'::jsonb THEN
     RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='shipa_live_confirmation_required';
   END IF;

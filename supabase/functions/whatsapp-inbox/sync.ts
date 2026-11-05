@@ -30,12 +30,15 @@ export async function syncInbox(admin: SupabaseClient, provider: EvolutionInboxC
     const identity = inboxIdentity(record);
     return identity ? { ...identity, contact_only: stage === "contacts" } : null;
   }).filter(Boolean);
+  let skipped = 0;
   for (let offset = 0; offset < rows.length; offset += 200) {
-    await inboxRpc(admin, "wa_ingest_messages", { p_rows: rows.slice(offset, offset + 200) });
+    const stored = await inboxRpc(admin, "wa_ingest_messages", { p_rows: rows.slice(offset, offset + 200) });
+    if (!isPlainObject(stored)) throw new InboxError("sync_unavailable", 503);
+    skipped += Number(stored.skipped ?? 0);
   }
-  const processed = Number(run.processed_count) + rows.length;
+  const processed = Number(run.processed_count) + rows.length - skipped;
   const { data: saved, error } = await admin.from("whatsapp_sync_runs").update({ state: complete ? "complete" : "partial",
-    cursor_json: next, processed_count: processed, unresolved_count: Number(run.unresolved_count) + records.length - rows.length,
+    cursor_json: next, processed_count: processed, unresolved_count: Number(run.unresolved_count) + records.length - rows.length + skipped,
     lease_token: null, lease_expires_at: null, updated_at: new Date().toISOString() })
     .eq("id", run.id).eq("lease_token", run.lease_token).select("id").maybeSingle();
   if (error || !saved) throw new InboxError("sync_conflict", 409);

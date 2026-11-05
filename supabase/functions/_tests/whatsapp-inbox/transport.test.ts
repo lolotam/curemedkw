@@ -10,7 +10,7 @@ const requestId = "87000000-0000-4000-8000-000000000003";
 
 // Only HTTP is replaced. Authentication, SDK query construction, validation,
 // provider dispatch and response handling execute their production code.
-function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: boolean; failSyncSave?: boolean } = {}) {
+function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: boolean; failSyncSave?: boolean; ingestSkips?: boolean } = {}) {
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   let reserved = false;
   let providerSends = 0;
@@ -26,8 +26,8 @@ function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: b
       if (path.endsWith("/wa_reserve_inbox_send")) {
         const first = !reserved; reserved = true; return Response.json(first);
       }
-      if (path.endsWith("/wa_ingest_messages")) return Response.json(1);
-      if (path.endsWith("/wa_mark_chat_read")) return Response.json(null);
+      if (path.endsWith("/wa_ingest_messages")) return Response.json(options.ingestSkips ? { inserted: 0, skipped: 1 } : { inserted: 1, skipped: 0 });
+      if (path.endsWith("/wa_mark_chat_read")) return Response.json(true);
       if (path.endsWith("/wa_claim_inbox_sync")) return Response.json({ id: requestId, lease_token: actor,
         cursor_json: { stage: "messages", page: 2 }, processed_count: 100, unresolved_count: 0 });
       if (path === "/rest/v1/whatsapp_sync_runs") return Response.json(options.failSyncSave ? null : { id: requestId });
@@ -88,6 +88,12 @@ Deno.test("a successful reply preserves LID addressing and persists before ackno
   assertEquals(test.calls.find(call => call.path === "/message/sendText/curemed")?.body.number, "123456789012345@lid");
   assertEquals(test.calls.at(-1)?.path, "/rest/v1/rpc/wa_ingest_messages");
   assertEquals((test.calls.at(-1)?.body.p_rows as Record<string, unknown>[])[0].remote_jid, "123456789012345@lid");
+  assertEquals(test.sends(), 1);
+});
+
+Deno.test("a provider-accepted reply that storage skipped is reported uncertain", async () => {
+  const test = fixture({ ingestSkips: true });
+  assertEquals((await test.request({ action: "send", chatId: chat, requestId, text: "Hello" })).status, 502);
   assertEquals(test.sends(), 1);
 });
 

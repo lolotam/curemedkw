@@ -10,6 +10,10 @@ Deno.test("LID messages survive without phone, and alternate phone does not repl
   assertEquals(inboxMessage(message, true)?.normalized_phone, null);
   assertEquals(inboxMessage(message, true)?.remote_jid, "123456789012345@lid");
   assertEquals(inboxIdentity({ ...message, senderPn: "96550000001@s.whatsapp.net" })?.normalized_phone, "96550000001");
+  // SQL alias resolution needs the alternate jid itself, including key-level senderPn.
+  assertEquals(inboxIdentity({ ...message, key: { ...message.key, senderPn: "96550000001@s.whatsapp.net" } })?.remoteJidAlt,
+    "96550000001@s.whatsapp.net");
+  assertEquals(inboxIdentity({ ...message, remoteJidAlt: "not-a-jid" })?.remoteJidAlt, undefined);
   assertEquals(inboxMessage({ ...message, key: { ...message.key, remoteJid: "12345@g.us" } }, true), null);
 });
 

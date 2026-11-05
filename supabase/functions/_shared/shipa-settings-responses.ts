@@ -52,6 +52,7 @@ export type ShipaSettingsErrorCode =
   | "verification_failed"
   | "origin_city_unmatched"
   | "scheduler_stale"
+  | "live_confirmation_required"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -75,6 +76,7 @@ export const SHIPA_SETTINGS_ERROR_MESSAGES: Readonly<
   verification_failed: "The stored credential has not passed verification.",
   origin_city_unmatched: "The pickup city does not match the provider directory.",
   scheduler_stale: "The scheduler has no current successful run.",
+  live_confirmation_required: "Switching Shipa to live needs an explicit confirmation.",
   runtime_not_ready:
     "Shipa delivery cannot be enabled yet because the delivery runtime is not ready.",
   upgrade_required: "The Shipa settings storage is not available in this deployment yet.",
@@ -119,6 +121,7 @@ export function mapShipaSqlError(error: unknown): ShipaSettingsError {
     if (error.message === "shipa_verification_failed") return new ShipaSettingsError("verification_failed");
     if (error.message === "shipa_origin_city_unmatched") return new ShipaSettingsError("origin_city_unmatched");
     if (error.message === "shipa_scheduler_stale") return new ShipaSettingsError("scheduler_stale");
+    if (error.message === "shipa_live_confirmation_required") return new ShipaSettingsError("live_confirmation_required");
   }
   const sqlState = readSqlStateCode(error);
   if (sqlState === "40001" || sqlState === "23505" || sqlState === "40P01") return new ShipaSettingsError("conflict");

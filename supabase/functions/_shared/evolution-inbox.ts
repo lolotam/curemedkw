@@ -46,11 +46,14 @@ export function inboxIdentity(raw: unknown) {
   const key = isPlainObject(raw.key) ? raw.key : raw;
   const jid = key.remoteJid ?? raw.remoteJid ?? raw.id;
   if (typeof jid !== "string" || !/^\d{5,30}@(s\.whatsapp\.net|lid)$/.test(jid)) return null;
-  const alternate = key.remoteJidAlt ?? raw.remoteJidAlt ?? raw.senderPn;
-  const phoneJid = jid.endsWith("@s.whatsapp.net") ? jid : alternate;
+  const alternate = key.remoteJidAlt ?? raw.remoteJidAlt ?? key.senderPn ?? raw.senderPn;
+  // The alternate jid lets SQL resolve a lid chat and its phone-jid chat to one alias set.
+  const alt = typeof alternate === "string" && alternate !== jid && /^\d{5,30}@(s\.whatsapp\.net|lid)$/.test(alternate)
+    ? alternate : undefined;
+  const phoneJid = jid.endsWith("@s.whatsapp.net") ? jid : alt;
   const phone = typeof phoneJid === "string" && /^[1-9]\d{7,14}@s\.whatsapp\.net$/.test(phoneJid)
     ? phoneJid.split("@")[0] : null;
-  return { remote_jid: jid, normalized_phone: phone,
+  return { remote_jid: jid, ...(alt === undefined ? {} : { remoteJidAlt: alt }), normalized_phone: phone,
     display_name: String((key.fromMe === true ? undefined : raw.pushName) ?? raw.name ?? raw.notify ?? "").slice(0, 200) };
 }
 

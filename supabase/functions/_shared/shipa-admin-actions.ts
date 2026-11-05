@@ -237,6 +237,7 @@ export type ShipaAdminErrorCode =
   | "verification_failed"
   | "origin_city_unmatched"
   | "scheduler_stale"
+  | "live_confirmation_required"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -264,6 +265,7 @@ const SHIPA_ADMIN_ERROR_STATUS: Readonly<Record<ShipaAdminErrorCode, number>> =
     verification_failed: 409,
     origin_city_unmatched: 409,
     scheduler_stale: 409,
+    live_confirmation_required: 409,
     runtime_not_ready: 503,
     upgrade_required: 503,
     unavailable: 503,

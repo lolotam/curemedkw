@@ -71,6 +71,8 @@ $fn$;
 REVOKE ALL ON FUNCTION public.wa_reserve_inbox_send(uuid,uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.wa_reserve_inbox_send(uuid,uuid,uuid,text) TO service_role;
 
+-- The return type changed from integer to jsonb; CREATE OR REPLACE cannot change it in place.
+DROP FUNCTION IF EXISTS public.wa_ingest_messages(jsonb);
 CREATE OR REPLACE FUNCTION public.wa_ingest_messages(p_rows jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
 DECLARE skipped integer:=0; alt text; pending public.whatsapp_pending_acks; entry jsonb; jid text; phone text; chat uuid; other_chat uuid; inserted uuid; inserted_count integer:=0; stamp timestamptz;
@@ -90,6 +92,8 @@ BEGIN
     END IF;
     phone:=coalesce(phone,CASE WHEN jid LIKE '%@s.whatsapp.net' THEN split_part(jid,'@',1)
       WHEN alt LIKE '%@s.whatsapp.net' THEN split_part(alt,'@',1) END);
+    -- A jid-derived number that is not a valid E.164 body stays unknown instead of failing the chat CHECK.
+    IF phone !~ '^[1-9][0-9]{7,14}$' THEN phone:=NULL; END IF;
     IF entry->>'contact_only'='true' THEN
       IF phone IS NOT NULL THEN
         INSERT INTO public.whatsapp_contacts(normalized_phone,display_name) VALUES(phone,left(coalesce(entry->>'display_name',''),200))
@@ -122,8 +126,9 @@ BEGIN
         last_read_message_id=CASE WHEN source.last_read_at>target.last_read_at OR target.last_read_at IS NULL THEN source.last_read_message_id ELSE target.last_read_message_id END,
         last_read_at=greatest(target.last_read_at,source.last_read_at),
         last_message_at=greatest(target.last_message_at,source.last_message_at),
-        last_message_id=CASE WHEN source.last_message_at>target.last_message_at OR target.last_message_at IS NULL
-          THEN source.last_message_id ELSE target.last_message_id END
+        -- Same latest-message order as wa_mark_chat_read: (sent_at, provider_message_id COLLATE "C").
+        last_message_id=CASE WHEN target.last_message_at IS NULL OR (source.last_message_at,source.last_message_id COLLATE "C")
+          >(target.last_message_at,target.last_message_id COLLATE "C") THEN source.last_message_id ELSE target.last_message_id END
         FROM public.whatsapp_chats source WHERE target.id=other_chat AND source.id=chat;
       DELETE FROM public.whatsapp_chats WHERE id=chat;
       chat:=other_chat;
@@ -159,7 +164,8 @@ BEGIN
     IF inserted IS NOT NULL THEN
       inserted_count:=inserted_count+1;
       UPDATE public.whatsapp_chats SET
-        last_message_id=CASE WHEN last_message_at IS NULL OR stamp>=last_message_at THEN entry->>'provider_message_id' ELSE last_message_id END,
+        last_message_id=CASE WHEN last_message_at IS NULL OR (stamp,(entry->>'provider_message_id') COLLATE "C")
+          >(last_message_at,last_message_id COLLATE "C") THEN entry->>'provider_message_id' ELSE last_message_id END,
         last_message_at=greatest(last_message_at,stamp),
         unread_count=unread_count+CASE WHEN entry->>'direction'='inbound' AND entry->>'count_unread'='true' THEN 1 ELSE 0 END
         WHERE id=chat;

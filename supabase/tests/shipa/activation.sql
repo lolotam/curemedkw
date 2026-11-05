@@ -51,4 +51,21 @@ BEGIN
   IF settings#>>'{settings,dispatchMode}'<>'automatic_after_payment' THEN RAISE EXCEPTION 'Automatic activation failed'; END IF;
 END
 $proof$;
+RESET ROLE;
+UPDATE public.integrations SET enabled=true,environment='live' WHERE provider='shipa';
+SET LOCAL ROLE service_role;
+DO $live_resave$
+DECLARE actor uuid:='87000000-0000-4000-8000-000000000091'; settings jsonb; patch jsonb; revision integer;
+BEGIN
+  settings:=public.shipa_read_settings(actor); revision:=(settings#>>'{settings,revision}')::integer;
+  patch:=(settings->'settings')-'revision';
+  patch:=jsonb_set(jsonb_set(patch,'{sandbox}',(patch->'sandbox')-'credential'),'{live}',(patch->'live')-'credential');
+  BEGIN
+    PERFORM public.shipa_save_settings(revision,jsonb_set(patch,'{dispatchMode}','"manual_after_packing"'),NULL,actor);
+  EXCEPTION WHEN OTHERS THEN
+    -- Other readiness gates may still refuse; only a repeated live confirmation demand is wrong here.
+    IF SQLERRM='shipa_live_confirmation_required' THEN RAISE EXCEPTION 'Active live save demanded a new confirmation'; END IF;
+  END;
+END
+$live_resave$;
 ROLLBACK;
