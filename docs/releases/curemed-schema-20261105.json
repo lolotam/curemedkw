@@ -226,9 +226,9 @@
       "ordinal": 22,
       "filename": "20261105000200_whatsapp_inbox.sql",
       "path": "supabase/migrations/20261105000200_whatsapp_inbox.sql",
-      "gitBlob": "8a1236024886a48f34c249225f9b804f290abafe",
-      "sha256GitBytes": "a6a220dffd6e342fee5d7710b5471589403144f50d18e0ba6647a6259495d71d",
-      "bytes": 14903,
+      "gitBlob": "815176cb1154681396804840fc0d57b8f8e2e08b",
+      "sha256GitBytes": "4992f3f989efdd2a94ddcf0aaab812cce276ccdb786cc7cbbeae40a8f252f247",
+      "bytes": 14963,
       "header": "BEGIN;",
       "activationFunctions": []
     }

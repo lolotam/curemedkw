@@ -139,7 +139,8 @@ BEGIN
         ON CONFLICT(remote_jid) DO UPDATE SET display_name=CASE WHEN whatsapp_contacts.display_name=''
           THEN excluded.display_name ELSE whatsapp_contacts.display_name END;
     END IF;
-    IF nullif(entry->>'provider_message_id','') IS NULL THEN RAISE EXCEPTION 'missing_message_id'; END IF;
+    -- Chat-list sync rows carry no message; the chat upsert above is the whole effect.
+    IF nullif(entry->>'provider_message_id','') IS NULL THEN CONTINUE; END IF;
     stamp:=(entry->>'sent_at')::timestamptz;
     INSERT INTO public.whatsapp_messages(chat_id,instance_identity,provider_message_id,session_generation,direction,message_type,body,sent_at,historical,provider_media)
       VALUES(chat,'curemed',entry->>'provider_message_id',0,entry->>'direction',entry->>'message_type',

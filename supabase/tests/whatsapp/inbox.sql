@@ -46,8 +46,9 @@ BEGIN
   IF (SELECT last_read_at FROM public.whatsapp_chats WHERE id=survivor) IS NULL THEN RAISE EXCEPTION 'Read watermark lost'; END IF;
   PERFORM public.wa_update_ack('early-ack','read');
   PERFORM public.wa_update_ack('early-ack','delivered');
-  result:=public.wa_ingest_messages('[{"remote_jid":"12345@sXwhatsappXnet"},{"remote_jid":"123456789012345@lid"},{"remote_jid":"123456789012345@lid","remoteJidAlt":"96550000092@s.whatsapp.net","provider_message_id":"early-ack","direction":"outbound","message_type":"text","sent_at":"2026-11-05T12:00:00Z"}]');
-  IF result<> '{"inserted":1,"skipped":2}'::jsonb THEN RAISE EXCEPTION 'Mixed batch failed: %',result; END IF;
+  result:=public.wa_ingest_messages('[{"remote_jid":"12345@sXwhatsappXnet"},{"remote_jid":"323456789012345@lid","display_name":"Chat only"},{"remote_jid":"123456789012345@lid","remoteJidAlt":"96550000092@s.whatsapp.net","provider_message_id":"early-ack","direction":"outbound","message_type":"text","sent_at":"2026-11-05T12:00:00Z"}]');
+  IF result<> '{"inserted":1,"skipped":1}'::jsonb THEN RAISE EXCEPTION 'Mixed batch failed: %',result; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.whatsapp_chats WHERE remote_jid='323456789012345@lid') THEN RAISE EXCEPTION 'Chat-only sync row was dropped'; END IF;
   IF (SELECT ack_state FROM public.whatsapp_messages WHERE provider_message_id='early-ack')<>'read' OR EXISTS(SELECT 1 FROM public.whatsapp_pending_acks WHERE provider_message_id='early-ack') THEN RAISE EXCEPTION 'Pending ACK failed'; END IF;
   PERFORM public.wa_ingest_messages('[{"remote_jid":"223456789012345@lid","senderPn":"96550000092@s.whatsapp.net","provider_message_id":"alias-new","direction":"inbound","message_type":"text","sent_at":"2026-11-05T12:01:00Z"}]');
   IF (SELECT chat_id FROM public.whatsapp_messages WHERE provider_message_id='alias-new')<>survivor THEN RAISE EXCEPTION 'Alias duplicated chat'; END IF;
