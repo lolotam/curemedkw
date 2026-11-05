@@ -4,7 +4,9 @@ import { handleOptions, jsonError, jsonResponse } from "../_shared/cors.ts";
 import { getAdminClient } from "../_shared/supabase-admin.ts";
 import { getMyFatoorahConfig } from "../_shared/myfatoorah.ts";
 import { verifyMyFatoorahSignature } from "../_shared/payment-security.ts";
-import { applyPaymentToOrder, extractDetails, findOrder } from "../_shared/apply-payment.ts";
+import { recordIntegrationPayment } from "../_shared/integration-payment.ts";
+import { mapMyFatoorahStatus } from "../_shared/payment-status.ts";
+import { dispatchOrderNotifications, extractDetails, findOrder } from "../_shared/apply-payment.ts";
 
 Deno.serve(async (req) => {
   const preflight = handleOptions(req);
@@ -16,7 +18,7 @@ Deno.serve(async (req) => {
     }
 
     const raw = await req.text();
-    let event: any;
+    let event: { Data?: { Invoice?: { ExternalIdentifier?: string; UserDefinedField?: string } }; Event?: { Reference?: string; Name?: string; Code?: number } };
     try {
       event = JSON.parse(raw);
     } catch {
@@ -74,13 +76,13 @@ Deno.serve(async (req) => {
 
     let isSuccess = false;
     let providerStatus = "UNKNOWN";
-    if (order) {
-      const result = await applyPaymentToOrder(admin, order, data);
-      isSuccess = result.mapped.isSuccess;
-      providerStatus = result.mapped.providerStatus;
-    }
+    const receipt = await recordIntegrationPayment(admin, data, "signed_webhook");
+    const mapped = mapMyFatoorahStatus(data);
+    isSuccess = mapped.isSuccess;
+    providerStatus = mapped.providerStatus;
+    if (order && receipt?.payment_status === "paid") await dispatchOrderNotifications(admin, order.id);
 
-    await admin.from("payment_events").insert({
+    const { error: eventError } = await admin.from("payment_events").insert({
       order_id: order?.id ?? null,
       provider: "myfatoorah",
       event_source: "webhook",
@@ -94,9 +96,10 @@ Deno.serve(async (req) => {
       raw_payload: event,
       signature_valid: true,
       processed: !!order,
-      processing_error: order ? null : "order_not_found",
+      processing_error: receipt?.handled === false ? receipt.reason : order ? null : "order_not_found",
     });
 
+    if (eventError) throw new Error("payment_event_storage_unavailable");
     return jsonResponse(req, { success: true, processed: !!order }, 200);
   } catch (error) {
     console.error(

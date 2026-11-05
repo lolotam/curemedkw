@@ -27,7 +27,7 @@ class AppDeploymentContractTests(unittest.TestCase):
                          "persist_kong_cors", "deploy_functions", "apply_migrations"]:
             self.assertLess(gate, lines.index(mutation))
         self.assertEqual(self.manifest.get("schemaPrerequisites", {}).get("inventory"),
-                         "docs/releases/curemed-schema-20261104.json")
+                         "docs/releases/curemed-schema-20261105.json")
 
 
 if __name__ == "__main__":

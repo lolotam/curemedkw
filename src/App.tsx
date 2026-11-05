@@ -52,6 +52,7 @@ const AdminCoupons = lazy(() => import("./pages/admin/AdminCoupons"));
 const AdminNotificationTemplates = lazy(() => import("./pages/admin/AdminNotificationTemplates"));
 const AdminBranding = lazy(() => import("./pages/admin/AdminBranding"));
 const AdminLogs = lazy(() => import("./pages/admin/AdminLogs"));
+const AdminWhatsAppInbox = lazy(() => import("./pages/admin/AdminWhatsAppInbox"));
 const AdminWhatsApp = lazy(() => import("./pages/admin/AdminWhatsApp"));
 const AdminOrderEmail = lazy(() => import("./pages/admin/AdminOrderEmail"));
 const AdminIntegrations = lazy(() => import("./pages/admin/AdminIntegrations"));
@@ -127,6 +128,7 @@ const App = () => {
                   <Route path="branding" element={<AdminBranding />} />
                   <Route path="logs" element={<AdminLogs />} />
                   <Route path="whatsapp" element={<AdminWhatsApp />} />
+                  <Route path="whatsapp/inbox" element={<AdminWhatsAppInbox />} />
                   <Route path="order-email" element={<AdminOrderEmail />} />
                   <Route path="integrations" element={<AdminIntegrations />} />
                 </Route>

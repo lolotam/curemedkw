@@ -2,6 +2,7 @@
 // Used by both verify (callback) and webhook functions so downgrade-protection
 // rules stay identical. Success is final and never overwritten.
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { paymentAttestation, recordIntegrationPayment } from "./integration-payment.ts";
 import { mapMyFatoorahStatus, type MappedStatus } from "./payment-status.ts";
 
 export interface ResolvedDetails {
@@ -60,69 +61,12 @@ export async function applyPaymentToOrder(
   data: unknown,
 ): Promise<ApplyResult> {
   const mapped = mapMyFatoorahStatus(data);
-  const details = extractDetails(data);
+  if (paymentAttestation(data).external_identifier !== orderRow.id) throw new Error("payment_order_mismatch");
+  const receipt = await recordIntegrationPayment(admin, data, "verified_callback");
+  if (!receipt) throw new Error("payment_receipt_missing");
   const alreadyPaid = orderRow.payment_status === "paid";
-
-  // Never downgrade a paid order.
-  if (alreadyPaid) {
-    return { mapped, orderId: orderRow.id, alreadyPaid: true, changed: false };
-  }
-
-  const patch: Record<string, unknown> = {
-    payment_status: mapped.paymentStatus,
-    payment_verified_at: new Date().toISOString(),
-    myfatoorah_invoice_id: details.invoiceId ?? undefined,
-    myfatoorah_invoice_reference: details.invoiceReference ?? undefined,
-    myfatoorah_payment_id: details.paymentId ?? undefined,
-    myfatoorah_transaction_id: details.transactionId ?? undefined,
-    myfatoorah_reference_id: details.referenceId ?? undefined,
-    myfatoorah_track_id: details.trackId ?? undefined,
-    // Actual method used per the provider response (source of truth over the requested one).
-    payment_online_method: details.paymentMethod ?? undefined,
-    myfatoorah_card_brand: details.cardBrand ?? undefined,
-    myfatoorah_card_last4: details.cardLast4 ?? undefined,
-  };
-
-
-  if (mapped.isSuccess) {
-    patch.paid_at = new Date().toISOString();
-    patch.order_status = "confirmed";
-    patch.payment_error_code = null;
-    patch.payment_error_message = null;
-  } else if (mapped.isFinal) {
-    patch.failed_at = new Date().toISOString();
-    if (details.errorCode) patch.payment_error_code = details.errorCode;
-    if (details.errorMessage) patch.payment_error_message = details.errorMessage;
-  }
-
-  // Strip undefined so we don't clobber existing columns.
-  for (const k of Object.keys(patch)) {
-    if (patch[k] === undefined) delete patch[k];
-  }
-
-  // The result MUST be inspected. A rejected PATCH — e.g. PGRST204 when a
-  // column in `patch` is missing because a migration never applied — otherwise
-  // fails completely silently: the provider is recorded as SUCCESS, the event
-  // row is marked processed, and the order simply never leaves pending_payment.
-  // That is exactly what happened between 2026-06-29 and 2026-08-09.
-  const { error: updateError } = await admin
-    .from("orders")
-    .update(patch)
-    .eq("id", orderRow.id);
-
-  if (updateError) {
-    console.error(
-      `apply-payment: order_update_failed order=${orderRow.id} code=${updateError.code} ${updateError.message}`,
-    );
-    throw new Error(`Failed to apply payment to order ${orderRow.id}: ${updateError.message}`);
-  }
-
-  // On first successful payment, fire order notifications (email + WhatsApp).
-  if (mapped.isSuccess) {
-    await dispatchOrderNotifications(admin, orderRow.id);
-  }
-
-  return { mapped, orderId: orderRow.id, alreadyPaid: false, changed: true };
+  if (receipt.payment_status === "paid") await dispatchOrderNotifications(admin, orderRow.id);
+  return { mapped, orderId: orderRow.id, alreadyPaid, changed: receipt.changed === true };
 }
 
 /**
@@ -135,6 +79,8 @@ export async function dispatchOrderNotifications(
   orderId: string,
 ): Promise<void> {
   try {
+    const { data: owner, error: ownerError } = await admin.rpc("wa_read_payment_owner", { p_order_id: orderId });
+    if (ownerError) throw new Error("payment_owner_unavailable");
     // Atomically claim the notification slot (NULL -> now()).
     const claimedAt = new Date().toISOString();
     const { data: claimed } = await admin
@@ -193,7 +139,7 @@ export async function dispatchOrderNotifications(
     );
 
     // 2) Customer order confirmation (order.paid).
-    if (order.customer_phone) {
+    if (owner?.owner === "legacy" && owner?.owner_snapshot?.whatsapp?.manual_only !== true && order.customer_phone) {
       tasks.push(
         admin.functions.invoke("send-whatsapp", {
           headers: invokeHeaders,
@@ -213,7 +159,7 @@ export async function dispatchOrderNotifications(
     }
 
     // 3) Admin new-order alert to company numbers.
-    if (adminNumbers.length > 0) {
+    if (owner?.owner === "legacy" && owner?.owner_snapshot?.whatsapp?.manual_only !== true && adminNumbers.length > 0) {
       tasks.push(
         admin.functions.invoke("send-whatsapp", {
           headers: invokeHeaders,

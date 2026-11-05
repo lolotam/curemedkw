@@ -1,0 +1,43 @@
+# Shipa activation and WhatsApp inbox
+
+This change makes saved Shipa settings activatable and adds administrator replies through the existing `curemed` Evolution session. It is prepared locally. It does not constitute production SQL, merge, deployment, shipping, payment, or customer-message acceptance.
+
+## Behavior
+
+- Shipa enablement requires unchanged saved configuration, its credential, a matching probe less than five minutes old, verified credentials and a matched origin city. Automatic mode additionally requires a scheduler heartbeat less than three minutes old. Disabling remains available. The existing browser confirmation applies to live activation.
+- `shipa-dispatch` verifies pending payment evidence, expires leases, processes at most three candidates through the existing claim/begin-submission protocol, and records readiness only for the dedicated scheduler credential. The shopping hold remains authoritative. Starting a scheduler does not authorize a shipment while that hold is active.
+- MyFatoorah callbacks and authenticated webhooks use the canonical owner RPC. Signed success without amount evidence goes through provider verification. KWD base amounts are parsed exactly to three-decimal integer amounts; display currency is not payment authority.
+- WhatsApp settings have Direct API and Postora tabs. The inbox supports contact search, paged history, unread counters, live updates with polling fallback, text, attachments and voice recording. Storage is administrator-only. Media is limited to 10 MiB and an explicit MIME allowlist; signed access expires after 60 seconds.
+- LID identities are retained without invented telephone numbers. Proven alternate phone identifiers merge related chats. PostgreSQL's existing nullable phone uniqueness already permits multiple unknown numbers, so a redundant partial index is unnecessary. Message ingestion and read counters serialize, and repeated provider IDs do not increment unread counts.
+- A send reserves its request UUID before contacting Evolution. Unknown outcomes keep that reservation. Retrying the same unchanged draft cannot send twice; operators must inspect the conversation before intentionally composing a new request.
+- Synchronization resumes a durable leased cursor. It imports only the history Evolution already holds. It never resets, creates, logs out, re-pairs, or changes `syncFullHistory` on the session.
+
+## Production cutover prerequisites
+
+### Mandatory deployment dependency order
+
+Before merging, pause all four deployment triggers: Dokploy `autoDeploy` for app `DUD-HjdHdzWt9fuE0LxRz`, the root crontab `*/2` migration job, the root crontab `*/5` post-deploy job, and `/etc/cron.d/curemed-supabase-post-deploy`. Verify all four are paused before proceeding.
+
+Only then merge, apply the inventoried migrations, run `integration_activate_payment_retention`, and verify the invoice guards. Deploy Edge code only after those database prerequisites pass. Re-enable the four triggers only after the compatible release is verified. This order is a hard dependency; do not let an automatic deployment publish new writers before the database guards are active.
+
+`scripts/tests/test_curemed_app_release.py` intentionally pins `1819a10` as a historical release fixture. Keep that pin and retain separate current-head release coverage.
+
+Production remains a separate owner decision. Before an approved cutover, capture compatible frontend, Edge/shared code, routing, configuration and image before-assets. Quiesce payment writers and administrator order mutation/deletion while establishing the existing invoice and retention guards. The previous release instructions in `curemed-app-20261104.md` remain applicable.
+
+1. Apply and record the exact 22 migrations in `curemed-schema-20261105.json` through the controlled schema process. The November 4 inventory remains immutable. The app prerequisite checks all 22 checksums with one bounded read-only ledger query; it does not apply migrations. A separate read-only gate also requires the retention flag, valid unique invoice index and enabled invoice identity/truncate triggers before publication.
+2. Under the approved quiesced cutover, activate and verify `integration_activate_invoice_guard` and `integration_activate_payment_retention` before enabling the new payment writers. Preserve retained evidence and guards during rollback. Do not enable the native automatic WhatsApp notification owner as part of this inbox change: the inbox is manual administrator messaging.
+3. Deliver `shipa-dispatch`, `whatsapp-inbox`, the modified payment/webhook handlers, `_shared`, configuration and frontend according to `ops/edge-env.manifest.example.json`. Supply secrets through the existing secure environment delivery, never committed files or command arguments. Obtain `SHIPA_DISPATCH_TOKEN` through the secret-input mechanism during the approved deployment.
+4. Preserve the server-owned `main` router. A read-only inspection showed it selects the first path segment. The internal Evolution webhook target is `http://cloud-supabase-hns8fw-supabase-edge-functions:9000/whatsapp-pairing-webhook`; `/functions/v1` is the Kong path and is incorrect for this direct internal target. Check routing after function delivery without resetting the instance.
+5. Install `scripts/run-shipa-dispatch.sh` at `/opt/curemed/run-shipa-dispatch.sh`. Its curl configuration at `/etc/curemed/shipa-dispatch.curl` must be root-owned, mode `0600`, a regular non-symlink file, containing the reviewed endpoint and `x-shipa-dispatch-token` header. Schedule `* * * * * /opt/curemed/run-shipa-dispatch.sh`. The script uses `flock` to prevent overlapping local cron invocations. Never echo the configuration or secret.
+6. Save Shipa configuration and credentials while disabled, diagnose, observe a real scheduler heartbeat, then activate the selected mode using the admin UI and its live confirmation. Do not release the shopping hold as an incidental deployment step.
+7. From the Direct API tab, synchronize to configure the authenticated webhook and import existing contacts/history. Confirm that the instance remains open. A controlled recipient must be explicitly authorized before live text/media/reply acceptance testing.
+
+## Rollback and verification limits
+
+Rollback stops the scheduler and restores compatible application assets while retaining migrations, payment evidence, invoice protection, chat history and the paired session. An uncertain or accepted send/shipment must never be replayed during rollback. Do not restore a whole stale database/environment snapshot or deploy this repository's untracked `main` directory.
+
+Local verification uses the disposable isolated PostgreSQL fixture and synthetic accounts only: migrations, reruns, roles, activation, LID merges, unread races and concurrent duplicate ingestion. Deno tests cover transport authentication, uncertain send retries, durable sync, provider boundaries and existing Shipa behavior. Frontend typecheck, production build, Vitest and release-script tests validate source composition. These are not proof of live provider delivery, browser media compatibility on every device, or production deployment. Larger historical media may have expired at Evolution and will show a retrieval error.
+
+Review corrections: committed payment receipts survive deferred-verification outages; paid receipts retry atomic notification claiming; scheduler progress is independent of payment-verification outages; native keyId ACKs and outbound LID identity are preserved. Uncertain sends display a distinct operator warning. Mark-read uses the server last-message identity only once that message is loaded, including equal-timestamp messages. Media storage is content-addressed and reused, so repeated identical uploads do not create one object per retry. Production compatibility checks remain deferred to an approved deployment.
+
+The `shipa-dispatch` cron must be installed even while Shipa stays disabled: it is also the payment-verification worker.

@@ -12,16 +12,20 @@ checks = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(checks)
 
 
+# This verifier belongs to the frozen November 4 release, not later feature heads.
+RELEASE_REF = "1819a10"
+
+
 class AppReleaseContentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        inventory = subprocess.check_output(["git", "show", ":" + checks.SOURCES], cwd=ROOT)
+        inventory = subprocess.check_output(["git", "show", RELEASE_REF + ":" + checks.SOURCES], cwd=ROOT)
         selected = {item["path"] for item in json.loads(inventory)["paths"]}
         cls.paths = selected | checks.ADDITIONS
         cls.captured_blobs = {}
         for path in cls.paths:
             try:
-                cls.captured_blobs[path] = subprocess.check_output(["git", "show", ":" + path], cwd=ROOT, stderr=subprocess.DEVNULL)
+                cls.captured_blobs[path] = subprocess.check_output(["git", "show", RELEASE_REF + ":" + path], cwd=ROOT, stderr=subprocess.DEVNULL)
             except subprocess.CalledProcessError:
                 cls.captured_blobs[path] = (ROOT / path).read_bytes().replace(b"\r\n", b"\n")
 

@@ -1,6 +1,7 @@
 """The DB/process boundary is mocked; no SQL, Docker or server operation runs."""
 import importlib.util
 import json
+import subprocess
 import os
 from pathlib import Path
 import tempfile
@@ -33,13 +34,26 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         self.reader = Mock(return_value=self.rows)
 
     def verify(self):
-        return checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader)
+        return checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader, lambda _: True)
+
+    def test_current_release_manifest_and_migration_blobs(self):
+        self.manifest = json.loads((ROOT / "ops/edge-env.manifest.example.json").read_text())
+        self.assertTrue({"shipa-dispatch", "whatsapp-inbox"}.issubset(self.manifest["deployFunctions"]))
+        self.assertTrue(self.verify()["schemaReady"])
+        for item in self.items:
+            raw = (ROOT / item["path"]).read_bytes().replace(b"\r\n", b"\n")
+            blob = subprocess.check_output(["git", "hash-object", "--stdin"], input=raw, cwd=ROOT).decode().strip()
+            self.assertEqual(item["gitBlob"], blob, item["path"])
+
+    def test_unarmed_payment_guards_refuse_publication(self):
+        with self.assertRaisesRegex(checks.SchemaReadinessError, "payment_guards_not_ready"):
+            checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader, lambda _: False)
 
     def test_exact_existing_ledger_allows_app_publication_without_activation(self):
         result = self.verify()
         self.assertTrue(result["schemaReady"])
         self.assertFalse(result["schemaActivated"])
-        self.assertEqual(result["verifiedMigrations"], 20)
+        self.assertEqual(result["verifiedMigrations"], 22)
         self.reader.assert_called_once_with("curemed-db", [x["filename"] for x in self.items])
 
     def test_missing_checksum_or_ledger_row_refuses(self):
@@ -118,7 +132,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         query = process.call_args.args[0][-1]
         self.assertIn("octet_length(checksum)", query)
         self.assertIn("octet_length(filename)", query)
-        self.assertIn("LIMIT 21", query)
+        self.assertIn("LIMIT 23", query)
         self.assertEqual(process.call_args.kwargs.get("stderr"), checks.subprocess.DEVNULL)
         self.assertNotIn("capture_output", process.call_args.kwargs)
 

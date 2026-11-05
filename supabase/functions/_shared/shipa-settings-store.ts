@@ -105,7 +105,7 @@ export function createShipaSettingsStore(
       const { expectedRevision, settings } = parsed.request;
       const raw = await callShipaRpc(client, "shipa_save_settings", {
         _expected_revision: expectedRevision,
-        _settings: settings,
+        _settings: { ...settings, ...(parsed.request.liveActivationConfirmed === undefined ? {} : { liveActivationConfirmed: parsed.request.liveActivationConfirmed }) },
         // An ordinary save preserves the stored credential. Replacing or
         // removing a credential is a separate, later operation.
         _credential_change: null,

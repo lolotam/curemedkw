@@ -55,6 +55,13 @@ export type ShipaAdminErrorCode =
   | "credential_in_use"
   | "credential_missing"
   | "invalid_response"
+  | "save_before_activation"
+  | "configuration_incomplete"
+  | "verification_stale"
+  | "verification_failed"
+  | "origin_city_unmatched"
+  | "scheduler_stale"
+  | "live_confirmation_required"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -80,6 +87,13 @@ export const SHIPA_ADMIN_ERROR_MESSAGES: Readonly<Record<ShipaAdminErrorCode, st
     "The Shipa API key is still in use by a shipment that may still be dispatched.",
   credential_missing: "No Shipa API key is configured for this environment.",
   invalid_response: "The Shipa service returned an unusable response.",
+  save_before_activation: "Save configuration with delivery disabled, then verify before enabling.",
+  configuration_incomplete: "Complete the pickup and parcel configuration.",
+  verification_stale: "Run a new connection check before enabling delivery.",
+  verification_failed: "The stored credential has not passed verification.",
+  origin_city_unmatched: "The pickup city does not match the provider directory.",
+  scheduler_stale: "The scheduler has no current successful run.",
+  live_confirmation_required: "Switching Shipa to live needs an explicit confirmation.",
   runtime_not_ready:
     "Shipa delivery cannot be enabled yet because the delivery runtime is not ready.",
   upgrade_required: "Shipa delivery configuration is not available in this deployment yet.",
@@ -124,6 +138,7 @@ export type ShipaAdminInvoke = (
 
 /** The request of a settings-only save. */
 export interface ShipaAdminSaveRequest {
+  readonly liveActivationConfirmed?: boolean;
   readonly expectedRevision: number;
   readonly settings: ShipaSaveableSettings;
 }
@@ -218,7 +233,7 @@ export function createShipaAdminClient(invoke: ShipaAdminInvoke): ShipaAdminClie
       if (settings === null) return failure("invalid_request");
       return writeSettings({
         action: "settings.save",
-        request: { expectedRevision: settings.expectedRevision, settings: settings.settings },
+        request: { expectedRevision: settings.expectedRevision, settings: settings.settings, ...(request.liveActivationConfirmed === true ? { liveActivationConfirmed: true } : {}) },
       }, settings.expectedRevision);
     },
 
@@ -232,6 +247,7 @@ export function createShipaAdminClient(invoke: ShipaAdminInvoke): ShipaAdminClie
         request: {
           expectedRevision: settings.expectedRevision,
           settings: settings.settings,
+          ...(request.liveActivationConfirmed === true ? { liveActivationConfirmed: true } : {}),
           credential,
         },
       }, settings.expectedRevision);

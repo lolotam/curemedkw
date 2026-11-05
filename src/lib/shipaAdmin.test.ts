@@ -137,9 +137,10 @@ describe("the action vocabulary", () => {
     const settings = saveableSettingsFixture();
     fake.queueResult(successResponse(writtenSettingsFixture()));
 
-    await client.saveSettings({ expectedRevision: 7, settings });
+    await client.saveSettings({ expectedRevision: 7, settings, liveActivationConfirmed: true });
 
     const request = recordedAction(fake.calls[0]).request;
+    expect(request?.liveActivationConfirmed).toBe(true);
     expect(request?.expectedRevision).toBe(7);
     const payload = request?.settings as ShipaSaveableSettings;
     expect(Object.keys(payload).sort()).toEqual([

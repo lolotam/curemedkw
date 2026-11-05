@@ -53,6 +53,13 @@ export type ShipaConfigurationErrorCode =
   | "conflict"
   | "forbidden"
   | "credential_in_use"
+  | "save_before_activation"
+  | "configuration_incomplete"
+  | "verification_stale"
+  | "verification_failed"
+  | "origin_city_unmatched"
+  | "scheduler_stale"
+  | "live_confirmation_required"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -79,6 +86,13 @@ export const SHIPA_CONFIGURATION_ERROR_MESSAGES: Readonly<
   forbidden: "The Shipa configuration request is not allowed.",
   credential_in_use:
     "The Shipa credential is still in use by an order that may still be dispatched.",
+  save_before_activation: "Save configuration with delivery disabled, then verify before enabling.",
+  configuration_incomplete: "Complete the pickup and parcel configuration.",
+  verification_stale: "Run a new connection check before enabling delivery.",
+  verification_failed: "The stored credential has not passed verification.",
+  origin_city_unmatched: "The pickup city does not match the provider directory.",
+  scheduler_stale: "The scheduler has no current successful run.",
+  live_confirmation_required: "Switching Shipa to live needs an explicit confirmation.",
   runtime_not_ready:
     "Shipa delivery cannot be enabled yet because the delivery runtime is not ready.",
   upgrade_required:
@@ -176,6 +190,7 @@ export type ShipaCredentialAction =
 
 /** The validated credential save action. */
 export interface ShipaCredentialSaveRequest {
+  readonly liveActivationConfirmed?: boolean;
   readonly expectedRevision: number;
   /** The validated safe settings patch. */
   readonly settings: ShipaSaveableSettings;
@@ -221,6 +236,7 @@ const credentialActionSchema = z.discriminatedUnion("mode", [
 const credentialSaveRequestSchema = z.object({
   expectedRevision: z.number().int().nonnegative().max(SHIPA_MAX_REVISION),
   settings: z.unknown(),
+  liveActivationConfirmed: z.boolean().optional(),
   credential: credentialActionSchema,
 }).strict();
 
@@ -243,7 +259,7 @@ export function parseShipaCredentialSaveRequest(
 ): ShipaConfigurationParseResult<ShipaCredentialSaveRequest> {
   if (!isPlainRecord(raw)) return { ok: false };
   if (
-    !hasExactRecordKeys(raw, ["expectedRevision", "settings", "credential"])
+    !hasExactRecordKeys(raw, ["expectedRevision", "settings", "credential", ...(Object.hasOwn(raw, "liveActivationConfirmed") ? ["liveActivationConfirmed"] : [])])
   ) {
     return { ok: false };
   }
@@ -267,6 +283,7 @@ export function parseShipaCredentialSaveRequest(
     request: {
       expectedRevision,
       settings: saveRequest.settings,
+      ...(parsed.data.liveActivationConfirmed === undefined ? {} : { liveActivationConfirmed: parsed.data.liveActivationConfirmed }),
       credential,
     },
   };
@@ -318,6 +335,16 @@ const RUNTIME_NOT_READY_REASON = "shipa_runtime_not_ready";
 export function mapShipaConfigurationSqlError(
   error: unknown,
 ): ShipaConfigurationError {
+  if (isPlainRecord(error)) {
+    if (error.message === "shipa_credential_missing") return new ShipaConfigurationError("credential_missing");
+    if (error.message === "shipa_save_before_activation") return new ShipaConfigurationError("save_before_activation");
+    if (error.message === "shipa_configuration_incomplete") return new ShipaConfigurationError("configuration_incomplete");
+    if (error.message === "shipa_verification_stale") return new ShipaConfigurationError("verification_stale");
+    if (error.message === "shipa_verification_failed") return new ShipaConfigurationError("verification_failed");
+    if (error.message === "shipa_origin_city_unmatched") return new ShipaConfigurationError("origin_city_unmatched");
+    if (error.message === "shipa_scheduler_stale") return new ShipaConfigurationError("scheduler_stale");
+    if (error.message === "shipa_live_confirmation_required") return new ShipaConfigurationError("live_confirmation_required");
+  }
   const sqlState = readSqlStateCode(error);
   if (
     sqlState === "40001" || sqlState === "23505" || sqlState === "40P01"

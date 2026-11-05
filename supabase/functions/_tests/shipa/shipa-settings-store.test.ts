@@ -647,3 +647,11 @@ Deno.test("never reports a refused enablement as an enabled configuration", asyn
   );
   assertEquals(client.calls.length, 1);
 });
+
+Deno.test("admin action preserves explicit live activation confirmation", async () => {
+  const { parseShipaAdminAction } = await import("../../_shared/shipa-admin-actions.ts");
+  const request = { ...createSaveRequest(), liveActivationConfirmed: true };
+  assertEquals(parseShipaAdminAction({ action: "settings.save", request }), {
+    ok: true, action: { action: "settings.save", request },
+  });
+});

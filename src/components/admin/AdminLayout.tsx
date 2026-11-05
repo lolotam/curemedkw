@@ -23,6 +23,7 @@ const NAV = [
   { to: "/admin/branding", icon: Palette, label: "Branding" },
   { to: "/admin/flags", icon: Flag, label: "Site Flags" },
   { to: "/admin/messages", icon: Mail, label: "Messages" },
+  { to: "/admin/whatsapp/inbox", icon: MessageCircle, label: "WhatsApp Inbox" },
   { to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
   { to: "/admin/order-email", icon: MailCheck, label: "Order Email" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },
