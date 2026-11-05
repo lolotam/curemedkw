@@ -55,6 +55,9 @@ DECLARE inserted uuid;
 BEGIN
   PERFORM private.wa_require_admin(p_actor_id);
   IF p_content_hash !~ '^[a-f0-9]{64}$' THEN RAISE EXCEPTION 'invalid_content_hash'; END IF;
+  PERFORM pg_advisory_xact_lock(20261105,20);
+  PERFORM 1 FROM public.whatsapp_chats WHERE id=p_chat_id FOR KEY SHARE;
+  IF NOT FOUND THEN RETURN false; END IF;
   INSERT INTO private.wa_inbox_sends(request_id,chat_id,actor_id,content_hash) VALUES(p_request_id,p_chat_id,p_actor_id,p_content_hash)
     ON CONFLICT DO NOTHING RETURNING request_id INTO inserted;
   RETURN inserted IS NOT NULL;
@@ -64,17 +67,24 @@ REVOKE ALL ON FUNCTION public.wa_reserve_inbox_send(uuid,uuid,uuid,text) FROM PU
 GRANT EXECUTE ON FUNCTION public.wa_reserve_inbox_send(uuid,uuid,uuid,text) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.wa_ingest_messages(p_rows jsonb)
-RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
-DECLARE entry jsonb; jid text; phone text; chat uuid; other_chat uuid; inserted uuid; inserted_count integer:=0; stamp timestamptz;
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
+DECLARE skipped integer:=0; alt text; pending public.whatsapp_pending_acks; entry jsonb; jid text; phone text; chat uuid; other_chat uuid; inserted uuid; inserted_count integer:=0; stamp timestamptz;
 BEGIN
   IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array' OR jsonb_array_length(p_rows)>200 THEN
     RAISE EXCEPTION 'invalid_inbox_batch'; END IF;
   -- Serializes aliases, merges and read counters, including concurrent sync/webhook batches.
   PERFORM pg_advisory_xact_lock(20261105,20);
   FOR entry IN SELECT * FROM jsonb_array_elements(p_rows) LOOP
+    BEGIN
     jid:=entry->>'remote_jid'; phone:=entry->>'normalized_phone'; chat:=NULL; other_chat:=NULL;
-    IF jid IS NULL OR jid !~ '^[0-9]{5,30}@(s.whatsapp.net|lid)$' THEN RAISE EXCEPTION 'invalid_chat_identity'; END IF;
+    IF jid IS NULL OR jid !~ '^[0-9]{5,30}@(s\.whatsapp\.net|lid)$' THEN RAISE EXCEPTION 'invalid_chat_identity'; END IF;
     IF phone IS NOT NULL AND phone !~ '^[1-9][0-9]{7,14}$' THEN RAISE EXCEPTION 'invalid_chat_phone'; END IF;
+    alt:=coalesce(entry->>'remoteJidAlt',entry->>'senderPn');
+    IF alt IS NOT NULL AND alt !~ '^[0-9]{5,30}@(s\.whatsapp\.net|lid)$' THEN
+      RAISE EXCEPTION 'invalid_chat_identity';
+    END IF;
+    phone:=coalesce(phone,CASE WHEN jid LIKE '%@s.whatsapp.net' THEN split_part(jid,'@',1)
+      WHEN alt LIKE '%@s.whatsapp.net' THEN split_part(alt,'@',1) END);
     IF entry->>'contact_only'='true' THEN
       IF phone IS NOT NULL THEN
         INSERT INTO public.whatsapp_contacts(normalized_phone,display_name) VALUES(phone,left(coalesce(entry->>'display_name',''),200))
@@ -88,6 +98,8 @@ BEGIN
     entry:=jsonb_set(entry,'{display_name}',to_jsonb(coalesce(nullif(entry->>'display_name',''),
       (SELECT display_name FROM public.whatsapp_contacts WHERE (phone IS NOT NULL AND normalized_phone=phone) OR remote_jid=jid ORDER BY normalized_phone NULLS LAST LIMIT 1),'')));
     SELECT chat_id INTO chat FROM private.wa_chat_aliases WHERE instance_identity='curemed' AND remote_jid=jid;
+    IF chat IS NULL THEN SELECT chat_id INTO chat FROM private.wa_chat_aliases WHERE instance_identity='curemed' AND remote_jid=alt; END IF;
+    IF chat IS NULL THEN SELECT id INTO chat FROM public.whatsapp_chats WHERE instance_identity='curemed' AND remote_jid=alt; END IF;
     IF chat IS NULL THEN SELECT id INTO chat FROM public.whatsapp_chats WHERE instance_identity='curemed' AND remote_jid=jid; END IF;
     IF phone IS NOT NULL THEN SELECT id INTO other_chat FROM public.whatsapp_chats WHERE instance_identity='curemed' AND normalized_phone=phone; END IF;
     IF chat IS NULL THEN chat:=other_chat; END IF;
@@ -95,10 +107,15 @@ BEGIN
       INSERT INTO public.whatsapp_chats(instance_identity,remote_jid,normalized_phone,display_name)
         VALUES('curemed',jid,phone,left(coalesce(entry->>'display_name',''),200)) RETURNING id INTO chat;
     ELSIF other_chat IS NOT NULL AND chat<>other_chat THEN
+      PERFORM id FROM public.whatsapp_chats WHERE id IN (chat,other_chat) ORDER BY id FOR UPDATE;
+      INSERT INTO private.wa_chat_aliases SELECT instance_identity,remote_jid,other_chat FROM public.whatsapp_chats WHERE id=chat AND remote_jid IS NOT NULL
+        ON CONFLICT(instance_identity,remote_jid) DO UPDATE SET chat_id=excluded.chat_id;
       UPDATE public.whatsapp_messages SET chat_id=other_chat WHERE chat_id=chat;
       UPDATE private.wa_inbox_sends SET chat_id=other_chat WHERE chat_id=chat;
       UPDATE private.wa_chat_aliases SET chat_id=other_chat WHERE chat_id=chat;
       UPDATE public.whatsapp_chats target SET unread_count=target.unread_count+source.unread_count,
+        last_read_message_id=CASE WHEN source.last_read_at>target.last_read_at OR target.last_read_at IS NULL THEN source.last_read_message_id ELSE target.last_read_message_id END,
+        last_read_at=greatest(target.last_read_at,source.last_read_at),
         last_message_at=greatest(target.last_message_at,source.last_message_at),
         last_message_id=CASE WHEN source.last_message_at>target.last_message_at OR target.last_message_at IS NULL
           THEN source.last_message_id ELSE target.last_message_id END
@@ -107,6 +124,9 @@ BEGIN
       chat:=other_chat;
     END IF;
     INSERT INTO private.wa_chat_aliases VALUES('curemed',jid,chat) ON CONFLICT(instance_identity,remote_jid) DO UPDATE SET chat_id=excluded.chat_id;
+    IF alt IS NOT NULL THEN
+      INSERT INTO private.wa_chat_aliases VALUES('curemed',alt,chat) ON CONFLICT(instance_identity,remote_jid) DO UPDATE SET chat_id=excluded.chat_id;
+    END IF;
     UPDATE public.whatsapp_chats SET normalized_phone=coalesce(normalized_phone,phone),
       display_name=CASE WHEN display_name='' THEN left(coalesce(entry->>'display_name',''),200) ELSE display_name END,
       updated_at=clock_timestamp() WHERE id=chat;
@@ -119,12 +139,17 @@ BEGIN
         ON CONFLICT(remote_jid) DO UPDATE SET display_name=CASE WHEN whatsapp_contacts.display_name=''
           THEN excluded.display_name ELSE whatsapp_contacts.display_name END;
     END IF;
-    IF entry->>'provider_message_id' IS NULL THEN CONTINUE; END IF;
+    IF nullif(entry->>'provider_message_id','') IS NULL THEN RAISE EXCEPTION 'missing_message_id'; END IF;
     stamp:=(entry->>'sent_at')::timestamptz;
     INSERT INTO public.whatsapp_messages(chat_id,instance_identity,provider_message_id,session_generation,direction,message_type,body,sent_at,historical,provider_media)
       VALUES(chat,'curemed',entry->>'provider_message_id',0,entry->>'direction',entry->>'message_type',
         coalesce(entry->>'body',''),stamp,NOT coalesce((entry->>'count_unread')::boolean,false),entry->'provider_media')
       ON CONFLICT(instance_identity,provider_message_id) DO NOTHING RETURNING id INTO inserted;
+    SELECT * INTO pending FROM public.whatsapp_pending_acks WHERE instance_identity='curemed' AND provider_message_id=entry->>'provider_message_id';
+    IF FOUND THEN
+      PERFORM public.wa_update_ack(pending.provider_message_id,pending.ack_state);
+      DELETE FROM public.whatsapp_pending_acks WHERE instance_identity='curemed' AND provider_message_id=pending.provider_message_id;
+    END IF;
     IF inserted IS NOT NULL THEN
       inserted_count:=inserted_count+1;
       UPDATE public.whatsapp_chats SET
@@ -133,8 +158,11 @@ BEGIN
         unread_count=unread_count+CASE WHEN entry->>'direction'='inbound' AND entry->>'count_unread'='true' THEN 1 ELSE 0 END
         WHERE id=chat;
     END IF;
+    EXCEPTION WHEN data_exception OR integrity_constraint_violation OR raise_exception THEN
+      skipped:=skipped+1;
+    END;
   END LOOP;
-  RETURN inserted_count;
+  RETURN jsonb_build_object('inserted',inserted_count,'skipped',skipped);
 END
 $fn$;
 
@@ -152,6 +180,16 @@ CREATE OR REPLACE FUNCTION public.wa_update_ack(p_message_id text,p_state text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
 BEGIN
   IF p_state NOT IN ('accepted','delivered','read','rejected') THEN RAISE EXCEPTION 'invalid_ack'; END IF;
+  PERFORM pg_advisory_xact_lock(20261105,20);
+  IF NOT EXISTS(SELECT 1 FROM public.whatsapp_messages WHERE instance_identity='curemed' AND provider_message_id=p_message_id) THEN
+    IF p_state<>'accepted' THEN
+      INSERT INTO public.whatsapp_pending_acks(instance_identity,provider_message_id,ack_state,occurred_at)
+        VALUES('curemed',p_message_id,p_state,clock_timestamp())
+        ON CONFLICT(instance_identity,provider_message_id) DO UPDATE SET ack_state=excluded.ack_state,occurred_at=excluded.occurred_at
+        WHERE whatsapp_pending_acks.ack_state<>'read' AND excluded.ack_state='read';
+    END IF;
+    RETURN;
+  END IF;
   UPDATE public.whatsapp_messages SET ack_state=p_state,
     delivered_at=CASE WHEN p_state='delivered' THEN clock_timestamp() ELSE delivered_at END,
     read_at=CASE WHEN p_state='read' THEN clock_timestamp() ELSE read_at END,

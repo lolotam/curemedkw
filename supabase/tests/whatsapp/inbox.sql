@@ -12,6 +12,10 @@ BEGIN
 END
 $dedup$;
 SELECT public.wa_ingest_messages('[{"remote_jid":"96550000092@s.whatsapp.net","normalized_phone":"96550000092","provider_message_id":"phone-2","direction":"inbound","message_type":"text","body":"New","sent_at":"2026-11-05T10:01:00Z","count_unread":true}]');
+SELECT public.wa_reserve_inbox_send('87000000-0000-4000-8000-000000000093',(SELECT id FROM public.whatsapp_chats WHERE remote_jid='123456789012345@lid'),'87000000-0000-4000-8000-000000000092',repeat('b',64));
+RESET ROLE;
+UPDATE public.whatsapp_chats SET last_read_at='2026-11-05',last_read_message_id='saved-read' WHERE remote_jid='123456789012345@lid';
+SET LOCAL ROLE service_role;
 SELECT public.wa_ingest_messages('[{"remote_jid":"123456789012345@lid","normalized_phone":"96550000092","provider_message_id":"lid-1","direction":"inbound","message_type":"text","body":"Hello","sent_at":"2026-11-05T10:00:00Z","count_unread":false}]');
 DO $merge_and_read$
 DECLARE chat uuid; request uuid:=gen_random_uuid(); actor uuid:='87000000-0000-4000-8000-000000000092';
@@ -19,6 +23,8 @@ BEGIN
   SELECT id INTO chat FROM public.whatsapp_chats WHERE normalized_phone='96550000092';
   IF (SELECT count(*) FROM public.whatsapp_messages WHERE chat_id=chat)<>2 OR
     (SELECT unread_count FROM public.whatsapp_chats WHERE id=chat)<>2 THEN RAISE EXCEPTION 'LID merge lost messages'; END IF;
+  IF (SELECT last_read_message_id FROM public.whatsapp_chats WHERE id=chat) IS DISTINCT FROM 'saved-read'
+    OR (SELECT last_read_at FROM public.whatsapp_chats WHERE id=chat) IS DISTINCT FROM '2026-11-05'::timestamptz THEN RAISE EXCEPTION 'Merge lost read watermark'; END IF;
   PERFORM public.wa_mark_chat_read(chat,'lid-1',actor);
   IF (SELECT unread_count FROM public.whatsapp_chats WHERE id=chat)<>2 THEN RAISE EXCEPTION 'Read cleared a newer message'; END IF;
   PERFORM public.wa_mark_chat_read(chat,'phone-2',actor);
@@ -30,6 +36,23 @@ BEGIN
   IF (SELECT ack_state FROM public.whatsapp_messages WHERE provider_message_id='phone-2')<>'read' THEN RAISE EXCEPTION 'ACK regressed'; END IF;
 END
 $merge_and_read$;
+RESET ROLE;
+DO $hardening$
+DECLARE result jsonb; survivor uuid;
+BEGIN
+  SELECT id INTO survivor FROM public.whatsapp_chats WHERE normalized_phone='96550000092';
+  IF (SELECT chat_id FROM private.wa_inbox_sends WHERE request_id='87000000-0000-4000-8000-000000000093')<>survivor THEN RAISE EXCEPTION 'Reservation not merged'; END IF;
+  -- The subsequent explicit mark-read advances the retained merge watermark.
+  IF (SELECT last_read_at FROM public.whatsapp_chats WHERE id=survivor) IS NULL THEN RAISE EXCEPTION 'Read watermark lost'; END IF;
+  PERFORM public.wa_update_ack('early-ack','read');
+  PERFORM public.wa_update_ack('early-ack','delivered');
+  result:=public.wa_ingest_messages('[{"remote_jid":"12345@sXwhatsappXnet"},{"remote_jid":"123456789012345@lid"},{"remote_jid":"123456789012345@lid","remoteJidAlt":"96550000092@s.whatsapp.net","provider_message_id":"early-ack","direction":"outbound","message_type":"text","sent_at":"2026-11-05T12:00:00Z"}]');
+  IF result<> '{"inserted":1,"skipped":2}'::jsonb THEN RAISE EXCEPTION 'Mixed batch failed: %',result; END IF;
+  IF (SELECT ack_state FROM public.whatsapp_messages WHERE provider_message_id='early-ack')<>'read' OR EXISTS(SELECT 1 FROM public.whatsapp_pending_acks WHERE provider_message_id='early-ack') THEN RAISE EXCEPTION 'Pending ACK failed'; END IF;
+  PERFORM public.wa_ingest_messages('[{"remote_jid":"223456789012345@lid","senderPn":"96550000092@s.whatsapp.net","provider_message_id":"alias-new","direction":"inbound","message_type":"text","sent_at":"2026-11-05T12:01:00Z"}]');
+  IF (SELECT chat_id FROM public.whatsapp_messages WHERE provider_message_id='alias-new')<>survivor THEN RAISE EXCEPTION 'Alias duplicated chat'; END IF;
+END
+$hardening$;
 SET LOCAL ROLE authenticated;
 DO $permissions$
 BEGIN
