@@ -230,6 +230,12 @@ export type ShipaAdminErrorCode =
   | "credential_in_use"
   | "credential_missing"
   | "invalid_response"
+  | "save_before_activation"
+  | "configuration_incomplete"
+  | "verification_stale"
+  | "verification_failed"
+  | "origin_city_unmatched"
+  | "scheduler_stale"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -251,6 +257,12 @@ const SHIPA_ADMIN_ERROR_STATUS: Readonly<Record<ShipaAdminErrorCode, number>> =
     credential_in_use: 409,
     credential_missing: 409,
     invalid_response: 502,
+    save_before_activation: 409,
+    configuration_incomplete: 409,
+    verification_stale: 409,
+    verification_failed: 409,
+    origin_city_unmatched: 409,
+    scheduler_stale: 409,
     runtime_not_ready: 503,
     upgrade_required: 503,
     unavailable: 503,

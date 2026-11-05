@@ -123,7 +123,8 @@ Deno.serve(async (req) => {
     // Provider unreachable -> pending_status_update.
     if (!details) {
       if (order && order.payment_status !== "paid") {
-        await admin.from("orders").update({ payment_status: "pending_status_update" }).eq("id", order.id);
+        await admin.from("orders").update({ payment_status: "pending_status_update" }).eq("id", order.id)
+          .not("payment_status", "in", "(paid,refunded,partially_refunded)");
       }
       return jsonResponse(req, {
         success: false,

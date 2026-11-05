@@ -42,9 +42,16 @@ import {
  * provider response.
  */
 export type ShipaSettingsErrorCode =
+  | "credential_missing"
   | "conflict"
   | "forbidden"
   | "invalid_request"
+  | "save_before_activation"
+  | "configuration_incomplete"
+  | "verification_stale"
+  | "verification_failed"
+  | "origin_city_unmatched"
+  | "scheduler_stale"
   | "runtime_not_ready"
   | "upgrade_required"
   | "unavailable"
@@ -58,9 +65,16 @@ export type ShipaSettingsErrorCode =
 export const SHIPA_SETTINGS_ERROR_MESSAGES: Readonly<
   Record<ShipaSettingsErrorCode, string>
 > = {
+  credential_missing: "The Shipa credential is not configured.",
   conflict: "The Shipa settings were changed by someone else. Reload and try again.",
   forbidden: "The Shipa settings request is not allowed.",
   invalid_request: "The Shipa settings request is not valid.",
+  save_before_activation: "Save configuration with delivery disabled, then verify before enabling.",
+  configuration_incomplete: "Complete the pickup and parcel configuration.",
+  verification_stale: "Run a new connection check before enabling delivery.",
+  verification_failed: "The stored credential has not passed verification.",
+  origin_city_unmatched: "The pickup city does not match the provider directory.",
+  scheduler_stale: "The scheduler has no current successful run.",
   runtime_not_ready:
     "Shipa delivery cannot be enabled yet because the delivery runtime is not ready.",
   upgrade_required: "The Shipa settings storage is not available in this deployment yet.",
@@ -97,6 +111,15 @@ const RUNTIME_NOT_READY_REASON = "shipa_runtime_not_ready";
  * to classify the failure and are never returned or attached.
  */
 export function mapShipaSqlError(error: unknown): ShipaSettingsError {
+  if (isPlainRecord(error)) {
+    if (error.message === "shipa_credential_missing") return new ShipaSettingsError("credential_missing");
+    if (error.message === "shipa_save_before_activation") return new ShipaSettingsError("save_before_activation");
+    if (error.message === "shipa_configuration_incomplete") return new ShipaSettingsError("configuration_incomplete");
+    if (error.message === "shipa_verification_stale") return new ShipaSettingsError("verification_stale");
+    if (error.message === "shipa_verification_failed") return new ShipaSettingsError("verification_failed");
+    if (error.message === "shipa_origin_city_unmatched") return new ShipaSettingsError("origin_city_unmatched");
+    if (error.message === "shipa_scheduler_stale") return new ShipaSettingsError("scheduler_stale");
+  }
   const sqlState = readSqlStateCode(error);
   if (sqlState === "40001" || sqlState === "23505" || sqlState === "40P01") return new ShipaSettingsError("conflict");
   if (sqlState === "42501") return new ShipaSettingsError("forbidden");
