@@ -180,7 +180,8 @@ BEGIN
   PERFORM pg_advisory_xact_lock(20261105,20);
   UPDATE public.whatsapp_chats SET unread_count=0,last_read_message_id=p_seen_message_id,last_read_at=clock_timestamp()
     -- Equal timestamps use provider_message_id in C collation as the deterministic tie-break.
-    WHERE id=p_chat_id AND unread_count>0 AND p_seen_message_id=(
+    -- Re-marking the latest message is an idempotent success, so already-read chats report true.
+    WHERE id=p_chat_id AND p_seen_message_id=(
       SELECT provider_message_id FROM public.whatsapp_messages WHERE chat_id=p_chat_id
       ORDER BY sent_at DESC,provider_message_id COLLATE "C" DESC LIMIT 1);
   RETURN FOUND;

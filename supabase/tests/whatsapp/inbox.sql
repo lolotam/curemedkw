@@ -27,7 +27,8 @@ BEGIN
     OR (SELECT last_read_at FROM public.whatsapp_chats WHERE id=chat) IS DISTINCT FROM '2026-11-05'::timestamptz THEN RAISE EXCEPTION 'Merge lost read watermark'; END IF;
   IF public.wa_mark_chat_read(chat,'lid-1',actor) THEN RAISE EXCEPTION 'False read receipt'; END IF;
   IF (SELECT unread_count FROM public.whatsapp_chats WHERE id=chat)<>2 THEN RAISE EXCEPTION 'Read cleared a newer message'; END IF;
-  PERFORM public.wa_mark_chat_read(chat,'phone-2',actor);
+  IF NOT public.wa_mark_chat_read(chat,'phone-2',actor) THEN RAISE EXCEPTION 'Read of latest message reported false'; END IF;
+  IF NOT public.wa_mark_chat_read(chat,'phone-2',actor) THEN RAISE EXCEPTION 'Repeated read of an already-read chat reported false'; END IF;
   IF (SELECT unread_count FROM public.whatsapp_chats WHERE id=chat)<>0 THEN RAISE EXCEPTION 'Read did not clear seen messages'; END IF;
   IF NOT public.wa_reserve_inbox_send(request,chat,actor,repeat('a',64))
     OR public.wa_reserve_inbox_send(request,chat,actor,repeat('a',64)) THEN RAISE EXCEPTION 'Repeated send was authorized'; END IF;
