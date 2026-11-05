@@ -14,6 +14,14 @@ This change makes saved Shipa settings activatable and adds administrator replie
 
 ## Production cutover prerequisites
 
+### Mandatory deployment dependency order
+
+Before merging, pause all four deployment triggers: Dokploy `autoDeploy` for app `DUD-HjdHdzWt9fuE0LxRz`, the root crontab `*/2` migration job, the root crontab `*/5` post-deploy job, and `/etc/cron.d/curemed-supabase-post-deploy`. Verify all four are paused before proceeding.
+
+Only then merge, apply the inventoried migrations, run `integration_activate_payment_retention`, and verify the invoice guards. Deploy Edge code only after those database prerequisites pass. Re-enable the four triggers only after the compatible release is verified. This order is a hard dependency; do not let an automatic deployment publish new writers before the database guards are active.
+
+`scripts/tests/test_curemed_app_release.py` intentionally pins `1819a10` as a historical release fixture. Keep that pin and retain separate current-head release coverage.
+
 Production remains a separate owner decision. Before an approved cutover, capture compatible frontend, Edge/shared code, routing, configuration and image before-assets. Quiesce payment writers and administrator order mutation/deletion while establishing the existing invoice and retention guards. The previous release instructions in `curemed-app-20261104.md` remain applicable.
 
 1. Apply and record the exact 22 migrations in `curemed-schema-20261105.json` through the controlled schema process. The November 4 inventory remains immutable. The app prerequisite checks all 22 checksums with one bounded read-only ledger query; it does not apply migrations. A separate read-only gate also requires the retention flag, valid unique invoice index and enabled invoice identity/truncate triggers before publication.
@@ -31,3 +39,5 @@ Rollback stops the scheduler and restores compatible application assets while re
 Local verification uses the disposable isolated PostgreSQL fixture and synthetic accounts only: migrations, reruns, roles, activation, LID merges, unread races and concurrent duplicate ingestion. Deno tests cover transport authentication, uncertain send retries, durable sync, provider boundaries and existing Shipa behavior. Frontend typecheck, production build, Vitest and release-script tests validate source composition. These are not proof of live provider delivery, browser media compatibility on every device, or production deployment. Larger historical media may have expired at Evolution and will show a retrieval error.
 
 Review corrections: committed payment receipts survive deferred-verification outages; paid receipts retry atomic notification claiming; scheduler progress is independent of payment-verification outages; native keyId ACKs and outbound LID identity are preserved. Uncertain sends display a distinct operator warning. Mark-read uses the server last-message identity only once that message is loaded, including equal-timestamp messages. Media storage is content-addressed and reused, so repeated identical uploads do not create one object per retry. Production compatibility checks remain deferred to an approved deployment.
+
+The `shipa-dispatch` cron must be installed even while Shipa stays disabled: it is also the payment-verification worker.

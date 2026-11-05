@@ -10,7 +10,7 @@ const requestId = "87000000-0000-4000-8000-000000000003";
 
 // Only HTTP is replaced. Authentication, SDK query construction, validation,
 // provider dispatch and response handling execute their production code.
-function fixture(options: { isAdmin?: boolean; providerFails?: boolean; failSyncSave?: boolean } = {}) {
+function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: boolean; failSyncSave?: boolean } = {}) {
   const calls: { path: string; body: Record<string, unknown> }[] = [];
   let reserved = false;
   let providerSends = 0;
@@ -39,6 +39,8 @@ function fixture(options: { isAdmin?: boolean; providerFails?: boolean; failSync
     fetchImpl: (input, init) => {
       const path = new URL(String(input)).pathname;
       calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : {} });
+      if (path === "/webhook/find/curemed") return Promise.resolve(Response.json(options.hook ?? {}));
+      if (path === "/webhook/set/curemed") return Promise.resolve(Response.json({}));
       if (path === "/instance/connectionState/curemed") return Promise.resolve(Response.json({ instance: { state: "open" } }));
       if (path === "/message/sendText/curemed") {
         providerSends++;
@@ -121,5 +123,25 @@ Deno.test("sync resumes its durable cursor, imports history without unread incre
     const rows = test.calls.find(call => call.path.endsWith("/wa_ingest_messages"))?.body.p_rows as Record<string, unknown>[];
     assertEquals(rows[0].count_unread, false);
     assertEquals(test.calls.at(-1)?.body.processed_count, 101);
+  }
+});
+
+Deno.test("webhook merges events and preserves custom headers using the v2 DTO", async () => {
+  const test = fixture({ hook: { events: ["CALL", "MESSAGES_UPSERT"], headers: { custom: "value", "X-Curemed-Webhook-Key": "old" } } });
+  assertEquals((await test.request({ action: "webhook.ensure" })).status, 200);
+  const calls = test.calls.filter(call => call.path.startsWith("/webhook/"));
+  assertEquals(calls.map(call => call.path), ["/webhook/find/curemed", "/webhook/set/curemed"]);
+  assertEquals(calls[1].body, { webhook: { enabled: true,
+    url: "http://cloud-supabase-hns8fw-supabase-edge-functions:9000/whatsapp-pairing-webhook",
+    headers: { custom: "value", "x-curemed-webhook-key": "fixture-hk" }, byEvents: false, base64: false,
+    events: ["CALL", "MESSAGES_UPSERT", "CONNECTION_UPDATE", "MESSAGES_UPDATE"] } });
+});
+Deno.test("webhook conflicts require explicit force", async () => {
+  for (const force of [false, true]) {
+    const test = fixture({ hook: { url: "https://other.test/hook", events: ["CALL"] } });
+    const response = await test.request({ action: "webhook.ensure", force });
+    assertEquals(response.status, force ? 200 : 409);
+    if (!force) assertEquals((await response.json()).error.code, "webhook_conflict");
+    assertEquals(test.calls.some(call => call.path === "/webhook/set/curemed"), force);
   }
 });

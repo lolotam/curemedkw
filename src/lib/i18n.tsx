@@ -12,6 +12,8 @@ export const TRANSLATIONS: Dict = {
   "admin.whatsapp.sync": { en: "Sync conversations and contacts", ar: "مزامنة المحادثات وجهات الاتصال" },
   "admin.whatsapp.historyNote": { en: "Imports the history available on the connected account. Older messages may be unavailable. Your paired session is preserved.", ar: "تستورد المزامنة السجل المتاح للحساب المتصل. قد لا تتوفر الرسائل القديمة. تظل جلسة الربط محفوظة." },
   "admin.whatsapp.processed": { en: "Records processed", ar: "السجلات المستوردة" },
+  "admin.whatsapp.webhookConflict": { en: "Another webhook URL is configured. Replace it to enable the inbox?", ar: "يوجد رابط webhook آخر. هل تريد استبداله لتفعيل صندوق الوارد؟" },
+  "admin.whatsapp.webhookForce": { en: "Replace webhook and sync", ar: "استبدال webhook والمزامنة" },
   "admin.whatsapp.syncFailed": { en: "Sync paused. Wait a minute, then press Sync to resume.", ar: "توقفت المزامنة. انتظر دقيقة ثم اضغط المزامنة للاستكمال." },
   "admin.whatsapp.connected": { en: "Connected", ar: "متصل" },
   "admin.whatsapp.disconnected": { en: "Disconnected or checking connection — sending unavailable", ar: "غير متصل أو جارٍ فحص الاتصال — الإرسال غير متاح" },

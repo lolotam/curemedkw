@@ -16,9 +16,9 @@ export async function callWhatsAppInbox<T>(body: Record<string, unknown>): Promi
     try {
       const failure = await error.context.json();
       const code = failure?.error?.code;
-      if (["send_uncertain", "send_already_attempted", "session_disconnected", "invalid_media"].includes(code)) throw new Error(code);
+      if (["webhook_conflict", "send_uncertain", "send_already_attempted", "session_disconnected", "invalid_media"].includes(code)) throw new Error(code);
     } catch (failure) {
-      if (failure instanceof Error && ["send_uncertain", "send_already_attempted", "session_disconnected", "invalid_media"].includes(failure.message)) throw failure;
+      if (failure instanceof Error && ["webhook_conflict", "send_uncertain", "send_already_attempted", "session_disconnected", "invalid_media"].includes(failure.message)) throw failure;
     }
   }
   if (error || !envelope?.success) throw new Error(envelope?.error?.code ?? "inbox_unavailable");

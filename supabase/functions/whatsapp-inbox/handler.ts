@@ -14,7 +14,7 @@ const sendFields = { chatId: z.string().uuid(), requestId: z.string().uuid(), te
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("status") }).strict(),
   z.object({ action: z.literal("sync") }).strict(),
-  z.object({ action: z.literal("webhook.ensure") }).strict(),
+  z.object({ action: z.literal("webhook.ensure"), force: z.boolean().optional() }).strict(),
   z.object({ action: z.literal("markRead"), chatId: z.string().uuid(), seenMessageId: z.string().min(1).max(250) }).strict(),
   z.object({ action: z.literal("send"), ...sendFields, text: z.string().trim().min(1).max(4096) }).strict(),
   z.object({ action: z.literal("media.send"), ...sendFields,
@@ -52,13 +52,26 @@ export function createInboxHandler(options: { admin: SupabaseClient; readConfig:
           receipt = { connected: state === "open", webhookReady: isPlainObject(hook) && hook.enabled === true && hook.url === WEBHOOK_URL };
           break;
         }
-        case "webhook.ensure":
+        case "webhook.ensure": {
           if (!config.webhookSecret.trim()) throw new InboxError("webhook_not_configured", 503);
+          const current = await provider("webhookStatus");
+          const hook = isPlainObject(current) ? current : {};
+          if (typeof hook.url === "string" && hook.url && hook.url !== WEBHOOK_URL && !action.force) {
+            throw new InboxError("webhook_conflict", 409);
+          }
+          const headers = isPlainObject(hook.headers) ? Object.fromEntries(
+            Object.entries(hook.headers).filter(([key]) => key.toLowerCase() !== "x-curemed-webhook-key"),
+          ) : {};
+          const events = [...new Set([
+            ...(Array.isArray(hook.events) ? hook.events.filter((event): event is string => typeof event === "string") : []),
+            "CONNECTION_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE",
+          ])];
           await provider("webhook", { webhook: { enabled: true, url: WEBHOOK_URL,
-            headers: { "x-curemed-webhook-key": config.webhookSecret }, webhookByEvents: false, webhookBase64: false,
-            events: ["CONNECTION_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE"] } });
+            headers: { ...headers, "x-curemed-webhook-key": config.webhookSecret }, byEvents: false, base64: false,
+            events } });
           receipt = { configured: true };
           break;
+        }
         case "sync": receipt = await syncInbox(options.admin, provider, authorization.actor.userId); break;
         case "markRead":
           receipt = { read: await inboxRpc(options.admin, "wa_mark_chat_read", { p_chat_id: action.chatId, p_seen_message_id: action.seenMessageId, p_actor_id: authorization.actor.userId }) === true }; break;

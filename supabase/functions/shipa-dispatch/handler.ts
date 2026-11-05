@@ -32,7 +32,7 @@ export function createShipaDispatchHandler(options: DispatchOptions) {
       const context = await dispatchRpc(options.client, "shipa_worker_context");
       if (!isPlainRecord(context) || !isShipaEnvironment(context.environment) ||
         typeof context.credential_fingerprint !== "string") {
-        return Response.json({ code: "credential_missing" }, { status: 409 });
+        return Response.json({ success: true, shipa: "not_configured", paymentVerificationPending });
       }
       const dispatcher = createShipaDispatcher({ ...options, keyring: await runtime.requireKeyring() });
       await dispatchRpc(options.client, "shipa_expire_leases");

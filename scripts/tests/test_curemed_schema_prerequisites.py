@@ -1,6 +1,7 @@
 """The DB/process boundary is mocked; no SQL, Docker or server operation runs."""
 import importlib.util
 import json
+import subprocess
 import os
 from pathlib import Path
 import tempfile
@@ -34,6 +35,15 @@ class SchemaPrerequisiteTests(unittest.TestCase):
 
     def verify(self):
         return checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader, lambda _: True)
+
+    def test_current_release_manifest_and_migration_blobs(self):
+        self.manifest = json.loads((ROOT / "ops/edge-env.manifest.example.json").read_text())
+        self.assertTrue({"shipa-dispatch", "whatsapp-inbox"}.issubset(self.manifest["deployFunctions"]))
+        self.assertTrue(self.verify()["schemaReady"])
+        for item in self.items:
+            raw = (ROOT / item["path"]).read_bytes().replace(b"\r\n", b"\n")
+            blob = subprocess.check_output(["git", "hash-object", "--stdin"], input=raw, cwd=ROOT).decode().strip()
+            self.assertEqual(item["gitBlob"], blob, item["path"])
 
     def test_unarmed_payment_guards_refuse_publication(self):
         with self.assertRaisesRegex(checks.SchemaReadinessError, "payment_guards_not_ready"):
