@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { dispatchOrderNotifications } from "./apply-payment.ts";
 import { isPlainObject } from "./evolution-pairing.ts";
 import { isIntegrationUuid } from "./integration-credential-contract.ts";
 import { getMyFatoorahConfig, myfatoorahRequest } from "./myfatoorah.ts";
@@ -41,18 +42,33 @@ export function verifiedPaymentAttestation(raw: unknown) {
 
 async function paymentRpc(admin: SupabaseClient, name: string, args: Record<string, unknown>) {
   const { data: receipt, error } = await admin.rpc(name, args);
-  if (error) throw new Error("payment_storage_unavailable");
+  if (error) throw new Error(error.message || "payment_storage_unavailable");
   return receipt;
 }
 
 export async function recordIntegrationPayment(admin: SupabaseClient, raw: unknown, source: "signed_webhook" | "verified_callback") {
-  const status = source === "signed_webhook" ? paymentAttestation(raw) : verifiedPaymentAttestation(raw);
+  let status;
+  try {
+    status = source === "signed_webhook" ? paymentAttestation(raw) : verifiedPaymentAttestation(raw);
+  } catch (error) {
+    if (source === "signed_webhook" && error instanceof Error && error.message === "payment_identity_invalid") {
+      return { handled: false, reason: "payment_identity_invalid" } as const;
+    }
+    throw error;
+  }
   const binding = await paymentRpc(admin, "wa_find_canonical_payment_attempt", {
     p_invoice_id: status.invoice_id, p_external_identifier: status.external_identifier,
   });
   if (!isPlainObject(binding) || binding.state !== "found") {
     if (source === "signed_webhook") {
-      await paymentRpc(admin, "wa_record_unbound_payment_status", { p_signed_status: status });
+      try {
+        await paymentRpc(admin, "wa_record_unbound_payment_status", { p_signed_status: status });
+      } catch (error) {
+        if (error instanceof Error && error.message === "unbound_success_required") {
+          return { handled: false, reason: "unbound_non_success" } as const;
+        }
+        throw error;
+      }
       return null;
     }
     throw new Error("payment_binding_unavailable");
@@ -74,7 +90,13 @@ export async function verifyPendingIntegrationPayment(admin: SupabaseClient, ord
     const unbound = await paymentRpc(admin, "wa_list_unbound_payment_statuses", { p_limit: 3 });
     if (!Array.isArray(unbound)) throw new Error("payment_queue_invalid");
     for (const candidate of unbound) {
-      await paymentRpc(admin, "wa_bind_unbound_payment_status", { p_pending_id: candidate.pending_id });
+      const bound = await paymentRpc(admin, "wa_bind_unbound_payment_status", { p_pending_id: candidate.pending_id });
+      if (isPlainObject(bound) && isPlainObject(bound.payment_result)) {
+        const snapshot = bound.payment_result.owner_snapshot;
+        if (isPlainObject(snapshot) && isPlainObject(snapshot.facts)) {
+          await notifyPaidOrder(admin, snapshot.facts.order_id);
+        }
+      }
     }
   }
   const pending = await paymentRpc(admin, "wa_claim_pending_payment_verification", {
@@ -82,18 +104,35 @@ export async function verifyPendingIntegrationPayment(admin: SupabaseClient, ord
   });
   if (!isPlainObject(pending)) return;
   const lease = pending.lease_token;
+  let verified;
   try {
     const response = await myfatoorahRequest<unknown>(getMyFatoorahConfig(),
       `/v3/payments/${encodeURIComponent(String(pending.transaction_payment_id))}`, { method: "GET", timeoutMs: 10_000 });
-    const verified = verifiedPaymentAttestation(response.Data);
-    await paymentRpc(admin, "wa_resolve_pending_payment_verification", {
-      p_pending_id: pending.id, p_lease_token: lease, p_verified_result: verified, p_terminal_state: "resolved",
-    });
-  } catch {
+    verified = verifiedPaymentAttestation(response.Data);
+  } catch (error) {
     // A failed verification remains durable and bounded by the SQL retry schedule.
+    const message = error instanceof Error ? error.message : "";
+    const mismatch = message === "payment_amount_invalid" || message === "payment_identity_invalid";
+    const code = message === "payment_amount_invalid" ? "payment_amount_mismatch"
+      : message === "payment_identity_invalid" ? "payment_identity_mismatch"
+      : message === "MyFatoorah request timed out" ? "provider_timeout" : "provider_response_invalid";
     await paymentRpc(admin, "wa_resolve_pending_payment_verification", {
       p_pending_id: pending.id, p_lease_token: lease,
-      p_verified_result: { code: "provider_response_invalid" }, p_terminal_state: "retry",
+      p_verified_result: { code }, p_terminal_state: mismatch ? "evidence_mismatch" : "retry",
     });
+    return;
   }
+  await paymentRpc(admin, "wa_resolve_pending_payment_verification", {
+    p_pending_id: pending.id, p_lease_token: lease, p_verified_result: verified, p_terminal_state: "resolved",
+  });
+  await notifyPaidOrder(admin, pending.order_id);
+}
+
+async function notifyPaidOrder(admin: SupabaseClient, orderId: unknown) {
+  // Notification reads and delivery must never undo a committed payment.
+  try {
+    if (typeof orderId !== "string") return;
+    const { data: order, error } = await admin.from("orders").select("payment_status").eq("id", orderId).maybeSingle();
+    if (!error && order?.payment_status === "paid") await dispatchOrderNotifications(admin, orderId);
+  } catch { /* The atomic order_notified_at claim protects subsequent attempts. */ }
 }

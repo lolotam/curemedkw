@@ -17,7 +17,8 @@
       "supabase/functions/shipa-admin/shipment-handler.test.ts",
       "supabase/functions/_tests/whatsapp-pairing/",
       "supabase/functions/shipa-dispatch/handler.test.ts",
-      "supabase/functions/_tests/whatsapp-inbox/"
+      "supabase/functions/_tests/whatsapp-inbox/",
+      "supabase/functions/_tests/payments/"
     ]
   },
   "lint": {
