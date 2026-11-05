@@ -1,33 +1,33 @@
 {
-    "lock":  "deno.shipa.lock",
-    "nodeModulesDir":  "none",
-    "compilerOptions":  {
-                            "strict":  true,
-                            "types":  [
-
-                                      ],
-                            "lib":  [
-                                        "deno.window",
-                                        "dom",
-                                        "dom.iterable"
-                                    ]
-                        },
-    "test":  {
-                 "include":  [
-                                 "supabase/functions/_tests/shipa/",
-                                 "supabase/functions/shipa-admin/handler.test.ts",
-                                 "supabase/functions/shipa-admin/shipment-handler.test.ts",
-                                 "supabase/functions/_tests/whatsapp-pairing/"
-                             ]
-             },
-    "lint":  {
-                 "rules":  {
-                               "exclude":  [
-                                               "no-import-prefix"
-                                           ]
-                           }
-             },
-    "imports":  {
-                    "zod":  "npm:zod@3.25.76"
-                }
+  "lock": "deno.shipa.lock",
+  "nodeModulesDir": "none",
+  "compilerOptions": {
+    "strict": true,
+    "types": [],
+    "lib": [
+      "deno.window",
+      "dom",
+      "dom.iterable"
+    ]
+  },
+  "test": {
+    "include": [
+      "supabase/functions/_tests/shipa/",
+      "supabase/functions/shipa-admin/handler.test.ts",
+      "supabase/functions/shipa-admin/shipment-handler.test.ts",
+      "supabase/functions/_tests/whatsapp-pairing/",
+      "supabase/functions/shipa-dispatch/handler.test.ts",
+      "supabase/functions/_tests/whatsapp-inbox/"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "exclude": [
+        "no-import-prefix"
+      ]
+    }
+  },
+  "imports": {
+    "zod": "npm:zod@3.25.76"
+  }
 }

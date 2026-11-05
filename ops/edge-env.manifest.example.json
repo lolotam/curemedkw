@@ -20,8 +20,15 @@
     {
       "name": "shipa-admin",
       "verifyJwt": false,
-      "methods": ["POST", "OPTIONS"],
-      "requiredSecrets": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "INTEGRATIONS_ENCRYPTION_KEY_V1"]
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "INTEGRATIONS_ENCRYPTION_KEY_V1"
+      ]
     },
     {
       "name": "create-myfatoorah-payment",
@@ -95,6 +102,37 @@
         "POST"
       ],
       "requiredSecrets": [
+        "CUREMED_EVOLUTION_WEBHOOK_SECRET",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
+    },
+    {
+      "name": "shipa-dispatch",
+      "verifyJwt": false,
+      "methods": [
+        "POST"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SHIPA_DISPATCH_TOKEN",
+        "INTEGRATIONS_ENCRYPTION_KEY_V1",
+        "MYFATOORAH_TOKEN"
+      ]
+    },
+    {
+      "name": "whatsapp-inbox",
+      "verifyJwt": false,
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "CUREMED_EVOLUTION_URL",
+        "CUREMED_EVOLUTION_API_KEY",
         "CUREMED_EVOLUTION_WEBHOOK_SECRET"
       ]
     }
@@ -113,7 +151,8 @@
     "APP_PUBLIC_URL",
     "CUREMED_EVOLUTION_URL",
     "CUREMED_EVOLUTION_API_KEY",
-    "CUREMED_EVOLUTION_WEBHOOK_SECRET"
+    "CUREMED_EVOLUTION_WEBHOOK_SECRET",
+    "SHIPA_DISPATCH_TOKEN"
   ],
   "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' \u2014 the server's router is hand-patched and diverged from this repo.",
   "deployFunctions": [
@@ -126,10 +165,12 @@
     "send-order-email",
     "send-whatsapp",
     "whatsapp-pairing",
-    "whatsapp-pairing-webhook"
+    "whatsapp-pairing-webhook",
+    "shipa-dispatch",
+    "whatsapp-inbox"
   ],
   "schemaPrerequisites": {
-    "inventory": "docs/releases/curemed-schema-20261104.json"
+    "inventory": "docs/releases/curemed-schema-20261105.json"
   },
   "defaults": {
     "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",

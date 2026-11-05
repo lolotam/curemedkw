@@ -113,6 +113,7 @@ Deno.test("an authorization timeout never starts reading the request body", asyn
 
 Deno.test("webhook body cancellation cannot leave an unbounded reader", async () => {
   const handler = createEvolutionPairingWebhookHandler({
+    ingest: async () => {},
     readSecret: () => HOOK_MARKER,
   });
   const controller = new AbortController();
@@ -138,6 +139,7 @@ Deno.test("webhook body cancellation cannot leave an unbounded reader", async ()
 
 Deno.test("prototype-shaped envelope cannot supply webhook instance authority", async () => {
   const handler = createEvolutionPairingWebhookHandler({
+    ingest: async () => {},
     readSecret: () => HOOK_MARKER,
   });
   const response = await handler(
@@ -703,6 +705,7 @@ function createWebhook(
   secret: string | undefined = HOOK_MARKER,
 ): (req: Request) => Promise<Response> {
   return createEvolutionPairingWebhookHandler({
+    ingest: async () => {},
     readSecret: () => secret,
   });
 }
@@ -785,7 +788,6 @@ Deno.test("an unknown event is refused by the webhook", async () => {
     "messages.upsert",
     "qrcode.update",
     "connection.update.extra",
-    "CONNECTION_UPDATE",
   ];
 
   for (const event of refused) {
@@ -859,7 +861,7 @@ Deno.test("pairing-code credentials are refused at both webhook locations", asyn
   }
 });
 
-Deno.test("a valid connection update is acknowledged without a write", async () => {
+Deno.test("a valid connection update is acknowledged after persistence", async () => {
   const handler = createWebhook();
   const body = JSON.stringify({
     instance: "curemed",
@@ -892,7 +894,7 @@ Deno.test("a valid connection update is acknowledged without a write", async () 
   assert(!JSON.stringify(answer).includes("server_url"));
 });
 
-Deno.test("a replayed acknowledgement changes nothing", async () => {
+Deno.test("replayed connection updates return the same acknowledgement", async () => {
   const handler = createWebhook();
   const body = JSON.stringify({
     instance: "curemed",
@@ -948,7 +950,7 @@ Deno.test("an oversized webhook body is refused", async () => {
       JSON.stringify({
         instance: "curemed",
         event: "connection.update",
-        pad: "x".repeat(40_000),
+        pad: "x".repeat(1_048_577),
       }),
       { headers: { "x-curemed-webhook-key": HOOK_MARKER } },
     ),

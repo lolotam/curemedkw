@@ -13,7 +13,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { EvolutionPairingCard } from "@/components/admin/EvolutionPairingCard";
+import { WhatsAppDirectSettings } from "@/components/admin/WhatsAppDirectSettings";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface WaSettings {
   enabled: boolean;
@@ -76,6 +77,14 @@ const TEMPLATE_FIELDS: { eventKey: string; placeholders: string }[] = [
 ];
 
 export default function AdminWhatsApp() {
+  return <Tabs defaultValue="direct" className="space-y-5">
+    <TabsList><TabsTrigger value="postora">Postora connector</TabsTrigger><TabsTrigger value="direct">Direct API (Evolution)</TabsTrigger></TabsList>
+    <TabsContent value="postora"><PostoraSettings /></TabsContent>
+    <TabsContent value="direct"><WhatsAppDirectSettings /></TabsContent>
+  </Tabs>;
+}
+
+function PostoraSettings() {
   const qc = useQueryClient();
   const [s, setS] = useState<WaSettings>(DEFAULT);
   const [newNum, setNewNum] = useState("");
@@ -445,9 +454,7 @@ export default function AdminWhatsApp() {
         </div>
       </div>
 
-      {/* Native WhatsApp pairing of the Curemed instance. It is a separate
-          surface: it never changes the Postora settings above. */}
-      <EvolutionPairingCard />
+
     </div>
   );
 }

@@ -33,13 +33,17 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         self.reader = Mock(return_value=self.rows)
 
     def verify(self):
-        return checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader)
+        return checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader, lambda _: True)
+
+    def test_unarmed_payment_guards_refuse_publication(self):
+        with self.assertRaisesRegex(checks.SchemaReadinessError, "payment_guards_not_ready"):
+            checks.verify_prerequisites(self.repo, self.manifest, "curemed-db", self.reader, lambda _: False)
 
     def test_exact_existing_ledger_allows_app_publication_without_activation(self):
         result = self.verify()
         self.assertTrue(result["schemaReady"])
         self.assertFalse(result["schemaActivated"])
-        self.assertEqual(result["verifiedMigrations"], 20)
+        self.assertEqual(result["verifiedMigrations"], 22)
         self.reader.assert_called_once_with("curemed-db", [x["filename"] for x in self.items])
 
     def test_missing_checksum_or_ledger_row_refuses(self):
@@ -118,7 +122,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         query = process.call_args.args[0][-1]
         self.assertIn("octet_length(checksum)", query)
         self.assertIn("octet_length(filename)", query)
-        self.assertIn("LIMIT 21", query)
+        self.assertIn("LIMIT 23", query)
         self.assertEqual(process.call_args.kwargs.get("stderr"), checks.subprocess.DEVNULL)
         self.assertNotIn("capture_output", process.call_args.kwargs)
 

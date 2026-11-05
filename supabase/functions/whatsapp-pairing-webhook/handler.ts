@@ -1,25 +1,4 @@
-// Curemed — the connection only webhook.
-//
-// The webhook accepts exactly one provider event: the connection update of
-// the fixed Curemed Evolution instance. It authenticates the request with an
-// independently generated header secret, it projects the bounded connection
-// state, and it answers with a safe acknowledgement.
-//
-// What it deliberately does not do
-// -------------------------------
-//   * It does not write anything. There is no database client, no instance
-//     mutation, no readiness or generation change and no session reopen.
-//     A replayed acknowledgement therefore cannot change anything: the
-//     endpoint has no write path at all.
-//   * It does not subscribe to messages, contacts or history. A message or
-//     a QR event is refused.
-//   * It does not trust the native envelope. The apikey, sender,
-//     destination and server_url of a native body are dropped: they are not
-//     authorization and they are never logged, returned or persisted.
-//   * It does not authorize a browser, the service role key or the anon
-//     key. Only the independent header secret opens it, and an empty
-//     configured secret fails closed.
-
+// Authenticated Curemed webhook. Persists connection, message and acknowledgement events.
 import {
   EvolutionBodyTooLargeError,
   type EvolutionConnectionState,
@@ -32,14 +11,14 @@ import { secretsMatch } from "../_shared/caller-auth.ts";
 /** The one instance this endpoint accepts. */
 export const WEBHOOK_INSTANCE = "curemed";
 
-/** The one event this endpoint accepts. */
+/** The connection event accepted alongside message and acknowledgement events. */
 export const WEBHOOK_EVENT = "connection.update";
 
 /** The exact header the independent secret is presented in. */
 export const WEBHOOK_HEADER_NAME = "x-curemed-webhook-key";
 
 /** The hard cap of the request body. */
-export const WEBHOOK_MAX_REQUEST_BYTES = 32_768;
+export const WEBHOOK_MAX_REQUEST_BYTES = 1_048_576;
 
 /** The closed set of failures this endpoint reports. */
 export type WebhookErrorCode =
@@ -47,12 +26,14 @@ export type WebhookErrorCode =
   | "method_not_allowed"
   | "invalid_request"
   | "request_too_large"
-  | "not_configured";
+  | "not_configured"
+  | "storage_unavailable";
 
 /** The fixed wording of every failure. */
 export const WEBHOOK_ERROR_MESSAGES: Record<WebhookErrorCode, string> = {
+  storage_unavailable: "The webhook could not persist the event.",
   unauthorized: "The webhook request was not authorized.",
-  method_not_allowed: "This endpoint only accepts a connection update.",
+  method_not_allowed: "This endpoint only accepts POST webhook events.",
   invalid_request: "The webhook request was rejected as invalid.",
   request_too_large: "The webhook request was too large.",
   not_configured: "The webhook secret is not configured on the server yet.",
@@ -62,6 +43,7 @@ export const WEBHOOK_ERROR_MESSAGES: Record<WebhookErrorCode, string> = {
 export interface EvolutionWebhookHandlerOptions {
   /** Reads the independent webhook secret, lazily, per request. */
   readonly readSecret: () => string | undefined;
+  readonly ingest: (event: string, payload: unknown) => Promise<void>;
 }
 
 /**
@@ -108,7 +90,7 @@ function projectState(body: Record<string, unknown>): EvolutionConnectionState {
 }
 
 /**
- * Builds the request handler of the connection only webhook.
+ * Builds the authenticated handler for connection, message and acknowledgement events.
  */
 export function createEvolutionPairingWebhookHandler(
   options: EvolutionWebhookHandlerOptions,
@@ -176,6 +158,14 @@ export function createEvolutionPairingWebhookHandler(
     // Native authentication/sender/destination fields are never consulted.
     const sanitized = parsed;
 
+    if (sanitized.instance !== WEBHOOK_INSTANCE) return errorResponse(400, "invalid_request");
+    const event = typeof sanitized.event === "string" ? sanitized.event.toLowerCase().replaceAll("_", ".") : "";
+    if (event === "messages.upsert" || event === "messages.update") {
+      if (!sanitized.data || (typeof sanitized.data !== "object")) return errorResponse(400, "invalid_request");
+      try { await options.ingest(event, sanitized.data); }
+      catch { return errorResponse(503, "storage_unavailable"); }
+      return Response.json({ success: true, acknowledged: true }, { headers: { "Cache-Control": "no-store" } });
+    }
     // A QR or a message is refused whatever the event field claims.
     for (const key of REFUSED_PAYLOAD_KEYS) {
       if (
@@ -191,15 +181,16 @@ export function createEvolutionPairingWebhookHandler(
       return errorResponse(400, "invalid_request");
     }
     if (
-      !Object.hasOwn(sanitized, "event") || sanitized.event !== WEBHOOK_EVENT
+      !Object.hasOwn(sanitized, "event") || event !== WEBHOOK_EVENT
     ) {
       return errorResponse(400, "invalid_request");
     }
 
     const state = projectState(sanitized);
+    try { await options.ingest(event, { state }); }
+    catch { return errorResponse(503, "storage_unavailable"); }
 
-    // The acknowledgement is the only answer. Nothing is stored, and the
-    // displayed state of the website comes from the native scoped status.
+    // Acknowledge only after durable storage has accepted the event.
     return new Response(
       JSON.stringify({
         success: true,
