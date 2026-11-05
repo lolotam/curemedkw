@@ -240,7 +240,7 @@ Deno.serve(async (req) => {
       });
       const d = result.Data;
 
-      await admin
+      const { error: attemptUpdateError } = await admin
         .from("payment_attempts")
         .update({
           invoice_id: d.InvoiceId,
@@ -250,6 +250,7 @@ Deno.serve(async (req) => {
           status: "created",
         })
         .eq("id", attempt.id);
+      if (attemptUpdateError) throw attemptUpdateError;
 
       await admin
         .from("orders")
