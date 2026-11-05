@@ -308,7 +308,7 @@ export function useShipaConfiguration() {
       ? { environment: pendingCredential.environment, mode: "remove" }
       : { environment: pendingCredential.environment, mode: "preserve" };
     setPendingCredential(null);
-    void runSave(request, credential);
+    void runSave({ ...request, liveActivationConfirmed: true }, credential);
   }, [
     prepareRequest,
     pendingCredential,

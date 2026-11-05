@@ -22,6 +22,7 @@ export async function callWhatsAppInbox<T>(body: Record<string, unknown>): Promi
     }
   }
   if (error || !envelope?.success) throw new Error(envelope?.error?.code ?? "inbox_unavailable");
+  if (body.action === "markRead" && envelope.data?.read !== true) throw new Error("read_not_cleared");
   return envelope.data as T;
 }
 

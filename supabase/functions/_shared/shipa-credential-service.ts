@@ -152,7 +152,7 @@ export function createShipaCredentialService(
       // in the same atomic save, so the revision advances exactly once.
       const raw = await callSaveSettings(client, {
         _expected_revision: expectedRevision,
-        _settings: settings,
+        _settings: { ...settings, ...(parsed.request.liveActivationConfirmed === undefined ? {} : { liveActivationConfirmed: parsed.request.liveActivationConfirmed }) },
         _credential_change: credentialChange,
         _actor_id: actor.userId,
       });

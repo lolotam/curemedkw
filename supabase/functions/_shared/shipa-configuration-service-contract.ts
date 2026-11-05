@@ -188,6 +188,7 @@ export type ShipaCredentialAction =
 
 /** The validated credential save action. */
 export interface ShipaCredentialSaveRequest {
+  readonly liveActivationConfirmed?: boolean;
   readonly expectedRevision: number;
   /** The validated safe settings patch. */
   readonly settings: ShipaSaveableSettings;
@@ -233,6 +234,7 @@ const credentialActionSchema = z.discriminatedUnion("mode", [
 const credentialSaveRequestSchema = z.object({
   expectedRevision: z.number().int().nonnegative().max(SHIPA_MAX_REVISION),
   settings: z.unknown(),
+  liveActivationConfirmed: z.boolean().optional(),
   credential: credentialActionSchema,
 }).strict();
 
@@ -255,7 +257,7 @@ export function parseShipaCredentialSaveRequest(
 ): ShipaConfigurationParseResult<ShipaCredentialSaveRequest> {
   if (!isPlainRecord(raw)) return { ok: false };
   if (
-    !hasExactRecordKeys(raw, ["expectedRevision", "settings", "credential"])
+    !hasExactRecordKeys(raw, ["expectedRevision", "settings", "credential", ...(Object.hasOwn(raw, "liveActivationConfirmed") ? ["liveActivationConfirmed"] : [])])
   ) {
     return { ok: false };
   }
@@ -279,6 +281,7 @@ export function parseShipaCredentialSaveRequest(
     request: {
       expectedRevision,
       settings: saveRequest.settings,
+      ...(parsed.data.liveActivationConfirmed === undefined ? {} : { liveActivationConfirmed: parsed.data.liveActivationConfirmed }),
       credential,
     },
   };

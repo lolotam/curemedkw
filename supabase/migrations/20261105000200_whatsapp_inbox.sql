@@ -43,11 +43,13 @@ CREATE TABLE IF NOT EXISTS private.wa_chat_aliases (
   chat_id uuid NOT NULL REFERENCES public.whatsapp_chats(id),
   PRIMARY KEY(instance_identity,remote_jid)
 );
+ALTER TABLE private.wa_chat_aliases ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.wa_chat_aliases FROM PUBLIC,anon,authenticated,service_role;
 CREATE TABLE IF NOT EXISTS private.wa_inbox_sends (
   request_id uuid PRIMARY KEY, chat_id uuid NOT NULL REFERENCES public.whatsapp_chats(id),
   actor_id uuid NOT NULL, content_hash text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE private.wa_inbox_sends ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.wa_inbox_sends FROM PUBLIC,anon,authenticated,service_role;
 CREATE OR REPLACE FUNCTION public.wa_reserve_inbox_send(p_request_id uuid,p_chat_id uuid,p_actor_id uuid,p_content_hash text)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
@@ -60,6 +62,9 @@ BEGIN
   IF NOT FOUND THEN RETURN false; END IF;
   INSERT INTO private.wa_inbox_sends(request_id,chat_id,actor_id,content_hash) VALUES(p_request_id,p_chat_id,p_actor_id,p_content_hash)
     ON CONFLICT DO NOTHING RETURNING request_id INTO inserted;
+  IF inserted IS NULL AND EXISTS(SELECT 1 FROM private.wa_inbox_sends WHERE request_id=p_request_id AND content_hash IS DISTINCT FROM p_content_hash) THEN
+    RAISE EXCEPTION 'request_content_mismatch';
+  END IF;
   RETURN inserted IS NOT NULL;
 END
 $fn$;
@@ -167,13 +172,18 @@ BEGIN
 END
 $fn$;
 
+DROP FUNCTION IF EXISTS public.wa_mark_chat_read(uuid,text,uuid);
 CREATE OR REPLACE FUNCTION public.wa_mark_chat_read(p_chat_id uuid,p_seen_message_id text,p_actor_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,private,pg_temp AS $fn$
 BEGIN
   PERFORM private.wa_require_admin(p_actor_id);
   PERFORM pg_advisory_xact_lock(20261105,20);
   UPDATE public.whatsapp_chats SET unread_count=0,last_read_message_id=p_seen_message_id,last_read_at=clock_timestamp()
-    WHERE id=p_chat_id AND last_message_id=p_seen_message_id;
+    -- Equal timestamps use provider_message_id in C collation as the deterministic tie-break.
+    WHERE id=p_chat_id AND unread_count>0 AND p_seen_message_id=(
+      SELECT provider_message_id FROM public.whatsapp_messages WHERE chat_id=p_chat_id
+      ORDER BY sent_at DESC,provider_message_id COLLATE "C" DESC LIMIT 1);
+  RETURN FOUND;
 END
 $fn$;
 

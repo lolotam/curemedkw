@@ -1,7 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1.0.19";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createInboxHandler } from "../../whatsapp-inbox/handler.ts";
-import { ingestInboxEvent } from "../../whatsapp-inbox/webhook.ts";
+import { ingestInboxEvent } from "../../_shared/whatsapp-inbox-webhook.ts";
 import { recordIntegrationPayment } from "../../_shared/integration-payment.ts";
 
 const actor = "87000000-0000-4000-8000-000000000001";

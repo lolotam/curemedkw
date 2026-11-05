@@ -39,7 +39,7 @@ RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,publi
 DECLARE v_row public.integrations; v_env text; v_tuple jsonb; v_nonce bytea; v_ciphertext bytea; v_mode text;
 BEGIN
   PERFORM private.shipa_require_admin(_actor_id);
-  IF _expected_revision IS NULL OR _expected_revision<0 OR NOT coalesce(private.shipa_exact_keys(_settings,
+  IF _expected_revision IS NULL OR _expected_revision<0 OR NOT coalesce(private.shipa_exact_keys(_settings-'liveActivationConfirmed',
     ARRAY['enabled','environment','dispatchMode','sandbox','live']),false) THEN
     RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='shipa_invalid_settings';
   END IF;
@@ -55,6 +55,10 @@ BEGIN
   SELECT * INTO STRICT v_row FROM public.integrations WHERE provider='shipa' FOR UPDATE;
   IF v_row.revision<>_expected_revision THEN
     RAISE EXCEPTION USING ERRCODE='40001', MESSAGE='settings_conflict';
+  END IF;
+  IF _settings->'enabled'='true'::jsonb AND _settings->>'environment'='live'
+    AND (_settings->'liveActivationConfirmed') IS DISTINCT FROM 'true'::jsonb THEN
+    RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='shipa_live_confirmation_required';
   END IF;
   IF _settings->'enabled'='true'::jsonb THEN
     PERFORM private.shipa_require_activation(v_row,_settings,_credential_change);

@@ -8,7 +8,7 @@ import re
 import subprocess
 
 INVENTORY = "docs/releases/curemed-schema-20261105.json"
-INVENTORY_SHA256 = "1d7e48c32fb35b9ae513bfbb58a32e89dfecd1f7a54525d5dd09dd9cb3c51dce"
+INVENTORY_SHA256 = "50f058374e958f1516716912b3fe581e904b9d63024c654c94786a6870c79ac1"
 FILENAME = re.compile(r"[0-9]{14}_[a-z0-9_]+\.sql\Z")
 CONTAINER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\Z")
 

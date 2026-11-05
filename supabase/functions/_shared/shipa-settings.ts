@@ -225,6 +225,7 @@ export const shipaSaveRequestSchema = z
   .object({
     expectedRevision: z.number().int().nonnegative().max(SHIPA_MAX_REVISION),
     settings: shipaSaveableSettingsSchema,
+    liveActivationConfirmed: z.boolean().optional(),
   })
   .strict();
 

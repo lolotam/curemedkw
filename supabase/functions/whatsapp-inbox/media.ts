@@ -62,7 +62,7 @@ export async function getInboxMedia(admin: SupabaseClient, provider: EvolutionIn
   const { data: media, error: mediaError } = await admin.from("whatsapp_media_objects").select("object_path,mime_type,file_name")
     .eq("id", objectId).eq("instance_identity", "curemed").single();
   if (mediaError || !media) throw new InboxError("media_unavailable", 404);
-  const { data: signed, error: signError } = await admin.storage.from("whatsapp-media").createSignedUrl(media.object_path, 60);
+  const { data: signed, error: signError } = await admin.storage.from("whatsapp-media").createSignedUrl(media.object_path, 600);
   if (signError || !signed) throw new InboxError("media_unavailable", 503);
   return { url: signed.signedUrl, mime: media.mime_type, fileName: media.file_name };
 }

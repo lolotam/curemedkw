@@ -66,7 +66,7 @@ export function inboxMessage(raw: unknown, countUnread: boolean) {
   const mediaType = ["image", "audio", "video", "document"].find(kind => isPlainObject(message[`${kind}Message`]));
   const media = mediaType ? message[`${mediaType}Message`] as Record<string, unknown> : null;
   const extended = isPlainObject(message.extendedTextMessage) ? message.extendedTextMessage.text : null;
-  const body = String(message.conversation ?? extended ?? media?.caption ?? "").slice(0, 4096);
+  const body = Array.from(String(message.conversation ?? extended ?? media?.caption ?? "")).slice(0, 4096).join("");
   const timestamp = isPlainObject(raw.messageTimestamp) ? raw.messageTimestamp.low : raw.messageTimestamp;
   const seconds = Number(timestamp);
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 253402300799) return null;

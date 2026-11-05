@@ -50,3 +50,9 @@ Deno.test("verified payment uses exact provider base amount, never rounds or tru
     assertThrows(() => verifiedPaymentAttestation({ ...response, Amount: amount }));
   }
 });
+
+Deno.test("message truncation preserves emoji at code point boundary", () => {
+  const body = "a".repeat(4095) + "\u{1F600}" + "z";
+  const result = inboxMessage({ key: { remoteJid: "123456789012345@lid", id: "boundary" }, message: { conversation: body }, messageTimestamp: 1793872800 }, true);
+  assertEquals(result?.body, "a".repeat(4095) + "\u{1F600}");
+});

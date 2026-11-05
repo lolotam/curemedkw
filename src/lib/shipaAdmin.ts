@@ -136,6 +136,7 @@ export type ShipaAdminInvoke = (
 
 /** The request of a settings-only save. */
 export interface ShipaAdminSaveRequest {
+  readonly liveActivationConfirmed?: boolean;
   readonly expectedRevision: number;
   readonly settings: ShipaSaveableSettings;
 }
@@ -230,7 +231,7 @@ export function createShipaAdminClient(invoke: ShipaAdminInvoke): ShipaAdminClie
       if (settings === null) return failure("invalid_request");
       return writeSettings({
         action: "settings.save",
-        request: { expectedRevision: settings.expectedRevision, settings: settings.settings },
+        request: { expectedRevision: settings.expectedRevision, settings: settings.settings, ...(request.liveActivationConfirmed === true ? { liveActivationConfirmed: true } : {}) },
       }, settings.expectedRevision);
     },
 
@@ -244,6 +245,7 @@ export function createShipaAdminClient(invoke: ShipaAdminInvoke): ShipaAdminClie
         request: {
           expectedRevision: settings.expectedRevision,
           settings: settings.settings,
+          ...(request.liveActivationConfirmed === true ? { liveActivationConfirmed: true } : {}),
           credential,
         },
       }, settings.expectedRevision);

@@ -101,6 +101,7 @@ export function parseShipaAdminAction(raw: unknown): ShipaAdminActionResult {
     case "settings.save": {
       if (!hasExactRecordKeys(raw, ["action", "request"])) return { ok: false };
       const request = raw["request"];
+      // Preserve the explicit liveActivationConfirmed flag through to the storage RPC.
       const parsed = parseShipaSaveRequest(request);
       if (!parsed.ok || parsed.request === undefined) return { ok: false };
       return { ok: true, action: { action, request } };

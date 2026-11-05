@@ -61,8 +61,7 @@ export function createInboxHandler(options: { admin: SupabaseClient; readConfig:
           break;
         case "sync": receipt = await syncInbox(options.admin, provider, authorization.actor.userId); break;
         case "markRead":
-          await inboxRpc(options.admin, "wa_mark_chat_read", { p_chat_id: action.chatId, p_seen_message_id: action.seenMessageId, p_actor_id: authorization.actor.userId });
-          receipt = { read: true }; break;
+          receipt = { read: await inboxRpc(options.admin, "wa_mark_chat_read", { p_chat_id: action.chatId, p_seen_message_id: action.seenMessageId, p_actor_id: authorization.actor.userId }) === true }; break;
         case "send": case "media.send": receipt = await sendInboxMessage(options.admin, provider, action, authorization.actor.userId); break;
         case "media.get": receipt = await getInboxMedia(options.admin, provider, action.messageId); break;
       }

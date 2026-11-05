@@ -18,6 +18,12 @@ BEGIN
   PERFORM public.shipa_save_settings(0,patch,jsonb_build_object('mode','replace','environment','sandbox','envelope',envelope),actor);
   patch:=jsonb_set(patch,'{enabled}','true');
   BEGIN
+    PERFORM public.shipa_save_settings(1,jsonb_set(patch,'{environment}','"live"'),NULL,actor);
+    RAISE EXCEPTION 'Live activation without confirmation succeeded';
+  EXCEPTION WHEN object_not_in_prerequisite_state THEN
+    IF SQLERRM<>'shipa_live_confirmation_required' THEN RAISE; END IF;
+  END;
+  BEGIN
     PERFORM public.shipa_save_settings(1,patch,NULL,actor);
     RAISE EXCEPTION 'Activation without a current probe succeeded';
   EXCEPTION WHEN object_not_in_prerequisite_state THEN
