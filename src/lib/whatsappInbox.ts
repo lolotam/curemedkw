@@ -9,6 +9,8 @@ export type WhatsAppMessage = {
   id: string; chat_id: string; instance_identity: string; provider_message_id: string;
   direction: "inbound" | "outbound"; message_type: "text" | "image" | "video" | "audio" | "document" | "unsupported";
   body: string; sent_at: string; ack_state: "accepted" | "delivered" | "read" | "rejected"; media_object_id: string | null;
+  /** Original WhatsApp attachment payload kept for media download; null for text and locally composed rows. */
+  provider_media?: unknown;
 }
 export async function callWhatsAppInbox<T>(body: Record<string, unknown>): Promise<T> {
   const { data: envelope, error } = await supabase.functions.invoke("whatsapp-inbox", { body });

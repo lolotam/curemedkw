@@ -1,7 +1,8 @@
 import { useEffect } from "react";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { callWhatsAppInbox, type WhatsAppChat, type WhatsAppMessage } from "@/lib/whatsappInbox";
+import { chunk, type ChatPreview } from "@/lib/whatsappInboxView";
 
 export function useWhatsAppInbox(chatId: string | null, search: string) {
   const cache = useQueryClient();
@@ -35,8 +36,35 @@ export function useWhatsAppInbox(chatId: string | null, search: string) {
         void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "chats"] });
       }).on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_messages", ...(chatId ? { filter: `chat_id=eq.${chatId}` } : {}) }, () => {
         void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "messages", chatId] });
+        void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "previews"] });
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [cache, chatId]);
   return { chats, messages, connection };
+}
+
+/** PostgREST `in` lists travel in the URL; 50 provider ids keep each request well under URL limits. */
+const PREVIEW_BATCH = 50;
+
+/**
+ * Last-message previews for the loaded chats, keyed by provider message id.
+ *
+ * `whatsapp_chats` keeps only `last_message_id`, so the rows it points at are read back in batches
+ * (one request per 50 chats). The key changes whenever a chat gets a new last message, and the
+ * previous map stays on screen while the new one loads. Delivery and read acks update a message without
+ * changing that id, so the map also refreshes on the chat-list polling interval.
+ */
+export function useChatPreviews(chats: WhatsAppChat[]) {
+  const ids = [...new Set(chats.map(chat => chat.last_message_id).filter((id): id is string => !!id))].sort();
+  return useQuery({ queryKey: ["whatsapp-inbox", "previews", ids], enabled: ids.length > 0, placeholderData: keepPreviousData, refetchInterval: 15_000,
+    queryFn: async () => {
+      const batches = await Promise.all(chunk(ids, PREVIEW_BATCH).map(async batch => {
+        const { data: rows, error } = await supabase.from("whatsapp_messages")
+          .select("chat_id,provider_message_id,body,message_type,direction,ack_state")
+          .eq("instance_identity", "curemed").in("provider_message_id", batch);
+        if (error) throw error;
+        return rows as ChatPreview[];
+      }));
+      return new Map(batches.flat().map(row => [row.provider_message_id, row]));
+    } });
 }
