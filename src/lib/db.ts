@@ -1570,6 +1570,8 @@ export interface CreateOrderInput {
   discountAmount?: number;
   /** SHA-256 hash of the guest payment session token (online payments only). */
   paymentSessionTokenHash?: string | null;
+  /** The storefront language at checkout; order WhatsApp messages can follow it. */
+  language: "ar" | "en";
   items: Array<{
     productId: string;
     productName: string;
@@ -1610,6 +1612,7 @@ export function useCreateOrder() {
           coupon_code: input.couponCode ?? null,
           payment_method: input.paymentMethod,
           payment_session_token_hash: input.paymentSessionTokenHash ?? null,
+          language: input.language,
         } as any)
         .select("*")
         .single();
