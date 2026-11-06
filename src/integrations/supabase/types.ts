@@ -1,4 +1,4 @@
-import type { WhatsAppChat, WhatsAppMessage } from "@/lib/whatsappInbox";
+import type { WhatsAppChat, WhatsAppContact, WhatsAppMessage } from "@/lib/whatsappInbox";
 export type Json =
   | string
   | number
@@ -16,6 +16,7 @@ export type Database = {
   public: {
     Tables: {
       whatsapp_chats: { Row: WhatsAppChat; Insert: never; Update: never; Relationships: [] }
+      whatsapp_contacts: { Row: WhatsAppContact; Insert: never; Update: never; Relationships: [] }
       whatsapp_messages: { Row: WhatsAppMessage; Insert: never; Update: never; Relationships: [] }
       app_logs: {
         Row: {

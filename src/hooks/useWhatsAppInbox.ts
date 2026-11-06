@@ -1,22 +1,31 @@
 import { useEffect } from "react";
 import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
-import { callWhatsAppInbox, type WhatsAppChat, type WhatsAppMessage } from "@/lib/whatsappInbox";
+import { callWhatsAppInbox, type WhatsAppChat, type WhatsAppContact, type WhatsAppMessage } from "@/lib/whatsappInbox";
 import { chunk } from "@/lib/whatsappInboxView";
+
+/** Strips the characters PostgREST's `or` filter syntax reserves, so a search term stays one value. */
+function searchTerm(search: string): string {
+  return search.replace(/[,%()\\"]/g, "").trim();
+}
+
+/** One page of chats, most recent first, optionally filtered by name or number. */
+async function fetchChats(search: string, from: number, size: number): Promise<WhatsAppChat[]> {
+  let query = supabase.from("whatsapp_chats").select("*").eq("instance_identity", "curemed")
+    .order("last_message_at", { ascending: false, nullsFirst: false }).order("id", { ascending: false })
+    .range(from, from + size - 1);
+  const term = searchTerm(search);
+  if (term) query = query.or(`display_name.ilike.%${term}%,normalized_phone.ilike.%${term}%`);
+  const { data: rows, error } = await query;
+  if (error) throw error;
+  return rows as WhatsAppChat[];
+}
 
 export function useWhatsAppInbox(chatId: string | null, search: string) {
   const cache = useQueryClient();
   const chats = useInfiniteQuery({ queryKey: ["whatsapp-inbox", "chats", search], initialPageParam: 0,
-    queryFn: async ({ pageParam }) => {
-      let query = supabase.from("whatsapp_chats").select("*").eq("instance_identity", "curemed")
-        .order("last_message_at", { ascending: false, nullsFirst: false }).order("id", { ascending: false })
-        .range(pageParam, pageParam + 199);
-      const term = search.replace(/[,%()\\"]/g, "").trim();
-      if (term) query = query.or(`display_name.ilike.%${term}%,normalized_phone.ilike.%${term}%`);
-      const { data: rows, error } = await query;
-      if (error) throw error;
-      return rows as WhatsAppChat[];
-    }, getNextPageParam: (last, pages) => last.length === 200 ? pages.length * 200 : undefined, refetchInterval: 15_000 });
+    queryFn: ({ pageParam }) => fetchChats(search, pageParam, 200),
+    getNextPageParam: (last, pages) => last.length === 200 ? pages.length * 200 : undefined, refetchInterval: 15_000 });
   const messages = useInfiniteQuery({ queryKey: ["whatsapp-inbox", "messages", chatId], enabled: !!chatId,
     initialPageParam: null as { sent_at: string; id: string } | null,
     queryFn: async ({ pageParam }) => {
@@ -76,5 +85,47 @@ export function useDeleteWhatsAppMessage() {
   return useMutation({
     mutationFn: (input: { messageId: string; scope: DeleteScope }) => callWhatsAppInbox({ action: "message.delete", ...input }),
     onSettled: () => cache.invalidateQueries({ queryKey: ["whatsapp-inbox"] }),
+  });
+}
+
+/** Chats offered as forward targets: the most recent ones, or those matching the search. */
+export function useForwardTargets(search: string) {
+  return useQuery({ queryKey: ["whatsapp-inbox", "forward-targets", search], queryFn: () => fetchChats(search, 0, 30) });
+}
+
+/**
+ * Forwards a message to another chat. The caller passes the requestId so a retry of the same
+ * forward is refused by the server instead of sending a second copy.
+ */
+export function useForwardWhatsAppMessage() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { messageId: string; chatId: string; requestId: string }) =>
+      callWhatsAppInbox({ action: "message.forward", ...input }),
+    onSuccess: () => cache.invalidateQueries({ queryKey: ["whatsapp-inbox"] }),
+  });
+}
+
+/** Contacts by name, with the matching business names and numbers; at most 200 per search. */
+export function useWhatsAppContacts(search: string) {
+  return useQuery({ queryKey: ["whatsapp-inbox", "contacts", search], queryFn: async () => {
+    let query = supabase.from("whatsapp_contacts").select("id,normalized_phone,remote_jid,display_name,business_name,email,notes,updated_at")
+      .order("display_name").order("id").limit(200);
+    const term = searchTerm(search);
+    if (term) query = query.or(`display_name.ilike.%${term}%,business_name.ilike.%${term}%,normalized_phone.ilike.%${term}%`);
+    const { data: rows, error } = await query;
+    if (error) throw error;
+    return rows as WhatsAppContact[];
+  } });
+}
+
+export type ContactPatch = Partial<Pick<WhatsAppContact, "display_name" | "business_name" | "email" | "notes">> & { phone?: string };
+
+/** Saves a contact edit; the chat list refreshes too because an edited name renames the chat. */
+export function useUpdateWhatsAppContact() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { contactId: string; patch: ContactPatch }) => callWhatsAppInbox<{ contact: WhatsAppContact }>({ action: "contact.update", ...input }),
+    onSuccess: () => cache.invalidateQueries({ queryKey: ["whatsapp-inbox"] }),
   });
 }

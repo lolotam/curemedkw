@@ -4,7 +4,7 @@ process.env.TZ = "Asia/Kuwait";
 import { describe, expect, it } from "vitest";
 import type { WhatsAppChat, WhatsAppMessage } from "@/lib/whatsappInbox";
 import {
-  canDeleteForEveryone, chatInitials, chatPhone, chatTitle, chunk, groupByDay, lastMessageTime, previewText, providerMediaMeta, resolveMediaKind, toAspectRatio,
+  canDeleteForEveryone, canForward, chatInitials, chatPhone, chatTitle, chunk, groupByDay, lastMessageTime, normalizeContactPhone, previewText, providerMediaMeta, resolveMediaKind, toAspectRatio,
 } from "./whatsappInboxView";
 
 const chat = (overrides: Partial<WhatsAppChat>): WhatsAppChat => ({
@@ -133,5 +133,27 @@ describe("chat list previews", () => {
   it("batches ids into slices of at most the given size", () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
     expect(chunk([], 50)).toEqual([]);
+  });
+});
+
+describe("forwarding and contact numbers", () => {
+  it.each([
+    [{ body: "Price list" }, true],
+    [{ body: "   " }, false],
+    [{ message_type: "image" as const }, true],
+    [{ message_type: "document" as const }, true],
+    [{ message_type: "unsupported" as const, body: "?" }, false],
+    [{ body: "Gone", remote_deleted_at: "2026-11-05T10:01:00.000Z" }, false],
+  ])("forward is offered for %o: %s", (overrides, expected) => {
+    expect(canForward(message(overrides))).toBe(expected);
+  });
+
+  it.each([
+    ["5000 0088", "96550000088"],
+    ["+965 5000-0088", "96550000088"],
+    ["0096550000088", "96550000088"],
+    ["+20 100 123 4567", "201001234567"],
+  ])("normalizes the typed number %s to %s", (typed, expected) => {
+    expect(normalizeContactPhone(typed)).toBe(expected);
   });
 });

@@ -3,11 +3,13 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/lib/i18n";
 import { callWhatsAppInbox, type WhatsAppChat } from "@/lib/whatsappInbox";
 import { useChatAvatars, useWhatsAppInbox } from "@/hooks/useWhatsAppInbox";
 import { WhatsAppInboxComposer } from "@/components/admin/WhatsAppInboxComposer";
 import { WhatsAppChatList } from "@/components/admin/whatsapp/WhatsAppChatList";
+import { WhatsAppContactList } from "@/components/admin/whatsapp/WhatsAppContactList";
 import { WhatsAppThread } from "@/components/admin/whatsapp/WhatsAppThread";
 import { WhatsAppThreadHeader } from "@/components/admin/whatsapp/WhatsAppThreadHeader";
 
@@ -42,11 +44,18 @@ export default function AdminWhatsAppInbox() {
     </p>
     {readFailed && <p role="alert" className="text-sm text-destructive">{t("admin.whatsapp.readFailed")}</p>}
     <div className="flex min-h-[420px] flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
-      <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-e md:w-80 md:shrink-0`}>
-        <WhatsAppChatList chats={chatRows} avatars={avatars} isLoading={chats.isPending} failed={!!chats.error}
-          selectedId={selected?.id ?? null} onSelect={setSelected} search={search} onSearchChange={setSearch}
-          hasMore={!!chats.hasNextPage} loadingMore={chats.isFetchingNextPage} onLoadMore={() => void chats.fetchNextPage()} />
-      </aside>
+      <Tabs defaultValue="chats" className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-e md:w-80 md:shrink-0`}>
+        <TabsList className="m-2 grid grid-cols-2">
+          <TabsTrigger value="chats">{t("admin.whatsapp.chatsTab")}</TabsTrigger>
+          <TabsTrigger value="contacts">{t("admin.whatsapp.contactsTab")}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="chats" className="mt-0 min-h-0 flex-1">
+          <WhatsAppChatList chats={chatRows} avatars={avatars} isLoading={chats.isPending} failed={!!chats.error}
+            selectedId={selected?.id ?? null} onSelect={setSelected} search={search} onSearchChange={setSearch}
+            hasMore={!!chats.hasNextPage} loadingMore={chats.isFetchingNextPage} onLoadMore={() => void chats.fetchNextPage()} />
+        </TabsContent>
+        <TabsContent value="contacts" className="mt-0 min-h-0 flex-1"><WhatsAppContactList /></TabsContent>
+      </Tabs>
       <section className={`${selected ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}>
         {current ? <>
           <WhatsAppThreadHeader chat={current} avatarUrl={avatars[current.id]} onBack={() => setSelected(null)} />

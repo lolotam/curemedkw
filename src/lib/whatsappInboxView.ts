@@ -134,6 +134,23 @@ export function canDeleteForEveryone(message: Pick<WhatsAppMessage, "direction" 
   return message.direction === "outbound" && !message.remote_deleted_at && now - Date.parse(message.sent_at) < REVOKE_WINDOW_MS;
 }
 
+const FORWARDABLE_MEDIA = new Set<WhatsAppMessage["message_type"]>(["image", "video", "audio", "document"]);
+
+/** Mirrors the server's forward rules: text with content, or an attachment, and never a deleted message. */
+export function canForward(message: Pick<WhatsAppMessage, "message_type" | "body" | "remote_deleted_at">): boolean {
+  if (message.remote_deleted_at) return false;
+  return message.message_type === "text" ? message.body.trim() !== "" : FORWARDABLE_MEDIA.has(message.message_type);
+}
+
+/**
+ * Digits of a number typed into the contact form. A bare 8-digit number is a Kuwaiti one, the format
+ * checkout stores, so it gains the 965 country code; the server still checks the result.
+ */
+export function normalizeContactPhone(input: string): string {
+  const digits = input.replace(/\D/g, "").replace(/^00/, "");
+  return digits.length === 8 ? `965${digits}` : digits;
+}
+
 /** Splits `items` into consecutive slices of at most `size` items. */
 export function chunk<T>(items: T[], size: number): T[][] {
   const slices: T[][] = [];
