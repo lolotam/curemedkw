@@ -35,7 +35,7 @@ function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: b
     } },
   });
   const handler = createInboxHandler({ admin,
-    readConfig: () => ({ origin: "http://curemed-evolution:8080", apiKey: "fixture-key", webhookSecret: "fixture-hk" }),
+    readConfig: () => ({ origin: "http://curemed-evolution:8080", apiKey: "fixture-key", webhookSecret: "fixture-hk", storagePublicUrl: "" }),
     fetchImpl: (input, init) => {
       const path = new URL(String(input)).pathname;
       calls.push({ path, body: init?.body ? JSON.parse(String(init.body)) : {} });

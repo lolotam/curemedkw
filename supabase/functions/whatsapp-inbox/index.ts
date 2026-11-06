@@ -7,5 +7,6 @@ Deno.serve(createInboxHandler({
   admin: getAdminClient(),
   readConfig: () => ({ origin: env("CUREMED_EVOLUTION_URL"),
     apiKey: env("CUREMED_EVOLUTION_API_KEY"),
-    webhookSecret: env("CUREMED_EVOLUTION_WEBHOOK_SECRET") }),
+    webhookSecret: env("CUREMED_EVOLUTION_WEBHOOK_SECRET"),
+    storagePublicUrl: env("SUPABASE_PUBLIC_URL") }),
 }));
