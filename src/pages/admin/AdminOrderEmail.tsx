@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSiteSetting, useUpdateSiteSetting } from "@/lib/db";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { OrderWhatsAppTab } from "@/components/admin/OrderWhatsAppTab";
+import { SectionCard } from "@/components/admin/SectionCard";
 import { EmailLivePreview } from "@/components/admin/EmailLivePreview";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -133,6 +135,7 @@ export default function AdminOrderEmail() {
   const [audienceTab, setAudienceTab] = useState<EmailAudience>("customer");
   const [previewLang, setPreviewLang] = useState<EmailLang>("en");
 
+  const [channel, setChannel] = useState<"email" | "whatsapp">("email");
   const [testTo, setTestTo] = useState("");
   const [testOrderId, setTestOrderId] = useState("");
   const [sendingTest, setSendingTest] = useState(false);
@@ -262,12 +265,12 @@ export default function AdminOrderEmail() {
   return (
     <div className="p-6 md:p-10 w-full max-w-none space-y-8">
       <AdminPageHeader
-        title="Order Email"
-        subtitle="Confirmation emails sent automatically when an order is paid — to the customer and to your team."
+        title="Order Messages"
+        subtitle="Emails and WhatsApp messages sent automatically for each order — to the customer and to your team."
         eyebrow="Automation"
         eyebrowIcon={MailCheck}
         gradient="cyan-sky-blue"
-        actions={
+        actions={channel === "email" && (
           <div className="flex items-center gap-2">
             {dirty && <span className="text-xs text-muted-foreground">Unsaved changes</span>}
             <Button onClick={save} disabled={!dirty || update.isPending} className="bg-brand hover:bg-brand/90 text-white">
@@ -275,8 +278,16 @@ export default function AdminOrderEmail() {
               Save all
             </Button>
           </div>
-        }
+        )}
       />
+
+      <Tabs value={channel} onValueChange={(v) => setChannel(v as "email" | "whatsapp")} className="space-y-8">
+        <TabsList>
+          <TabsTrigger value="email">Email</TabsTrigger>
+          <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
+        </TabsList>
+        {/* Both tabs stay mounted so switching never discards unsaved changes. */}
+        <TabsContent value="email" forceMount className="space-y-8 data-[state=inactive]:hidden">
 
       <SectionCard title="Delivery" description="Master switch and who receives each email.">
         <div className="flex items-center justify-between gap-4">
@@ -536,27 +547,12 @@ export default function AdminOrderEmail() {
           </div>
         )}
       </SectionCard>
+        </TabsContent>
+        <TabsContent value="whatsapp" forceMount className="data-[state=inactive]:hidden">
+          <OrderWhatsAppTab />
+        </TabsContent>
+      </Tabs>
     </div>
-  );
-}
-
-function SectionCard({
-  title,
-  description,
-  children,
-}: {
-  title: string;
-  description?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card p-5 space-y-4">
-      <div>
-        <h2 className="text-base font-semibold">{title}</h2>
-        {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
-      </div>
-      {children}
-    </section>
   );
 }
 

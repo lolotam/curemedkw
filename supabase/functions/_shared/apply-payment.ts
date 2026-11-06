@@ -91,6 +91,7 @@ export async function dispatchOrderNotifications(
       .select("id")
       .maybeSingle();
     if (!claimed) return; // already notified or column missing
+    const whatsAppTabEnabled = await queueOrderWhatsAppConfirmation(admin, orderId);
 
     const { data: order } = await admin.from("orders").select("*").eq("id", orderId).maybeSingle();
     if (!order) return;
@@ -138,8 +139,9 @@ export async function dispatchOrderNotifications(
       }),
     );
 
-    // 2) Customer order confirmation (order.paid).
-    if (owner?.owner === "legacy" && owner?.owner_snapshot?.whatsapp?.manual_only !== true && order.customer_phone) {
+    // 2) Customer order confirmation (order.paid). The order-WhatsApp tab sends its own when enabled.
+    if (!whatsAppTabEnabled && owner?.owner === "legacy" && owner?.owner_snapshot?.whatsapp?.manual_only !== true &&
+      order.customer_phone) {
       tasks.push(
         admin.functions.invoke("send-whatsapp", {
           headers: invokeHeaders,
@@ -185,6 +187,16 @@ export async function dispatchOrderNotifications(
   }
 }
 
+
+/**
+ * Queues the order-WhatsApp confirmation and answers whether that tab is enabled. When the RPC is
+ * unavailable (for instance before its migration is applied) the answer is false, so the legacy
+ * customer message still goes out.
+ */
+async function queueOrderWhatsAppConfirmation(admin: SupabaseClient, orderId: string): Promise<boolean> {
+  const { data, error } = await admin.rpc("owa_enqueue_confirmation", { p_order_id: orderId });
+  return !error && (data as { enabled?: unknown } | null)?.enabled === true;
+}
 
 /** Find an order by any of the known MyFatoorah references. */
 export async function findOrder(

@@ -291,6 +291,7 @@ export default function Checkout() {
     try {
       logOperation({ category: "order", operation: "checkout_started", status: "info", metadata: { items_count: items.length, subtotal, method: onlineMethod } });
       const order = await createOrder.mutateAsync({
+        language: lang,
         customerName: form.customerName,
         customerEmail: form.customerEmail,
         customerPhone,
