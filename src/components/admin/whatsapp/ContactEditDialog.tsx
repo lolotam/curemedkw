@@ -49,7 +49,7 @@ export function ContactEditDialog({ contact, onClose }: { contact: WhatsAppConta
   const canAttachPhone = !contact.normalized_phone && !!contact.remote_jid;
   const phone = canAttachPhone ? normalizeContactPhone(phoneInput) : "";
   const patch = changedFields(contact, form, phone);
-  const set = (field: ProfileField) => (event: { target: { value: string } }) => setForm({ ...form, [field]: event.target.value });
+  const updateField = (field: ProfileField) => (event: { target: { value: string } }) => setForm({ ...form, [field]: event.target.value });
 
   function save() {
     update.mutate({ contactId: contact.id, patch }, {
@@ -67,16 +67,16 @@ export function ContactEditDialog({ contact, onClose }: { contact: WhatsAppConta
         </DialogHeader>
         <div className="space-y-3">
           <Field id="contact-name" label={t("admin.whatsapp.contact.name")}>
-            <Input id="contact-name" value={form.display_name} onChange={set("display_name")} maxLength={200} dir="auto" />
+            <Input id="contact-name" value={form.display_name} onChange={updateField("display_name")} maxLength={200} dir="auto" />
           </Field>
           <Field id="contact-business" label={t("admin.whatsapp.contact.business")}>
-            <Input id="contact-business" value={form.business_name} onChange={set("business_name")} maxLength={200} dir="auto" />
+            <Input id="contact-business" value={form.business_name} onChange={updateField("business_name")} maxLength={200} dir="auto" />
           </Field>
           <Field id="contact-email" label={t("admin.whatsapp.contact.email")}>
-            <Input id="contact-email" type="email" value={form.email} onChange={set("email")} maxLength={320} dir="ltr" />
+            <Input id="contact-email" type="email" value={form.email} onChange={updateField("email")} maxLength={320} dir="ltr" />
           </Field>
           <Field id="contact-notes" label={t("admin.whatsapp.contact.notes")}>
-            <Textarea id="contact-notes" value={form.notes} onChange={set("notes")} maxLength={4000} rows={3} dir="auto" />
+            <Textarea id="contact-notes" value={form.notes} onChange={updateField("notes")} maxLength={4000} rows={3} dir="auto" />
           </Field>
           {canAttachPhone && (
             <Field id="contact-phone" label={t("admin.whatsapp.contact.phone")}>
