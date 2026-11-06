@@ -7,8 +7,8 @@ from pathlib import Path
 import re
 import subprocess
 
-INVENTORY = "docs/releases/curemed-schema-20261105.json"
-INVENTORY_SHA256 = "1a0ce78a1890aa1ed8fe2671e72ce07cef7a2a9a0ee1b59e74ec78da16eceb04"
+INVENTORY = "docs/releases/curemed-schema-20261106.json"
+INVENTORY_SHA256 = "b720f5cde23ecc88e0a15d2e1c5cbeb7be2fd2e04e013c1efde4f684292a2450"
 FILENAME = re.compile(r"[0-9]{14}_[a-z0-9_]+\.sql\Z")
 CONTAINER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,199}\Z")
 
@@ -18,17 +18,17 @@ class SchemaReadinessError(RuntimeError):
 
 
 def read_live_ledger(container, filenames):
-    if (not CONTAINER.fullmatch(container) or not 1 <= len(filenames) <= 22
+    if (not CONTAINER.fullmatch(container) or not 1 <= len(filenames) <= 23
             or any(len(x) > 200 or not FILENAME.fullmatch(x) for x in filenames)):
         raise SchemaReadinessError("schema_target_invalid")
     quoted = ",".join("'" + name + "'" for name in filenames)
     # Bound data before psql serializes it, even if an unexpected ledger lacks
-    # uniqueness or contains huge text. 23 bounded rows stay below 32KiB;
-    # a duplicate/extra row still fails the exact twenty-two-row comparison.
+    # uniqueness or contains huge text. 24 bounded rows stay below 32KiB;
+    # a duplicate/extra row still fails the exact twenty-three-row comparison.
     query = ("SELECT COALESCE(json_agg(json_build_object('filename',filename,'checksum',checksum)),"
              "'[]'::json)::text FROM (SELECT CASE WHEN octet_length(filename)<=200 THEN filename END AS filename,"
              "CASE WHEN octet_length(checksum)=64 THEN substring(checksum from '^[0-9a-f]{64}$') END AS checksum "
-             "FROM public.self_hosted_migrations WHERE filename IN (" + quoted + ") LIMIT 23) bounded;")
+             "FROM public.self_hosted_migrations WHERE filename IN (" + quoted + ") LIMIT 24) bounded;")
     try:
         # Match the subsequent migration runner's supported target overrides.
         database_user = os.environ.get("SUPABASE_DB_USER") or "postgres"
@@ -74,7 +74,7 @@ def verify_prerequisites(repo, manifest, container, read_ledger=read_live_ledger
             raise SchemaReadinessError("schema_inventory_mismatch")
         migrations = json.loads(raw)["migrations"]
         expected = {item["filename"]: item["sha256GitBytes"] for item in migrations}
-        if len(migrations) != 22 or len(expected) != 22:
+        if len(migrations) != 23 or len(expected) != 23:
             raise SchemaReadinessError("schema_inventory_mismatch")
         for item in migrations:
             if not FILENAME.fullmatch(item["filename"]) or item["path"] != "supabase/migrations/" + item["filename"]:

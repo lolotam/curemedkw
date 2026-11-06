@@ -140,7 +140,7 @@ Deno.test("webhook merges events and preserves custom headers using the v2 DTO",
   assertEquals(calls[1].body, { webhook: { enabled: true,
     url: "http://cloud-supabase-hns8fw-supabase-edge-functions:9000/whatsapp-pairing-webhook",
     headers: { custom: "value", "x-curemed-webhook-key": "fixture-hk" }, byEvents: false, base64: false,
-    events: ["CALL", "MESSAGES_UPSERT", "CONNECTION_UPDATE", "MESSAGES_UPDATE"] } });
+    events: ["CALL", "MESSAGES_UPSERT", "CONNECTION_UPDATE", "MESSAGES_UPDATE", "MESSAGES_DELETE"] } });
 });
 Deno.test("webhook conflicts require explicit force", async () => {
   for (const force of [false, true]) {

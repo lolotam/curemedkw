@@ -5,13 +5,14 @@ import { Input } from "@/components/ui/input";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { WhatsAppChat } from "@/lib/whatsappInbox";
-import { chatTitle, lastMessageTime, previewText, type ChatPreview } from "@/lib/whatsappInboxView";
+import { chatTitle, lastMessageTime, previewText } from "@/lib/whatsappInboxView";
 import { ChatAvatar } from "./ChatAvatar";
 import { StatusTicks } from "./StatusTicks";
 
 interface WhatsAppChatListProps {
   chats: WhatsAppChat[];
-  previews: Map<string, ChatPreview> | undefined;
+  /** Profile picture URL per chat id; chats without an entry show their initials. */
+  avatars: Record<string, string | null>;
   isLoading: boolean;
   failed: boolean;
   selectedId: string | null;
@@ -25,20 +26,21 @@ interface WhatsAppChatListProps {
 
 interface ChatRowProps {
   chat: WhatsAppChat;
-  preview: ChatPreview | undefined;
+  avatarUrl: string | null | undefined;
   selected: boolean;
   onSelect: (chat: WhatsAppChat) => void;
 }
 
 /** One conversation: avatar, name and last-message time, then the preview and the unread count. */
-function ChatRow({ chat, preview, selected, onSelect }: ChatRowProps) {
+function ChatRow({ chat, avatarUrl, selected, onSelect }: ChatRowProps) {
   const { t, lang } = useI18n();
+  const preview = chat.last_message_preview;
   const unread = chat.unread_count > 0;
   return (
     <li>
       <button type="button" onClick={() => onSelect(chat)} aria-current={selected || undefined}
         className={cn("flex w-full items-center gap-3 border-b px-3 py-2.5 text-start transition-colors hover:bg-muted/60", selected && "bg-muted")}>
-        <ChatAvatar chat={chat} />
+        <ChatAvatar chat={chat} src={avatarUrl} />
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline justify-between gap-2">
             <span className="truncate text-sm font-medium" dir="auto">{chatTitle(chat, t("admin.whatsapp.unknownContact"))}</span>
@@ -48,7 +50,7 @@ function ChatRow({ chat, preview, selected, onSelect }: ChatRowProps) {
           </span>
           <span className="flex items-center justify-between gap-2">
             <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
-              {preview?.direction === "outbound" && <StatusTicks ack={preview.ack_state} />}
+              {preview?.direction === "outbound" && !preview.deleted && <StatusTicks ack={preview.ack_state} />}
               <span className="truncate" dir="auto">{preview ? previewText(preview, t) : ""}</span>
             </span>
             {unread && (
@@ -65,7 +67,7 @@ function ChatRow({ chat, preview, selected, onSelect }: ChatRowProps) {
 
 /** WhatsApp Web style conversation list: avatar, name, last-message time, preview and unread count. */
 export function WhatsAppChatList({
-  chats, previews, isLoading, failed, selectedId, onSelect, search, onSearchChange, hasMore, loadingMore, onLoadMore,
+  chats, avatars, isLoading, failed, selectedId, onSelect, search, onSearchChange, hasMore, loadingMore, onLoadMore,
 }: WhatsAppChatListProps) {
   const { t } = useI18n();
   return (
@@ -83,8 +85,7 @@ export function WhatsAppChatList({
         {!isLoading && !failed && chats.length === 0 && <p className="p-4 text-sm text-muted-foreground">{t("admin.whatsapp.empty")}</p>}
         <ul>
           {chats.map(chat => (
-            <ChatRow key={chat.id} chat={chat} selected={chat.id === selectedId} onSelect={onSelect}
-              preview={chat.last_message_id ? previews?.get(chat.last_message_id) : undefined} />
+            <ChatRow key={chat.id} chat={chat} avatarUrl={avatars[chat.id]} selected={chat.id === selectedId} onSelect={onSelect} />
           ))}
         </ul>
         {hasMore && (

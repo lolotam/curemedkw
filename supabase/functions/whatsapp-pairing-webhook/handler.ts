@@ -160,7 +160,7 @@ export function createEvolutionPairingWebhookHandler(
 
     if (sanitized.instance !== WEBHOOK_INSTANCE) return errorResponse(400, "invalid_request");
     const event = typeof sanitized.event === "string" ? sanitized.event.toLowerCase().replaceAll("_", ".") : "";
-    if (event === "messages.upsert" || event === "messages.update") {
+    if (event === "messages.upsert" || event === "messages.update" || event === "messages.delete") {
       if (!sanitized.data || (typeof sanitized.data !== "object")) return errorResponse(400, "invalid_request");
       try { await options.ingest(event, sanitized.data); }
       catch { return errorResponse(503, "storage_unavailable"); }

@@ -4,18 +4,19 @@ process.env.TZ = "Asia/Kuwait";
 import { describe, expect, it } from "vitest";
 import type { WhatsAppChat, WhatsAppMessage } from "@/lib/whatsappInbox";
 import {
-  chatInitials, chatPhone, chatTitle, chunk, groupByDay, lastMessageTime, previewText, providerMediaMeta, resolveMediaKind, toAspectRatio,
+  canDeleteForEveryone, chatInitials, chatPhone, chatTitle, chunk, groupByDay, lastMessageTime, previewText, providerMediaMeta, resolveMediaKind, toAspectRatio,
 } from "./whatsappInboxView";
 
 const chat = (overrides: Partial<WhatsAppChat>): WhatsAppChat => ({
   id: "chat-1", instance_identity: "curemed", normalized_phone: "96550000000", remote_jid: "96550000000@s.whatsapp.net",
-  display_name: "", last_message_at: null, last_message_id: null, unread_count: 0, ...overrides,
+  display_name: "", last_message_at: null, last_message_id: null, unread_count: 0, last_message_preview: null, ...overrides,
 });
 const lidChat = chat({ normalized_phone: null, remote_jid: "123456789012345@lid" });
 
 const message = (overrides: Partial<WhatsAppMessage>): WhatsAppMessage => ({
   id: "m-1", chat_id: "chat-1", instance_identity: "curemed", provider_message_id: "P1", direction: "inbound",
-  message_type: "text", body: "", sent_at: "2026-11-05T10:00:00.000Z", ack_state: "accepted", media_object_id: null, ...overrides,
+  message_type: "text", body: "", sent_at: "2026-11-05T10:00:00.000Z", ack_state: "accepted", media_object_id: null,
+  remote_deleted_at: null, ...overrides,
 });
 const documentWith = (payload: Record<string, unknown>) =>
   message({ message_type: "document", provider_media: { key: { id: "P1" }, message: { documentMessage: payload } } });
@@ -107,10 +108,26 @@ describe("attachments", () => {
 describe("chat list previews", () => {
   const t = (key: string) => `[${key}]`;
   it("shows the first line of the text, or the attachment type when there is no caption", () => {
-    expect(previewText({ body: "  Hello\nsecond line", message_type: "text" }, t)).toBe("Hello");
-    expect(previewText({ body: "", message_type: "image" }, t)).toBe("[admin.whatsapp.preview.image]");
-    expect(previewText({ body: "See attached", message_type: "document" }, t)).toBe("See attached");
-    expect(previewText({ body: "", message_type: "unsupported" }, t)).toBe("[admin.whatsapp.unsupported]");
+    expect(previewText({ body: "  Hello\nsecond line", message_type: "text", deleted: false }, t)).toBe("Hello");
+    expect(previewText({ body: "", message_type: "image", deleted: false }, t)).toBe("[admin.whatsapp.preview.image]");
+    expect(previewText({ body: "See attached", message_type: "document", deleted: false }, t)).toBe("See attached");
+    expect(previewText({ body: "", message_type: "unsupported", deleted: false }, t)).toBe("[admin.whatsapp.unsupported]");
+  });
+
+  it("labels a deleted last message instead of showing what was left of it", () => {
+    expect(previewText({ body: "", message_type: "image", deleted: true }, t)).toBe("[admin.whatsapp.deletedMessage]");
+  });
+
+  it("offers delete for everyone only for our own undeleted messages inside the 60-hour window", () => {
+    const now = Date.parse("2026-11-08T10:00:00.000Z");
+    const sentAt = (hoursAgo: number) => new Date(now - hoursAgo * 3_600_000).toISOString();
+    const cases: [Partial<WhatsAppMessage>, boolean][] = [
+      [{ direction: "outbound", sent_at: sentAt(59.9) }, true],
+      [{ direction: "outbound", sent_at: sentAt(60) }, false],
+      [{ direction: "inbound", sent_at: sentAt(1) }, false],
+      [{ direction: "outbound", sent_at: sentAt(1), remote_deleted_at: sentAt(0) }, false],
+    ];
+    for (const [overrides, offered] of cases) expect(canDeleteForEveryone(message(overrides), now)).toBe(offered);
   });
 
   it("batches ids into slices of at most the given size", () => {

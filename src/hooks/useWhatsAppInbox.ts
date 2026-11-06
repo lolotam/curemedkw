@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/clientRuntime";
 import { callWhatsAppInbox, type WhatsAppChat, type WhatsAppMessage } from "@/lib/whatsappInbox";
-import { chunk, type ChatPreview } from "@/lib/whatsappInboxView";
+import { chunk } from "@/lib/whatsappInboxView";
 
 export function useWhatsAppInbox(chatId: string | null, search: string) {
   const cache = useQueryClient();
@@ -20,7 +20,7 @@ export function useWhatsAppInbox(chatId: string | null, search: string) {
   const messages = useInfiniteQuery({ queryKey: ["whatsapp-inbox", "messages", chatId], enabled: !!chatId,
     initialPageParam: null as { sent_at: string; id: string } | null,
     queryFn: async ({ pageParam }) => {
-      let query = supabase.from("whatsapp_messages").select("*").eq("chat_id", chatId!)
+      let query = supabase.from("whatsapp_messages").select("*").eq("chat_id", chatId!).is("locally_deleted_at", null)
         .order("sent_at", { ascending: false }).order("id", { ascending: false }).limit(50);
       if (pageParam) query = query.or(`sent_at.lt.${pageParam.sent_at},and(sent_at.eq.${pageParam.sent_at},id.lt.${pageParam.id})`);
       const { data: rows, error } = await query;
@@ -36,35 +36,45 @@ export function useWhatsAppInbox(chatId: string | null, search: string) {
         void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "chats"] });
       }).on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_messages", ...(chatId ? { filter: `chat_id=eq.${chatId}` } : {}) }, () => {
         void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "messages", chatId] });
-        void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "previews"] });
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [cache, chatId]);
   return { chats, messages, connection };
 }
 
-/** PostgREST `in` lists travel in the URL; 50 provider ids keep each request well under URL limits. */
-const PREVIEW_BATCH = 50;
+/** The `avatars.get` action accepts at most 50 chats per call. */
+const AVATAR_BATCH = 50;
+/** Signed picture URLs live an hour; refreshing before that keeps long-open screens showing pictures. */
+const AVATAR_REFRESH_MS = 50 * 60 * 1000;
+/** Each call looks up a few new pictures on WhatsApp; while some are still missing, ask again shortly. */
+const AVATAR_PENDING_MS = 5_000;
+
+type AvatarBatch = { avatars: Record<string, string | null>; pending: boolean };
 
 /**
- * Last-message previews for the loaded chats, keyed by provider message id.
- *
- * `whatsapp_chats` keeps only `last_message_id`, so the rows it points at are read back in batches
- * (one request per 50 chats). The key changes whenever a chat gets a new last message, and the
- * previous map stays on screen while the new one loads. Delivery and read acks update a message without
- * changing that id, so the map also refreshes on the chat-list polling interval.
+ * Profile picture URLs by chat id (null when a chat has none). Ids are sorted before batching so a
+ * chat moving up the list does not change any query key, and the key lives outside the
+ * `whatsapp-inbox` tree so a reply or a list refresh never re-signs every picture.
  */
-export function useChatPreviews(chats: WhatsAppChat[]) {
-  const ids = [...new Set(chats.map(chat => chat.last_message_id).filter((id): id is string => !!id))].sort();
-  return useQuery({ queryKey: ["whatsapp-inbox", "previews", ids], enabled: ids.length > 0, placeholderData: keepPreviousData, refetchInterval: 15_000,
-    queryFn: async () => {
-      const batches = await Promise.all(chunk(ids, PREVIEW_BATCH).map(async batch => {
-        const { data: rows, error } = await supabase.from("whatsapp_messages")
-          .select("chat_id,provider_message_id,body,message_type,direction,ack_state")
-          .eq("instance_identity", "curemed").in("provider_message_id", batch);
-        if (error) throw error;
-        return rows as ChatPreview[];
-      }));
-      return new Map(batches.flat().map(row => [row.provider_message_id, row]));
-    } });
+export function useChatAvatars(chatIds: string[]): Record<string, string | null> {
+  const batches = chunk([...new Set(chatIds)].sort(), AVATAR_BATCH);
+  return useQueries({
+    queries: batches.map(batch => ({
+      queryKey: ["whatsapp-avatars", batch], staleTime: AVATAR_REFRESH_MS, retry: false,
+      queryFn: () => callWhatsAppInbox<AvatarBatch>({ action: "avatars.get", chatIds: batch }),
+      refetchInterval: (query: { state: { data?: AvatarBatch } }) => query.state.data?.pending ? AVATAR_PENDING_MS : AVATAR_REFRESH_MS,
+    })),
+    combine: results => Object.assign({}, ...results.map(result => result.data?.avatars ?? {})) as Record<string, string | null>,
+  });
+}
+
+export type DeleteScope = "local" | "everyone";
+
+/** Deletes a message for this inbox only, or for everyone on WhatsApp, then refreshes the thread and the list. */
+export function useDeleteWhatsAppMessage() {
+  const cache = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { messageId: string; scope: DeleteScope }) => callWhatsAppInbox({ action: "message.delete", ...input }),
+    onSettled: () => cache.invalidateQueries({ queryKey: ["whatsapp-inbox"] }),
+  });
 }

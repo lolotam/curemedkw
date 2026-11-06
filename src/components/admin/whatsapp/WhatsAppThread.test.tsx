@@ -9,7 +9,8 @@ vi.mock("@/integrations/supabase/clientRuntime", () => ({ supabase: { functions:
 
 const message = (overrides: Partial<WhatsAppMessage>): WhatsAppMessage => ({
   id: "m-1", chat_id: "chat-1", instance_identity: "curemed", provider_message_id: "P1", direction: "inbound",
-  message_type: "text", body: "", sent_at: "2026-11-05T10:00:00.000Z", ack_state: "accepted", media_object_id: null, ...overrides,
+  message_type: "text", body: "", sent_at: "2026-11-05T10:00:00.000Z", ack_state: "accepted", media_object_id: null,
+  remote_deleted_at: null, ...overrides,
 });
 
 const fileResponse = (type: string) => ({ ok: true, blob: async () => new Blob(["bytes"], { type }) });
@@ -91,6 +92,36 @@ describe("WhatsApp thread", () => {
     // The media query retries once before giving up, so allow for the retry delay.
     const fallback = await screen.findByText("Attachment unavailable or expired. Try again.", undefined, { timeout: 4000 });
     expect(within(fallback.parentElement!).getByRole("button", { name: "Download: Voice message" })).toBeInTheDocument();
+  });
+
+  it("keeps a message deleted for everyone in place as a placeholder, without its content or delivery ticks", () => {
+    renderThread([message({ id: "gone", direction: "outbound", body: "Old price list", ack_state: "read",
+      remote_deleted_at: "2026-11-05T10:01:00.000Z" })]);
+    expect(screen.getByText("This message was deleted")).toBeInTheDocument();
+    expect(screen.queryByText("Old price list")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img", { name: "Read" })).not.toBeInTheDocument();
+  });
+
+  it("asks for the delete scope and offers delete for everyone only for our own recent messages", async () => {
+    invoke.mockResolvedValue({ data: { success: true, data: { deleted: true } }, error: null });
+    const recent = new Date().toISOString();
+    renderThread([message({ id: "theirs", body: "Customer text", sent_at: recent }),
+      message({ id: "ours", direction: "outbound", body: "Our text", sent_at: recent })]);
+    const [theirsMenu, oursMenu] = screen.getAllByRole("button", { name: "Message options" });
+
+    fireEvent.keyDown(theirsMenu, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const customerDialog = await screen.findByRole("alertdialog");
+    expect(within(customerDialog).queryByRole("button", { name: "Delete for everyone" })).not.toBeInTheDocument();
+    fireEvent.click(within(customerDialog).getByRole("button", { name: "Delete for me" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("whatsapp-inbox",
+      { body: { action: "message.delete", messageId: "theirs", scope: "local" } }));
+
+    fireEvent.keyDown(oursMenu, { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete for everyone" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("whatsapp-inbox",
+      { body: { action: "message.delete", messageId: "ours", scope: "everyone" } }));
   });
 
   it("puts each local day under its own date chip", () => {

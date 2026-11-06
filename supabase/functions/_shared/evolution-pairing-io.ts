@@ -35,26 +35,25 @@ export function withAbortSignal<T>(
 }
 
 /** The stream, rather than Content-Length, enforces the byte cap. */
-export async function readBoundedText(
+export async function readBoundedBytes(
   body: ReadableStream<Uint8Array> | null,
   limit: number,
   declaredLength: string | null,
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<Uint8Array> {
   if (declaredLength !== null && Number(declaredLength) > limit) {
     void body?.cancel().catch(() => {});
     throw new EvolutionBodyTooLargeError();
   }
-  if (body === null) return "";
+  if (body === null) return new Uint8Array();
   const reader = body.getReader();
   const cancel = () => {
     void reader.cancel().catch(() => {});
   };
   signal?.addEventListener("abort", cancel, { once: true });
   if (signal?.aborted) cancel();
-  const decoder = new TextDecoder();
+  const chunks: Uint8Array[] = [];
   let received = 0;
-  let text = "";
   try {
     for (;;) {
       const chunk = await withAbortSignal(reader.read(), signal);
@@ -64,11 +63,26 @@ export async function readBoundedText(
         cancel();
         throw new EvolutionBodyTooLargeError();
       }
-      text += decoder.decode(chunk.value, { stream: true });
+      chunks.push(chunk.value);
     }
-    return text + decoder.decode();
   } finally {
     signal?.removeEventListener("abort", cancel);
     reader.releaseLock();
   }
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
+}
+
+export async function readBoundedText(
+  body: ReadableStream<Uint8Array> | null,
+  limit: number,
+  declaredLength: string | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  return new TextDecoder().decode(await readBoundedBytes(body, limit, declaredLength, signal));
 }
