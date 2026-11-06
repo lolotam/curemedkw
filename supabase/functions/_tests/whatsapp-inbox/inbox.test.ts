@@ -1,8 +1,9 @@
 import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1.0.19";
 import { createEvolutionInboxClient, inboxIdentity, inboxMessage, InboxError } from "../../_shared/evolution-inbox.ts";
-import { decodeInboxMedia } from "../../whatsapp-inbox/media.ts";
+import { decodeInboxMedia, getInboxMedia } from "../../whatsapp-inbox/media.ts";
 import { createEvolutionPairingWebhookHandler } from "../../whatsapp-pairing-webhook/handler.ts";
 import { verifiedPaymentAttestation } from "../../_shared/integration-payment.ts";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 Deno.test("LID messages survive without phone, and alternate phone does not replace addressing identity", () => {
   const message = { key: { remoteJid: "123456789012345@lid", id: "message-1", fromMe: false },
@@ -59,4 +60,28 @@ Deno.test("message truncation preserves emoji at code point boundary", () => {
   const body = "a".repeat(4095) + "\u{1F600}" + "z";
   const result = inboxMessage({ key: { remoteJid: "123456789012345@lid", id: "boundary" }, message: { conversation: body }, messageTimestamp: 1793872800 }, true);
   assertEquals(result?.body, "a".repeat(4095) + "\u{1F600}");
+});
+
+/** Admin client double for an attachment that is already in storage, signed on the internal Kong host. */
+function storedMediaAdmin() {
+  const row = (data: unknown) => ({ eq: () => row(data), single: () => Promise.resolve({ data, error: null }) });
+  const tables: Record<string, unknown> = {
+    whatsapp_messages: { id: "message-1", media_object_id: "object-1", provider_media: null },
+    whatsapp_media_objects: { object_path: "curemed/abc", mime_type: "application/pdf", file_name: "invoice.pdf" },
+  };
+  return {
+    from: (table: string) => ({ select: () => row(tables[table]) }),
+    storage: { from: () => ({ createSignedUrl: () => Promise.resolve({ error: null,
+      data: { signedUrl: "http://kong:8000/storage/v1/object/sign/whatsapp-media/curemed/abc?token=signed" } }) }) },
+  } as unknown as SupabaseClient;
+}
+
+// Regression 2026-11-06: production inbox images/PDFs never loaded because media.get returned http://kong:8000 links.
+Deno.test("media URL handed to the browser uses the public storage origin, not the internal gateway", async () => {
+  const provider = () => Promise.reject(new Error("stored media must not hit the provider"));
+  const media = await getInboxMedia(storedMediaAdmin(), provider, "message-1", "https://supabase.example.test/");
+  assertEquals(media.url, "https://supabase.example.test/storage/v1/object/sign/whatsapp-media/curemed/abc?token=signed");
+  assertEquals(media.fileName, "invoice.pdf");
+  const unconfigured = await getInboxMedia(storedMediaAdmin(), provider, "message-1", "");
+  assertEquals(unconfigured.url, "http://kong:8000/storage/v1/object/sign/whatsapp-media/curemed/abc?token=signed");
 });

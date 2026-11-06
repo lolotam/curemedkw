@@ -45,7 +45,17 @@ export async function storeInboxMedia(admin: SupabaseClient, input: { encoded: s
   return stored.id as string;
 }
 
-export async function getInboxMedia(admin: SupabaseClient, provider: EvolutionInboxClient, messageId: string) {
+/**
+ * Self-hosted Supabase signs storage URLs on the gateway the function itself talks to (`http://kong:8000`),
+ * which no browser can reach. Re-root the signed path on the public API origin; without one, keep it as is.
+ */
+function browserReachableUrl(signedUrl: string, publicOrigin: string) {
+  if (!publicOrigin.trim()) return signedUrl;
+  const signed = new URL(signedUrl);
+  return new URL(`${signed.pathname}${signed.search}`, publicOrigin).toString();
+}
+
+export async function getInboxMedia(admin: SupabaseClient, provider: EvolutionInboxClient, messageId: string, publicOrigin: string) {
   const { data: message, error } = await admin.from("whatsapp_messages").select("id,media_object_id,provider_media")
     .eq("id", messageId).eq("instance_identity", "curemed").single();
   if (error || !message) throw new InboxError("message_not_found", 404);
@@ -64,5 +74,5 @@ export async function getInboxMedia(admin: SupabaseClient, provider: EvolutionIn
   if (mediaError || !media) throw new InboxError("media_unavailable", 404);
   const { data: signed, error: signError } = await admin.storage.from("whatsapp-media").createSignedUrl(media.object_path, 600);
   if (signError || !signed) throw new InboxError("media_unavailable", 503);
-  return { url: signed.signedUrl, mime: media.mime_type, fileName: media.file_name };
+  return { url: browserReachableUrl(signed.signedUrl, publicOrigin), mime: media.mime_type, fileName: media.file_name };
 }
