@@ -30,7 +30,7 @@ export default function AdminWhatsAppInbox() {
     void callWhatsAppInbox({ action: "markRead", chatId: current.id, seenMessageId: seenId })
       .then(() => cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "chats"] })).catch(() => setReadFailed(true));
   }, [current?.id, seenId, cache]);
-  return <div className="space-y-3">
+  return <div className="flex h-dvh flex-col gap-3">
     <header className="flex items-center justify-between"><h1 className="text-2xl font-semibold">{t("admin.whatsapp.inbox")}</h1>
       <Button asChild variant="outline" size="sm"><Link to="/admin/whatsapp"><Settings className="me-2 h-4 w-4" />{t("admin.whatsapp.settings")}</Link></Button></header>
     <p className={`text-sm ${connection.data?.connected ? "text-emerald-700" : "text-muted-foreground"}`} role="status">
@@ -38,7 +38,7 @@ export default function AdminWhatsAppInbox() {
       {connection.data?.connected && !connection.data.webhookReady && ` · ${t("admin.whatsapp.webhookMissing")}`}
     </p>
     {readFailed && <p role="alert" className="text-sm text-destructive">{t("admin.whatsapp.readFailed")}</p>}
-    <div className="flex h-[calc(100dvh-230px)] min-h-[420px] overflow-hidden rounded-xl border bg-card shadow-sm">
+    <div className="flex min-h-[420px] flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
       <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-e md:w-80 md:shrink-0`}>
         <WhatsAppChatList chats={chatRows} previews={previews.data} isLoading={chats.isPending} failed={!!chats.error}
           selectedId={selected?.id ?? null} onSelect={setSelected} search={search} onSearchChange={setSearch}
