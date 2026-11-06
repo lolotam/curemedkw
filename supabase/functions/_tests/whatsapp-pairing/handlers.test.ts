@@ -802,6 +802,25 @@ Deno.test("an unknown event is refused by the webhook", async () => {
   }
 });
 
+Deno.test("message events, including phone-side deletes, reach ingestion under their normalized name", async () => {
+  const ingested: [string, unknown][] = [];
+  const handler = createEvolutionPairingWebhookHandler({
+    ingest: (event, data) => { ingested.push([event, data]); return Promise.resolve(); },
+    readSecret: () => HOOK_MARKER,
+  });
+  for (const event of ["MESSAGES_UPSERT", "messages.update", "MESSAGES_DELETE"]) {
+    const response = await handler(
+      request(
+        WEBHOOK_ENDPOINT,
+        JSON.stringify({ instance: "curemed", event, data: { id: "m-1" } }),
+        { headers: { "x-curemed-webhook-key": HOOK_MARKER } },
+      ),
+    );
+    assertEquals(response.status, 200, event);
+  }
+  assertEquals(ingested.map(([event]) => event), ["messages.upsert", "messages.update", "messages.delete"]);
+});
+
 Deno.test("a QR or a message payload is refused by the webhook", async () => {
   const handler = createWebhook();
 

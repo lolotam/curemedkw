@@ -11,6 +11,8 @@ const paths = {
   media: ["POST", "message/sendMedia"],
   audio: ["POST", "message/sendWhatsAppAudio"],
   download: ["POST", "chat/getBase64FromMediaMessage"],
+  avatar: ["POST", "chat/fetchProfilePictureUrl"],
+  revoke: ["DELETE", "chat/deleteMessageForEveryone"],
 } as const;
 
 export class InboxError extends Error {
@@ -27,7 +29,7 @@ export function createEvolutionInboxClient(config: { origin: string; apiKey: str
     try {
       const response = await (config.fetchImpl ?? fetch)(`${EVOLUTION_ALLOWED_ORIGIN}/${path}/${EVOLUTION_INSTANCE}`, {
         method, headers: { ["apikey"]: config.apiKey, "Content-Type": "application/json" },
-        ...(method === "POST" ? { body: JSON.stringify(payload ?? {}) } : {}), redirect: "error", signal,
+        ...(method === "GET" ? {} : { body: JSON.stringify(payload ?? {}) }), redirect: "error", signal,
       });
       if (!response.ok) throw new InboxError("provider_unavailable", 502);
       const text = await readBoundedText(response.body, action === "download" ? 15_000_000 : 4_194_304,
@@ -57,15 +59,30 @@ export function inboxIdentity(raw: unknown) {
     display_name: String((key.fromMe === true ? undefined : raw.pushName) ?? raw.name ?? raw.notify ?? "").slice(0, 200) };
 }
 
-export function inboxMessage(raw: unknown, countUnread: boolean) {
-  const identity = inboxIdentity(raw);
-  if (!identity || !isPlainObject(raw) || !isPlainObject(raw.key) || typeof raw.key.id !== "string") return null;
-  if (!raw.key.id || raw.key.id.length > 250) return null;
+/** Unwraps the containers WhatsApp puts around disappearing and view-once content. */
+function innerMessage(raw: Record<string, unknown>) {
   let message = isPlainObject(raw.message) ? raw.message : {};
   for (const wrapper of ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2"]) {
     const nested = message[wrapper];
     if (isPlainObject(nested) && isPlainObject(nested.message)) message = nested.message;
   }
+  return message;
+}
+
+/** The id a "delete for everyone" protocol message revokes, or null for any other message. */
+export function inboxRevokedId(raw: unknown): string | null {
+  if (!isPlainObject(raw)) return null;
+  const protocol = innerMessage(raw).protocolMessage;
+  if (!isPlainObject(protocol) || !["REVOKE", 0, "0"].includes(protocol.type as string | number)) return null;
+  const id = isPlainObject(protocol.key) ? protocol.key.id : null;
+  return typeof id === "string" && id.length >= 1 && id.length <= 250 ? id : null;
+}
+
+export function inboxMessage(raw: unknown, countUnread: boolean) {
+  const identity = inboxIdentity(raw);
+  if (!identity || !isPlainObject(raw) || !isPlainObject(raw.key) || typeof raw.key.id !== "string") return null;
+  if (!raw.key.id || raw.key.id.length > 250) return null;
+  const message = innerMessage(raw);
   const mediaType = ["image", "audio", "video", "document"].find(kind => isPlainObject(message[`${kind}Message`]));
   const media = mediaType ? message[`${mediaType}Message`] as Record<string, unknown> : null;
   const extended = isPlainObject(message.extendedTextMessage) ? message.extendedTextMessage.text : null;

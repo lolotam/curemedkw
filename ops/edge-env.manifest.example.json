@@ -170,7 +170,7 @@
     "whatsapp-inbox"
   ],
   "schemaPrerequisites": {
-    "inventory": "docs/releases/curemed-schema-20261105.json"
+    "inventory": "docs/releases/curemed-schema-20261106.json"
   },
   "defaults": {
     "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",

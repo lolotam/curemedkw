@@ -5,7 +5,7 @@ import { MessageCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
 import { callWhatsAppInbox, type WhatsAppChat } from "@/lib/whatsappInbox";
-import { useChatPreviews, useWhatsAppInbox } from "@/hooks/useWhatsAppInbox";
+import { useChatAvatars, useWhatsAppInbox } from "@/hooks/useWhatsAppInbox";
 import { WhatsAppInboxComposer } from "@/components/admin/WhatsAppInboxComposer";
 import { WhatsAppChatList } from "@/components/admin/whatsapp/WhatsAppChatList";
 import { WhatsAppThread } from "@/components/admin/whatsapp/WhatsAppThread";
@@ -19,11 +19,14 @@ export default function AdminWhatsAppInbox() {
   const [readFailed, setReadFailed] = useState(false);
   const { chats, messages, connection } = useWhatsAppInbox(selected?.id ?? null, search);
   const chatRows = chats.data?.pages.flat() ?? [];
-  const previews = useChatPreviews(chatRows);
+  const avatars = useChatAvatars(chatRows.map(chat => chat.id));
   const current = chatRows.find(chat => chat.id === selected?.id) ?? selected;
   const rows = [...new Map((messages.data?.pages.flat() ?? []).map(message => [message.id, message])).values()].reverse();
   // Mark read only once the chat's last message is actually loaded, so a newer unseen message keeps the chat unread.
-  const seenId = rows.some(message => message.provider_message_id === current?.last_message_id) ? current?.last_message_id : null;
+  // A last message deleted "for me" is never loaded; the operator removed it, so it counts as seen once the thread loads.
+  const lastHidden = !!current?.last_message_preview?.deleted && messages.isSuccess;
+  const lastLoaded = rows.some(message => message.provider_message_id === current?.last_message_id);
+  const seenId = lastLoaded || lastHidden ? current?.last_message_id : null;
   useEffect(() => {
     if (!current?.id || !seenId || document.visibilityState !== "visible") return;
     setReadFailed(false);
@@ -40,13 +43,13 @@ export default function AdminWhatsAppInbox() {
     {readFailed && <p role="alert" className="text-sm text-destructive">{t("admin.whatsapp.readFailed")}</p>}
     <div className="flex min-h-[420px] flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
       <aside className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-e md:w-80 md:shrink-0`}>
-        <WhatsAppChatList chats={chatRows} previews={previews.data} isLoading={chats.isPending} failed={!!chats.error}
+        <WhatsAppChatList chats={chatRows} avatars={avatars} isLoading={chats.isPending} failed={!!chats.error}
           selectedId={selected?.id ?? null} onSelect={setSelected} search={search} onSearchChange={setSearch}
           hasMore={!!chats.hasNextPage} loadingMore={chats.isFetchingNextPage} onLoadMore={() => void chats.fetchNextPage()} />
       </aside>
       <section className={`${selected ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}>
         {current ? <>
-          <WhatsAppThreadHeader chat={current} onBack={() => setSelected(null)} />
+          <WhatsAppThreadHeader chat={current} avatarUrl={avatars[current.id]} onBack={() => setSelected(null)} />
           <WhatsAppThread key={current.id} chatId={current.id} messages={rows} isLoading={messages.isPending} failed={!!messages.error}
             hasOlder={!!messages.hasNextPage} loadingOlder={messages.isFetchingNextPage} onLoadOlder={() => void messages.fetchNextPage()} />
           <WhatsAppInboxComposer key={current.id} chatId={current.id} disabled={!connection.data?.connected || !!connection.error}

@@ -1,5 +1,5 @@
 import type { Lang } from "@/lib/i18n";
-import type { WhatsAppChat, WhatsAppMessage } from "@/lib/whatsappInbox";
+import type { ChatPreview, WhatsAppChat, WhatsAppMessage } from "@/lib/whatsappInbox";
 
 /** Intl tag for inbox dates: Kuwaiti Arabic with Latin digits, or day-first English. */
 export function inboxLocaleTag(lang: Lang): string {
@@ -109,8 +109,6 @@ export function toAspectRatio(width: number, height: number): string | null {
   return `${width} / ${height}`;
 }
 
-export type ChatPreview = Pick<WhatsAppMessage, "chat_id" | "provider_message_id" | "body" | "message_type" | "direction" | "ack_state">;
-
 /** Translation key that labels a message with no text in the chat list. */
 const PREVIEW_KEYS: Record<WhatsAppMessage["message_type"], string> = {
   text: "admin.whatsapp.unsupported",
@@ -121,10 +119,19 @@ const PREVIEW_KEYS: Record<WhatsAppMessage["message_type"], string> = {
   document: "admin.whatsapp.preview.document",
 };
 
-/** One-line preview of a chat's last message: its first text line, or a label for its attachment type. */
-export function previewText(preview: Pick<ChatPreview, "body" | "message_type">, t: (key: string) => string): string {
+/** One-line preview of a chat's last message: its first text line, or a label for a deletion or an attachment. */
+export function previewText(preview: Pick<ChatPreview, "body" | "message_type" | "deleted">, t: (key: string) => string): string {
+  if (preview.deleted) return t("admin.whatsapp.deletedMessage");
   const firstLine = preview.body.trim().split("\n")[0];
   return firstLine || t(PREVIEW_KEYS[preview.message_type]);
+}
+
+/** Mirrors the server's revoke window (`REVOKE_WINDOW_MS` in the whatsapp-inbox function), which stays authoritative. */
+const REVOKE_WINDOW_MS = 60 * 60 * 60 * 1000;
+
+/** Whether "delete for everyone" is offered: only for our own messages, once, and within WhatsApp's window. */
+export function canDeleteForEveryone(message: Pick<WhatsAppMessage, "direction" | "sent_at" | "remote_deleted_at">, now = Date.now()): boolean {
+  return message.direction === "outbound" && !message.remote_deleted_at && now - Date.parse(message.sent_at) < REVOKE_WINDOW_MS;
 }
 
 /** Splits `items` into consecutive slices of at most `size` items. */

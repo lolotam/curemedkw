@@ -49,16 +49,17 @@ export async function storeInboxMedia(admin: SupabaseClient, input: { encoded: s
  * Self-hosted Supabase signs storage URLs on the gateway the function itself talks to (`http://kong:8000`),
  * which no browser can reach. Re-root the signed path on the public API origin; without one, keep it as is.
  */
-function browserReachableUrl(signedUrl: string, publicOrigin: string) {
+export function browserReachableUrl(signedUrl: string, publicOrigin: string) {
   if (!publicOrigin.trim()) return signedUrl;
   const signed = new URL(signedUrl);
   return new URL(`${signed.pathname}${signed.search}`, publicOrigin).toString();
 }
 
 export async function getInboxMedia(admin: SupabaseClient, provider: EvolutionInboxClient, messageId: string, publicOrigin: string) {
-  const { data: message, error } = await admin.from("whatsapp_messages").select("id,media_object_id,provider_media")
+  const { data: message, error } = await admin.from("whatsapp_messages").select("id,media_object_id,provider_media,remote_deleted_at")
     .eq("id", messageId).eq("instance_identity", "curemed").single();
   if (error || !message) throw new InboxError("message_not_found", 404);
+  if (message.remote_deleted_at) throw new InboxError("media_unavailable", 404);
   let objectId = message.media_object_id;
   if (!objectId) {
     if (!message.provider_media) throw new InboxError("media_unavailable", 404);

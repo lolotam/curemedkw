@@ -5,6 +5,8 @@ import { createShipaRuntimeClient } from "../_shared/shipa-runtime.ts";
 import { handleOptions, isAllowedOrigin, jsonError, jsonResponse } from "../_shared/cors.ts";
 import { createEvolutionInboxClient, InboxError } from "../_shared/evolution-inbox.ts";
 import { EvolutionBodyTooLargeError, isPlainObject, readBoundedText } from "../_shared/evolution-pairing.ts";
+import { getInboxAvatars } from "./avatars.ts";
+import { deleteInboxMessage } from "./delete.ts";
 import { getInboxMedia } from "./media.ts";
 import { sendInboxMessage } from "./send.ts";
 import { inboxRpc, updateInboxConnection } from "./storage.ts";
@@ -20,6 +22,8 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("media.send"), ...sendFields,
     media: z.object({ base64: z.string().max(13981016), mime: z.string().max(150), fileName: z.string().min(1).max(200) }).strict() }).strict(),
   z.object({ action: z.literal("media.get"), messageId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("message.delete"), messageId: z.string().uuid(), scope: z.enum(["local", "everyone"]) }).strict(),
+  z.object({ action: z.literal("avatars.get"), chatIds: z.array(z.string().uuid()).min(1).max(50) }).strict(),
 ]);
 // Direct runtime routing consumes the first path segment; /functions/v1 belongs to Kong only.
 const WEBHOOK_URL = "http://cloud-supabase-hns8fw-supabase-edge-functions:9000/whatsapp-pairing-webhook";
@@ -64,7 +68,7 @@ export function createInboxHandler(options: { admin: SupabaseClient; readConfig:
           ) : {};
           const events = [...new Set([
             ...(Array.isArray(hook.events) ? hook.events.filter((event): event is string => typeof event === "string") : []),
-            "CONNECTION_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE",
+            "CONNECTION_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE", "MESSAGES_DELETE",
           ])];
           await provider("webhook", { webhook: { enabled: true, url: WEBHOOK_URL,
             headers: { ...headers, "x-curemed-webhook-key": config.webhookSecret }, byEvents: false, base64: false,
@@ -77,6 +81,9 @@ export function createInboxHandler(options: { admin: SupabaseClient; readConfig:
           receipt = { read: await inboxRpc(options.admin, "wa_mark_chat_read", { p_chat_id: action.chatId, p_seen_message_id: action.seenMessageId, p_actor_id: authorization.actor.userId }) === true }; break;
         case "send": case "media.send": receipt = await sendInboxMessage(options.admin, provider, action, authorization.actor.userId); break;
         case "media.get": receipt = await getInboxMedia(options.admin, provider, action.messageId, config.storagePublicUrl); break;
+        case "message.delete": receipt = await deleteInboxMessage(options.admin, provider, action, authorization.actor.userId); break;
+        case "avatars.get":
+          receipt = await getInboxAvatars(options.admin, provider, action.chatIds, { publicOrigin: config.storagePublicUrl }); break;
       }
       const response = jsonResponse(request, { success: true, data: receipt });
       response.headers.set("Cache-Control", "no-store");
