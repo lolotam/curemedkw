@@ -54,13 +54,15 @@ describe("WhatsApp thread", () => {
     expect(screen.getByText("Unsupported message")).toBeInTheDocument();
   });
 
-  it("loads an image through a signed URL and shows it inline from a local object URL", async () => {
+  it("loads an image through a signed URL and shows it inline under the recorded MIME type", async () => {
     invoke.mockResolvedValue({ data: { success: true, data: { url: "https://storage.test/signed/photo", mime: "image/jpeg", fileName: "photo.jpg" } }, error: null });
-    fetchMock.mockResolvedValue(fileResponse("image/jpeg"));
+    // Storage may answer with a generic Content-Type; the MIME recorded by media.get must win.
+    fetchMock.mockResolvedValue(fileResponse("application/octet-stream"));
     renderThread([message({ id: "img", message_type: "image" })]);
 
     const image = await screen.findByRole("img", { name: "photo.jpg" });
     expect(image).toHaveAttribute("src", "blob:preview");
+    expect(vi.mocked(URL.createObjectURL).mock.calls[0][0]).toHaveProperty("type", "image/jpeg");
     expect(invoke).toHaveBeenCalledWith("whatsapp-inbox", { body: { action: "media.get", messageId: "img" } });
     expect(fetchMock).toHaveBeenCalledWith("https://storage.test/signed/photo");
   });

@@ -10,6 +10,8 @@ import { useAttachmentName, type OpenableMediaProps } from "./mediaShared";
 
 /** Thumbnail width in CSS pixels (the frame is w-56), rendered at 2x for sharp high-DPI screens. */
 const THUMB_PIXELS = 224 * 2;
+/** Height cap so an extremely tall, narrow page cannot force a huge canvas allocation (the frame shows max-h-72). */
+const THUMB_MAX_HEIGHT = 288 * 2;
 
 /**
  * Renders the first page of a PDF to a PNG data URL. pdf.js and its worker are imported on first
@@ -24,7 +26,8 @@ async function renderFirstPage(blob: Blob, onTask: (task: PDFDocumentLoadingTask
   const task = getDocument({ data: new Uint8Array(await blob.arrayBuffer()) });
   onTask(task);
   const page = await (await task.promise).getPage(1);
-  const viewport = page.getViewport({ scale: THUMB_PIXELS / page.getViewport({ scale: 1 }).width });
+  const natural = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: Math.min(THUMB_PIXELS / natural.width, THUMB_MAX_HEIGHT / natural.height) });
   const canvas = document.createElement("canvas");
   canvas.width = viewport.width;
   canvas.height = viewport.height;

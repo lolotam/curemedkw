@@ -20,8 +20,10 @@ function mediaBlobQuery(messageId: string) {
       const media = await callWhatsAppInbox<{ url: string; mime: string; fileName: string }>({ action: "media.get", messageId });
       const response = await fetch(media.url);
       if (!response.ok) throw new Error("media_fetch_failed");
-      const blob = await response.blob();
-      return { blob, mimeType: media.mime || blob.type, fileName: media.fileName };
+      const fetched = await response.blob();
+      // Inline viewers (notably the PDF iframe) go by the Blob's own type, so stamp the recorded MIME on it.
+      const blob = media.mime ? new Blob([fetched], { type: media.mime }) : fetched;
+      return { blob, mimeType: blob.type, fileName: media.fileName };
     },
   };
 }

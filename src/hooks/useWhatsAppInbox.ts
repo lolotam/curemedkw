@@ -36,6 +36,7 @@ export function useWhatsAppInbox(chatId: string | null, search: string) {
         void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "chats"] });
       }).on("postgres_changes", { event: "*", schema: "public", table: "whatsapp_messages", ...(chatId ? { filter: `chat_id=eq.${chatId}` } : {}) }, () => {
         void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "messages", chatId] });
+        void cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "previews"] });
       }).subscribe();
     return () => { void supabase.removeChannel(channel); };
   }, [cache, chatId]);
@@ -50,11 +51,12 @@ const PREVIEW_BATCH = 50;
  *
  * `whatsapp_chats` keeps only `last_message_id`, so the rows it points at are read back in batches
  * (one request per 50 chats). The key changes whenever a chat gets a new last message, and the
- * previous map stays on screen while the new one loads.
+ * previous map stays on screen while the new one loads. Delivery and read acks update a message without
+ * changing that id, so the map also refreshes on the chat-list polling interval.
  */
 export function useChatPreviews(chats: WhatsAppChat[]) {
   const ids = [...new Set(chats.map(chat => chat.last_message_id).filter((id): id is string => !!id))].sort();
-  return useQuery({ queryKey: ["whatsapp-inbox", "previews", ids], enabled: ids.length > 0, placeholderData: keepPreviousData,
+  return useQuery({ queryKey: ["whatsapp-inbox", "previews", ids], enabled: ids.length > 0, placeholderData: keepPreviousData, refetchInterval: 15_000,
     queryFn: async () => {
       const batches = await Promise.all(chunk(ids, PREVIEW_BATCH).map(async batch => {
         const { data: rows, error } = await supabase.from("whatsapp_messages")

@@ -47,7 +47,7 @@ export default function AdminWhatsAppInbox() {
       <section className={`${selected ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}>
         {current ? <>
           <WhatsAppThreadHeader chat={current} onBack={() => setSelected(null)} />
-          <WhatsAppThread chatId={current.id} messages={rows} isLoading={messages.isPending} failed={!!messages.error}
+          <WhatsAppThread key={current.id} chatId={current.id} messages={rows} isLoading={messages.isPending} failed={!!messages.error}
             hasOlder={!!messages.hasNextPage} loadingOlder={messages.isFetchingNextPage} onLoadOlder={() => void messages.fetchNextPage()} />
           <WhatsAppInboxComposer key={current.id} chatId={current.id} disabled={!connection.data?.connected || !!connection.error}
             onSent={() => { void cache.invalidateQueries({ queryKey: ["whatsapp-inbox"] }); }} />
