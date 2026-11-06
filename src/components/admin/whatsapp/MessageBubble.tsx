@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import { Ban, ChevronDown, Trash2 } from "lucide-react";
+import { Ban, ChevronDown, Forward, Trash2 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { LinkifiedText } from "@/components/ui/linkified-text";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { WhatsAppMessage } from "@/lib/whatsappInbox";
-import { resolveMediaKind, type MediaKind } from "@/lib/whatsappInboxView";
+import { canForward, resolveMediaKind, type MediaKind } from "@/lib/whatsappInboxView";
 import { MediaAudio } from "./messageMedia/MediaAudio";
 import { MediaDocumentChip } from "./messageMedia/MediaDocumentChip";
 import type { OpenableMediaProps } from "./messageMedia/mediaShared";
@@ -23,6 +23,8 @@ interface MessageBubbleProps extends Omit<OpenableMediaProps, "message"> {
   timeFormatter: Intl.DateTimeFormat;
   /** Asks the thread to confirm deleting this message; the thread owns the choice of scope. */
   onRequestDelete: (message: WhatsAppMessage) => void;
+  /** Asks the thread to pick a chat to forward this message to. */
+  onRequestForward: (message: WhatsAppMessage) => void;
 }
 
 /**
@@ -30,7 +32,7 @@ interface MessageBubbleProps extends Omit<OpenableMediaProps, "message"> {
  * with clickable links, the time with delivery ticks on outbound messages, and a message menu.
  * A message deleted for everyone keeps its place as a "deleted" placeholder, as on WhatsApp.
  */
-export function MessageBubble({ message, timeFormatter, onRequestDelete, ...mediaProps }: MessageBubbleProps) {
+export function MessageBubble({ message, timeFormatter, onRequestDelete, onRequestForward, ...mediaProps }: MessageBubbleProps) {
   const { t } = useI18n();
   const outbound = message.direction === "outbound";
   const deleted = !!message.remote_deleted_at;
@@ -47,6 +49,11 @@ export function MessageBubble({ message, timeFormatter, onRequestDelete, ...medi
             <ChevronDown className="size-4 text-black/45 dark:text-white/50" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {canForward(message) && (
+              <DropdownMenuItem onSelect={() => onRequestForward(message)}>
+                <Forward className="me-2 size-4" />{t("admin.whatsapp.forward")}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={() => onRequestDelete(message)}>
               <Trash2 className="me-2 size-4" />{t("admin.whatsapp.delete")}
             </DropdownMenuItem>

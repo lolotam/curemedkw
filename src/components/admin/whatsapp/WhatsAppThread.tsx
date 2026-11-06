@@ -10,6 +10,7 @@ import { useDownloadWhatsAppMedia } from "@/hooks/useWhatsAppMedia";
 import { useI18n } from "@/lib/i18n";
 import type { WhatsAppMessage } from "@/lib/whatsappInbox";
 import { canDeleteForEveryone, groupByDay, inboxLocaleTag } from "@/lib/whatsappInboxView";
+import { ForwardMessageDialog } from "./ForwardMessageDialog";
 import { MessageBubble } from "./MessageBubble";
 import { MediaLightbox } from "./messageMedia/MediaLightbox";
 import type { LightboxEntry } from "./messageMedia/mediaShared";
@@ -27,7 +28,7 @@ interface WhatsAppThreadProps {
 
 /**
  * Scrollable conversation: a date chip per local day, message bubbles, older-page loading, the
- * shared media lightbox and the delete confirmation. Marking the chat read stays with the page,
+ * shared media lightbox, the forward picker and the delete confirmation. Marking the chat read stays with the page,
  * which owns the read contract.
  */
 export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, loadingOlder, onLoadOlder }: WhatsAppThreadProps) {
@@ -36,6 +37,7 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
   const remove = useDeleteWhatsAppMessage();
   const [lightbox, setLightbox] = useState<LightboxEntry | null>(null);
   const [deleting, setDeleting] = useState<WhatsAppMessage | null>(null);
+  const [forwarding, setForwarding] = useState<WhatsAppMessage | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
   const tag = inboxLocaleTag(lang);
   const dayFormatter = useMemo(() => new Intl.DateTimeFormat(tag, { dateStyle: "medium" }), [tag]);
@@ -77,13 +79,14 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
           </div>
           {group.rows.map(message => (
             <MessageBubble key={message.id} message={message} timeFormatter={timeFormatter} downloadPending={pendingId === message.id}
-              onRequestDelete={setDeleting} {...mediaProps} />
+              onRequestDelete={setDeleting} onRequestForward={setForwarding} {...mediaProps} />
           ))}
         </section>
       ))}
       <div ref={bottom} />
       <MediaLightbox entry={lightbox} onClose={() => setLightbox(null)} onDownload={onDownload}
         downloadPending={!!lightbox && pendingId === lightbox.message.id} />
+      <ForwardMessageDialog message={forwarding} onClose={() => setForwarding(null)} />
       <AlertDialog open={!!deleting} onOpenChange={open => { if (!open) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

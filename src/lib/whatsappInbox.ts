@@ -20,9 +20,14 @@ export type WhatsAppMessage = {
   /** Original WhatsApp attachment payload kept for media download; null for text and locally composed rows. */
   provider_media?: unknown;
 }
+/** A WhatsApp contact: keyed by its number, or by its @lid address while the number is unknown. */
+export type WhatsAppContact = {
+  id: string; normalized_phone: string | null; remote_jid: string | null; display_name: string; business_name: string;
+  email: string; notes: string; updated_at: string;
+}
 /** Error codes the inbox screens explain to the operator; every other failure is `inbox_unavailable`. */
 const SURFACED_ERRORS = ["webhook_conflict", "send_uncertain", "send_already_attempted", "session_disconnected", "invalid_media",
-  "delete_not_allowed", "delete_window_expired"];
+  "delete_not_allowed", "delete_window_expired", "forward_not_supported", "phone_in_use", "phone_locked", "invalid_phone"];
 
 export async function callWhatsAppInbox<T>(body: Record<string, unknown>): Promise<T> {
   const { data: envelope, error } = await supabase.functions.invoke("whatsapp-inbox", { body });

@@ -53,7 +53,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         result = self.verify()
         self.assertTrue(result["schemaReady"])
         self.assertFalse(result["schemaActivated"])
-        self.assertEqual(result["verifiedMigrations"], 23)
+        self.assertEqual(result["verifiedMigrations"], 24)
         self.reader.assert_called_once_with("curemed-db", [x["filename"] for x in self.items])
 
     def test_missing_checksum_or_ledger_row_refuses(self):
@@ -132,7 +132,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         query = process.call_args.args[0][-1]
         self.assertIn("octet_length(checksum)", query)
         self.assertIn("octet_length(filename)", query)
-        self.assertIn("LIMIT 24", query)
+        self.assertIn("LIMIT 25", query)
         self.assertEqual(process.call_args.kwargs.get("stderr"), checks.subprocess.DEVNULL)
         self.assertNotIn("capture_output", process.call_args.kwargs)
 

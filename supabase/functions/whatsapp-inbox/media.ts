@@ -55,24 +55,34 @@ export function browserReachableUrl(signedUrl: string, publicOrigin: string) {
   return new URL(`${signed.pathname}${signed.search}`, publicOrigin).toString();
 }
 
+type InboxMediaMessage = { id: string; media_object_id: string | null; provider_media: unknown; remote_deleted_at: string | null };
+
+/** The stored media object of a message, fetched from Evolution and stored the first time it is needed. */
+export async function ensureInboxMediaObject(admin: SupabaseClient, provider: EvolutionInboxClient, message: InboxMediaMessage) {
+  if (message.remote_deleted_at) throw new InboxError("media_unavailable", 404);
+  if (message.media_object_id) return message.media_object_id;
+  if (!message.provider_media) throw new InboxError("media_unavailable", 404);
+  const download = await provider("download", { message: message.provider_media, convertToMp4: false });
+  if (!isPlainObject(download) || typeof download.base64 !== "string" || typeof download.mimetype !== "string") throw new InboxError("media_unavailable", 502);
+  const objectId = await storeInboxMedia(admin, { encoded: download.base64, mime: download.mimetype,
+    fileName: String(download.fileName ?? "attachment"), actorId: null });
+  const { error } = await admin.from("whatsapp_messages").update({ media_object_id: objectId }).eq("id", message.id);
+  if (error) throw new InboxError("storage_unavailable", 503);
+  return objectId;
+}
+
+export async function inboxMediaObject(admin: SupabaseClient, objectId: string) {
+  const { data: media, error } = await admin.from("whatsapp_media_objects").select("object_path,mime_type,file_name")
+    .eq("id", objectId).eq("instance_identity", "curemed").single();
+  if (error || !media) throw new InboxError("media_unavailable", 404);
+  return media as { object_path: string; mime_type: string; file_name: string };
+}
+
 export async function getInboxMedia(admin: SupabaseClient, provider: EvolutionInboxClient, messageId: string, publicOrigin: string) {
   const { data: message, error } = await admin.from("whatsapp_messages").select("id,media_object_id,provider_media,remote_deleted_at")
     .eq("id", messageId).eq("instance_identity", "curemed").single();
   if (error || !message) throw new InboxError("message_not_found", 404);
-  if (message.remote_deleted_at) throw new InboxError("media_unavailable", 404);
-  let objectId = message.media_object_id;
-  if (!objectId) {
-    if (!message.provider_media) throw new InboxError("media_unavailable", 404);
-    const download = await provider("download", { message: message.provider_media, convertToMp4: false });
-    if (!isPlainObject(download) || typeof download.base64 !== "string" || typeof download.mimetype !== "string") throw new InboxError("media_unavailable", 502);
-    objectId = await storeInboxMedia(admin, { encoded: download.base64, mime: download.mimetype,
-      fileName: String(download.fileName ?? "attachment"), actorId: null });
-    const { error: attachError } = await admin.from("whatsapp_messages").update({ media_object_id: objectId }).eq("id", message.id);
-    if (attachError) throw new InboxError("storage_unavailable", 503);
-  }
-  const { data: media, error: mediaError } = await admin.from("whatsapp_media_objects").select("object_path,mime_type,file_name")
-    .eq("id", objectId).eq("instance_identity", "curemed").single();
-  if (mediaError || !media) throw new InboxError("media_unavailable", 404);
+  const media = await inboxMediaObject(admin, await ensureInboxMediaObject(admin, provider, message));
   const { data: signed, error: signError } = await admin.storage.from("whatsapp-media").createSignedUrl(media.object_path, 600);
   if (signError || !signed) throw new InboxError("media_unavailable", 503);
   return { url: browserReachableUrl(signed.signedUrl, publicOrigin), mime: media.mime_type, fileName: media.file_name };

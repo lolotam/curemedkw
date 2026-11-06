@@ -6,13 +6,20 @@ import { handleOptions, isAllowedOrigin, jsonError, jsonResponse } from "../_sha
 import { createEvolutionInboxClient, InboxError } from "../_shared/evolution-inbox.ts";
 import { EvolutionBodyTooLargeError, isPlainObject, readBoundedText } from "../_shared/evolution-pairing.ts";
 import { getInboxAvatars } from "./avatars.ts";
+import { updateInboxContact } from "./contacts.ts";
 import { deleteInboxMessage } from "./delete.ts";
+import { forwardInboxMessage } from "./forward.ts";
 import { getInboxMedia } from "./media.ts";
 import { sendInboxMessage } from "./send.ts";
 import { inboxRpc, updateInboxConnection } from "./storage.ts";
 import { syncInbox } from "./sync.ts";
 
 const sendFields = { chatId: z.string().uuid(), requestId: z.string().uuid(), text: z.string().max(4096) };
+const contactPatch = z.object({
+  display_name: z.string().trim().max(200), business_name: z.string().trim().max(200),
+  email: z.union([z.literal(""), z.string().trim().email().max(320)]), notes: z.string().max(4000),
+  phone: z.string().regex(/^[1-9][0-9]{7,14}$/),
+}).partial().strict().refine(patch => Object.keys(patch).length > 0);
 const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("status") }).strict(),
   z.object({ action: z.literal("sync") }).strict(),
@@ -24,6 +31,9 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("media.get"), messageId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("message.delete"), messageId: z.string().uuid(), scope: z.enum(["local", "everyone"]) }).strict(),
   z.object({ action: z.literal("avatars.get"), chatIds: z.array(z.string().uuid()).min(1).max(50) }).strict(),
+  z.object({ action: z.literal("message.forward"), messageId: z.string().uuid(), chatId: z.string().uuid(),
+    requestId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("contact.update"), contactId: z.string().uuid(), patch: contactPatch }).strict(),
 ]);
 // Direct runtime routing consumes the first path segment; /functions/v1 belongs to Kong only.
 const WEBHOOK_URL = "http://cloud-supabase-hns8fw-supabase-edge-functions:9000/whatsapp-pairing-webhook";
@@ -84,6 +94,8 @@ export function createInboxHandler(options: { admin: SupabaseClient; readConfig:
         case "message.delete": receipt = await deleteInboxMessage(options.admin, provider, action, authorization.actor.userId); break;
         case "avatars.get":
           receipt = await getInboxAvatars(options.admin, provider, action.chatIds, { publicOrigin: config.storagePublicUrl }); break;
+        case "message.forward": receipt = await forwardInboxMessage(options.admin, provider, action, authorization.actor.userId); break;
+        case "contact.update": receipt = await updateInboxContact(options.admin, action, authorization.actor.userId); break;
       }
       const response = jsonResponse(request, { success: true, data: receipt });
       response.headers.set("Cache-Control", "no-store");

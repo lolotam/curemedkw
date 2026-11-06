@@ -5,7 +5,15 @@ import type { WhatsAppMessage } from "@/lib/whatsappInbox";
 import { WhatsAppThread } from "./WhatsAppThread";
 
 const invoke = vi.hoisted(() => vi.fn());
-vi.mock("@/integrations/supabase/clientRuntime", () => ({ supabase: { functions: { invoke } } }));
+const chatRows = vi.hoisted(() => ({ current: [] as unknown[] }));
+// A PostgREST query is a chain of filters awaited at the end; every link returns the chain itself.
+const from = vi.hoisted(() => vi.fn(() => {
+  const query: Record<string, unknown> = {};
+  for (const link of ["select", "eq", "order", "range", "or", "limit"]) query[link] = () => query;
+  query.then = (resolve: (value: unknown) => void) => resolve({ data: chatRows.current, error: null });
+  return query;
+}));
+vi.mock("@/integrations/supabase/clientRuntime", () => ({ supabase: { functions: { invoke }, from } }));
 
 const message = (overrides: Partial<WhatsAppMessage>): WhatsAppMessage => ({
   id: "m-1", chat_id: "chat-1", instance_identity: "curemed", provider_message_id: "P1", direction: "inbound",
@@ -122,6 +130,31 @@ describe("WhatsApp thread", () => {
     fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Delete for everyone" }));
     await waitFor(() => expect(invoke).toHaveBeenCalledWith("whatsapp-inbox",
       { body: { action: "message.delete", messageId: "ours", scope: "everyone" } }));
+  });
+
+  it("forwards to the chosen chat and retries a failed forward under the same request id", async () => {
+    chatRows.current = [
+      { id: "chat-1", normalized_phone: "96550000001", display_name: "Current chat" },
+      { id: "chat-2", normalized_phone: "96550000002", display_name: "Sara Ali" },
+    ];
+    invoke.mockResolvedValueOnce({ data: { success: false, error: { code: "inbox_unavailable" } }, error: null })
+      .mockResolvedValueOnce({ data: { success: true, data: { sent: true } }, error: null });
+    renderThread([message({ id: "price", body: "Price list" })]);
+
+    fireEvent.keyDown(screen.getByRole("button", { name: "Message options" }), { key: "Enter" });
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Forward" }));
+    const dialog = await screen.findByRole("dialog");
+    // The message's own chat is not offered as a target.
+    expect(within(dialog).queryByText("Current chat")).not.toBeInTheDocument();
+    fireEvent.click(await within(dialog).findByText("Sara Ali"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Forward" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Forward" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    const [first, retry] = invoke.mock.calls.map(call => call[1].body);
+    expect(first).toMatchObject({ action: "message.forward", messageId: "price", chatId: "chat-2" });
+    expect(retry.requestId).toBe(first.requestId);
   });
 
   it("puts each local day under its own date chip", () => {
