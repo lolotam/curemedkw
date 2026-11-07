@@ -1,6 +1,7 @@
 import { assertEquals } from "jsr:@std/assert@1.0.19";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createModelSyncHandler } from "./handler.ts";
+import { withModelCatalogAuth } from "../_shared/model-catalog-auth.ts";
 
 const actor = "87000000-0000-4000-8000-000000000001";
 function fixture(options: { admin?: boolean; providerFails?: boolean; storageFails?: boolean; empty?: boolean } = {}) {
@@ -79,4 +80,28 @@ Deno.test("storage failures and arbitrary provider destinations cannot report sy
   assertEquals((await invalid.request({ provider: "https://foreign.test" })).status, 400);
   assertEquals(invalid.writes, []);
   assertEquals(invalid.calls.length, 2);
+});
+
+Deno.test("provider adapters authorize locally even when the runtime does not enforce JWT", async () => {
+  for (const scenario of ["anonymous", "ordinary", "admin", "service"]) {
+    let providerCalls = 0;
+    let authCalls = 0;
+    const admin = createClient("https://fixture.supabase.test", "fixture-key", {
+      auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: (input) => {
+        authCalls++;
+        const path = new URL(String(input)).pathname;
+        if (path === "/auth/v1/user") return Promise.resolve(Response.json({ id: actor }));
+        if (path === "/rest/v1/user_roles") return Promise.resolve(Response.json(scenario === "admin" ? [{ role: "admin" }] : []));
+        throw new Error("Unexpected auth request");
+      } },
+    });
+    const handler = withModelCatalogAuth(() => {
+      providerCalls++; return Promise.resolve(Response.json({ models: [] }));
+    }, { getAdmin: () => admin, readServiceKey: () => "fixture-service" });
+    const headers: Record<string, string> = scenario === "anonymous" ? {} : { authorization: `Bearer ${scenario === "service" ? "fixture-service" : "fixture-user"}` };
+    const response = await handler(new Request("https://fixture.test/models", { headers }));
+    assertEquals(response.status, scenario === "anonymous" ? 401 : scenario === "ordinary" ? 403 : 200);
+    assertEquals(providerCalls, ["admin", "service"].includes(scenario) ? 1 : 0);
+    assertEquals(authCalls, ["anonymous", "service"].includes(scenario) ? 0 : 2);
+  }
 });

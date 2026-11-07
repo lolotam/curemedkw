@@ -41,6 +41,10 @@ class AppDeploymentContractTests(unittest.TestCase):
                 self.assertIn(key, self.manifest["requiredSecrets"])
                 self.assertIn('Deno.env.get("' + key + '")',
                               (ROOT / "supabase/functions" / name / "index.ts").read_text(encoding="utf-8"))
+                source = (ROOT / "supabase/functions" / name / "index.ts").read_text(encoding="utf-8")
+                self.assertIn('Deno.serve(withModelCatalogAuth(', source)
+                self.assertIn("SUPABASE_URL", functions[name]["requiredSecrets"])
+                self.assertIn("SUPABASE_SERVICE_ROLE_KEY", functions[name]["requiredSecrets"])
 
 
 if __name__ == "__main__":
