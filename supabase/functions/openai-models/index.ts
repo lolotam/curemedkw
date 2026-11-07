@@ -1,3 +1,5 @@
+import { withModelCatalogAuth } from "../_shared/model-catalog-auth.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -20,7 +22,7 @@ function classify(id: string): "chat" | "image" | null {
   return null;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withModelCatalogAuth(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
     const apiKey = Deno.env.get("OPENAI_API_KEY");
@@ -47,4 +49,4 @@ Deno.serve(async (req) => {
     console.error("openai-models error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
-});
+}));

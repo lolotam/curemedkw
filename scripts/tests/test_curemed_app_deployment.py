@@ -29,6 +29,23 @@ class AppDeploymentContractTests(unittest.TestCase):
         self.assertEqual(self.manifest.get("schemaPrerequisites", {}).get("inventory"),
                          "docs/releases/curemed-schema-20261106c.json")
 
+    def test_model_sync_dependencies_and_their_runtime_secrets_are_deployed(self):
+        functions = {item["name"]: item for item in self.manifest["edgeFunctions"]}
+        self.assertIn("sync-provider-models", self.manifest["deployFunctions"])
+        for provider in ["openrouter", "openai", "google", "anthropic", "atlascloud"]:
+            name = provider + "-models"
+            key = provider.upper() + "_API_KEY"
+            with self.subTest(provider=provider):
+                self.assertIn(name, self.manifest["deployFunctions"])
+                self.assertIn(key, functions[name]["requiredSecrets"])
+                self.assertIn(key, self.manifest["requiredSecrets"])
+                self.assertIn('Deno.env.get("' + key + '")',
+                              (ROOT / "supabase/functions" / name / "index.ts").read_text(encoding="utf-8"))
+                source = (ROOT / "supabase/functions" / name / "index.ts").read_text(encoding="utf-8")
+                self.assertIn('Deno.serve(withModelCatalogAuth(', source)
+                self.assertIn("SUPABASE_URL", functions[name]["requiredSecrets"])
+                self.assertIn("SUPABASE_SERVICE_ROLE_KEY", functions[name]["requiredSecrets"])
+
 
 if __name__ == "__main__":
     unittest.main()

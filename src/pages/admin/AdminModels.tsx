@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Sparkles,
   Check,
   ChevronsUpDown,
   RotateCcw,
+  RefreshCw,
   AlertCircle,
   CheckCircle2,
   Cpu,
@@ -67,6 +69,26 @@ function formatPricePerM(value?: string | number) {
 
 export default function AdminModels() {
   const { slots, setSlot, resetSlot, resetAll } = useAiModels();
+  const cache = useQueryClient();
+  const [syncing, setSyncing] = useState(false);
+  const [syncResults, setSyncResults] = useState<{ provider: Provider; count: number | null }[]>([]);
+  async function syncAllProviders() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncResults([]);
+    try {
+      const results = await Promise.all(PROVIDERS.map(async provider => {
+        try {
+          const { data, error } = await supabase.functions.invoke("sync-provider-models", { body: { provider } });
+          return { provider, count: !error && typeof data?.count === "number" ? data.count : null };
+        } catch { return { provider, count: null }; }
+      }));
+      setSyncResults(results);
+      await cache.invalidateQueries({ queryKey: ["provider-models"] });
+      if (results.some(result => result.count === null)) toast.error("Some providers could not sync. Their saved models were retained.");
+      else toast.success("All provider model catalogs updated and saved.");
+    } finally { setSyncing(false); }
+  }
 
   return (
     <div className="p-6 md:p-10 w-full max-w-none">
@@ -76,7 +98,16 @@ export default function AdminModels() {
         title="AI Models"
         subtitle="Configure AI providers and models for chat (used by AI product import) and image generation. Within each tab, models are tried top-to-bottom — Primary first, then Fallback #2, then #3."
         gradient="indigo-violet-purple"
+        actions={<Button onClick={() => void syncAllProviders()} disabled={syncing} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? "Syncing providers…" : "Sync / refresh all providers"}
+        </Button>}
       />
+      {syncResults.length > 0 && <div role="status" className="mb-5 flex flex-wrap gap-2">
+        {syncResults.map(result => <Badge key={result.provider} variant={result.count === null ? "destructive" : "secondary"}>
+          {PROVIDER_LABELS[result.provider]}: {result.count === null ? "Sync failed — previous catalog retained" : `${result.count} models saved`}
+        </Badge>)}
+      </div>}
 
 
       <Card className="p-5 mb-6 flex items-center gap-4">
@@ -418,10 +449,10 @@ function TestConnectionButton({ slot, kind }: { slot: Slot; kind: ModelKind }) {
       });
       if (error) {
         toast.error(`Test failed: ${error.message}`);
-      } else if ((data as any)?.ok) {
-        toast.success(`Connection OK (${(data as any).latency_ms}ms)`);
+      } else if (data?.ok) {
+        toast.success(`Connection OK (${data.latency_ms}ms)`);
       } else {
-        toast.error(`Test failed: ${(data as any)?.error ?? "unknown error"}`);
+        toast.error(`Test failed: ${data?.error ?? "unknown error"}`);
       }
     } catch (e) {
       toast.error(`Test failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -548,8 +579,8 @@ function ScrapingEndpointCard() {
       const { data, error } = await supabase.functions.invoke("scrape-product", {
         body: { url: "https://example.com", endpoint },
       });
-      if (error || (data as any)?.error) {
-        toast.error(`Connection failed: ${(data as any)?.error || error?.message}`);
+      if (error || data?.error) {
+        toast.error(`Connection failed: ${data?.error || error?.message}`);
       } else {
         toast.success(`${endpoint === "cloud" ? "Cloud" : "Self-hosted"} endpoint is reachable`);
       }

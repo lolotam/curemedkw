@@ -1,3 +1,5 @@
+import { withModelCatalogAuth } from "../_shared/model-catalog-auth.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -22,7 +24,7 @@ function classify(m: any): "chat" | "image" {
   return "chat";
 }
 
-Deno.serve(async (req) => {
+Deno.serve(withModelCatalogAuth(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
@@ -50,4 +52,4 @@ Deno.serve(async (req) => {
     console.error("openrouter-models error", e);
     return json({ error: e instanceof Error ? e.message : "Unknown error" }, 500);
   }
-});
+}));
