@@ -34,5 +34,8 @@ verify_jwt = false
 [functions.whatsapp-inbox]
 verify_jwt = false
 
+[functions.order-whatsapp-dispatch]
+verify_jwt = false
+
 [functions.sync-provider-models]
 verify_jwt = false

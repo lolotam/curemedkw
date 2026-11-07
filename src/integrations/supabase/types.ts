@@ -1,3 +1,4 @@
+import type { OrderWhatsAppMessage } from "@/lib/orderWhatsApp";
 import type { WhatsAppChat, WhatsAppContact, WhatsAppMessage } from "@/lib/whatsappInbox";
 export type Json =
   | string
@@ -15,6 +16,7 @@ export type Database = {
   }
   public: {
     Tables: {
+      order_whatsapp_messages: { Row: OrderWhatsAppMessage; Insert: never; Update: never; Relationships: [] }
       whatsapp_chats: { Row: WhatsAppChat; Insert: never; Update: never; Relationships: [] }
       whatsapp_contacts: { Row: WhatsAppContact; Insert: never; Update: never; Relationships: [] }
       whatsapp_messages: { Row: WhatsAppMessage; Insert: never; Update: never; Relationships: [] }
@@ -451,6 +453,8 @@ export type Database = {
           customer_email: string
           customer_name: string
           customer_phone: string
+          delivered_at: string | null
+          language: string | null
           discount_amount: number
           failed_at: string | null
           governorate: string
@@ -500,6 +504,8 @@ export type Database = {
           customer_email: string
           customer_name: string
           customer_phone: string
+          delivered_at?: string | null
+          language?: string | null
           discount_amount?: number
           failed_at?: string | null
           governorate?: string
@@ -549,6 +555,8 @@ export type Database = {
           customer_email?: string
           customer_name?: string
           customer_phone?: string
+          delivered_at?: string | null
+          language?: string | null
           discount_amount?: number
           failed_at?: string | null
           governorate?: string

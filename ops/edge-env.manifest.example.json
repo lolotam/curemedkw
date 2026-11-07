@@ -137,6 +137,20 @@
       ]
     },
     {
+      "name": "order-whatsapp-dispatch",
+      "verifyJwt": false,
+      "methods": [
+        "POST"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "CUREMED_EVOLUTION_URL",
+        "CUREMED_EVOLUTION_API_KEY",
+        "ORDER_WHATSAPP_DISPATCH_TOKEN"
+      ]
+    },
+    {
       "name": "sync-provider-models",
       "verifyJwt": false,
       "methods": [
@@ -164,7 +178,8 @@
     "CUREMED_EVOLUTION_URL",
     "CUREMED_EVOLUTION_API_KEY",
     "CUREMED_EVOLUTION_WEBHOOK_SECRET",
-    "SHIPA_DISPATCH_TOKEN"
+    "SHIPA_DISPATCH_TOKEN",
+    "ORDER_WHATSAPP_DISPATCH_TOKEN"
   ],
   "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' \u2014 the server's router is hand-patched and diverged from this repo.",
   "deployFunctions": [
@@ -180,10 +195,11 @@
     "whatsapp-pairing-webhook",
     "shipa-dispatch",
     "whatsapp-inbox",
+    "order-whatsapp-dispatch",
     "sync-provider-models"
   ],
   "schemaPrerequisites": {
-    "inventory": "docs/releases/curemed-schema-20261106b.json"
+    "inventory": "docs/releases/curemed-schema-20261106c.json"
   },
   "defaults": {
     "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",

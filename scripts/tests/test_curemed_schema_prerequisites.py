@@ -38,7 +38,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
 
     def test_current_release_manifest_and_migration_blobs(self):
         self.manifest = json.loads((ROOT / "ops/edge-env.manifest.example.json").read_text())
-        self.assertTrue({"shipa-dispatch", "whatsapp-inbox"}.issubset(self.manifest["deployFunctions"]))
+        self.assertTrue({"shipa-dispatch", "whatsapp-inbox", "order-whatsapp-dispatch"}.issubset(self.manifest["deployFunctions"]))
         self.assertTrue(self.verify()["schemaReady"])
         for item in self.items:
             raw = (ROOT / item["path"]).read_bytes().replace(b"\r\n", b"\n")
@@ -53,7 +53,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         result = self.verify()
         self.assertTrue(result["schemaReady"])
         self.assertFalse(result["schemaActivated"])
-        self.assertEqual(result["verifiedMigrations"], 24)
+        self.assertEqual(result["verifiedMigrations"], 25)
         self.reader.assert_called_once_with("curemed-db", [x["filename"] for x in self.items])
 
     def test_missing_checksum_or_ledger_row_refuses(self):
@@ -132,7 +132,7 @@ class SchemaPrerequisiteTests(unittest.TestCase):
         query = process.call_args.args[0][-1]
         self.assertIn("octet_length(checksum)", query)
         self.assertIn("octet_length(filename)", query)
-        self.assertIn("LIMIT 25", query)
+        self.assertIn("LIMIT 26", query)
         self.assertEqual(process.call_args.kwargs.get("stderr"), checks.subprocess.DEVNULL)
         self.assertNotIn("capture_output", process.call_args.kwargs)
 

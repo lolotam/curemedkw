@@ -28,14 +28,14 @@ def main():
     parser.add_argument('--state', type=Path, required=True)
     args = parser.parse_args()
     container = fixture.marker_guard(json.loads(args.state.read_text(encoding='utf-8')))
-    inventory = json.loads((ROOT / 'docs/releases/curemed-schema-20261106b.json').read_text(encoding='utf-8'))
+    inventory = json.loads((ROOT / 'docs/releases/curemed-schema-20261106c.json').read_text(encoding='utf-8'))
     for migration in inventory['migrations']:
         fixture.sql(container, (ROOT / migration['path']).read_text(encoding='utf-8'), 'postgres')
         print('Applied', migration['filename'], flush=True)
     for migration in inventory['migrations'][-2:]:
         fixture.sql(container, (ROOT / migration['path']).read_text(encoding='utf-8'), 'postgres')
     for path in ['shipa/settings.sql', 'shipa/credential_readiness.sql', 'shipa/activation.sql', 'whatsapp/inbox.sql',
-                 'whatsapp/inbox_features.sql', 'whatsapp/contact_edit.sql']:
+                 'whatsapp/inbox_features.sql', 'whatsapp/contact_edit.sql', 'whatsapp/order_messages.sql']:
         fixture.sql(container, (ROOT / 'supabase/tests' / path).read_text(encoding='utf-8'), 'postgres')
         print('Passed', path, flush=True)
     concurrency_proof(container)
