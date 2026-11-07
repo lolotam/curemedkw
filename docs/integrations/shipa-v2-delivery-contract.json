@@ -1,0 +1,48 @@
+{
+  "scope": "Implemented repository subset; not a vendor OpenAPI schema or deployment receipt",
+  "verifiedMain": "1919045a6a0970138962d5b62b17a190a7197133",
+  "sources": [
+    "supabase/functions/_shared/shipa-contract.ts",
+    "supabase/functions/_shared/shipa-client.ts"
+  ],
+  "bases": {
+    "sandbox": "https://sandbox-api.shipadelivery.com/v2",
+    "live": "https://api.shipadelivery.com/v2"
+  },
+  "authentication": {
+    "location": "query",
+    "name": "apikey"
+  },
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/health"
+    },
+    {
+      "method": "GET",
+      "path": "/countries"
+    },
+    {
+      "method": "GET",
+      "path": "/countries/{iso3Code}"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/{orderId}"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/{orderId}/story"
+    },
+    {
+      "method": "GET",
+      "path": "/orders/{orderId}/tracking"
+    },
+    {
+      "method": "POST",
+      "path": "/orders"
+    }
+  ],
+  "redirects": "refused",
+  "uncertainCreation": "No automatic rebooking"
+}
