@@ -19,7 +19,7 @@ Verified against main `1919045a6a0970138962d5b62b17a190a7197133`. These document
 - [shipa-submission-rpc-contract.md](shipa-submission-rpc-contract.md): Shipa preparation and durable begin.
 - [shipa-tracking-rpc-contract.md](shipa-tracking-rpc-contract.md): Shipa accepted-booking tracking.
 - [shipa-v2-contract.md](shipa-v2-contract.md): Implemented Shipa Delivery V2 subset.
-- [shipa-v2-delivery-contract.json](shipa-v2-delivery-contract.json): {.
+- [shipa-v2-delivery-contract.json](shipa-v2-delivery-contract.json): Implemented Shipa API subset.
 - [whatsapp-contract-decisions.md](whatsapp-contract-decisions.md): WhatsApp contract boundaries.
 - [whatsapp-credential-rpc-contract.md](whatsapp-credential-rpc-contract.md): WhatsApp credentials and readiness.
 - [whatsapp-delivery-rpc-contract.md](whatsapp-delivery-rpc-contract.md): WhatsApp reservation and completion.
