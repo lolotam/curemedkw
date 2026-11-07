@@ -25,8 +25,8 @@ function fixture(options: { admin?: boolean; providerFails?: boolean; storageFai
     } },
   });
   const handler = createModelSyncHandler(client);
-  return { writes, calls, request: (body: unknown, authenticated = true) => handler(new Request("https://fixture.test/sync", {
-    method: "POST", headers: authenticated ? { authorization: "Bearer fixture-user" } : {}, body: JSON.stringify(body),
+  return { writes, calls, request: (body: unknown, authenticated = true, raw = false) => handler(new Request("https://fixture.test/sync", {
+    method: "POST", headers: authenticated ? { authorization: "Bearer fixture-user" } : {}, body: raw ? String(body) : JSON.stringify(body),
   })) };
 }
 
@@ -37,6 +37,17 @@ Deno.test("model sync refuses anonymous and non-admin requests before provider o
   const ordinary = fixture({ admin: false });
   assertEquals((await ordinary.request({ provider: "openai" })).status, 403);
   assertEquals(ordinary.calls, ["/auth/v1/user", "/rest/v1/user_roles"]);
+});
+
+Deno.test("empty and malformed JSON are client errors without provider or storage access", async () => {
+  for (const body of ["", "   ", "{", '{"provider":']) {
+    const test = fixture();
+    const response = await test.request(body, true, true);
+    assertEquals(response.status, 400);
+    assertEquals((await response.json()).error.code, "invalid_request");
+    assertEquals(test.calls, ["/auth/v1/user", "/rest/v1/user_roles"]);
+    assertEquals(test.writes, []);
+  }
 });
 
 Deno.test("model sync fetches the provider and persists a deduplicated catalog before success", async () => {

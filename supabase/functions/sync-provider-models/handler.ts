@@ -20,9 +20,12 @@ export function createModelSyncHandler(admin: SupabaseClient) {
     if (request.method !== "POST") return jsonError(request, "method_not_allowed", "POST required.", 405);
     const authorization = await requireShipaAdmin(request, createShipaRuntimeClient(admin));
     if (!authorization.ok) return jsonError(request, authorization.code, "Administrator access required.", authorization.status);
+    let body: unknown;
+    try { body = await request.json(); }
+    catch { return jsonError(request, "invalid_request", "Invalid JSON body.", 400); }
+    const parsed = requestSchema.safeParse(body);
+    if (!parsed.success) return jsonError(request, "invalid_request", "Unknown provider.", 400);
     try {
-      const parsed = requestSchema.safeParse(await request.json());
-      if (!parsed.success) return jsonError(request, "invalid_request", "Unknown provider.", 400);
       const { provider } = parsed.data;
       // Reuse the existing provider adapters and their server-owned API keys.
       const { data, error } = await admin.functions.invoke(`${provider}-models`, { method: "GET", signal: AbortSignal.timeout(45_000) });
