@@ -39,3 +39,18 @@ verify_jwt = false
 
 [functions.sync-provider-models]
 verify_jwt = false
+
+[functions.openrouter-models]
+verify_jwt = true
+
+[functions.openai-models]
+verify_jwt = true
+
+[functions.google-models]
+verify_jwt = true
+
+[functions.anthropic-models]
+verify_jwt = true
+
+[functions.atlascloud-models]
+verify_jwt = true

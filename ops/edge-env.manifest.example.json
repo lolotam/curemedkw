@@ -161,6 +161,61 @@
         "SUPABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY"
       ]
+    },
+    {
+      "name": "openrouter-models",
+      "verifyJwt": true,
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "OPENROUTER_API_KEY"
+      ]
+    },
+    {
+      "name": "openai-models",
+      "verifyJwt": true,
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "OPENAI_API_KEY"
+      ]
+    },
+    {
+      "name": "google-models",
+      "verifyJwt": true,
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "GOOGLE_API_KEY"
+      ]
+    },
+    {
+      "name": "anthropic-models",
+      "verifyJwt": true,
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "ANTHROPIC_API_KEY"
+      ]
+    },
+    {
+      "name": "atlascloud-models",
+      "verifyJwt": true,
+      "methods": [
+        "GET",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "ATLASCLOUD_API_KEY"
+      ]
     }
   ],
   "requiredSecrets": [
@@ -179,7 +234,12 @@
     "CUREMED_EVOLUTION_API_KEY",
     "CUREMED_EVOLUTION_WEBHOOK_SECRET",
     "SHIPA_DISPATCH_TOKEN",
-    "ORDER_WHATSAPP_DISPATCH_TOKEN"
+    "ORDER_WHATSAPP_DISPATCH_TOKEN",
+    "OPENROUTER_API_KEY",
+    "OPENAI_API_KEY",
+    "GOOGLE_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "ATLASCLOUD_API_KEY"
   ],
   "//deployFunctions": "Edge function directories copied into the runtime volume. NEVER add 'main' \u2014 the server's router is hand-patched and diverged from this repo.",
   "deployFunctions": [
@@ -196,7 +256,12 @@
     "shipa-dispatch",
     "whatsapp-inbox",
     "order-whatsapp-dispatch",
-    "sync-provider-models"
+    "sync-provider-models",
+    "openrouter-models",
+    "openai-models",
+    "google-models",
+    "anthropic-models",
+    "atlascloud-models"
   ],
   "schemaPrerequisites": {
     "inventory": "docs/releases/curemed-schema-20261106c.json"
