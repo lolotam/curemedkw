@@ -33,3 +33,6 @@ verify_jwt = false
 
 [functions.whatsapp-inbox]
 verify_jwt = false
+
+[functions.sync-provider-models]
+verify_jwt = false

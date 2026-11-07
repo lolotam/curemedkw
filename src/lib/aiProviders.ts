@@ -37,12 +37,17 @@ export function useProviderModels(provider: Provider) {
     queryKey: ["provider-models", provider],
     staleTime: 60 * 60 * 1000,
     queryFn: async () => {
+      const { data: saved, error: readError } = await supabase.from("site_settings").select("value")
+        .eq("key", `ai_provider_models_${provider}`).maybeSingle();
+      if (readError) throw readError;
+      const snapshot = saved?.value as { models?: ProviderModel[] } | null;
+      if (Array.isArray(snapshot?.models) && snapshot.models.length) return snapshot.models;
       const { data, error } = await supabase.functions.invoke(FN_BY_PROVIDER[provider], {
-        method: "GET" as any,
+        method: "GET",
       });
-      if (error) throw new Error((data as any)?.error || error.message);
-      if ((data as any)?.error) throw new Error((data as any).error);
-      return ((data as any).models ?? []) as ProviderModel[];
+      if (error) throw new Error(data?.error || error.message);
+      if (data?.error) throw new Error(data.error);
+      return (data.models ?? []) as ProviderModel[];
     },
   });
 }

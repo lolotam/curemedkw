@@ -135,6 +135,18 @@
         "CUREMED_EVOLUTION_API_KEY",
         "CUREMED_EVOLUTION_WEBHOOK_SECRET"
       ]
+    },
+    {
+      "name": "sync-provider-models",
+      "verifyJwt": false,
+      "methods": [
+        "POST",
+        "OPTIONS"
+      ],
+      "requiredSecrets": [
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_ROLE_KEY"
+      ]
     }
   ],
   "requiredSecrets": [
@@ -167,7 +179,8 @@
     "whatsapp-pairing",
     "whatsapp-pairing-webhook",
     "shipa-dispatch",
-    "whatsapp-inbox"
+    "whatsapp-inbox",
+    "sync-provider-models"
   ],
   "schemaPrerequisites": {
     "inventory": "docs/releases/curemed-schema-20261106b.json"
