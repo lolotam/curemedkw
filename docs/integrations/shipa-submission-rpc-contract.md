@@ -11,6 +11,8 @@ shipa_prepare_submission(_shipment_id uuid) -> jsonb
 shipa_begin_submission(_shipment_id uuid,_attempt_token uuid,_prepared jsonb) -> jsonb
 ```
 
+The `_prepared` argument is a strict object with exactly `settings_revision`, `input_fingerprint`, `credential_revision`, `credential_fingerprint`, `payload` and `payload_hash`. Extra fields are rejected with `shipa_invalid_prepared_request`; the full ready-preparation response is not a valid begin argument. The dispatcher obtains credential revision/fingerprint from the credential it actually loaded and validated, not merely from the ready response. These values must match the current SQL context before the durable marker is installed.
+
 ## Source
 
 - [supabase/migrations/20261103001600_shipa_submission.sql](../../supabase/migrations/20261103001600_shipa_submission.sql)

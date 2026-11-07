@@ -16,6 +16,12 @@ wa_apply_verified_payment(p_order_id uuid,p_attempt_id uuid,p_verified_result js
 wa_resolve_pending_payment_verification(p_pending_id uuid,p_lease_token uuid, p_verified_result jsonb,p_terminal_state text) -> jsonb
 ```
 
+## Activation prerequisite
+
+Schema application initializes `private.integration_payment_release.retention_ready` to false. Outcome recording and verification claims fail with `shared_payment_activation_required` until `integration_activate_payment_retention` succeeds. Applying migrations alone does not authorize payment-handler cutover.
+
+Activation requires a real administrator actor, locks WhatsApp settings and Shipa integrations, and requires quiescent payment writers: existing invoice bindings or payment verification receipts cause `payment_retention_requires_quiescent_writers`. It calls `wa_activate_retention_constraints`, installs the retained-evidence foreign keys and then sets `retention_ready`. Repeated activation after readiness returns `changed: false`. This describes prerequisites; it does not authorize production activation.
+
 ## Source
 
 - [supabase/migrations/20261103001300_integration_payment_owner.sql](../../supabase/migrations/20261103001300_integration_payment_owner.sql)

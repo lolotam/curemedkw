@@ -13,6 +13,8 @@ wa_record_provider_readiness(p_expected_revision bigint, p_provider text, p_cred
 wa_read_provider_readiness(p_provider text, p_credential_binding text) -> jsonb
 ```
 
+Before calling `wa_record_provider_readiness`, trusted server code must perform the provider diagnostic and derive the actual account identity, applicable connection generation and baseline fallback status from trusted observations. Request-body assertions are not diagnostics. SQL checks binding, freshness and local connection consistency but does not contact the provider or independently verify fallback delivery. A false fallback attestation can permit configured migration to clear the legacy plaintext key without a working fallback.
+
 ## Source
 
 - [supabase/migrations/20261103000200_whatsapp_transactions.sql](../../supabase/migrations/20261103000200_whatsapp_transactions.sql)

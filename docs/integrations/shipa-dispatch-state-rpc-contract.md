@@ -12,6 +12,8 @@ shipa_expire_leases(_shipment_id uuid DEFAULT NULL) -> jsonb
 shipa_read_shipment(_shipment_id uuid,_actor_id uuid) -> jsonb
 ```
 
+An accepted provider response becomes `created` only when its reference can be assigned. If another shipment already owns that provider reference, completion keeps this shipment `unknown` with `remote_reference_conflict`; it does not authorize another provider create.
+
 ## Source
 
 - [supabase/migrations/20261103001100_shipa_dispatch_state.sql](../../supabase/migrations/20261103001100_shipa_dispatch_state.sql)
