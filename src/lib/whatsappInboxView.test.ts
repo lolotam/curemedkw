@@ -4,7 +4,7 @@ process.env.TZ = "Asia/Kuwait";
 import { describe, expect, it } from "vitest";
 import type { WhatsAppChat, WhatsAppMessage } from "@/lib/whatsappInbox";
 import {
-  canDeleteForEveryone, canForward, chatInitials, chatPhone, chatTitle, chunk, groupByDay, lastMessageTime, normalizeContactPhone, previewText, providerMediaMeta, resolveMediaKind, toAspectRatio,
+  canDeleteForEveryone, canForward, chatInitials, chatPhone, chatTitle, chunk, groupByDay, isGifPlayback, lastMessageTime, normalizeContactPhone, previewText, providerMediaMeta, resolveMediaKind, toAspectRatio,
 } from "./whatsappInboxView";
 
 const chat = (overrides: Partial<WhatsAppChat>): WhatsAppChat => ({
@@ -20,6 +20,14 @@ const message = (overrides: Partial<WhatsAppMessage>): WhatsAppMessage => ({
 });
 const documentWith = (payload: Record<string, unknown>) =>
   message({ message_type: "document", provider_media: { key: { id: "P1" }, message: { documentMessage: payload } } });
+
+it("recognizes sticker metadata as image content and GIF playback as video", () => {
+  const sticker = message({ message_type: "image", provider_media: { message: { stickerMessage: { mimetype: "image/webp" } } } });
+  expect(providerMediaMeta(sticker).mimeType).toBe("image/webp");
+  expect(resolveMediaKind(sticker)).toBe("image");
+  expect(isGifPlayback(message({ message_type: "video", provider_media: { message: { videoMessage: { gifPlayback: true } } } }))).toBe(true);
+  expect(isGifPlayback(message({ message_type: "video" }))).toBe(false);
+});
 
 describe("chat identity", () => {
   it("titles a chat by contact name, then by its number, and never invents a number for an @lid chat", () => {

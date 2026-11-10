@@ -62,9 +62,11 @@ export function inboxIdentity(raw: unknown) {
 /** Unwraps the containers WhatsApp puts around disappearing and view-once content. */
 function innerMessage(raw: Record<string, unknown>) {
   let message = isPlainObject(raw.message) ? raw.message : {};
-  for (const wrapper of ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2"]) {
-    const nested = message[wrapper];
-    if (isPlainObject(nested) && isPlainObject(nested.message)) message = nested.message;
+  for (let depth = 0; depth < 8; depth++) {
+    const wrapper = ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2", "viewOnceMessageV2Extension", "documentWithCaptionMessage"]
+      .map(key => message[key]).find(value => isPlainObject(value) && isPlainObject(value.message));
+    if (!isPlainObject(wrapper) || !isPlainObject(wrapper.message)) break;
+    message = wrapper.message;
   }
   return message;
 }
@@ -78,22 +80,27 @@ export function inboxRevokedId(raw: unknown): string | null {
   return typeof id === "string" && id.length >= 1 && id.length <= 250 ? id : null;
 }
 
+/**
+ * Normalize an Evolution message for ingestion, retaining native attachment payloads
+ * for later downloads. Invalid identities or timestamps are excluded from the batch.
+ */
 export function inboxMessage(raw: unknown, countUnread: boolean) {
   const identity = inboxIdentity(raw);
   if (!identity || !isPlainObject(raw) || !isPlainObject(raw.key) || typeof raw.key.id !== "string") return null;
   if (!raw.key.id || raw.key.id.length > 250) return null;
   const message = innerMessage(raw);
-  const mediaType = ["image", "audio", "video", "document"].find(kind => isPlainObject(message[`${kind}Message`]));
+  const mediaType = ["image", "audio", "video", "document", "sticker"].find(kind => isPlainObject(message[`${kind}Message`]));
   const media = mediaType ? message[`${mediaType}Message`] as Record<string, unknown> : null;
   const extended = isPlainObject(message.extendedTextMessage) ? message.extendedTextMessage.text : null;
-  const body = Array.from(String(message.conversation ?? extended ?? media?.caption ?? "")).slice(0, 4096).join("");
+  const reaction = isPlainObject(message.reactionMessage) ? message.reactionMessage : null;
+  const body = Array.from(String(message.conversation ?? extended ?? media?.caption ?? reaction?.text ?? "")).slice(0, 4096).join("");
   const timestamp = isPlainObject(raw.messageTimestamp) ? raw.messageTimestamp.low : raw.messageTimestamp;
   const seconds = Number(timestamp);
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 253402300799) return null;
   return { ...identity, provider_message_id: raw.key.id, direction: raw.key.fromMe === true ? "outbound" : "inbound",
-    message_type: mediaType ?? (body ? "text" : "unsupported"), body, sent_at: new Date(seconds * 1000).toISOString(),
+    message_type: mediaType === "sticker" ? "image" : mediaType ?? (body ? "text" : "unsupported"), body, sent_at: new Date(seconds * 1000).toISOString(),
     count_unread: countUnread, provider_media: media ? { key: { id: raw.key.id, remoteJid: identity.remote_jid, fromMe: raw.key.fromMe === true },
-      message: { [`${mediaType}Message`]: media } } : null };
+      message: { [`${mediaType}Message`]: media } } : reaction && body ? { reaction: { text: body } } : null };
 }
 
 export function inboxAck(raw: unknown): "accepted" | "delivered" | "read" | "rejected" | null {

@@ -76,6 +76,26 @@ describe("WhatsApp thread", () => {
     expect(fetchMock).toHaveBeenCalledWith("https://storage.test/signed/photo");
   });
 
+  it("renders WebP stickers and animated GIF video without unsupported placeholders", async () => {
+    invoke.mockImplementation((_name, { body }: { body: { messageId: string } }) => Promise.resolve({
+      data: { success: true, data: { url: `https://storage.test/${body.messageId}`, mime: body.messageId === "sticker" ? "image/webp" : "video/mp4", fileName: body.messageId } }, error: null,
+    }));
+    fetchMock.mockResolvedValue(fileResponse("application/octet-stream"));
+    renderThread([
+      message({ id: "sticker", message_type: "image", provider_media: { message: { stickerMessage: { mimetype: "image/webp", isAnimated: true } } } }),
+      message({ id: "gif", message_type: "video", provider_media: { message: { videoMessage: { gifPlayback: true } } } }),
+    ]);
+    expect(await screen.findByRole("img", { name: "sticker" })).toBeInTheDocument();
+    const video = await waitFor(() => {
+      const node = screen.getByRole("log").querySelector("video");
+      expect(node).not.toBeNull(); return node!;
+    });
+    expect(video).toHaveAttribute("loop");
+    expect(video).toHaveAttribute("autoplay");
+    expect(screen.queryByText("Unsupported message")).not.toBeInTheDocument();
+    expect(screen.getByRole("log")).toHaveAttribute("data-radix-scroll-area-viewport");
+  });
+
   it("downloads a document under its WhatsApp file name and reuses the fetched file on a second download", async () => {
     invoke.mockResolvedValue({ data: { success: true, data: { url: "https://storage.test/signed/doc", mime: "application/vnd.ms-excel", fileName: "prices.xlsx" } }, error: null });
     fetchMock.mockResolvedValue(fileResponse("application/vnd.ms-excel"));

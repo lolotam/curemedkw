@@ -5,6 +5,29 @@ import { createEvolutionPairingWebhookHandler } from "../../whatsapp-pairing-web
 import { verifiedPaymentAttestation } from "../../_shared/integration-payment.ts";
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 
+Deno.test("stickers retain the original WebP download payload and emoji reactions remain readable", () => {
+  const base = { key: { remoteJid: "123456789012345@lid", id: "sticker-1", fromMe: false }, messageTimestamp: 1793872800 };
+  const sticker = { mimetype: "image/webp", isAnimated: true, directPath: "/fixture-sticker" };
+  const normalized = inboxMessage({ ...base, message: { stickerMessage: sticker } }, true);
+  assertEquals(normalized?.message_type, "image");
+  assertEquals(normalized?.provider_media, { key: base.key, message: { stickerMessage: sticker } });
+  assertEquals(inboxMessage({ ...base, message: { reactionMessage: { text: "❤️", key: { id: "original" } } } }, true)?.body, "❤️");
+  assertEquals(inboxMessage({ ...base, message: { conversation: "👋🏽 😊" } }, true)?.body, "👋🏽 😊");
+});
+
+Deno.test("nested disappearing content and captioned documents preserve supported attachments", () => {
+  const base = { key: { remoteJid: "123456789012345@lid", id: "nested-1", fromMe: false }, messageTimestamp: 1793872800 };
+  const row = inboxMessage({ ...base, message: { viewOnceMessageV2: { message: { ephemeralMessage: { message: {
+    documentWithCaptionMessage: { message: { documentMessage: { mimetype: "application/pdf", caption: "Document" } } },
+  } } } } } }, false);
+  assertEquals(row?.message_type, "document");
+  assertEquals(row?.body, "Document");
+  const gif = inboxMessage({ ...base, message: { videoMessage: { mimetype: "video/mp4", gifPlayback: true } } }, false);
+  assertEquals(gif?.message_type, "video");
+  assertEquals(gif?.provider_media, { key: base.key, message: { videoMessage: { mimetype: "video/mp4", gifPlayback: true } } });
+  assertEquals(decodeInboxMedia("R0lGODlh", "image/gif").kind, "image");
+});
+
 Deno.test("LID messages survive without phone, and alternate phone does not replace addressing identity", () => {
   const message = { key: { remoteJid: "123456789012345@lid", id: "message-1", fromMe: false },
     message: { conversation: "Hello" }, messageTimestamp: 1793872800 };

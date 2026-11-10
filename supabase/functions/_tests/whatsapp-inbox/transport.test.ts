@@ -3,10 +3,32 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { createInboxHandler } from "../../whatsapp-inbox/handler.ts";
 import { ingestInboxEvent } from "../../_shared/whatsapp-inbox-webhook.ts";
 import { recordIntegrationPayment } from "../../_shared/integration-payment.ts";
+import { repairUnsupportedInboxContent } from "../../_shared/whatsapp-inbox-content.ts";
 
 const actor = "87000000-0000-4000-8000-000000000001";
 const chat = "87000000-0000-4000-8000-000000000002";
 const requestId = "87000000-0000-4000-8000-000000000003";
+
+Deno.test("history sync repairs unsupported content without touching unread, ACKs or deleted messages", async () => {
+  const requests: { url: URL; method: string; body: unknown }[] = [];
+  const admin = createClient("https://fixture.supabase.test", "fixture-key", { auth: { persistSession: false, autoRefreshToken: false }, global: {
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      requests.push({ url: new URL(request.url), method: request.method, body: request.method === "PATCH" ? await request.json() : null });
+      return request.method === "GET" ? Response.json([{ id: requestId, provider_message_id: "sticker-1" }]) : new Response(null, { status: 204 });
+    },
+  } });
+  const content = { provider_message_id: "sticker-1", message_type: "image", body: "", provider_media: { message: { stickerMessage: { mimetype: "image/webp" } } } };
+  await repairUnsupportedInboxContent(admin, [content]);
+  assertEquals(requests.length, 2);
+  for (const request of requests) {
+    assertEquals(request.url.searchParams.get("message_type"), "eq.unsupported");
+    assertEquals(request.url.searchParams.get("remote_deleted_at"), "is.null");
+    assertEquals(request.url.searchParams.get("locally_deleted_at"), "is.null");
+    assertEquals(request.url.searchParams.get("instance_identity"), "eq.curemed");
+  }
+  assertEquals(requests[1].body, { message_type: "image", body: "", provider_media: content.provider_media });
+});
 
 // Only HTTP is replaced. Authentication, SDK query construction, validation,
 // provider dispatch and response handling execute their production code.
@@ -31,6 +53,7 @@ function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: b
       if (path.endsWith("/wa_claim_inbox_sync")) return Response.json({ id: requestId, lease_token: actor,
         cursor_json: { stage: "messages", page: 2 }, processed_count: 100, unresolved_count: 0 });
       if (path === "/rest/v1/whatsapp_sync_runs") return Response.json(options.failSyncSave ? null : { id: requestId });
+      if (path === "/rest/v1/whatsapp_messages") return Response.json([]);
       throw new Error(`Unexpected database request: ${path}`);
     } },
   });

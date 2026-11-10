@@ -4,7 +4,7 @@ import { isPlainObject } from "../_shared/evolution-pairing.ts";
 
 export const MEDIA_MAX_BYTES = 10 * 1024 * 1024;
 const mimeKinds: Record<string, "image" | "video" | "audio" | "document"> = {
-  "image/jpeg": "image", "image/png": "image", "image/webp": "image",
+  "image/jpeg": "image", "image/png": "image", "image/webp": "image", "image/gif": "image",
   "video/mp4": "video", "video/webm": "video", "audio/ogg": "audio", "audio/mpeg": "audio",
   "audio/mp4": "audio", "audio/webm": "audio", "audio/wav": "audio", "application/pdf": "document",
   "text/plain": "document", "application/msword": "document",
