@@ -56,7 +56,7 @@ export default function AdminWhatsAppInbox() {
         </TabsContent>
         <TabsContent value="contacts" className="mt-0 min-h-0 flex-1"><WhatsAppContactList /></TabsContent>
       </Tabs>
-      <section className={`${selected ? "flex" : "hidden md:flex"} min-w-0 flex-1 flex-col`}>
+      <section className={`${selected ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-hidden`}>
         {current ? <>
           <WhatsAppThreadHeader chat={current} avatarUrl={avatars[current.id]} onBack={() => setSelected(null)} />
           <WhatsAppThread key={current.id} chatId={current.id} messages={rows} isLoading={messages.isPending} failed={!!messages.error}

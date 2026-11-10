@@ -77,10 +77,17 @@ function nonEmpty(value: unknown): string | null {
  * known before the file itself is fetched. Messages without that payload return nulls.
  */
 export function providerMediaMeta(message: MediaMessage): { fileName: string | null; mimeType: string | null } {
-  const payload = isRecord(message.provider_media) && isRecord(message.provider_media.message)
-    ? message.provider_media.message[`${message.message_type}Message`] : null;
+  const content = isRecord(message.provider_media) && isRecord(message.provider_media.message) ? message.provider_media.message : null;
+  const payload = content?.[`${message.message_type}Message`] ?? content?.stickerMessage;
   if (!isRecord(payload)) return { fileName: null, mimeType: null };
   return { fileName: nonEmpty(payload.fileName), mimeType: nonEmpty(payload.mimetype) };
+}
+
+/** WhatsApp carries GIF playback on video messages and stickers as animated WebP. */
+export function isGifPlayback(message: MediaMessage): boolean {
+  if (!isRecord(message.provider_media) || !isRecord(message.provider_media.message)) return false;
+  const video = message.provider_media.message.videoMessage;
+  return isRecord(video) && video.gifPlayback === true;
 }
 
 function isPdfMime(mimeType: string): boolean {

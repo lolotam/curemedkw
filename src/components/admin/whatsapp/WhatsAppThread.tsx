@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
+import { ScrollBar } from "@/components/ui/scroll-area";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
@@ -63,27 +65,32 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
   const pendingId = download.isPending ? download.variables : null;
 
   return (
-    <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#efeae2] p-4 dark:bg-[#0b141a]" role="log" aria-label={t("admin.whatsapp.inbox")}>
-      {hasOlder && messages.length > 0 && (
-        <div className="flex justify-center">
-          <Button size="sm" variant="secondary" disabled={loadingOlder} onClick={onLoadOlder}>{t("admin.whatsapp.older")}</Button>
-        </div>
-      )}
-      {isLoading && <p className="text-center text-sm text-muted-foreground">{t("common.loading")}</p>}
-      {failed && <p role="alert" className="text-center text-sm text-destructive">{t("admin.whatsapp.loadFailed")}</p>}
-      {!isLoading && !failed && messages.length === 0 && <p className="text-center text-sm text-muted-foreground">{t("admin.whatsapp.emptyThread")}</p>}
-      {groups.map(group => (
-        <section key={group.day} className="space-y-1.5" aria-label={dayFormatter.format(group.date)}>
-          <div className="flex justify-center">
-            <span className="rounded-md bg-white/80 px-2 py-0.5 text-[11px] text-muted-foreground shadow-sm dark:bg-[#182229]">{dayFormatter.format(group.date)}</span>
-          </div>
-          {group.rows.map(message => (
-            <MessageBubble key={message.id} message={message} timeFormatter={timeFormatter} downloadPending={pendingId === message.id}
-              onRequestDelete={setDeleting} onRequestForward={setForwarding} {...mediaProps} />
+    <ScrollAreaPrimitive.Root className="relative min-h-0 min-w-0 flex-1 overflow-hidden bg-[#efeae2] dark:bg-[#0b141a]">
+      <ScrollAreaPrimitive.Viewport className="h-full w-full [&>div]:!block" role="log" tabIndex={0} aria-label={t("admin.whatsapp.inbox")}>
+        <div className="space-y-2 p-4">
+          {hasOlder && messages.length > 0 && (
+            <div className="flex justify-center">
+              <Button size="sm" variant="secondary" disabled={loadingOlder} onClick={onLoadOlder}>{t("admin.whatsapp.older")}</Button>
+            </div>
+          )}
+          {isLoading && <p className="text-center text-sm text-muted-foreground">{t("common.loading")}</p>}
+          {failed && <p role="alert" className="text-center text-sm text-destructive">{t("admin.whatsapp.loadFailed")}</p>}
+          {!isLoading && !failed && messages.length === 0 && <p className="text-center text-sm text-muted-foreground">{t("admin.whatsapp.emptyThread")}</p>}
+          {groups.map(group => (
+            <section key={group.day} className="space-y-1.5" aria-label={dayFormatter.format(group.date)}>
+              <div className="flex justify-center">
+                <span className="rounded-md bg-white/80 px-2 py-0.5 text-[11px] text-muted-foreground shadow-sm dark:bg-[#182229]">{dayFormatter.format(group.date)}</span>
+              </div>
+              {group.rows.map(message => (
+                <MessageBubble key={message.id} message={message} timeFormatter={timeFormatter} downloadPending={pendingId === message.id}
+                  onRequestDelete={setDeleting} onRequestForward={setForwarding} {...mediaProps} />
+              ))}
+            </section>
           ))}
-        </section>
-      ))}
-      <div ref={bottom} />
+          <div ref={bottom} />
+        </div>
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollBar orientation="vertical" />
       <MediaLightbox entry={lightbox} onClose={() => setLightbox(null)} onDownload={onDownload}
         downloadPending={!!lightbox && pendingId === lightbox.message.id} />
       <ForwardMessageDialog message={forwarding} onClose={() => setForwarding(null)} />
@@ -106,6 +113,6 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </ScrollAreaPrimitive.Root>
   );
 }
