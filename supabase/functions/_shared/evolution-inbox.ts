@@ -80,6 +80,10 @@ export function inboxRevokedId(raw: unknown): string | null {
   return typeof id === "string" && id.length >= 1 && id.length <= 250 ? id : null;
 }
 
+/**
+ * Normalize an Evolution message for ingestion, retaining native attachment payloads
+ * for later downloads. Invalid identities or timestamps are excluded from the batch.
+ */
 export function inboxMessage(raw: unknown, countUnread: boolean) {
   const identity = inboxIdentity(raw);
   if (!identity || !isPlainObject(raw) || !isPlainObject(raw.key) || typeof raw.key.id !== "string") return null;

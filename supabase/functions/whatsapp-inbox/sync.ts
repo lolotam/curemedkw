@@ -4,6 +4,11 @@ import { isPlainObject } from "../_shared/evolution-pairing.ts";
 import { inboxRpc } from "./storage.ts";
 import { repairUnsupportedInboxContent } from "../_shared/whatsapp-inbox-content.ts";
 
+/**
+ * Import one leased history batch without adding unread counts. Persist the next
+ * cursor only after ingestion and unsupported-content repair succeed, so retries
+ * can safely resume the same batch after a failed operation or expired lease.
+ */
 export async function syncInbox(admin: SupabaseClient, provider: EvolutionInboxClient, actorId: string) {
   const run = await inboxRpc(admin, "wa_claim_inbox_sync", { p_actor_id: actorId });
   if (!isPlainObject(run) || !isPlainObject(run.cursor_json)) throw new InboxError("sync_unavailable", 503);
