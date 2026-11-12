@@ -274,7 +274,7 @@
     "atlascloud-models"
   ],
   "schemaPrerequisites": {
-    "inventory": "docs/releases/curemed-schema-20261106c.json"
+    "inventory": "docs/releases/curemed-schema-20261112.json"
   },
   "defaults": {
     "MYFATOORAH_BASE_URL": "https://api.myfatoorah.com",
