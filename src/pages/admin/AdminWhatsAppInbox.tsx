@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { MessageCircle, Settings } from "lucide-react";
@@ -58,13 +58,15 @@ export default function AdminWhatsAppInbox() {
         <TabsContent value="contacts" className="mt-0 min-h-0 flex-1"><WhatsAppContactList /></TabsContent>
       </Tabs>
       <section className={`${selected ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col overflow-hidden`}>
-        {current ? <>
+        {/* One key for the whole conversation: sibling keys must differ, and a shared key let React keep the
+            previous chat's thread mounted next to the new one. */}
+        {current ? <Fragment key={current.id}>
           <WhatsAppThreadHeader chat={current} avatarUrl={avatars[current.id]} onBack={() => setSelected(null)} />
-          <WhatsAppThread key={current.id} chatId={current.id} messages={rows} isLoading={messages.isPending} failed={!!messages.error}
+          <WhatsAppThread chatId={current.id} messages={rows} isLoading={messages.isPending} failed={!!messages.error}
             hasOlder={!!messages.hasNextPage} loadingOlder={messages.isFetchingNextPage} onLoadOlder={() => void messages.fetchNextPage()} />
-          <WhatsAppInboxComposer key={current.id} chatId={current.id} disabled={!connection.data?.connected || !!connection.error}
+          <WhatsAppInboxComposer chatId={current.id} disabled={!connection.data?.connected || !!connection.error}
             onSent={() => { void cache.invalidateQueries({ queryKey: ["whatsapp-inbox"] }); }} />
-        </> : <div className="m-auto text-center text-muted-foreground"><MessageCircle className="mx-auto mb-3 h-14 w-14" /><p>{t("admin.whatsapp.selectChat")}</p></div>}
+        </Fragment> : <div className="m-auto text-center text-muted-foreground"><MessageCircle className="mx-auto mb-3 h-14 w-14" /><p>{t("admin.whatsapp.selectChat")}</p></div>}
       </section>
     </div>
   </div>;

@@ -5,7 +5,7 @@ import AdminOrders from "./AdminOrders";
 
 const boundary = vi.hoisted(() => ({ from: vi.fn(), success: vi.fn(), error: vi.fn() }));
 vi.mock("@/integrations/supabase/clientRuntime", () => ({ supabase: boundary }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: boundary }));
+vi.mock("@/integrations/supabase/clientRuntime", () => ({ supabase: boundary }));
 vi.mock("sonner", () => ({ toast: { success: boundary.success, error: boundary.error } }));
 
 const PROTECTED = "This order is protected because a MyFatoorah invoice has been assigned. " +

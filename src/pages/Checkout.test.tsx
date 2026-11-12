@@ -39,7 +39,7 @@ vi.mock("@/lib/payment", async (importOriginal) => {
   };
 });
 
-vi.mock("@/integrations/supabase/client", () => ({
+vi.mock("@/integrations/supabase/clientRuntime", () => ({
   supabase: {
     from: () => ({
       select: () => ({

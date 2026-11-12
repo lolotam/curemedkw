@@ -24,7 +24,7 @@ const NAV = [
   { to: "/admin/flags", icon: Flag, label: "Site Flags" },
   { to: "/admin/messages", icon: Mail, label: "Messages" },
   { to: "/admin/whatsapp/inbox", icon: MessageCircle, label: "WhatsApp Inbox" },
-  { to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp" },
+  { to: "/admin/whatsapp", icon: MessageCircle, label: "WhatsApp", end: true },
   { to: "/admin/order-email", icon: MailCheck, label: "Order Email" },
   { to: "/admin/integrations", icon: Plug, label: "Integrations" },
   { to: "/admin/subscribers", icon: Users, label: "Subscribers" },
@@ -79,7 +79,8 @@ export function AdminLayout() {
 
   return (
     <div data-brand="curemed" className="min-h-screen bg-muted/20 flex" dir="ltr">
-      <aside className="w-64 bg-background border-r border-border min-h-screen sticky top-0 flex flex-col">
+      {/* Viewport tall and scrolled on its own, so a long menu never stretches the page below a full-height screen. */}
+      <aside className="w-64 shrink-0 bg-background border-r border-border h-screen sticky top-0 overflow-y-auto flex flex-col">
         <div className="p-5 border-b border-border flex flex-col items-center text-center">
           <Link to="/curemed" aria-label="Go to main page">
             <img
@@ -127,7 +128,7 @@ export function AdminLayout() {
       </aside>
       <main className="relative flex-1 min-w-0 overflow-x-hidden">
         {/* Animated gradient backdrop — shared across every /admin/* page */}
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-sky-500/[0.06] via-violet-500/[0.05] to-pink-500/[0.06]" />
           <div className="absolute -top-40 -left-20 h-[28rem] w-[28rem] rounded-full bg-sky-400/20 blur-3xl animate-blob-drift" />
           <div className="absolute top-20 right-0 h-[24rem] w-[24rem] rounded-full bg-violet-400/15 blur-3xl animate-blob-drift animation-delay-200" />

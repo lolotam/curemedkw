@@ -31,7 +31,7 @@ import { COUNTRIES, findCountry, findGovernorate } from "@/lib/regionsData";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { logOperation } from "@/lib/logs";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import {
   ColorfulHeroBg,
   GlowCard,
