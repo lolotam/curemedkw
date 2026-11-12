@@ -187,18 +187,22 @@ describe("WhatsApp thread", () => {
   });
 
   describe("scrolling", () => {
-    // jsdom has no layout: give every element a fixed scroll size, and catch the resize observer the thread installs.
+    // jsdom has no layout: give every element a fixed scroll size, and stand in for the resize observer so a test
+    // can resize one element and reach the thread only if the thread observes that element.
     const layout = { scrollHeight: 1000, clientHeight: 400 };
-    let contentResized: () => void;
+    const observed = new Set<Element>();
+    let onResize: () => void;
 
     beforeEach(() => {
       layout.scrollHeight = 1000;
+      layout.clientHeight = 400;
+      observed.clear();
       Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => layout.scrollHeight });
       Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => layout.clientHeight });
       vi.stubGlobal("ResizeObserver", class {
-        constructor(callback: () => void) { contentResized = callback; }
-        observe() {}
-        disconnect() {}
+        constructor(callback: () => void) { onResize = callback; }
+        observe(target: Element) { observed.add(target); }
+        disconnect() { observed.clear(); }
       });
     });
     afterEach(() => {
@@ -210,6 +214,10 @@ describe("WhatsApp thread", () => {
       const log = screen.getByRole("log");
       log.scrollTop = position;
       fireEvent.scroll(log);
+    }
+
+    function resize(target: Element) {
+      if (observed.has(target)) act(() => onResize());
     }
 
     it("opens at the newest message and follows a new one by scrolling only the log", () => {
@@ -232,8 +240,18 @@ describe("WhatsApp thread", () => {
       scrollLogTo(scrollTop);
 
       layout.scrollHeight = 1500;
-      act(() => contentResized());
+      resize(screen.getByRole("log").firstElementChild!);
       expect(screen.getByRole("log").scrollTop).toBe(pinned ? 1500 : scrollTop);
+    });
+
+    it("keeps the newest message in view when a shorter window shrinks the log", () => {
+      renderThread([message({ id: "a", body: "Hello" })]);
+      scrollLogTo(600);
+
+      // Only the viewport changes: the messages keep their height, so nothing inside the log resizes.
+      layout.clientHeight = 300;
+      resize(screen.getByRole("log"));
+      expect(screen.getByRole("log").scrollTop).toBe(1000);
     });
 
     it("keeps the same messages on screen when an older page is added above them", () => {
@@ -249,6 +267,17 @@ describe("WhatsApp thread", () => {
       update({ loadingOlder: false, messages: [message({ id: "a", body: "First", sent_at: "2026-11-05T09:59:00.000Z" }), ...recent] });
       // The 900px between the old position and the end are preserved, so "Second" stays where it was.
       expect(screen.getByRole("log").scrollTop).toBe(900);
+    });
+
+    it("keeps where the operator scrolled to while an older page was loading, even when it adds nothing", () => {
+      const { update } = renderThread([message({ id: "b", body: "Second" })], { hasOlder: true });
+      scrollLogTo(100);
+
+      fireEvent.click(screen.getByRole("button", { name: "Older messages" }));
+      update({ loadingOlder: true });
+      scrollLogTo(300);
+      update({ loadingOlder: false });
+      expect(screen.getByRole("log").scrollTop).toBe(300);
     });
   });
 });

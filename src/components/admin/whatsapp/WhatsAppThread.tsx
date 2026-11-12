@@ -70,13 +70,15 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
     atBottom.current = true;
   }, [newestId, chatId]);
 
-  // Media finishing loading grows the log; keep the end in view, unless the operator scrolled up to read.
+  // Media finishing loading grows the log, and a shorter window shrinks the viewport; either way keep the end
+  // in view, unless the operator scrolled up to read.
   useEffect(() => {
     const scroller = log.current;
     const inner = content.current;
     if (!scroller || !inner || typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(() => { if (atBottom.current) scrollToEnd(scroller); });
     observer.observe(inner);
+    observer.observe(scroller);
     return () => observer.disconnect();
   }, []);
 
@@ -88,6 +90,12 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
     olderAnchor.current = null;
     atBottom.current = isNearBottom(node);
   }, [oldestId, loadingOlder]);
+
+  function onLogScroll(node: HTMLElement) {
+    atBottom.current = isNearBottom(node);
+    // The operator moved while an older page loads: restore where they are now, not where they clicked.
+    if (olderAnchor.current !== null) olderAnchor.current = node.scrollHeight - node.scrollTop;
+  }
 
   function loadOlder() {
     const node = log.current;
@@ -111,7 +119,7 @@ export function WhatsAppThread({ chatId, messages, isLoading, failed, hasOlder, 
 
   return (
     <div ref={log} role="log" tabIndex={0} aria-label={t("admin.whatsapp.inbox")}
-      onScroll={event => { atBottom.current = isNearBottom(event.currentTarget); }}
+      onScroll={event => onLogScroll(event.currentTarget)}
       className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-[#efeae2] dark:bg-[#0b141a]">
       <div ref={content} className="space-y-2 p-4">
         {hasOlder && messages.length > 0 && (
