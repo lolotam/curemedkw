@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/clientRuntime";
 import { useSiteSetting, useUpdateSiteSetting } from "@/lib/db";
 import { SectionCard } from "@/components/admin/SectionCard";
 import { Badge } from "@/components/ui/badge";

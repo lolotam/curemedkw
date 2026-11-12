@@ -16,7 +16,7 @@ vi.mock("@/lib/db", () => ({
   useSiteSetting: () => ({ data: boundary.saved, isLoading: false }),
   useUpdateSiteSetting: () => ({ mutate: boundary.mutate, isPending: false }),
 }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: boundary.from } }));
+vi.mock("@/integrations/supabase/clientRuntime", () => ({ supabase: { from: boundary.from } }));
 vi.mock("sonner", () => ({ toast: { success: boundary.success, error: boundary.error } }));
 
 describe("order WhatsApp tab", () => {
