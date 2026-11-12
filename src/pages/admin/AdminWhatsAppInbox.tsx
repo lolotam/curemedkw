@@ -35,15 +35,16 @@ export default function AdminWhatsAppInbox() {
     void callWhatsAppInbox({ action: "markRead", chatId: current.id, seenMessageId: seenId })
       .then(() => cache.invalidateQueries({ queryKey: ["whatsapp-inbox", "chats"] })).catch(() => setReadFailed(true));
   }, [current?.id, seenId, cache]);
-  return <div className="flex h-dvh flex-col gap-3">
-    <header className="flex items-center justify-between"><h1 className="text-2xl font-semibold">{t("admin.whatsapp.inbox")}</h1>
+  // Exactly one viewport tall and never scrolled itself: only the chat list and the thread scroll.
+  return <div className="flex h-dvh flex-col gap-3 overflow-hidden">
+    <header className="flex shrink-0 items-center justify-between"><h1 className="text-2xl font-semibold">{t("admin.whatsapp.inbox")}</h1>
       <Button asChild variant="outline" size="sm"><Link to="/admin/whatsapp"><Settings className="me-2 h-4 w-4" />{t("admin.whatsapp.settings")}</Link></Button></header>
-    <p className={`text-sm ${connection.data?.connected ? "text-emerald-700" : "text-muted-foreground"}`} role="status">
+    <p className={`shrink-0 text-sm ${connection.data?.connected ? "text-emerald-700" : "text-muted-foreground"}`} role="status">
       {t(connection.data?.connected ? "admin.whatsapp.connected" : "admin.whatsapp.disconnected")}
       {connection.data?.connected && !connection.data.webhookReady && ` · ${t("admin.whatsapp.webhookMissing")}`}
     </p>
-    {readFailed && <p role="alert" className="text-sm text-destructive">{t("admin.whatsapp.readFailed")}</p>}
-    <div className="flex min-h-[420px] flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
+    {readFailed && <p role="alert" className="shrink-0 text-sm text-destructive">{t("admin.whatsapp.readFailed")}</p>}
+    <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border bg-card shadow-sm">
       <Tabs defaultValue="chats" className={`${selected ? "hidden md:flex" : "flex"} w-full flex-col border-e md:w-80 md:shrink-0`}>
         <TabsList className="m-2 grid grid-cols-2">
           <TabsTrigger value="chats">{t("admin.whatsapp.chatsTab")}</TabsTrigger>

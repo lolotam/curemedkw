@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { ComponentProps } from "react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WhatsAppMessage } from "@/lib/whatsappInbox";
@@ -23,11 +24,15 @@ const message = (overrides: Partial<WhatsAppMessage>): WhatsAppMessage => ({
 
 const fileResponse = (type: string) => ({ ok: true, blob: async () => new Blob(["bytes"], { type }) });
 
-function renderThread(messages: WhatsAppMessage[]) {
+type ThreadProps = ComponentProps<typeof WhatsAppThread>;
+
+function renderThread(messages: WhatsAppMessage[], overrides: Partial<ThreadProps> = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}>
-    <WhatsAppThread chatId="chat-1" messages={messages} isLoading={false} failed={false} hasOlder={false} loadingOlder={false} onLoadOlder={() => {}} />
-  </QueryClientProvider>);
+  const thread = (props: Partial<ThreadProps>) => <QueryClientProvider client={client}>
+    <WhatsAppThread chatId="chat-1" messages={messages} isLoading={false} failed={false} hasOlder={false} loadingOlder={false} onLoadOlder={() => {}} {...props} />
+  </QueryClientProvider>;
+  const view = render(thread(overrides));
+  return { ...view, update: (props: Partial<ThreadProps>) => view.rerender(thread({ ...overrides, ...props })) };
 }
 
 describe("WhatsApp thread", () => {
@@ -93,7 +98,6 @@ describe("WhatsApp thread", () => {
     expect(video).toHaveAttribute("loop");
     expect(video).toHaveAttribute("autoplay");
     expect(screen.queryByText("Unsupported message")).not.toBeInTheDocument();
-    expect(screen.getByRole("log")).toHaveAttribute("data-radix-scroll-area-viewport");
   });
 
   it("downloads a document under its WhatsApp file name and reuses the fetched file on a second download", async () => {
@@ -180,5 +184,100 @@ describe("WhatsApp thread", () => {
   it("puts each local day under its own date chip", () => {
     renderThread([message({ id: "a", sent_at: "2026-11-04T09:00:00.000Z" }), message({ id: "b", body: "later", sent_at: "2026-11-05T09:00:00.000Z" })]);
     expect(screen.getAllByRole("region")).toHaveLength(2);
+  });
+
+  describe("scrolling", () => {
+    // jsdom has no layout: give every element a fixed scroll size, and stand in for the resize observer so a test
+    // can resize one element and reach the thread only if the thread observes that element.
+    const layout = { scrollHeight: 1000, clientHeight: 400 };
+    const observed = new Set<Element>();
+    let onResize: () => void;
+
+    beforeEach(() => {
+      layout.scrollHeight = 1000;
+      layout.clientHeight = 400;
+      observed.clear();
+      Object.defineProperty(HTMLElement.prototype, "scrollHeight", { configurable: true, get: () => layout.scrollHeight });
+      Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => layout.clientHeight });
+      vi.stubGlobal("ResizeObserver", class {
+        constructor(callback: () => void) { onResize = callback; }
+        observe(target: Element) { observed.add(target); }
+        disconnect() { observed.clear(); }
+      });
+    });
+    afterEach(() => {
+      Reflect.deleteProperty(HTMLElement.prototype, "scrollHeight");
+      Reflect.deleteProperty(HTMLElement.prototype, "clientHeight");
+    });
+
+    function scrollLogTo(position: number) {
+      const log = screen.getByRole("log");
+      log.scrollTop = position;
+      fireEvent.scroll(log);
+    }
+
+    function resize(target: Element) {
+      if (observed.has(target)) act(() => onResize());
+    }
+
+    it("opens at the newest message and follows a new one by scrolling only the log", () => {
+      const first = message({ id: "a", body: "Hello" });
+      const { update } = renderThread([first]);
+      expect(screen.getByRole("log").scrollTop).toBe(1000);
+
+      layout.scrollHeight = 1600;
+      update({ messages: [first, message({ id: "b", body: "Reply", sent_at: "2026-11-05T10:01:00.000Z" })] });
+      expect(screen.getByRole("log").scrollTop).toBe(1600);
+      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { reading: "the newest message", scrollTop: 600, pinned: true },
+      { reading: "just above the newest message", scrollTop: 560, pinned: true },
+      { reading: "older history", scrollTop: 200, pinned: false },
+    ])("when loaded media grows the thread while the operator reads $reading, pinned to the end: $pinned", ({ scrollTop, pinned }) => {
+      renderThread([message({ id: "a", body: "Hello" })]);
+      scrollLogTo(scrollTop);
+
+      layout.scrollHeight = 1500;
+      resize(screen.getByRole("log").firstElementChild!);
+      expect(screen.getByRole("log").scrollTop).toBe(pinned ? 1500 : scrollTop);
+    });
+
+    it("keeps the newest message in view when a shorter window shrinks the log", () => {
+      renderThread([message({ id: "a", body: "Hello" })]);
+      scrollLogTo(600);
+
+      // Only the viewport changes: the messages keep their height, so nothing inside the log resizes.
+      layout.clientHeight = 300;
+      resize(screen.getByRole("log"));
+      expect(screen.getByRole("log").scrollTop).toBe(1000);
+    });
+
+    it("keeps the same messages on screen when an older page is added above them", () => {
+      const onLoadOlder = vi.fn();
+      const recent = [message({ id: "b", body: "Second" }), message({ id: "c", body: "Third", sent_at: "2026-11-05T10:01:00.000Z" })];
+      const { update } = renderThread(recent, { hasOlder: true, onLoadOlder });
+      scrollLogTo(100);
+
+      fireEvent.click(screen.getByRole("button", { name: "Older messages" }));
+      expect(onLoadOlder).toHaveBeenCalledTimes(1);
+      update({ loadingOlder: true });
+      layout.scrollHeight = 1800;
+      update({ loadingOlder: false, messages: [message({ id: "a", body: "First", sent_at: "2026-11-05T09:59:00.000Z" }), ...recent] });
+      // The 900px between the old position and the end are preserved, so "Second" stays where it was.
+      expect(screen.getByRole("log").scrollTop).toBe(900);
+    });
+
+    it("keeps where the operator scrolled to while an older page was loading, even when it adds nothing", () => {
+      const { update } = renderThread([message({ id: "b", body: "Second" })], { hasOlder: true });
+      scrollLogTo(100);
+
+      fireEvent.click(screen.getByRole("button", { name: "Older messages" }));
+      update({ loadingOlder: true });
+      scrollLogTo(300);
+      update({ loadingOlder: false });
+      expect(screen.getByRole("log").scrollTop).toBe(300);
+    });
   });
 });
