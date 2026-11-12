@@ -1,4 +1,5 @@
 import { EVOLUTION_ALLOWED_ORIGIN, EVOLUTION_INSTANCE, isPlainObject, readBoundedText } from "./evolution-pairing.ts";
+import { structuredContent } from "./evolution-inbox-text.ts";
 
 const paths = {
   status: ["GET", "instance/connectionState"],
@@ -59,12 +60,12 @@ export function inboxIdentity(raw: unknown) {
     display_name: String((key.fromMe === true ? undefined : raw.pushName) ?? raw.name ?? raw.notify ?? "").slice(0, 200) };
 }
 
-/** Unwraps the containers WhatsApp puts around disappearing and view-once content. */
+/** Unwraps the containers WhatsApp puts around disappearing, view-once and album-child content. */
 function innerMessage(raw: Record<string, unknown>) {
   let message = isPlainObject(raw.message) ? raw.message : {};
   for (let depth = 0; depth < 8; depth++) {
-    const wrapper = ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2", "viewOnceMessageV2Extension", "documentWithCaptionMessage"]
-      .map(key => message[key]).find(value => isPlainObject(value) && isPlainObject(value.message));
+    const wrapper = ["ephemeralMessage", "viewOnceMessage", "viewOnceMessageV2", "viewOnceMessageV2Extension", "documentWithCaptionMessage",
+      "associatedChildMessage"].map(key => message[key]).find(value => isPlainObject(value) && isPlainObject(value.message));
     if (!isPlainObject(wrapper) || !isPlainObject(wrapper.message)) break;
     message = wrapper.message;
   }
@@ -80,27 +81,58 @@ export function inboxRevokedId(raw: unknown): string | null {
   return typeof id === "string" && id.length >= 1 && id.length <= 250 ? id : null;
 }
 
+/** Bookkeeping WhatsApp stores as messages: protocol notices and edits, album headers, placeholders, key exchange. */
+const NEVER_A_BUBBLE = new Set(["protocolMessage", "editedMessage", "albumMessage", "placeholderMessage",
+  "senderKeyDistributionMessage", "messageContextInfo"]);
+
+/** True when the message holds bookkeeping only; any other content, known or not, still gets a bubble. */
+function isNeverABubble(message: Record<string, unknown>) {
+  const kinds = Object.keys(message).filter(kind => message[kind] != null);
+  return kinds.length > 0 && kinds.every(kind => NEVER_A_BUBBLE.has(kind));
+}
+
+/** A record with a valid inbox identity and provider id, with its content unwrapped. */
+function inboxRecord(raw: unknown) {
+  const identity = inboxIdentity(raw);
+  if (!identity || !isPlainObject(raw) || !isPlainObject(raw.key)) return null;
+  const id = raw.key.id;
+  if (typeof id !== "string" || !id || id.length > 250) return null;
+  return { raw, id, fromMe: raw.key.fromMe === true, identity, message: innerMessage(raw) };
+}
+
+/**
+ * The id of a valid record that must never render as a chat bubble, or null for any other record.
+ * `inboxMessage` skips exactly these records, so callers can tell them apart from invalid ones.
+ */
+export function inboxIgnoredId(raw: unknown): string | null {
+  const record = inboxRecord(raw);
+  return record && isNeverABubble(record.message) ? record.id : null;
+}
+
 /**
  * Normalize an Evolution message for ingestion, retaining native attachment payloads
- * for later downloads. Invalid identities or timestamps are excluded from the batch.
+ * for later downloads. Invalid identities or timestamps, and bookkeeping records
+ * (see `inboxIgnoredId`), are excluded from the batch.
  */
 export function inboxMessage(raw: unknown, countUnread: boolean) {
-  const identity = inboxIdentity(raw);
-  if (!identity || !isPlainObject(raw) || !isPlainObject(raw.key) || typeof raw.key.id !== "string") return null;
-  if (!raw.key.id || raw.key.id.length > 250) return null;
-  const message = innerMessage(raw);
+  const record = inboxRecord(raw);
+  if (!record || isNeverABubble(record.message)) return null;
+  const { id, fromMe, identity, message } = record;
   const mediaType = ["image", "audio", "video", "document", "sticker"].find(kind => isPlainObject(message[`${kind}Message`]));
   const media = mediaType ? message[`${mediaType}Message`] as Record<string, unknown> : null;
   const extended = isPlainObject(message.extendedTextMessage) ? message.extendedTextMessage.text : null;
   const reaction = isPlainObject(message.reactionMessage) ? message.reactionMessage : null;
-  const body = Array.from(String(message.conversation ?? extended ?? media?.caption ?? reaction?.text ?? "")).slice(0, 4096).join("");
-  const timestamp = isPlainObject(raw.messageTimestamp) ? raw.messageTimestamp.low : raw.messageTimestamp;
+  const structured = media ? null : structuredContent(message);
+  const body = Array.from(String(message.conversation ?? extended ?? media?.caption ?? structured?.body ?? reaction?.text ?? ""))
+    .slice(0, 4096).join("");
+  const timestamp = isPlainObject(record.raw.messageTimestamp) ? record.raw.messageTimestamp.low : record.raw.messageTimestamp;
   const seconds = Number(timestamp);
   if (!Number.isFinite(seconds) || seconds < 0 || seconds > 253402300799) return null;
-  return { ...identity, provider_message_id: raw.key.id, direction: raw.key.fromMe === true ? "outbound" : "inbound",
+  const details = structured?.provider_media ?? (reaction && body ? { reaction: { text: body } } : null);
+  return { ...identity, provider_message_id: id, direction: fromMe ? "outbound" : "inbound",
     message_type: mediaType === "sticker" ? "image" : mediaType ?? (body ? "text" : "unsupported"), body, sent_at: new Date(seconds * 1000).toISOString(),
-    count_unread: countUnread, provider_media: media ? { key: { id: raw.key.id, remoteJid: identity.remote_jid, fromMe: raw.key.fromMe === true },
-      message: { [`${mediaType}Message`]: media } } : reaction && body ? { reaction: { text: body } } : null };
+    count_unread: countUnread, provider_media: media ? { key: { id, remoteJid: identity.remote_jid, fromMe },
+      message: { [`${mediaType}Message`]: media } } : details };
 }
 
 export function inboxAck(raw: unknown): "accepted" | "delivered" | "read" | "rejected" | null {

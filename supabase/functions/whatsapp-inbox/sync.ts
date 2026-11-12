@@ -1,13 +1,15 @@
 import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
-import { type EvolutionInboxClient, inboxIdentity, inboxMessage, InboxError } from "../_shared/evolution-inbox.ts";
+import { type EvolutionInboxClient, inboxIdentity, inboxIgnoredId, inboxMessage, InboxError } from "../_shared/evolution-inbox.ts";
 import { isPlainObject } from "../_shared/evolution-pairing.ts";
 import { inboxRpc } from "./storage.ts";
-import { repairUnsupportedInboxContent } from "../_shared/whatsapp-inbox-content.ts";
+import { hideIgnoredInboxContent, repairUnsupportedInboxContent } from "../_shared/whatsapp-inbox-content.ts";
 
 /**
  * Import one leased history batch without adding unread counts. Persist the next
  * cursor only after ingestion and unsupported-content repair succeed, so retries
  * can safely resume the same batch after a failed operation or expired lease.
+ * Bookkeeping records are neither ingested nor unresolved; earlier unsupported
+ * copies of them are hidden.
  */
 export async function syncInbox(admin: SupabaseClient, provider: EvolutionInboxClient, actorId: string) {
   const run = await inboxRpc(admin, "wa_claim_inbox_sync", { p_actor_id: actorId });
@@ -36,6 +38,7 @@ export async function syncInbox(admin: SupabaseClient, provider: EvolutionInboxC
     const identity = inboxIdentity(record);
     return identity ? { ...identity, contact_only: stage === "contacts" } : null;
   }).filter(Boolean);
+  const ignored = stage === "messages" ? records.map(inboxIgnoredId).filter(id => id !== null) : [];
   let skipped = 0;
   for (let offset = 0; offset < rows.length; offset += 200) {
     const stored = await inboxRpc(admin, "wa_ingest_messages", { p_rows: rows.slice(offset, offset + 200) });
@@ -43,9 +46,10 @@ export async function syncInbox(admin: SupabaseClient, provider: EvolutionInboxC
     skipped += Number(stored.skipped ?? 0);
     if (stage === "messages") await repairUnsupportedInboxContent(admin, rows.slice(offset, offset + 200));
   }
+  await hideIgnoredInboxContent(admin, ignored);
   const processed = Number(run.processed_count) + rows.length - skipped;
   const { data: saved, error } = await admin.from("whatsapp_sync_runs").update({ state: complete ? "complete" : "partial",
-    cursor_json: next, processed_count: processed, unresolved_count: Number(run.unresolved_count) + records.length - rows.length + skipped,
+    cursor_json: next, processed_count: processed, unresolved_count: Number(run.unresolved_count) + records.length - rows.length - ignored.length + skipped,
     lease_token: null, lease_expires_at: null, updated_at: new Date().toISOString() })
     .eq("id", run.id).eq("lease_token", run.lease_token).select("id").maybeSingle();
   if (error || !saved) throw new InboxError("sync_conflict", 409);

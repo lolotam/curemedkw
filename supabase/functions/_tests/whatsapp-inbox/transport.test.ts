@@ -3,7 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { createInboxHandler } from "../../whatsapp-inbox/handler.ts";
 import { ingestInboxEvent } from "../../_shared/whatsapp-inbox-webhook.ts";
 import { recordIntegrationPayment } from "../../_shared/integration-payment.ts";
-import { repairUnsupportedInboxContent } from "../../_shared/whatsapp-inbox-content.ts";
+import { hideIgnoredInboxContent, repairUnsupportedInboxContent } from "../../_shared/whatsapp-inbox-content.ts";
 
 const actor = "87000000-0000-4000-8000-000000000001";
 const chat = "87000000-0000-4000-8000-000000000002";
@@ -30,18 +30,40 @@ Deno.test("history sync repairs unsupported content without touching unread, ACK
   assertEquals(requests[1].body, { message_type: "image", body: "", provider_media: content.provider_media });
 });
 
+Deno.test("history sync hides stored bookkeeping bubbles without touching unread, ACKs or deleted messages", async () => {
+  const requests: { url: URL; method: string; body: unknown }[] = [];
+  const admin = createClient("https://fixture.supabase.test", "fixture-key", { auth: { persistSession: false, autoRefreshToken: false }, global: {
+    fetch: async (input, init) => {
+      const request = new Request(input, init);
+      requests.push({ url: new URL(request.url), method: request.method, body: await request.json() });
+      return new Response(null, { status: 204 });
+    },
+  } });
+  await hideIgnoredInboxContent(admin, []);
+  assertEquals(requests.length, 0);
+  await hideIgnoredInboxContent(admin, ["protocol-1", "album-1"]);
+  assertEquals(requests.length, 1);
+  const [request] = requests;
+  assertEquals(request.method, "PATCH");
+  assertEquals(request.url.pathname, "/rest/v1/whatsapp_messages");
+  assertEquals(Object.fromEntries(request.url.searchParams), { instance_identity: "eq.curemed", message_type: "eq.unsupported",
+    remote_deleted_at: "is.null", locally_deleted_at: "is.null", provider_message_id: "in.(protocol-1,album-1)" });
+  assertEquals(Object.keys(request.body as Record<string, unknown>), ["locally_deleted_at"]);
+});
+
 // Only HTTP is replaced. Authentication, SDK query construction, validation,
 // provider dispatch and response handling execute their production code.
-function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: boolean; failSyncSave?: boolean; ingestSkips?: boolean } = {}) {
-  const calls: { path: string; body: Record<string, unknown> }[] = [];
+function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: boolean; failSyncSave?: boolean; ingestSkips?: boolean;
+  history?: unknown[] } = {}) {
+  const calls: { path: string; body: Record<string, unknown>; search?: URLSearchParams }[] = [];
   let reserved = false;
   let providerSends = 0;
   const admin = createClient("https://fixture.supabase.test", "fixture-service-key", {
     auth: { persistSession: false, autoRefreshToken: false },
     global: { fetch: async (input, init) => {
-      const path = new URL(String(input)).pathname;
+      const { pathname: path, searchParams: search } = new URL(String(input));
       const body = init?.body ? await new Request(input, init).json() : {};
-      calls.push({ path, body });
+      calls.push({ path, body, search });
       if (path === "/auth/v1/user") return Response.json({ id: actor });
       if (path === "/rest/v1/user_roles") return Response.json(options.isAdmin === false ? [] : [{ user_id: actor, role: "admin" }]);
       if (path === "/rest/v1/whatsapp_chats") return Response.json({ id: chat, remote_jid: "123456789012345@lid", normalized_phone: null });
@@ -72,7 +94,7 @@ function fixture(options: { hook?: unknown; isAdmin?: boolean; providerFails?: b
           message: { conversation: "Hello" },
         }));
       }
-      if (path === "/chat/findMessages/curemed") return Promise.resolve(Response.json({ messages: { pages: 2, records: [{
+      if (path === "/chat/findMessages/curemed") return Promise.resolve(Response.json({ messages: { pages: 2, records: options.history ?? [{
         key: { id: "history-1", remoteJid: "123456789012345@lid", fromMe: false }, messageTimestamp: 1793872800,
         message: { conversation: "History" },
       }] } }));
@@ -153,6 +175,24 @@ Deno.test("sync resumes its durable cursor, imports history without unread incre
     assertEquals(rows[0].count_unread, false);
     assertEquals(test.calls.at(-1)?.body.processed_count, 101);
   }
+});
+
+Deno.test("sync ingests real messages, hides bookkeeping and counts only invalid records as unresolved", async () => {
+  const history = (id: string, remoteJid: string, message: Record<string, unknown>) =>
+    ({ key: { id, remoteJid, fromMe: false }, messageTimestamp: 1793872800, message });
+  const test = fixture({ history: [
+    history("text-1", "96550000001@s.whatsapp.net", { conversation: "Hello" }),
+    history("protocol-1", "96550000001@s.whatsapp.net", { protocolMessage: { type: 3 } }),
+    history("group-1", "12345@g.us", { protocolMessage: { type: 3 } }),
+    history("unknown-1", "96550000001@s.whatsapp.net", { pollUpdateMessage: { vote: {} } }),
+  ] });
+  assertEquals((await test.request({ action: "sync" })).status, 200);
+  const rows = test.calls.find(call => call.path.endsWith("/wa_ingest_messages"))?.body.p_rows as Record<string, unknown>[];
+  assertEquals(rows.map(row => [row.provider_message_id, row.message_type]), [["text-1", "text"], ["unknown-1", "unsupported"]]);
+  const hide = test.calls.find(call => call.path === "/rest/v1/whatsapp_messages" && "locally_deleted_at" in call.body);
+  assertEquals(hide?.search?.get("provider_message_id"), "in.(protocol-1)");
+  const saved = test.calls.at(-1)?.body;
+  assertEquals([saved?.processed_count, saved?.unresolved_count], [102, 1]);
 });
 
 Deno.test("webhook merges events and preserves custom headers using the v2 DTO", async () => {

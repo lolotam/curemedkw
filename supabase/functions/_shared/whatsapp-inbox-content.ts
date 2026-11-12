@@ -29,3 +29,16 @@ export async function repairUnsupportedInboxContent(admin: SupabaseClient, rows:
     }));
   }
 }
+
+/**
+ * Bookkeeping records (see `inboxIgnoredId`) used to be stored as unsupported bubbles.
+ * Hide those copies from the thread the way "delete for me" does, under the repair's
+ * guards; unread counters, delivery state and message identity stay untouched.
+ */
+export async function hideIgnoredInboxContent(admin: SupabaseClient, providerMessageIds: string[]) {
+  if (!providerMessageIds.length) return;
+  const { error } = await admin.from("whatsapp_messages").update({ locally_deleted_at: new Date().toISOString() })
+    .eq("instance_identity", "curemed").eq("message_type", "unsupported")
+    .is("remote_deleted_at", null).is("locally_deleted_at", null).in("provider_message_id", providerMessageIds);
+  if (error) throw new InboxError("storage_unavailable", 503);
+}
