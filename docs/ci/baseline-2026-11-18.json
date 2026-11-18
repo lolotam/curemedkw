@@ -1,0 +1,239 @@
+{
+  "captured_date": "2026-11-18",
+  "repository": "lolotam/curemedkw",
+  "inspected_main_sha": "6355a407c5c2370a1bee60f20035778b7cb2627e",
+  "actions_workflows": {
+    "total_count": 0,
+    "workflows": []
+  },
+  "actions_runs": {
+    "total_count": 0,
+    "workflow_runs": []
+  },
+  "branch_rules": [],
+  "branch_protection": {
+    "api_error": "gh: Branch not protected (HTTP 404)"
+  },
+  "external_check_reference_samples": [
+    {
+      "pr": 42,
+      "pr_url": "https://github.com/lolotam/curemedkw/pull/42",
+      "head_sha": "ff5bce8ab81709aa02f030d3c0c3fc54832b6c97",
+      "title": "feat(catalog): read-only agent catalog view and product search RPC",
+      "merged_at": "2026-11-12T10:45:37Z",
+      "checks": [
+        {
+          "id": 131055984326,
+          "name": "CodeRabbit",
+          "app": "coderabbitai",
+          "status": "completed",
+          "conclusion": "neutral",
+          "started_at": "2026-11-12T08:10:33Z",
+          "completed_at": "2026-11-12T08:10:33Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/131055984326",
+          "details_url": "https://coderabbit.ai"
+        },
+        {
+          "id": 131055979856,
+          "name": "Socket Security: Pull Request Alerts",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T08:10:31Z",
+          "completed_at": "2026-11-12T08:10:33Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/131055979856",
+          "details_url": "https://socket.dev"
+        },
+        {
+          "id": 131055955391,
+          "name": "Socket Security: Project Report",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T08:10:29Z",
+          "completed_at": "2026-11-12T08:10:31Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/131055955391",
+          "details_url": "https://socket.dev/dashboard/org/lolotam/sbom/33c4dc87-497e-4e7d-be74-c2eab21d8bc3"
+        }
+      ],
+      "check_count": 3,
+      "check_query_error": null
+    },
+    {
+      "pr": 41,
+      "pr_url": "https://github.com/lolotam/curemedkw/pull/41",
+      "head_sha": "cdbfb88740612124bf0f770e356c29b7a76537bf",
+      "title": "fix(whatsapp): stop stacking chat threads; single sidebar selection and full-height inbox",
+      "merged_at": "2026-11-12T07:13:59Z",
+      "checks": [
+        {
+          "id": 131031681780,
+          "name": "CodeRabbit",
+          "app": "coderabbitai",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T07:10:57Z",
+          "completed_at": "2026-11-12T07:13:44Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/131031681780",
+          "details_url": "https://app.coderabbit.ai/change-stack/lolotam/curemedkw/pull/41"
+        },
+        {
+          "id": 131031572727,
+          "name": "Socket Security: Pull Request Alerts",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T07:10:38Z",
+          "completed_at": "2026-11-12T07:10:40Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/131031572727",
+          "details_url": "https://socket.dev"
+        },
+        {
+          "id": 131031552768,
+          "name": "Socket Security: Project Report",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T07:10:36Z",
+          "completed_at": "2026-11-12T07:10:38Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/131031552768",
+          "details_url": "https://socket.dev/dashboard/org/lolotam/sbom/d5e9c131-592d-44a7-bc07-809c8df3adcc"
+        }
+      ],
+      "check_count": 3,
+      "check_query_error": null
+    },
+    {
+      "pr": 40,
+      "pr_url": "https://github.com/lolotam/curemedkw/pull/40",
+      "head_sha": "aee4bb1a3f6efe84e947850a48e4f72f8fb118d8",
+      "title": "fix(whatsapp): render contact cards and templates, hide protocol/album placeholders",
+      "merged_at": "2026-11-12T06:00:25Z",
+      "checks": [
+        {
+          "id": 130995543216,
+          "name": "Socket Security: Pull Request Alerts",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T05:33:05Z",
+          "completed_at": "2026-11-12T05:33:07Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/130995543216",
+          "details_url": "https://socket.dev"
+        },
+        {
+          "id": 130995522893,
+          "name": "CodeRabbit",
+          "app": "coderabbitai",
+          "status": "completed",
+          "conclusion": "neutral",
+          "started_at": "2026-11-12T05:33:03Z",
+          "completed_at": "2026-11-12T05:33:03Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/130995522893",
+          "details_url": "https://coderabbit.ai"
+        },
+        {
+          "id": 130995507223,
+          "name": "Socket Security: Project Report",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T05:33:00Z",
+          "completed_at": "2026-11-12T05:33:05Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/130995507223",
+          "details_url": "https://socket.dev/dashboard/org/lolotam/sbom/c3eac4a7-6c6f-45b1-b06a-abe2a82780fb"
+        }
+      ],
+      "check_count": 3,
+      "check_query_error": null
+    },
+    {
+      "pr": 39,
+      "pr_url": "https://github.com/lolotam/curemedkw/pull/39",
+      "head_sha": "e85f76b1311fc0c0cb08e51d6edff70268d9f44b",
+      "title": "fix(whatsapp): stable inbox scrolling when switching chats and loading media",
+      "merged_at": "2026-11-12T05:36:50Z",
+      "checks": [
+        {
+          "id": 130996248290,
+          "name": "CodeRabbit",
+          "app": "coderabbitai",
+          "status": "completed",
+          "conclusion": "neutral",
+          "started_at": "2026-11-12T05:35:05Z",
+          "completed_at": "2026-11-12T05:35:05Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/130996248290",
+          "details_url": "https://coderabbit.ai"
+        },
+        {
+          "id": 130996194429,
+          "name": "Socket Security: Pull Request Alerts",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T05:34:55Z",
+          "completed_at": "2026-11-12T05:34:57Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/130996194429",
+          "details_url": "https://socket.dev"
+        },
+        {
+          "id": 130996174486,
+          "name": "Socket Security: Project Report",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-12T05:34:53Z",
+          "completed_at": "2026-11-12T05:34:54Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/130996174486",
+          "details_url": "https://socket.dev/dashboard/org/lolotam/sbom/99df818d-8968-4306-80b1-c41029c655d8"
+        }
+      ],
+      "check_count": 3,
+      "check_query_error": null
+    },
+    {
+      "pr": 38,
+      "pr_url": "https://github.com/lolotam/curemedkw/pull/38",
+      "head_sha": "f72438c94cd25353971ead0ed80601dcd1efc0c3",
+      "title": "Fix WhatsApp stickers, GIF playback and fragmented chat scrollbar",
+      "merged_at": "2026-11-10T04:12:38Z",
+      "checks": [
+        {
+          "id": 129621159267,
+          "name": "CodeRabbit",
+          "app": "coderabbitai",
+          "status": "completed",
+          "conclusion": "neutral",
+          "started_at": "2026-11-10T04:01:10Z",
+          "completed_at": "2026-11-10T04:01:10Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/129621159267",
+          "details_url": "https://coderabbit.ai"
+        },
+        {
+          "id": 129621143720,
+          "name": "Socket Security: Pull Request Alerts",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-10T04:01:06Z",
+          "completed_at": "2026-11-10T04:01:08Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/129621143720",
+          "details_url": "https://socket.dev"
+        },
+        {
+          "id": 129621126538,
+          "name": "Socket Security: Project Report",
+          "app": "socket-security",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-10T04:01:03Z",
+          "completed_at": "2026-11-10T04:01:05Z",
+          "check_url": "https://github.com/lolotam/curemedkw/runs/129621126538",
+          "details_url": "https://socket.dev/dashboard/org/lolotam/sbom/0f5eed84-f87d-4591-ba37-c836761127c6"
+        }
+      ],
+      "check_count": 3,
+      "check_query_error": null
+    }
+  ]
+}
