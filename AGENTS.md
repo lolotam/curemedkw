@@ -48,3 +48,19 @@ Report the active plan in three parts: «ما تم» (main tasks done, with PR n
 ## Boundaries
 
 Production, server, secrets and HOLD decisions stay Waleed's. These tiers add routing and merge-speed rules on top of the existing project gates; every gate already in force stays in force (including the CI standing rule of 2026-11-18 when it lands), and a tier never removes a coverage or review requirement the project mandates.
+
+## Canonical CureMed manager guidance: CI — owner instruction, 2026-11-18
+
+This section is the project record of Waleed's standing CI instruction. The applicability assessment, baseline evidence and measurement protocol are in [docs/ci/standing-instruction-2026-11-18.md](docs/ci/standing-instruction-2026-11-18.md). Track execution and the two-week review in [issue #43](https://github.com/lolotam/curemedkw/issues/43), due **2026-12-02, Asia/Kuwait**. Responsible execution owner: **CureMed project manager**; accountable owner and approval decisions: **Waleed (@lolotam)**.
+
+- Inspect the actual workflows and critical path before changing CI. Start independent builds and browser checks as soon as their real prerequisites finish; do not serialize them behind unrelated suites.
+- Split slow independent suites into isolated shards without dropping tests, weakening coverage or losing failure propagation. Every required outcome must reach the final merge gate; cancellation, skipped jobs and failed shards must not produce a false green gate.
+- Where multiple Docker targets exist, reuse their shared stage and begin with at most two parallel builds only after checking runner memory. Record resource pressure and adjust based on evidence.
+- Evaluate main-only staging image builds separately. Document any loss of pre-merge coverage and obtain applicable owner approval before moving that check. A CI speed target never authorizes loss of coverage.
+- Keep workflow changes in a dedicated reviewed CI PR, separate from product work. Preserve release, deployment, security, migration, HOLD and freeze controls. Frozen projects may record this instruction and defer execution until explicitly resumed.
+- Record why each technique does not apply. Do not invent parallelism, jobs, benchmarks or before/after gains when there is no measured pipeline.
+- Save baseline run links now, aiming for five comparable successful first-attempt code-PR runs. Compare with five after rollout; separate main runs, reruns and differing runner/cache conditions. Keep failed attempts in reliability accounting rather than concealing them through the successful sample filter.
+- Measure wall-clock time to the required gate, aggregate runner minutes, failures/retries and observed resource pressure. Report sample sizes, medians, absolute and percentage time changes and material cost/reliability tradeoffs. Unknown runner cost or retry history is not zero.
+- Recheck after two weeks and give Waleed one before/after report. When volume or observability is insufficient, report the available sample and its limits. Record actual rollout date and a two-week post-rollout due date if rollout occurs after the initial review date; keep the initial status review.
+
+Recording this instruction does not activate a workflow, authorize production operations or claim that these local records are already merged. The initial assessment found no repository GitHub Actions workflows or Actions runs; see the evidence and tracker for the concrete baseline blocker.
